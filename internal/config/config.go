@@ -149,6 +149,20 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WV_MASTER_PASS"); v != "" {
 		cfg.Vault.MasterPass = v
 	}
+	if v := os.Getenv("WV_PROXY_PORT"); v != "" {
+		var p int
+		fmt.Sscanf(v, "%d", &p)
+		if p > 0 {
+			cfg.Proxy.Port = p
+		}
+	}
+	if v := os.Getenv("WV_VAULT_PORT"); v != "" {
+		var p int
+		fmt.Sscanf(v, "%d", &p)
+		if p > 0 {
+			cfg.Vault.Port = p
+		}
+	}
 	// 레거시 호환 (OpenClaw 환경변수)
 	if v := os.Getenv("VAULT_URL"); v != "" && cfg.Proxy.VaultURL == "" {
 		cfg.Proxy.VaultURL = v

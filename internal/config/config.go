@@ -179,6 +179,12 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("VAULT_CLIENT_ID"); v != "" {
 		cfg.Proxy.ClientID = v
 	}
+	// Windows: APPDATA 기반 데이터 경로 자동 설정
+	if cfg.Vault.DataDir == "" {
+		if appdata := os.Getenv("APPDATA"); appdata != "" {
+			cfg.Vault.DataDir = filepath.Join(appdata, "wall-vault", "data")
+		}
+	}
 }
 
 // Save: 설정 파일 저장

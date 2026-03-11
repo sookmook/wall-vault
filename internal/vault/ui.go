@@ -40,6 +40,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(bots)
 	sb.WriteString(keyCard)
 	sb.WriteString(clientCard)
+	sb.WriteString(buildAddKeyModal())
 	sb.WriteString(`</div>
 <div class="footer">
   wall-vault v0.1.0 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
@@ -96,7 +97,17 @@ a{color:var(--accent);text-decoration:none}
 .model-form select,.model-form input{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.3rem .6rem;border-radius:4px;font-size:.8rem;width:100%;margin-bottom:.4rem;font-family:inherit}
 .btn{background:var(--accent);color:#fff;border:none;padding:.3rem .8rem;border-radius:4px;cursor:pointer;font-size:.8rem;font-family:inherit}
 .btn:hover{background:var(--accent-hover)}
-.footer{text-align:center;color:var(--text-muted);font-size:.72rem;margin-top:1.5rem;padding-top:.8rem;border-top:1px solid var(--border)}`
+.btn-sm{background:transparent;color:var(--accent);border:1px solid var(--accent);padding:.15rem .5rem;border-radius:4px;cursor:pointer;font-size:.72rem;font-family:inherit;margin-left:.5rem}
+.btn-sm:hover{background:var(--accent);color:#fff}
+.footer{text-align:center;color:var(--text-muted);font-size:.72rem;margin-top:1.5rem;padding-top:.8rem;border-top:1px solid var(--border)}
+.modal-overlay{display:none;position:fixed;inset:0;background:#00000088;z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;min-width:320px;max-width:90vw}
+.modal h3{color:var(--accent);margin-bottom:1rem;font-size:1rem}
+.modal label{display:block;color:var(--text-muted);font-size:.78rem;margin:.6rem 0 .2rem}
+.modal input,.modal select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.35rem .6rem;border-radius:4px;font-size:.82rem;width:100%;font-family:inherit}
+.modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end}
+.msg{font-size:.78rem;margin-top:.5rem;min-height:1rem}`
 }
 
 func buildJS() string {
@@ -133,24 +144,67 @@ function connectSSE() {
 }
 connectSSE();
 
+// Admin Token 헬퍼
+function getAdminToken() {
+  let token = localStorage.getItem('wv_admin_token');
+  if (!token) {
+    token = prompt('Admin Token (저장됨):');
+    if (!token) return null;
+    localStorage.setItem('wv_admin_token', token);
+  }
+  return token;
+}
+function clearAdminToken() { localStorage.removeItem('wv_admin_token'); }
+
+// 키 추가 모달
+function openAddKey() {
+  document.getElementById('modal-addkey').classList.add('open');
+  document.getElementById('ak-msg').textContent = '';
+  document.getElementById('ak-key').value = '';
+  document.getElementById('ak-label').value = '';
+  document.getElementById('ak-limit').value = '0';
+}
+function closeAddKey() {
+  document.getElementById('modal-addkey').classList.remove('open');
+}
+function submitAddKey() {
+  const token = getAdminToken();
+  if (!token) return;
+  const svc = document.getElementById('ak-service').value;
+  const key = document.getElementById('ak-key').value.trim();
+  const label = document.getElementById('ak-label').value.trim();
+  const limit = parseInt(document.getElementById('ak-limit').value) || 0;
+  if (!key) { document.getElementById('ak-msg').textContent = '키를 입력하세요'; return; }
+  document.getElementById('ak-msg').textContent = '추가 중...';
+  fetch('/admin/keys', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body: JSON.stringify({service:svc, key:key, label:label, daily_limit:limit})
+  }).then(r => r.json()).then(d => {
+    if (d.error) {
+      if (d.error === 'unauthorized') { clearAdminToken(); alert('토큰 오류'); }
+      else document.getElementById('ak-msg').textContent = '오류: '+d.error;
+    } else {
+      closeAddKey();
+      setTimeout(() => location.reload(), 500);
+    }
+  }).catch(e => { document.getElementById('ak-msg').textContent = '오류: '+e; });
+}
+
 // 모델 변경
 function changeModel(clientId) {
   const svc = document.getElementById('svc-'+clientId).value;
   const model = document.getElementById('mdl-'+clientId).value.trim();
   if (!model) return alert('모델명을 입력하세요');
-  let token = localStorage.getItem('wv_admin_token');
-  if (!token) {
-    token = prompt('Admin Token:');
-    if (!token) return;
-    localStorage.setItem('wv_admin_token', token);
-  }
+  const token = getAdminToken();
+  if (!token) return;
   fetch('/admin/clients/'+clientId, {
     method: 'PUT',
     headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
     body: JSON.stringify({default_service:svc, default_model:model})
   }).then(r => r.json()).then(d => {
     if (d.error) {
-      if (d.error === 'unauthorized') { localStorage.removeItem('wv_admin_token'); alert('토큰 오류'); }
+      if (d.error === 'unauthorized') { clearAdminToken(); alert('토큰 오류'); }
       else alert('오류: '+d.error);
     } else { location.reload(); }
   });
@@ -186,7 +240,10 @@ func buildBotsCard(proxies []*ProxyStatus) string {
 
 func buildKeysCard(keys []*APIKey) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(`<div class="card"><h2>🔑 API 키 <span class="count">%d개</span></h2>`, len(keys)))
+	sb.WriteString(fmt.Sprintf(
+		`<div class="card"><h2>🔑 API 키 <span class="count">%d개</span><button class="btn-sm" onclick="openAddKey()">+ 추가</button></h2>`,
+		len(keys),
+	))
 
 	if len(keys) == 0 {
 		sb.WriteString(`<div style="color:var(--text-muted);font-size:.82rem">등록된 키 없음</div></div>`)
@@ -298,4 +355,30 @@ func sel(b bool) string {
 		return " selected"
 	}
 	return ""
+}
+
+func buildAddKeyModal() string {
+	return `
+<div class="modal-overlay" id="modal-addkey" onclick="if(event.target===this)closeAddKey()">
+<div class="modal">
+  <h3>🔑 API 키 추가</h3>
+  <label>서비스</label>
+  <select id="ak-service">
+    <option value="google">google</option>
+    <option value="openrouter">openrouter</option>
+    <option value="ollama">ollama</option>
+  </select>
+  <label>API 키</label>
+  <input id="ak-key" type="password" placeholder="AIzaSy... 또는 sk-or-..." autocomplete="off">
+  <label>레이블 (선택)</label>
+  <input id="ak-label" type="text" placeholder="my-key-1">
+  <label>일일 한도 (0 = 무제한)</label>
+  <input id="ak-limit" type="number" value="0" min="0">
+  <div class="msg" id="ak-msg"></div>
+  <div class="modal-btns">
+    <button class="btn" style="background:var(--surface);color:var(--text)" onclick="closeAddKey()">취소</button>
+    <button class="btn" onclick="submitAddKey()">추가</button>
+  </div>
+</div>
+</div>`
 }

@@ -13,13 +13,16 @@ import (
 // ─── 최상위 설정 ────────────────────────────────────────────────────────────
 
 type Config struct {
-	Mode    string      `yaml:"mode"`    // standalone | distributed
-	Lang    string      `yaml:"lang"`    // ko | en | ja
-	Theme   string      `yaml:"theme"`   // sakura | dark | light | ocean
-	Proxy   ProxyConfig `yaml:"proxy"`
-	Vault   VaultConfig `yaml:"vault"`
+	Mode    string       `yaml:"mode"`    // standalone | distributed
+	Lang    string       `yaml:"lang"`    // ko | en | ja
+	Theme   string       `yaml:"theme"`   // sakura | dark | light | ocean
+	Proxy   ProxyConfig  `yaml:"proxy"`
+	Vault   VaultConfig  `yaml:"vault"`
 	Doctor  DoctorConfig `yaml:"doctor"`
-	Hooks   HooksConfig `yaml:"hooks"`
+	Hooks   HooksConfig  `yaml:"hooks"`
+
+	// 런타임 전용 — YAML 직렬화 제외 (LoadPlugins로 채워짐)
+	Plugins []ServicePlugin `yaml:"-"`
 }
 
 // ─── 프록시 설정 ─────────────────────────────────────────────────────────────
@@ -122,11 +125,14 @@ func Load(path string) (*Config, error) {
 		}
 		// 환경변수 덮어쓰기
 		applyEnv(cfg)
+		// 서비스 플러그인 로드
+		cfg.Plugins, _ = LoadPlugins(cfg.Vault.ServicesDir)
 		return cfg, nil
 	}
 
 	// 설정 파일 없음 — 기본값
 	applyEnv(cfg)
+	cfg.Plugins, _ = LoadPlugins(cfg.Vault.ServicesDir)
 	return cfg, nil
 }
 

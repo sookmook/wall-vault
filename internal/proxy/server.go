@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -17,32 +18,38 @@ import (
 
 // Server: 프록시 HTTP 서버
 type Server struct {
-	cfg        *config.Config
-	mu         sync.RWMutex
-	service    string
-	model      string
-	keyMgr     *KeyManager
-	filter     *ToolFilter
-	sse        *SSEClient
-	registry   *models.Registry
-	ollamaMu   sync.Mutex // 단일 Ollama 동시 요청 보호
+	cfg      *config.Config
+	mu       sync.RWMutex
+	service  string
+	model    string
+	keyMgr   *KeyManager
+	filter   *ToolFilter
+	sse      *SSEClient
+	registry *models.Registry
+	ollamaMu sync.Mutex // 단일 Ollama 동시 요청 보호
 }
 
 func NewServer(cfg *config.Config) *Server {
+	// 기본 서비스 결정
+	defaultSvc := "ollama"
+	if len(cfg.Proxy.Services) > 0 {
+		defaultSvc = cfg.Proxy.Services[0]
+	}
+
 	s := &Server{
 		cfg:      cfg,
-		service:  cfg.Proxy.Services[0], // 첫 번째 서비스가 기본값
+		service:  defaultSvc,
 		model:    "",
 		registry: models.NewRegistry(10 * time.Minute),
 	}
 
-	// 키 매니저
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
-
-	// 도구 필터
 	s.filter = NewToolFilter(FilterMode(cfg.Proxy.ToolFilter), cfg.Proxy.AllowedTools)
 
-	// SSE 클라이언트 (distributed 모드)
+	// 환경변수에서 키 로드 (standalone 모드)
+	s.keyMgr.LoadFromEnv()
+
+	// distributed 모드: 금고에서 키 동기화
 	if cfg.Proxy.VaultURL != "" {
 		s.sse = NewSSEClient(cfg.Proxy.VaultURL, cfg.Proxy.ClientID, func(svc, mdl string) {
 			s.mu.Lock()
@@ -55,21 +62,84 @@ func NewServer(cfg *config.Config) *Server {
 			s.mu.Unlock()
 		})
 		s.sse.Start()
+
+		// 금고에서 클라이언트 설정 및 키 초기 로드
+		go func() {
+			time.Sleep(2 * time.Second)
+			s.syncFromVault()
+		}()
+
+		// 주기적 키 동기화 (5분마다)
+		go func() {
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				s.syncFromVault()
+			}
+		}()
+
+		// Heartbeat 시작
+		s.startHeartbeat()
 	}
 
 	// 모델 레지스트리 초기화 (비동기)
 	go func() {
-		ollamaURL := ""
-		for _, svc := range cfg.Proxy.Services {
-			if svc == "ollama" {
-				ollamaURL = "http://localhost:11434"
-				break
-			}
-		}
+		ollamaURL := s.ollamaURL()
 		s.registry.Refresh(cfg.Proxy.Services, ollamaURL, "")
 	}()
 
 	return s
+}
+
+// syncFromVault: 금고에서 클라이언트 설정·키 동기화
+func (s *Server) syncFromVault() {
+	// 클라이언트 설정 조회
+	url := fmt.Sprintf("%s/api/clients", s.cfg.Proxy.VaultURL)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Printf("[sync] 금고 연결 실패: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var clients []struct {
+		ID             string `json:"id"`
+		DefaultService string `json:"default_service"`
+		DefaultModel   string `json:"default_model"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
+		return
+	}
+	for _, c := range clients {
+		if c.ID == s.cfg.Proxy.ClientID {
+			s.mu.Lock()
+			if c.DefaultService != "" {
+				s.service = c.DefaultService
+			}
+			if c.DefaultModel != "" {
+				s.model = c.DefaultModel
+			}
+			s.mu.Unlock()
+			log.Printf("[sync] 설정 로드: %s/%s", c.DefaultService, c.DefaultModel)
+			break
+		}
+	}
+
+	// 키 동기화
+	if err := s.keyMgr.SyncFromVault(); err != nil {
+		log.Printf("[sync] 키 동기화 실패: %v", err)
+	}
+}
+
+// ollamaURL: 설정·환경변수에서 Ollama URL 반환
+func (s *Server) ollamaURL() string {
+	if v := os.Getenv("OLLAMA_URL"); v != "" {
+		return v
+	}
+	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
+		return v
+	}
+	return "http://localhost:11434"
 }
 
 func (s *Server) Handler() http.Handler {
@@ -81,10 +151,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/config/think-mode", s.handleThinkMode)
 	mux.HandleFunc("/reload", s.handleReload)
 
-	// Gemini API 호환
-	mux.HandleFunc("/google/", s.handleGemini)
+	// Gemini API — 비스트리밍
+	mux.HandleFunc("/google/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "streamGenerateContent") {
+			s.handleGeminiStream(w, r)
+		} else {
+			s.handleGemini(w, r)
+		}
+	})
 
-	// OpenAI API 호환
+	// OpenAI 호환
 	mux.HandleFunc("/v1/chat/completions", s.handleOpenAI)
 
 	return mux
@@ -106,10 +182,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	mdl := s.model
 	s.mu.RUnlock()
 
-	sseConn := false
-	if s.sse != nil {
-		sseConn = s.sse.IsConnected()
-	}
+	sseConn := s.sse != nil && s.sse.IsConnected()
 
 	jsonOK(w, map[string]interface{}{
 		"status":   "ok",
@@ -120,11 +193,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"sse":      sseConn,
 		"filter":   s.cfg.Proxy.ToolFilter,
 		"services": s.cfg.Proxy.Services,
+		"mode":     s.cfg.Mode,
 	})
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
-	all := s.registry.All("")
+	svc := r.URL.Query().Get("service")
+	all := s.registry.All(svc)
 	jsonOK(w, map[string]interface{}{
 		"models": all,
 		"count":  len(all),
@@ -157,17 +232,15 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleThinkMode(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]string{"status": "ok", "note": "think mode not implemented"})
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
-	if s.sse != nil {
-		// SSE 재연결은 자동이므로 여기서는 설정 재로드만
-	}
-	jsonOK(w, map[string]string{"status": "reloaded"})
+	go s.syncFromVault()
+	jsonOK(w, map[string]string{"status": "reloading"})
 }
 
-// ─── Gemini API 핸들러 ────────────────────────────────────────────────────────
+// ─── Gemini API 핸들러 (비스트리밍) ──────────────────────────────────────────
 
 func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -187,7 +260,6 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 도구 필터 적용
 	stripped := s.filter.FilterGemini(&req)
 	if stripped > 0 {
 		log.Printf("[Security] 요청에서 %d개 도구 차단 (client=%s)", stripped, s.cfg.Proxy.ClientID)
@@ -198,12 +270,9 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	mdl := s.model
 	s.mu.RUnlock()
 
-	// URL에서 모델 추출 (Gemini API 경로)
 	if urlModel := extractModelFromPath(r.URL.Path); urlModel != "" {
-		if mdl == "" || strings.HasPrefix(urlModel, "gemini-") {
-			if svc == "" || strings.HasPrefix(urlModel, "gemini-") {
-				svc = "google"
-			}
+		if strings.HasPrefix(urlModel, "gemini-") {
+			svc = "google"
 			mdl = urlModel
 		}
 	}
@@ -214,15 +283,11 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[proxy] 오류: %v", err)
 		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": map[string]interface{}{
-				"code":    502,
-				"message": err.Error(),
-			},
+		json.NewEncoder(w).Encode(GeminiResponse{
+			Error: &GeminiError{Code: 502, Message: err.Error()},
 		})
 		return
 	}
-
 	json.NewEncoder(w).Encode(resp)
 }
 
@@ -239,8 +304,6 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-
-	// 도구 필터
 	s.filter.FilterOpenAI(&oaiReq)
 
 	s.mu.RLock()
@@ -251,7 +314,6 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		mdl = oaiReq.Model
 	}
 
-	// OpenAI → Gemini 변환 후 dispatch
 	geminiReq := OpenAIToGemini(&oaiReq)
 	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
 	if err != nil {
@@ -259,7 +321,6 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Gemini → OpenAI 응답 변환
 	oaiResp := &OpenAIResponse{}
 	for _, c := range geminiResp.Candidates {
 		oaiResp.Choices = append(oaiResp.Choices, OpenAIChoice{
@@ -268,7 +329,6 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			Index:        c.Index,
 		})
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(oaiResp)
 }
@@ -276,27 +336,38 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 // ─── 요청 분배 ────────────────────────────────────────────────────────────────
 
 func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiResponse, error) {
-	switch service {
-	case "google":
-		return s.callGoogle(model, req)
-	case "openrouter":
-		return s.callOpenRouter(model, req)
-	case "ollama":
-		return s.callOllama(model, req)
-	default:
-		// 서비스 순서대로 폴백
-		for _, svc := range s.cfg.Proxy.Services {
-			resp, err := s.dispatch(svc, model, req)
-			if err == nil {
-				return resp, nil
-			}
-			log.Printf("[proxy] %s 실패, 폴백: %v", svc, err)
+	var lastErr error
+	// 지정 서비스 먼저 시도
+	tryOrder := []string{service}
+	for _, svc := range s.cfg.Proxy.Services {
+		if svc != service {
+			tryOrder = append(tryOrder, svc)
 		}
-		return nil, fmt.Errorf("모든 서비스 실패")
 	}
+
+	for _, svc := range tryOrder {
+		var resp *GeminiResponse
+		var err error
+		switch svc {
+		case "google":
+			resp, err = s.callGoogle(model, req)
+		case "openrouter":
+			resp, err = s.callOpenRouter(model, req)
+		case "ollama":
+			resp, err = s.callOllama(model, req)
+		default:
+			continue
+		}
+		if err == nil {
+			return resp, nil
+		}
+		log.Printf("[proxy] %s 실패 → 폴백: %v", svc, err)
+		lastErr = err
+	}
+	return nil, fmt.Errorf("모든 서비스 실패: %v", lastErr)
 }
 
-// ─── Google Gemini 호출 ───────────────────────────────────────────────────────
+// ─── Google Gemini ────────────────────────────────────────────────────────────
 
 func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	key, plainKey, err := s.getKey("google")
@@ -305,7 +376,6 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 	}
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, plainKey)
-
 	data, _ := json.Marshal(req)
 	resp, err := s.doRequest("POST", url, data, nil)
 	if err != nil {
@@ -325,9 +395,8 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 		return nil, fmt.Errorf("Google 응답 파싱 오류: %w", err)
 	}
 	if geminiResp.Error != nil {
-		return nil, fmt.Errorf("Google API: %s", geminiResp.Error.Message)
+		return nil, fmt.Errorf("Google: %s", geminiResp.Error.Message)
 	}
-
 	tokens := 0
 	if geminiResp.UsageMetadata != nil {
 		tokens = geminiResp.UsageMetadata.TotalTokenCount
@@ -336,7 +405,7 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 	return &geminiResp, nil
 }
 
-// ─── OpenRouter 호출 ─────────────────────────────────────────────────────────
+// ─── OpenRouter ───────────────────────────────────────────────────────────────
 
 func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	key, plainKey, err := s.getKey("openrouter")
@@ -346,7 +415,6 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 
 	oaiReq := GeminiToOpenAI(model, req)
 	data, _ := json.Marshal(oaiReq)
-
 	headers := map[string]string{
 		"Authorization": "Bearer " + plainKey,
 		"HTTP-Referer":  "https://github.com/sookmook/wall-vault",
@@ -361,7 +429,7 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 
 	if resp.StatusCode != http.StatusOK {
 		s.keyMgr.RecordError(key, resp.StatusCode)
-		return nil, fmt.Errorf("OpenRouter API 오류: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("OpenRouter 오류: HTTP %d", resp.StatusCode)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
@@ -372,7 +440,6 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 	if oaiResp.Error != nil {
 		return nil, fmt.Errorf("OpenRouter: %s", oaiResp.Error.Message)
 	}
-
 	tokens := 0
 	if oaiResp.Usage != nil {
 		tokens = oaiResp.Usage.TotalTokens
@@ -381,27 +448,23 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 	return OpenAIRespToGemini(&oaiResp), nil
 }
 
-// ─── Ollama 호출 (뮤텍스로 단일 동시 요청) ──────────────────────────────────
+// ─── Ollama (뮤텍스로 단일 동시 요청) ────────────────────────────────────────
 
 func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	if model == "" {
 		model = "qwen3.5:35b"
 	}
+	ollamaURL := s.ollamaURL()
 
-	// 단일 동시 요청 제한
 	s.ollamaMu.Lock()
 	defer s.ollamaMu.Unlock()
-
-	ollamaURL := "http://localhost:11434"
-	// 환경변수에서 URL 가져오기
-	// TODO: cfg에서 가져오기
 
 	ollamaReq := GeminiToOllama(model, req)
 	data, _ := json.Marshal(ollamaReq)
 
 	resp, err := s.doRequest("POST", ollamaURL+"/api/chat", data, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Ollama 연결 실패: %w", err)
+		return nil, fmt.Errorf("Ollama 연결 실패 (%s): %w", ollamaURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -428,7 +491,6 @@ func (s *Server) doRequest(method, url string, body []byte, headers map[string]s
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-
 	client := &http.Client{Timeout: s.cfg.Proxy.Timeout}
 	return client.Do(req)
 }
@@ -444,7 +506,6 @@ func (s *Server) getKey(service string) (*localKey, string, error) {
 // ─── 유틸 ────────────────────────────────────────────────────────────────────
 
 func extractModelFromPath(path string) string {
-	// /google/v1beta/models/{model}:generateContent
 	prefix := "/google/v1beta/models/"
 	if !strings.HasPrefix(path, prefix) {
 		return ""

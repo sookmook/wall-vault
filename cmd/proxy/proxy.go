@@ -16,9 +16,14 @@ import (
 // Run: wall-vault proxy [flags]
 func Run(args []string) {
 	fs := flag.NewFlagSet("proxy", flag.ExitOnError)
-	cfgPath := fs.String("config", "", "설정 파일 경로")
-	port := fs.Int("port", 0, "포트 (기본 56244)")
-	clientID := fs.String("id", "", "클라이언트 ID")
+	cfgPath    := fs.String("config",       "",  "설정 파일 경로")
+	port       := fs.Int("port",            0,   "포트 (기본 56244)")
+	clientID   := fs.String("id",           "",  "클라이언트 ID")
+	keyGoogle  := fs.String("key-google",   "",  "Google API 키 (env: WV_KEY_GOOGLE)")
+	keyOR      := fs.String("key-openrouter","", "OpenRouter API 키 (env: WV_KEY_OPENROUTER)")
+	vaultURL   := fs.String("vault",        "",  "금고 서버 URL (env: WV_VAULT_URL)")
+	vaultToken := fs.String("vault-token",  "",  "금고 인증 토큰 (env: WV_VAULT_TOKEN)")
+	filter     := fs.String("filter",       "",  "도구 필터: strip_all|whitelist|passthrough")
 
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, `wall-vault proxy — AI API 프록시 서버
@@ -38,11 +43,36 @@ func Run(args []string) {
 	if err != nil {
 		log.Fatalf("설정 오류: %v", err)
 	}
+
+	// 플래그 덮어쓰기 (우선순위: 플래그 > 환경변수 > 설정 파일)
 	if *port > 0 {
 		cfg.Proxy.Port = *port
 	}
 	if *clientID != "" {
 		cfg.Proxy.ClientID = *clientID
+	}
+	if *vaultURL != "" {
+		cfg.Proxy.VaultURL = *vaultURL
+	}
+	if *vaultToken != "" {
+		cfg.Proxy.VaultToken = *vaultToken
+	}
+	if *filter != "" {
+		cfg.Proxy.ToolFilter = *filter
+	}
+
+	// API 키: 플래그 → 환경변수 순서로 적용
+	if v := *keyGoogle; v == "" {
+		v = os.Getenv("WV_KEY_GOOGLE")
+		_ = v
+	} else {
+		os.Setenv("WV_KEY_GOOGLE", v)
+	}
+	if v := *keyOR; v == "" {
+		v = os.Getenv("WV_KEY_OPENROUTER")
+		_ = v
+	} else {
+		os.Setenv("WV_KEY_OPENROUTER", v)
 	}
 
 	runProxy(cfg)

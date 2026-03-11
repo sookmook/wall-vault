@@ -188,6 +188,27 @@ func tryFetchOllama(client *http.Client, base string) ([]Model, error) {
 	return out, nil
 }
 
+// NeedsRefresh: TTL이 만료됐거나 한 번도 갱신되지 않았으면 true
+func (r *Registry) NeedsRefresh() bool {
+	return r.updatedAt.IsZero() || time.Since(r.updatedAt) >= r.ttl
+}
+
+// Search: 모델 ID·이름에서 query(대소문자 무시) 포함 여부로 필터링
+func (r *Registry) Search(query string) []Model {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return r.models
+	}
+	out := make([]Model, 0)
+	for _, m := range r.models {
+		if strings.Contains(strings.ToLower(m.ID), q) ||
+			strings.Contains(strings.ToLower(m.Name), q) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // FetchOllamaPublic: 설정 없이도 Ollama 목록 조회 (초보자용 setup wizard)
 func FetchOllamaPublic(ollamaURL string) ([]Model, error) {
 	client := &http.Client{Timeout: 5 * time.Second}

@@ -1,0 +1,101 @@
+# Changelog
+
+wall-vault의 모든 주요 변경 사항을 기록합니다.
+형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.0.0/)를 따릅니다.
+
+---
+
+## [Unreleased]
+
+### 추가
+- `cmd/proxy`: `--key-google`, `--key-openrouter`, `--vault`, `--vault-token`, `--filter` 플래그 추가
+- `internal/models`: `Registry.NeedsRefresh()` TTL 만료 여부 확인, `Registry.Search(query)` 모델 검색
+- `internal/i18n`: 단위 테스트 8개 (언어별 번역·폴백·로케일 문자열·누락 키 검출)
+
+---
+
+## [0.1.0] — 2026-03-11
+
+### 초기 릴리스 (단일 Go 바이너리)
+
+#### 아키텍처
+- **단일 바이너리** `wall-vault` — 서브커맨드 방식 (start / proxy / vault / doctor / setup)
+- **standalone / distributed** 두 가지 운용 모드
+- **SSE(Server-Sent Events)** 실시간 설정 동기화 (금고 → 프록시, 1–3초 이내 반영)
+- **AES-GCM 암호화** — 마스터 비밀번호 기반 API 키 영속화
+
+#### 서브커맨드
+
+| 커맨드 | 설명 |
+|--------|------|
+| `wall-vault start` | 프록시 + 키 금고 동시 실행 (standalone) |
+| `wall-vault proxy` | 프록시 단독 실행 |
+| `wall-vault vault` | 키 금고 단독 실행 |
+| `wall-vault doctor` | 헬스체크 및 자동복구 |
+| `wall-vault setup` | 대화형 설치 마법사 |
+
+#### 프록시 기능
+- **Google Gemini / OpenRouter / Ollama** 동시 지원
+- **라운드 로빈 키 관리** — `idx map[string]int`로 서비스별 인덱스 추적
+- **쿨다운 관리** — 429: 30분, 400/401/403: 24시간, 네트워크 오류: 10분
+- **도구 보안 필터** — strip_all / whitelist / passthrough
+- **폴백 체인** — Google → OpenRouter → Ollama
+- **훅 시스템** — 모델 변경·키 소진·서비스 다운 시 셸 명령 실행
+- **OpenClaw 소켓** 연동 지원
+
+#### 키 금고 (Vault)
+- **REST API** — `/api/keys`, `/api/clients`, `/api/status`
+- **SSE 브로드캐스트** — `/api/events` 엔드포인트
+- **웹 대시보드** — 테마(sakura/dark/light/ocean), 키 CRUD, 클라이언트 관리
+- **관리자 토큰** 기반 인증
+
+#### Doctor (헬스체크/자동복구)
+- `doctor check` / `fix` / `status` / `all` / `deploy` 서브커맨드
+- 자동복구 우선순위: **systemd → launchd → NSSM(Windows) → 직접 프로세스**
+- `deploy` — systemd / launchd / NSSM 서비스 파일 자동 생성
+
+#### Setup 마법사
+- **세계 10대 언어** — ko/en/zh/es/hi/ar/pt/fr/de/ja
+- 테마·모드·포트·서비스·도구 필터·보안 토큰 대화형 구성
+- Ollama 서버 자동 연결 및 모델 목록 조회
+- `crypto/rand` 기반 안전한 관리자 토큰 자동 생성
+
+#### 다국어 (i18n)
+- 세계 10대 언어 지원
+- LANG / WV_LANG 환경변수 자동 감지
+- 로케일 문자열 파싱 (e.g. `ko_KR.UTF-8` → `ko`)
+- 영어 폴백 보장
+
+#### 플랫폼 지원
+- **Linux** (amd64 / arm64)
+- **macOS** (amd64 / arm64, Apple Silicon)
+- **Windows** (amd64, NSSM 서비스 지원)
+- **WSL** 완벽 지원
+
+#### 모델 레지스트리
+- Google: 6개 고정 모델 (Gemini 1.5/2.0/2.5)
+- OpenRouter: 346개+ 동적 조회
+- Ollama: 로컬 서버 자동 탐지
+- TTL 기반 캐시 (기본 10분)
+- 대소문자 무시 모델 ID/이름 검색
+
+#### 서비스 플러그인
+- `~/.wall-vault/services/*.yaml` 기반 외부 서비스 플러그인 로더
+- `enabled: true/false` 필드로 런타임 활성화 제어
+
+#### 테스트 (39개, 전부 PASS)
+- `crypto_test.go` — AES-GCM 암호화·복호화·랜덤 nonce (5개)
+- `toolfilter_test.go` — strip_all·whitelist·passthrough (5개)
+- `convert_test.go` — Gemini↔OpenAI↔Ollama 포맷 변환 (6개)
+- `services_test.go` — 플러그인 로더 엣지 케이스 (5개)
+- `keymgr_test.go` — 라운드 로빈·쿨다운·일일한도 (8개)
+- `store_test.go` — 키/클라이언트 CRUD·영속화 (10개)
+
+#### CI/CD
+- GitHub Actions CI — push/PR 시 vet + test + 4플랫폼 크로스컴파일
+- GitHub Actions Release — v* 태그 시 자동 GitHub Release 생성
+
+---
+
+[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sookmook/wall-vault/releases/tag/v0.1.0

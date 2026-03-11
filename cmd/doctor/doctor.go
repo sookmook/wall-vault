@@ -96,7 +96,12 @@ func Run(args []string) {
 				fmt.Fprintf(os.Stderr, "[deploy] 오류: %v\n", err)
 				os.Exit(1)
 			}
-		default: // systemd
+		case "nssm", "windows":
+			if err := idoctor.GenerateNSSMScript(cfg); err != nil {
+				fmt.Fprintf(os.Stderr, "[deploy] 오류: %v\n", err)
+				os.Exit(1)
+			}
+		default: // systemd (Linux/WSL)
 			if err := idoctor.GenerateSystemdService(cfg); err != nil {
 				fmt.Fprintf(os.Stderr, "[deploy] 오류: %v\n", err)
 				os.Exit(1)

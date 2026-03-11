@@ -77,7 +77,7 @@ func Fix(cfg *config.Config) error {
 		return nil
 	}
 
-	// 1순위: systemd
+	// 1순위: systemd (Linux/WSL)
 	if isSystemd() {
 		return fixSystemd(cfg)
 	}
@@ -87,7 +87,14 @@ func Fix(cfg *config.Config) error {
 		return fixLaunchd()
 	}
 
-	// 3순위: 직접 프로세스 시작
+	// 3순위: NSSM (Windows 네이티브)
+	if runtime.GOOS == "windows" {
+		if err := fixNSSM(); err == nil {
+			return nil
+		}
+	}
+
+	// 4순위: 직접 프로세스 시작
 	return fixDirect(cfg)
 }
 
@@ -135,6 +142,19 @@ func fixLaunchd() error {
 	return cmd.Run()
 }
 
+// ─── NSSM 복구 (Windows) ──────────────────────────────────────────────────────
+
+func fixNSSM() error {
+	if _, err := exec.LookPath("nssm"); err != nil {
+		return fmt.Errorf("nssm 없음")
+	}
+	fmt.Println("[fix] NSSM 서비스 재시작: wall-vault")
+	cmd := exec.Command("nssm", "restart", "wall-vault")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // ─── 직접 프로세스 시작 ───────────────────────────────────────────────────────
 
 func fixDirect(cfg *config.Config) error {
@@ -160,12 +180,23 @@ func findBinary() string {
 	if exe, err := os.Executable(); err == nil {
 		return exe
 	}
-	// 2. ~/.local/bin
+	// 2. 플랫폼별 후보 경로
 	home, _ := os.UserHomeDir()
 	candidates := []string{
+		// Linux / WSL
 		filepath.Join(home, ".local", "bin", "wall-vault"),
 		filepath.Join(home, "go", "bin", "wall-vault"),
 		"/usr/local/bin/wall-vault",
+		// macOS (Homebrew prefix)
+		"/opt/homebrew/bin/wall-vault",
+		"/usr/local/bin/wall-vault",
+	}
+	// Windows
+	if runtime.GOOS == "windows" {
+		candidates = append(candidates,
+			filepath.Join(home, "AppData", "Local", "Programs", "wall-vault", "wall-vault.exe"),
+			`C:\Program Files\wall-vault\wall-vault.exe`,
+		)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
@@ -173,7 +204,11 @@ func findBinary() string {
 		}
 	}
 	// 3. PATH
-	if p, err := exec.LookPath("wall-vault"); err == nil {
+	bin := "wall-vault"
+	if runtime.GOOS == "windows" {
+		bin = "wall-vault.exe"
+	}
+	if p, err := exec.LookPath(bin); err == nil {
 		return p
 	}
 	return ""
@@ -270,6 +305,42 @@ func GenerateLaunchdPlist(cfg *config.Config) error {
 	fmt.Printf("[deploy] launchd plist 생성: %s\n", path)
 	fmt.Println("[deploy] 다음 명령으로 등록:")
 	fmt.Printf("  launchctl load %s\n", path)
+	return nil
+}
+
+// GenerateNSSMScript: Windows NSSM 서비스 등록 스크립트 생성
+func GenerateNSSMScript(cfg *config.Config) error {
+	bin := findBinary()
+	if bin == "" {
+		bin = `C:\Program Files\wall-vault\wall-vault.exe`
+	}
+	home, _ := os.UserHomeDir()
+	path := filepath.Join(home, "install-wall-vault-service.bat")
+
+	content := fmt.Sprintf(`@echo off
+REM wall-vault Windows 서비스 설치 스크립트 (NSSM 필요)
+REM https://nssm.cc 에서 다운로드 후 PATH에 추가
+
+SET BIN=%s
+SET SVC=wall-vault
+
+nssm install %s "%s" start
+nssm set %s AppDirectory "%s"
+nssm set %s AppEnvironmentExtra WV_LANG=ko
+nssm set %s Start SERVICE_AUTO_START
+nssm start %s
+
+echo.
+echo 서비스 등록 완료: %s
+echo 관리: nssm start/stop/restart %s
+`, bin, "%SVC%", "%BIN%", "%SVC%", home, "%SVC%", "%SVC%", "%SVC%", "%SVC%", "%SVC%")
+
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return err
+	}
+	fmt.Printf("[deploy] Windows 서비스 스크립트 생성: %s\n", path)
+	fmt.Println("[deploy] 관리자 권한으로 실행하세요:")
+	fmt.Printf("  %s\n", path)
 	return nil
 }
 

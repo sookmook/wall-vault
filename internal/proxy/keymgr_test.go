@@ -1,0 +1,145 @@
+package proxy
+
+import (
+	"testing"
+	"time"
+)
+
+func TestKeyManager_RoundRobin(t *testing.T) {
+	km := NewKeyManager("", "", "test")
+	km.AddKey("google", "id1", "key-A", 0)
+	km.AddKey("google", "id2", "key-B", 0)
+	km.AddKey("google", "id3", "key-C", 0)
+
+	// 3번 연속 조회 → A → B → C → A 순환
+	got := make([]string, 4)
+	for i := range got {
+		k, err := km.Get("google")
+		if err != nil {
+			t.Fatalf("Get 실패: %v", err)
+		}
+		got[i] = k.plaintext
+	}
+	if got[0] == got[1] || got[1] == got[2] {
+		t.Fatalf("라운드 로빈 미작동: %v", got)
+	}
+	if got[0] != got[3] {
+		t.Fatalf("순환 미작동: 첫 번째(%s) != 네 번째(%s)", got[0], got[3])
+	}
+}
+
+func TestKeyManager_SkipCooldown(t *testing.T) {
+	km := NewKeyManager("", "", "test")
+	km.AddKey("google", "id1", "key-A", 0)
+	km.AddKey("google", "id2", "key-B", 0)
+
+	// 첫 번째 키에 쿨다운 설정
+	k1, _ := km.Get("google")
+	km.RecordError(k1, 429)
+
+	// 두 번째 조회 → 쿨다운된 key-A를 건너뛰고 key-B 반환
+	k2, err := km.Get("google")
+	if err != nil {
+		t.Fatalf("쿨다운 건너뛰기 실패: %v", err)
+	}
+	if k2.plaintext == k1.plaintext {
+		t.Fatalf("쿨다운 키가 반환됨: %s", k2.plaintext)
+	}
+}
+
+func TestKeyManager_AllCooldown(t *testing.T) {
+	km := NewKeyManager("", "", "test")
+	km.AddKey("google", "id1", "key-A", 0)
+	km.AddKey("google", "id2", "key-B", 0)
+
+	// 두 키 모두 쿨다운
+	k1, _ := km.Get("google")
+	km.RecordError(k1, 429)
+	k2, _ := km.Get("google")
+	km.RecordError(k2, 429)
+
+	_, err := km.Get("google")
+	if err == nil {
+		t.Fatal("모두 쿨다운 상태에서 오류 기대")
+	}
+}
+
+func TestKeyManager_DailyLimit(t *testing.T) {
+	km := NewKeyManager("", "", "test")
+	km.AddKey("google", "id1", "key-A", 10) // 일일 한도 10
+
+	k, _ := km.Get("google")
+	km.RecordSuccess(k, 10) // 한도 도달
+
+	_, err := km.Get("google")
+	if err == nil {
+		t.Fatal("한도 초과 후 오류 기대")
+	}
+}
+
+func TestKeyManager_NoKeys(t *testing.T) {
+	km := NewKeyManager("", "", "test")
+	_, err := km.Get("google")
+	if err == nil {
+		t.Fatal("키 없을 때 오류 기대")
+	}
+}
+
+func TestKeyManager_LoadFromEnv(t *testing.T) {
+	t.Setenv("WV_KEY_GOOGLE", "key1,key2:500")
+	km := NewKeyManager("", "", "test")
+	km.LoadFromEnv()
+
+	k, err := km.Get("google")
+	if err != nil {
+		t.Fatalf("환경변수 키 로드 실패: %v", err)
+	}
+	if k.plaintext != "key1" {
+		t.Fatalf("첫 번째 키 기대 'key1', got %q", k.plaintext)
+	}
+}
+
+func TestKeyManager_SyncReplacesVaultKeys(t *testing.T) {
+	km := NewKeyManager("", "", "test")
+	// 환경변수 키
+	km.AddKey("google", "env-google-0", "env-key", 0)
+	// 금고 키 시뮬레이션 (직접 추가)
+	km.AddKey("google", "vault-1", "vault-key", 100)
+
+	// 금고 키만 제거하고 환경변수 키는 유지하는 로직 확인
+	km.mu.Lock()
+	var kept []*localKey
+	for _, k := range km.keys["google"] {
+		if len(k.id) > 4 && k.id[:4] == "env-" {
+			kept = append(kept, k)
+		}
+	}
+	km.keys["google"] = kept
+	km.mu.Unlock()
+
+	k, err := km.Get("google")
+	if err != nil {
+		t.Fatalf("환경변수 키 유지 실패: %v", err)
+	}
+	if k.plaintext != "env-key" {
+		t.Fatalf("환경변수 키 기대, got %q", k.plaintext)
+	}
+}
+
+func TestLocalKey_IsAvailable(t *testing.T) {
+	k := &localKey{plaintext: "key", dailyLimit: 100, todayUsage: 50}
+	if !k.isAvailable() {
+		t.Fatal("50/100 — 사용 가능해야 함")
+	}
+
+	k.todayUsage = 100
+	if k.isAvailable() {
+		t.Fatal("100/100 — 사용 불가해야 함")
+	}
+
+	k.todayUsage = 0
+	k.cooldownUntil = time.Now().Add(10 * time.Minute)
+	if k.isAvailable() {
+		t.Fatal("쿨다운 중 — 사용 불가해야 함")
+	}
+}

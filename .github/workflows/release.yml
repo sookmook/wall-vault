@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build all platforms
+        run: |
+          VERSION=${{ github.ref_name }}
+          LDFLAGS="-X main.version=${VERSION} -s -w"
+
+          GOOS=linux   GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o dist/wall-vault-linux-amd64
+          GOOS=linux   GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o dist/wall-vault-linux-arm64
+          GOOS=darwin  GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o dist/wall-vault-darwin-amd64
+          GOOS=darwin  GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o dist/wall-vault-darwin-arm64
+          GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o dist/wall-vault-windows-amd64.exe
+
+          # SHA256 체크섬
+          cd dist && sha256sum * > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/wall-vault-linux-amd64
+            dist/wall-vault-linux-arm64
+            dist/wall-vault-darwin-amd64
+            dist/wall-vault-darwin-arm64
+            dist/wall-vault-windows-amd64.exe
+            dist/SHA256SUMS
+          generate_release_notes: true
+          body: |
+            ## 설치
+
+            ### Linux / macOS
+            ```bash
+            # Linux (amd64)
+            curl -L https://github.com/sookmook/wall-vault/releases/download/${{ github.ref_name }}/wall-vault-linux-amd64 \
+              -o wall-vault && chmod +x wall-vault
+
+            # macOS Apple Silicon
+            curl -L https://github.com/sookmook/wall-vault/releases/download/${{ github.ref_name }}/wall-vault-darwin-arm64 \
+              -o wall-vault && chmod +x wall-vault
+            ```
+
+            ### Windows
+            ```powershell
+            # PowerShell (관리자 권한)
+            Invoke-WebRequest -Uri "https://github.com/sookmook/wall-vault/releases/download/${{ github.ref_name }}/wall-vault-windows-amd64.exe" `
+              -OutFile wall-vault.exe
+            ```
+
+            ### 처음 시작
+            ```bash
+            ./wall-vault setup   # 대화형 설치 마법사
+            ./wall-vault start   # 실행
+            ```

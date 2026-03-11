@@ -1,0 +1,36 @@
+# Ollama 로컬 모델 서비스 플러그인
+id: ollama
+name: Ollama (Local)
+enabled: true
+
+# ollama_url은 설정 파일 또는 환경변수 OLLAMA_URL에서 가져옴
+# 미설정 시 localhost:11434 자동 탐지
+endpoints:
+  generate: "{ollama_url}/api/chat"
+  list_models: "{ollama_url}/api/tags"
+
+auth:
+  type: none
+
+request_format: ollama
+
+# 모델 자동 조회 (Ollama 서버에서 실시간 조회)
+model_fetch:
+  enabled: true
+  dynamic: true       # 서버 기동 시마다 재조회
+  auto_detect_url: true
+
+# Ollama 동시 요청 제어 (단일 GPU 보호)
+concurrency:
+  max: 1              # 동시 요청 1개로 제한
+  queue_size: 10      # 대기열 최대 크기
+  wait_notify: true   # 대기 중 TUI 푸터에 알림 표시
+
+error_codes:
+  503:
+    cooldown: 10m
+    message: "Ollama 서버 미응답"
+
+# Ollama는 쿨다운 없이 폴백 전용으로 사용
+usage_threshold: 100
+fallback_only: false  # true로 설정 시 다른 서비스 실패할 때만 사용

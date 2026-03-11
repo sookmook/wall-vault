@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +26,10 @@ func cooldownFor(errCode int) time.Duration {
 	if d, ok := cooldownDurations[errCode]; ok {
 		return d
 	}
-	return 10 * time.Minute // 네트워크 오류 등
+	return 10 * time.Minute
 }
 
-// ─── 로컬 키 항목 ─────────────────────────────────────────────────────────────
+// ─── 로컬 키 ─────────────────────────────────────────────────────────────────
 
 type localKey struct {
 	id            string
@@ -50,10 +52,9 @@ func (k *localKey) isAvailable() bool {
 
 // ─── KeyManager ──────────────────────────────────────────────────────────────
 
-// KeyManager: 로컬 키 풀 관리 (볼트에서 받아오거나 config에서 직접 로드)
 type KeyManager struct {
 	mu       sync.Mutex
-	keys     map[string][]*localKey // service → keys
+	keys     map[string][]*localKey
 	vaultURL string
 	token    string
 	clientID string
@@ -68,7 +69,7 @@ func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 	}
 }
 
-// AddKey: 직접 키 추가 (standalone 모드)
+// AddKey: 직접 키 추가
 func (km *KeyManager) AddKey(service, id, plaintext string, dailyLimit int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
@@ -80,7 +81,7 @@ func (km *KeyManager) AddKey(service, id, plaintext string, dailyLimit int) {
 	})
 }
 
-// Get: 서비스에서 사용 가능한 키 반환 (라운드 로빈)
+// Get: 사용 가능한 키 반환 (라운드 로빈)
 func (km *KeyManager) Get(service string) (*localKey, error) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
@@ -90,41 +91,89 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 			return k, nil
 		}
 	}
-	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음", service)
+	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개)", service, len(keys))
 }
 
-// RecordSuccess: 성공 후 사용량 기록
+// RecordSuccess: 사용량 기록
 func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	k.todayUsage += tokens
-	// 볼트에 비동기 보고
-	if km.vaultURL != "" {
-		go km.reportToVault(k)
-	}
 }
 
-// RecordError: 오류 후 쿨다운 설정
+// RecordError: 쿨다운 설정
 func (km *KeyManager) RecordError(k *localKey, errCode int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	d := cooldownFor(errCode)
 	k.cooldownUntil = time.Now().Add(d)
+	log.Printf("[key] 쿨다운 설정: service=%s, 오류=%d, %.0f분", k.service, errCode, d.Minutes())
 }
 
-func (km *KeyManager) reportToVault(k *localKey) {
-	if km.vaultURL == "" {
-		return
+// ─── 환경변수에서 로드 ────────────────────────────────────────────────────────
+// 형식: WV_KEY_GOOGLE=AIza...         (단일 키)
+//       WV_KEY_GOOGLE=AIza...,AIzb... (쉼표 구분 복수 키)
+//       WV_KEY_GOOGLE=AIza...:500,AIzb...:1500 (키:일일한도)
+
+func (km *KeyManager) LoadFromEnv() {
+	serviceEnvMap := map[string]string{
+		"google":      "WV_KEY_GOOGLE",
+		"openrouter":  "WV_KEY_OPENROUTER",
+		"ollama":      "", // Ollama는 키 불필요
 	}
-	// 볼트에 사용량 보고 (심플하게 heartbeat로 대체)
+	// 레거시 호환
+	legacyEnvMap := map[string]string{
+		"google":     "GOOGLE_API_KEY",
+		"openrouter": "OPENROUTER_API_KEY",
+	}
+
+	loaded := 0
+	for svc, envName := range serviceEnvMap {
+		if envName == "" {
+			continue
+		}
+		val := os.Getenv(envName)
+		if val == "" {
+			// 레거시 환경변수 시도
+			if legacy, ok := legacyEnvMap[svc]; ok {
+				val = os.Getenv(legacy)
+			}
+		}
+		if val == "" {
+			continue
+		}
+
+		for _, entry := range strings.Split(val, ",") {
+			entry = strings.TrimSpace(entry)
+			if entry == "" {
+				continue
+			}
+			var key string
+			var limit int
+			if parts := strings.SplitN(entry, ":", 2); len(parts) == 2 {
+				key = parts[0]
+				fmt.Sscanf(parts[1], "%d", &limit)
+			} else {
+				key = entry
+			}
+			if key != "" {
+				km.AddKey(svc, fmt.Sprintf("env-%s-%d", svc, loaded), key, limit)
+				loaded++
+				log.Printf("[key] 환경변수에서 로드: service=%s", svc)
+			}
+		}
+	}
 }
 
-// SyncFromVault: 볼트에서 키 목록 동기화 (distributed 모드)
+// SyncFromVault: 금고에서 키 동기화 (/api/keys 엔드포인트)
+// 금고가 복호화된 키를 반환 (프록시는 마스터 비밀번호 불필요)
 func (km *KeyManager) SyncFromVault() error {
 	if km.vaultURL == "" {
 		return nil
 	}
-	req, err := http.NewRequest("GET", km.vaultURL+"/admin/keys", nil)
+
+	url := km.vaultURL + "/api/keys"
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -135,26 +184,39 @@ func (km *KeyManager) SyncFromVault() error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("금고 키 조회 실패: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("금고 인증 실패 — vault_token 확인 필요")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("금고 키 조회: HTTP %d", resp.StatusCode)
+	}
 
+	body, _ := io.ReadAll(resp.Body)
 	var keys []struct {
 		ID         string `json:"id"`
 		Service    string `json:"service"`
-		PlainKey   string `json:"plain_key"` // 볼트가 복호화해서 제공
+		PlainKey   string `json:"plain_key"`
 		DailyLimit int    `json:"daily_limit"`
 	}
 	if err := json.Unmarshal(body, &keys); err != nil {
-		return err
+		return fmt.Errorf("금고 키 파싱 오류: %w", err)
 	}
 
 	km.mu.Lock()
-	defer km.mu.Unlock()
-	// 기존 키 초기화 후 재동기화
-	km.keys = make(map[string][]*localKey)
+	// 금고에서 받은 키만 교체 (환경변수 키는 유지)
+	for svc := range km.keys {
+		var kept []*localKey
+		for _, k := range km.keys[svc] {
+			if strings.HasPrefix(k.id, "env-") {
+				kept = append(kept, k)
+			}
+		}
+		km.keys[svc] = kept
+	}
 	for _, k := range keys {
 		if k.PlainKey == "" {
 			continue
@@ -166,16 +228,8 @@ func (km *KeyManager) SyncFromVault() error {
 			dailyLimit: k.DailyLimit,
 		})
 	}
-	return nil
-}
+	km.mu.Unlock()
 
-// LoadFromEnv: 환경변수/설정에서 키 로드 (standalone 모드)
-// 형식: WV_KEY_GOOGLE="AIza...,AIza..." (쉼표 구분 복수 키)
-func (km *KeyManager) LoadFromEnv() {
-	services := []string{"google", "openrouter", "ollama"}
-	for _, svc := range services {
-		envKey := fmt.Sprintf("WV_KEY_%s", strings.ToUpper(svc))
-		// TODO: os.Getenv(envKey) 처리
-		_ = envKey
-	}
+	log.Printf("[sync] 금고에서 %d개 키 동기화 완료", len(keys))
+	return nil
 }

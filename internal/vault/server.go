@@ -23,11 +23,14 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{
+	srv := &Server{
 		cfg:    cfg,
 		store:  store,
 		broker: NewBroker(),
-	}, nil
+	}
+	// 일일 사용량 자정 리셋 시작
+	go srv.startDailyReset()
+	return srv, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -38,12 +41,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/events", s.broker.ServeHTTP)
 	mux.HandleFunc("/api/clients", s.handlePublicClients)
 
+	// 프록시 전용 (클라이언트 토큰 인증)
+	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))       // 복호화된 키 목록
+	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))  // Heartbeat 수신
+
 	// 관리자
 	mux.HandleFunc("/admin/clients", s.adminAuth(s.handleAdminClients))
 	mux.HandleFunc("/admin/clients/", s.adminAuth(s.handleAdminClientsID))
 	mux.HandleFunc("/admin/keys", s.adminAuth(s.handleAdminKeys))
 	mux.HandleFunc("/admin/keys/", s.adminAuth(s.handleAdminKeysID))
-	mux.HandleFunc("/admin/heartbeat", s.adminAuth(s.handleHeartbeat))
+	mux.HandleFunc("/admin/keys/reset", s.adminAuth(s.handleResetUsage))
+	mux.HandleFunc("/admin/heartbeat", s.adminAuth(s.handleHeartbeat)) // 관리자도 가능
 	mux.HandleFunc("/admin/proxies", s.adminAuth(s.handleAdminProxies))
 
 	// 대시보드 UI
@@ -66,6 +74,24 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next(w, r)
+	}
+}
+
+// clientAuth: 등록된 클라이언트 토큰으로 인증
+func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		// 관리자 토큰도 허용
+		if s.cfg.Vault.AdminToken != "" && token == s.cfg.Vault.AdminToken {
+			next(w, r)
+			return
+		}
+		// 클라이언트 토큰 확인
+		if s.cfg.Vault.AdminToken == "" || s.store.GetClientByToken(token) != nil {
+			next(w, r)
+			return
+		}
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
 	}
 }
 
@@ -263,6 +289,89 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAdminProxies(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, s.store.ListProxies())
+}
+
+// ─── 프록시 전용 API ──────────────────────────────────────────────────────────
+
+// handleProxyKeys: 프록시에게 복호화된 키 목록 제공 (클라이언트 토큰 인증)
+func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "GET required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 요청 클라이언트 확인
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	client := s.store.GetClientByToken(token)
+	serviceFilter := r.URL.Query().Get("service")
+
+	keys := s.store.ListKeys()
+	type safeKey struct {
+		ID         string `json:"id"`
+		Service    string `json:"service"`
+		PlainKey   string `json:"plain_key"`
+		DailyLimit int    `json:"daily_limit"`
+	}
+
+	result := make([]safeKey, 0, len(keys))
+	for _, k := range keys {
+		// 서비스 필터
+		if serviceFilter != "" && k.Service != serviceFilter {
+			continue
+		}
+		// 클라이언트의 허용 서비스 확인
+		if client != nil && len(client.AllowedServices) > 0 {
+			allowed := false
+			for _, svc := range client.AllowedServices {
+				if svc == k.Service {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				continue
+			}
+		}
+		// 키 복호화
+		plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass)
+		if err != nil {
+			continue
+		}
+		result = append(result, safeKey{
+			ID:         k.ID,
+			Service:    k.Service,
+			PlainKey:   plain,
+			DailyLimit: k.DailyLimit,
+		})
+	}
+	jsonOK(w, result)
+}
+
+// ─── 사용량 초기화 ────────────────────────────────────────────────────────────
+
+func (s *Server) handleResetUsage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	s.store.ResetDailyUsage()
+	s.broker.Broadcast(SSEEvent{Type: "usage_reset", Data: map[string]string{"time": time.Now().Format(time.RFC3339)}})
+	jsonOK(w, map[string]string{"status": "reset", "time": time.Now().Format(time.RFC3339)})
+}
+
+// ─── 일일 자정 리셋 ───────────────────────────────────────────────────────────
+
+func (s *Server) startDailyReset() {
+	for {
+		now := time.Now()
+		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 30, 0, now.Location())
+		time.Sleep(time.Until(next))
+		s.store.ResetDailyUsage()
+		s.broker.Broadcast(SSEEvent{
+			Type: "usage_reset",
+			Data: map[string]string{"time": time.Now().Format("2006-01-02")},
+		})
+	}
 }
 
 // ─── 대시보드 UI ──────────────────────────────────────────────────────────────

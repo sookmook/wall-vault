@@ -12,6 +12,7 @@ import (
 
 	"github.com/sookmook/wall-vault/cmd/doctor"
 	"github.com/sookmook/wall-vault/cmd/proxy"
+	"github.com/sookmook/wall-vault/cmd/setup"
 	"github.com/sookmook/wall-vault/cmd/vault"
 	"github.com/sookmook/wall-vault/internal/config"
 	"github.com/sookmook/wall-vault/internal/i18n"
@@ -36,6 +37,8 @@ func main() {
 		proxy.Run(os.Args[2:])
 	case "vault":
 		vault.Run(os.Args[2:])
+	case "setup":
+		setup.Run(os.Args[2:])
 	case "doctor":
 		doctor.Run(os.Args[2:])
 	case "version", "--version", "-v":
@@ -56,7 +59,7 @@ func runAll() {
 		log.Fatalf("설정 오류: %v", err)
 	}
 
-	// 볼트 시작
+	// 금고 시작
 	vaultSrv, err := ivault.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("[vault] 초기화 오류: %v", err)
@@ -95,7 +98,8 @@ func printHelp() {
 	fmt.Printf(`wall-vault %s — AI 프록시 + 키 금고
 
 사용법:
-  wall-vault start            모든 서비스 시작 (초보자용)
+  wall-vault setup            대화형 설치 마법사 (처음 시작)
+  wall-vault start            모든 서비스 시작
   wall-vault proxy [flags]    프록시 서버 단독 실행
   wall-vault vault [flags]    키 금고 서버 단독 실행
   wall-vault doctor [cmd]     헬스체크 및 자동 복구

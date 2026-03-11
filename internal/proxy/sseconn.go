@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// SSEClient: 볼트 SSE 스트림 구독 클라이언트
+// SSEClient: 금고 SSE 스트림 구독 클라이언트
 type SSEClient struct {
 	mu        sync.RWMutex
 	vaultURL  string
@@ -71,7 +71,7 @@ func (c *SSEClient) connect() error {
 	c.mu.Lock()
 	c.connected = true
 	c.mu.Unlock()
-	log.Printf("[SSE] ✅ 볼트 연결됨: %s", url)
+	log.Printf("[SSE] ✅ 금고 연결됨: %s", url)
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {

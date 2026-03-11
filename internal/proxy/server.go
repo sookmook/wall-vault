@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/middleware"
 	"github.com/sookmook/wall-vault/internal/models"
 )
 
@@ -151,7 +152,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/config/think-mode", s.handleThinkMode)
 	mux.HandleFunc("/reload", s.handleReload)
 
-	// Gemini API — 비스트리밍
+	// Gemini API
 	mux.HandleFunc("/google/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "streamGenerateContent") {
 			s.handleGeminiStream(w, r)
@@ -163,7 +164,11 @@ func (s *Server) Handler() http.Handler {
 	// OpenAI 호환
 	mux.HandleFunc("/v1/chat/completions", s.handleOpenAI)
 
-	return mux
+	return middleware.Chain(mux,
+		middleware.Recovery,
+		middleware.CORS,
+		middleware.Logger,
+	)
 }
 
 // ─── 헬스 / 상태 ─────────────────────────────────────────────────────────────

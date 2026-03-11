@@ -63,13 +63,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 	case "openrouter":
 		s.streamOpenRouter(w, flusher, mdl, &req)
 	case "ollama":
-		// Ollama는 비스트리밍으로 받아서 단일 청크로 전송
-		resp, err := s.callOllama(mdl, &req)
-		if err != nil {
-			writeGeminiErrorChunk(w, flusher, err)
-			return
-		}
-		writeGeminiChunk(w, flusher, resp, true)
+		s.streamOllama(w, flusher, mdl, &req)
 	default:
 		writeGeminiErrorChunk(w, flusher, fmt.Errorf("서비스 미지원: %s", svc))
 	}
@@ -209,6 +203,76 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 		}
 	}
 	s.keyMgr.RecordSuccess(key, totalTokens)
+}
+
+// ─── Ollama 스트리밍 ──────────────────────────────────────────────────────────
+
+func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
+	if model == "" {
+		model = "qwen3.5:35b"
+	}
+	ollamaURL := s.ollamaURL()
+
+	// Ollama 동시 요청 제한
+	s.ollamaMu.Lock()
+	defer s.ollamaMu.Unlock()
+
+	ollamaReq := GeminiToOllama(model, req)
+	ollamaReq.Stream = true
+	data, _ := json.Marshal(ollamaReq)
+
+	httpReq, _ := http.NewRequest("POST", ollamaURL+"/api/chat", bytes.NewReader(data))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: s.cfg.Proxy.Timeout}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("Ollama 연결 실패: %w", err))
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("Ollama 오류: HTTP %d", resp.StatusCode))
+		return
+	}
+
+	// Ollama 스트리밍: 한 줄씩 JSON 파싱 → Gemini SSE 변환
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		var chunk OllamaResponse
+		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
+			continue
+		}
+
+		geminiChunk := &GeminiResponse{
+			Candidates: []GeminiCandidate{
+				{
+					Content: GeminiContent{
+						Role:  "model",
+						Parts: []GeminiPart{{Text: chunk.Message.Content}},
+					},
+				},
+			},
+		}
+		if chunk.Done {
+			geminiChunk.Candidates[0].FinishReason = "STOP"
+		}
+
+		chunkData, _ := json.Marshal(geminiChunk)
+		fmt.Fprintf(w, "data: %s\n\n", chunkData)
+		if f != nil {
+			f.Flush()
+		}
+
+		if chunk.Done {
+			break
+		}
+	}
 }
 
 // ─── 유틸 ────────────────────────────────────────────────────────────────────

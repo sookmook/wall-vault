@@ -102,7 +102,7 @@ func printHelp() {
   wall-vault start            모든 서비스 시작
   wall-vault proxy [flags]    프록시 서버 단독 실행
   wall-vault vault [flags]    키 금고 서버 단독 실행
-  wall-vault doctor [cmd]     헬스체크 및 자동 복구
+  wall-vault doctor [cmd]     헬스체크·자동복구 (fix/deploy)
 
 옵션:
   -h, --help                  도움말

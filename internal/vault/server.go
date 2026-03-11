@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/middleware"
 	"github.com/sookmook/wall-vault/internal/theme"
 )
 
@@ -57,7 +58,11 @@ func (s *Server) Handler() http.Handler {
 	// 대시보드 UI
 	mux.HandleFunc("/", s.handleDashboard)
 
-	return mux
+	return middleware.Chain(mux,
+		middleware.Recovery,
+		middleware.CORS,
+		middleware.Logger,
+	)
 }
 
 // ─── 미들웨어 ────────────────────────────────────────────────────────────────

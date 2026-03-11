@@ -55,6 +55,7 @@ func (k *localKey) isAvailable() bool {
 type KeyManager struct {
 	mu       sync.Mutex
 	keys     map[string][]*localKey
+	idx      map[string]int // 서비스별 라운드 로빈 인덱스
 	vaultURL string
 	token    string
 	clientID string
@@ -63,6 +64,7 @@ type KeyManager struct {
 func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 	return &KeyManager{
 		keys:     make(map[string][]*localKey),
+		idx:      make(map[string]int),
 		vaultURL: vaultURL,
 		token:    token,
 		clientID: clientID,
@@ -82,16 +84,24 @@ func (km *KeyManager) AddKey(service, id, plaintext string, dailyLimit int) {
 }
 
 // Get: 사용 가능한 키 반환 (라운드 로빈)
+// 마지막으로 사용한 인덱스 다음부터 순환하여 가용 키를 반환
 func (km *KeyManager) Get(service string) (*localKey, error) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	keys := km.keys[service]
-	for _, k := range keys {
+	n := len(keys)
+	if n == 0 {
+		return nil, fmt.Errorf("서비스 '%s' 등록된 키 없음", service)
+	}
+	start := km.idx[service] % n
+	for i := 0; i < n; i++ {
+		k := keys[(start+i)%n]
 		if k.isAvailable() {
+			km.idx[service] = (start + i + 1) % n
 			return k, nil
 		}
 	}
-	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개)", service, len(keys))
+	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개, 모두 쿨다운/소진)", service, n)
 }
 
 // RecordSuccess: 사용량 기록

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/hooks"
 	"github.com/sookmook/wall-vault/internal/middleware"
 	"github.com/sookmook/wall-vault/internal/models"
 )
@@ -27,6 +28,7 @@ type Server struct {
 	filter   *ToolFilter
 	sse      *SSEClient
 	registry *models.Registry
+	hooksMgr *hooks.Manager
 	ollamaMu sync.Mutex // 단일 Ollama 동시 요청 보호
 }
 
@@ -47,6 +49,15 @@ func NewServer(cfg *config.Config) *Server {
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
 	s.filter = NewToolFilter(FilterMode(cfg.Proxy.ToolFilter), cfg.Proxy.AllowedTools)
 
+	// 훅 관리자 초기화
+	shellCmds := map[hooks.EventType]string{
+		hooks.EventModelChanged: cfg.Hooks.OnModelChange,
+		hooks.EventKeyExhausted: cfg.Hooks.OnKeyExhausted,
+		hooks.EventServiceDown:  cfg.Hooks.OnServiceDown,
+		hooks.EventDoctorFix:    cfg.Hooks.OnDoctorFix,
+	}
+	s.hooksMgr = hooks.NewManager(shellCmds, cfg.Hooks.OpenClawSocket)
+
 	// 환경변수에서 키 로드 (standalone 모드)
 	s.keyMgr.LoadFromEnv()
 
@@ -54,13 +65,21 @@ func NewServer(cfg *config.Config) *Server {
 	if cfg.Proxy.VaultURL != "" {
 		s.sse = NewSSEClient(cfg.Proxy.VaultURL, cfg.Proxy.ClientID, func(svc, mdl string) {
 			s.mu.Lock()
+			oldSvc, oldMdl := s.service, s.model
 			if svc != "" {
 				s.service = svc
 			}
 			if mdl != "" {
 				s.model = mdl
 			}
+			newSvc, newMdl := s.service, s.model
 			s.mu.Unlock()
+			if newSvc != oldSvc || newMdl != oldMdl {
+				s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
+					"service": newSvc,
+					"model":   newMdl,
+				})
+			}
 		})
 		s.sse.Start()
 
@@ -369,6 +388,9 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		log.Printf("[proxy] %s 실패 → 폴백: %v", svc, err)
 		lastErr = err
 	}
+	s.hooksMgr.Fire(hooks.EventServiceDown, map[string]string{
+		"error": lastErr.Error(),
+	})
 	return nil, fmt.Errorf("모든 서비스 실패: %v", lastErr)
 }
 
@@ -377,6 +399,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	key, plainKey, err := s.getKey("google")
 	if err != nil {
+		s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "google"})
 		return nil, err
 	}
 
@@ -415,6 +438,7 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	key, plainKey, err := s.getKey("openrouter")
 	if err != nil {
+		s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openrouter"})
 		return nil, err
 	}
 

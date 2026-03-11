@@ -1,0 +1,54 @@
+# Google Gemini 서비스 플러그인
+# wall-vault 서비스 플러그인 형식 v1
+
+id: google
+name: Google Gemini
+enabled: true
+
+# API 엔드포인트
+endpoints:
+  generate: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+  list_models: https://generativelanguage.googleapis.com/v1beta/models
+
+# 인증 방식
+auth:
+  type: query_param     # query_param | bearer | header
+  param: key            # ?key=API_KEY
+
+# 요청 형식 변환
+request_format: gemini  # gemini | openai | raw
+
+# 모델 자동 조회 (선택적 — 없으면 내장 목록 사용)
+model_fetch:
+  enabled: false        # API 키 없이 조회 불가
+  fallback_models:
+    - id: gemini-2.5-pro
+      name: Gemini 2.5 Pro
+    - id: gemini-2.5-flash
+      name: Gemini 2.5 Flash
+    - id: gemini-2.0-flash
+      name: Gemini 2.0 Flash
+    - id: gemini-1.5-pro
+      name: Gemini 1.5 Pro
+
+# 오류 코드 처리
+error_codes:
+  429:
+    cooldown: 30m
+    message: "요청 한도 초과"
+  400:
+    cooldown: 24h
+  401:
+    cooldown: 24h
+  403:
+    cooldown: 24h
+
+# 사용량 임계값 (%)
+usage_threshold: 97
+
+# 헤더 변환 규칙
+headers:
+  strip:
+    - x-goog-api-client
+  add:
+    Content-Type: application/json

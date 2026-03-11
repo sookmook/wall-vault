@@ -1,0 +1,36 @@
+# wall-vault 설정 예시 — 멀티 봇 분산 구성
+# 키 금고 서버가 별도 기기에 있을 때 사용
+#
+# 구성도:
+#   [키 금고 서버] 192.168.0.6:56243
+#        |── SSE 브로드캐스트
+#        ├── [봇 A] motoko:56244
+#        ├── [봇 B] mini:56244
+#        └── [봇 C] raspi:56244
+
+mode: distributed
+
+# 이 프록시의 식별자
+proxy:
+  port: 56244
+  host: 0.0.0.0
+  client_id: motoko          # 각 봇마다 고유한 ID
+
+  # 키 금고 연결
+  vault_url: http://192.168.0.6:56243
+  vault_token: ""            # 키 금고에서 발급한 토큰
+
+  tool_filter: strip_all
+  timeout: 60s
+
+  services:
+    - google
+    - openrouter
+    - ollama
+
+# 분산 모드에서 vault 설정은 사용 안 함 (키 금고가 다른 기기에 있음)
+# vault 서버를 이 기기에서도 실행하려면 mode: standalone 사용
+
+doctor:
+  interval: 5m
+  auto_fix: true

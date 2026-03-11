@@ -1,0 +1,38 @@
+# wall-vault 설정 예시 — 단독 봇 (초보자용)
+# 복사 후 wall-vault.yaml 으로 저장하세요
+#
+# 빠른 시작:
+#   cp configs/example-standalone.yaml wall-vault.yaml
+#   wall-vault start
+
+mode: standalone    # proxy + vault를 이 기기에서 함께 실행
+lang: ko            # 언어: ko | en | ja
+theme: sakura       # 테마: sakura | dark | light | ocean
+
+proxy:
+  port: 56244
+  host: 0.0.0.0
+  client_id: my-bot
+  tool_filter: strip_all    # 외부 도구 차단 (보안)
+  timeout: 60s
+
+  # 사용할 서비스 (순서 = 우선순위)
+  services:
+    - google
+    - openrouter
+    - ollama
+
+vault:
+  port: 56243
+  host: 127.0.0.1   # 단독 모드에서는 로컬만 허용
+  admin_token: ""   # 비워두면 자동 생성 후 ~/.wall-vault/admin_token 에 저장
+  master_password: "" # 비워두면 자동 생성
+
+doctor:
+  interval: 5m
+  auto_fix: true
+  log_file: /tmp/wall-vault-doctor.log
+
+# OpenClaw TUI 연동 (선택)
+hooks:
+  openclaw_socket: ""   # ~/.openclaw/wall-vault.sock 등

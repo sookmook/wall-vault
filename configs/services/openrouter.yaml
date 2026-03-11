@@ -1,0 +1,36 @@
+# OpenRouter 서비스 플러그인
+id: openrouter
+name: OpenRouter
+enabled: true
+
+endpoints:
+  generate: https://openrouter.ai/api/v1/chat/completions
+  list_models: https://openrouter.ai/api/v1/models
+
+auth:
+  type: bearer
+
+request_format: openai
+
+# OpenRouter 모델 자동 조회 (API 키 없이도 가능)
+model_fetch:
+  enabled: true
+  url: https://openrouter.ai/api/v1/models
+  auth_required: false    # 공개 API
+
+error_codes:
+  402:
+    cooldown: 24h
+    message: "크레딧 부족 — OpenRouter 충전 필요"
+  429:
+    cooldown: 30m
+  401:
+    cooldown: 24h
+
+usage_threshold: 97
+
+headers:
+  add:
+    Content-Type: application/json
+    HTTP-Referer: https://github.com/openclaw/wall-vault
+    X-Title: wall-vault

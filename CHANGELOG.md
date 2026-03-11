@@ -7,10 +7,21 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ## [Unreleased]
 
-### 추가
+---
+
+## [0.1.0] — 2026-03-11
+
+### v0.1.0 이후 추가 (post-release)
 - `cmd/proxy`: `--key-google`, `--key-openrouter`, `--vault`, `--vault-token`, `--filter` 플래그 추가
-- `internal/models`: `Registry.NeedsRefresh()` TTL 만료 여부 확인, `Registry.Search(query)` 모델 검색
-- `internal/i18n`: 단위 테스트 8개 (언어별 번역·폴백·로케일 문자열·누락 키 검출)
+- `internal/models`: `Registry.NeedsRefresh()`, `Registry.Search(query)` 추가
+- `internal/proxy/server_test.go`: 프록시 HTTP 핸들러 테스트 12개
+- `internal/vault/server_test.go`: 금고 HTTP 핸들러 테스트 15개
+- `internal/middleware/middleware_test.go`: 미들웨어 체인 테스트 8개
+- `internal/hooks/hooks_test.go`: 훅 시스템 테스트 7개
+- `docs/API.md`: 전체 API 엔드포인트 매뉴얼
+- `docs/MANUAL.md`: 사용자 가이드 (설치→분산모드→문제해결)
+- `CONTRIBUTING.md`: 기여 가이드
+- GitHub Actions CI/Release 워크플로우 (로컬 준비 완료)
 
 ---
 

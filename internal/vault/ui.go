@@ -729,9 +729,25 @@ function onAgentServiceChange(inputId, selId, service) {
       sel.appendChild(opt);
     });
     const inp=document.getElementById(inputId);
-    if(inp&&inp.value) sel.value=inp.value;
+    if(inp&&inp.value){
+      sel.value=inp.value;
+      if(!sel.value){
+        // 현재 값이 목록에 없음 → 직접 입력 중 표시
+        const cur=document.createElement('option');
+        cur.value=inp.value;
+        cur.textContent='✏ '+inp.value;
+        cur.selected=true;
+        sel.insertBefore(cur,sel.firstChild.nextSibling);
+      }
+    }
   }).catch(()=>{
+    const inp=document.getElementById(inputId);
     sel.innerHTML='<option value="">— 선택 또는 직접 입력 —</option>';
+    if(inp&&inp.value){
+      const cur=document.createElement('option');
+      cur.value=inp.value;cur.textContent='✏ '+inp.value;cur.selected=true;
+      sel.appendChild(cur);
+    }
   });
 }
 // ── 모델 select 선택 시 input에 반영 ──

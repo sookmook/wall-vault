@@ -5,6 +5,28 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.1] — 2026-03-13
+
+### Added
+- Agent card: model dropdown + manual input combo (same as modal) with auto-load on page
+- `onAgentServiceChange()`, `onModelSelect()` JS functions for agent service/model combo
+- DOMContentLoaded initializer pre-loads model lists for all agent cards on page load
+- README: OpenClaw integration section (KO + EN) — socket events, SSE sync, dir layout
+- README: multilingual sections (zh, ja, es, fr, de)
+- README: copyright/license notice (GPL-3.0)
+
+### Changed
+- License: MIT → GPL-3.0
+- Theme order unified to light/dark/gold/cherry/ocean across all code and docs
+- Agent modal: model field upgraded from datalist to select+input combo
+- All commit messages in English going forward
+
+### Fixed
+- `setTheme()` / `setLang()` missing `Authorization` header → 401 on theme/lang change
+- `server.go` theme error message updated to reflect correct order
+
+---
+
 ## [Unreleased]
 
 ### 보안 (Security)
@@ -132,5 +154,6 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/sookmook/wall-vault/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sookmook/wall-vault/releases/tag/v0.1.0

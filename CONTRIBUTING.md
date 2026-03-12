@@ -1,6 +1,7 @@
 # wall-vault 기여 가이드
 
 wall-vault에 기여해 주셔서 감사합니다!
+*(최종 갱신: 2026-03-13)*
 
 ---
 
@@ -118,6 +119,8 @@ func TestHandleKeys_Unauthorized(t *testing.T) {
 - [ ] 새 기능에 테스트 추가
 - [ ] 새 서브커맨드·플래그는 `docs/API.md` 또는 `docs/MANUAL.md` 업데이트
 - [ ] 주요 변경은 `CHANGELOG.md` [Unreleased] 섹션에 기록
+- [ ] 개인 API 키, 토큰, 비밀번호가 커밋에 포함되지 않았는지 확인
+- [ ] `wall-vault.yaml` 파일이 실수로 포함되지 않았는지 확인 (`.gitignore`에 있음)
 
 ---
 

@@ -64,6 +64,7 @@ func runAll() {
 	if err != nil {
 		log.Fatalf("[vault] 초기화 오류: %v", err)
 	}
+	vaultSrv.SetConfigPath("wall-vault.yaml")
 	vaultAddr := fmt.Sprintf("%s:%d", cfg.Vault.Host, cfg.Vault.Port)
 	go func() {
 		log.Printf("[vault] 시작 :%d → http://localhost:%d", cfg.Vault.Port, cfg.Vault.Port)

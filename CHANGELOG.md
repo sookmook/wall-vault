@@ -7,6 +7,29 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ## [Unreleased]
 
+### 보안 (Security)
+- `/admin/theme`, `/admin/lang` 엔드포인트에 `adminAuth` 미들웨어 적용 (기존 무인증 취약점 수정)
+- `/api/keys` 핸들러에 IP 화이트리스트 실제 적용 — CIDR 표기법 지원 (`net.ParseCIDR`), `X-Forwarded-For` 헤더 처리
+- 관리자 인증 실패 rate limiting 추가: 15분 이내 10회 실패 시 `429 Too Many Requests` 반환
+- `realIP()`, `ipAllowed()` 헬퍼 함수 추가
+
+### 추가 (Added)
+- 에이전트 상태 4단계 표시: 🟢 실행 중 (<3분) / 🟡 지연 (3-10분) / 🔴 오프라인 (>10분) / ⚫ 비활성·미연결
+- `.dot-yellow` CSS 클래스 추가 (+ glow effect)
+- `.dot-red` CSS glow effect 추가
+- 에이전트 모달 `vscode` 에이전트 종류 옵션 추가
+- 에이전트 종류 선택 시 작업 디렉토리 자동 힌트 (`onAgentTypeChange` JS 함수)
+  - `openclaw` → `~/.openclaw`
+  - `claude-code` → `~/.claude`
+  - `cursor` / `vscode` → `~/projects`
+- `docs/logo.png` 로고 파일 추가
+- README.md 탄생 배경 스토리 및 전면 개편 (MuJaMae 스타일)
+
+### 수정 (Fixed)
+- 에이전트 모달 필드 순서 정리: ID → 이름 → 에이전트 종류 → 작업 디렉토리 → 기본 서비스 → 기본 모델 → 설명 → 허용 IP → 토큰 → 활성화
+- `buildClientModalBody` `fmt.Sprintf` 인자 수 불일치 수정 (19개 verbs / 20개 args → 20/20)
+- 오프라인 상태(`dot-red`) CSS 클래스가 실제로 적용되지 않던 버그 수정
+
 ---
 
 ## [0.1.0] — 2026-03-11

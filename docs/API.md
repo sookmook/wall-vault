@@ -23,6 +23,8 @@
   - [프록시 전용 API](#프록시-전용-api-클라이언트-토큰)
   - [관리자 API — 키](#관리자-api--api-키)
   - [관리자 API — 클라이언트](#관리자-api--클라이언트)
+  - [관리자 API — 서비스](#관리자-api--서비스)
+  - [관리자 API — 모델 목록](#관리자-api--모델-목록)
   - [관리자 API — 프록시 상태](#관리자-api--프록시-상태)
 - [SSE 이벤트 타입](#sse-이벤트-타입)
 - [데이터 스키마](#데이터-스키마)
@@ -40,6 +42,12 @@
 | 프록시 API | 없음 (로컬) | — |
 
 `admin_token`이 설정되지 않은 경우(빈 문자열) 모든 관리자 API는 인증 없이 접근 가능합니다.
+
+### 보안 정책
+
+- **Rate Limiting**: 관리자 API 인증 실패 10회/15분 초과 시 해당 IP를 일시 차단 (`429 Too Many Requests`)
+- **IP 화이트리스트**: 에이전트(`Client`)의 `ip_whitelist` 필드에 등록된 IP/CIDR만 `/api/keys` 접근 허용. 빈 배열이면 모두 허용.
+- **theme·lang 보호**: `/admin/theme`, `/admin/lang`도 관리자 토큰 인증 필요 (v0.1.1+)
 
 ---
 
@@ -563,7 +571,12 @@ API 키 삭제.
   "token": "my-secret-token",
   "default_service": "google",
   "default_model": "gemini-2.5-flash",
-  "allowed_services": ["google", "openrouter"]
+  "allowed_services": ["google", "openrouter"],
+  "agent_type": "claude-code",
+  "work_dir": "/home/user/project",
+  "description": "개발 보조 에이전트",
+  "ip_whitelist": ["192.168.1.1", "10.0.0.0/24"],
+  "enabled": true
 }
 ```
 
@@ -575,6 +588,11 @@ API 키 삭제.
 | `default_service` | — | 기본 서비스 |
 | `default_model` | — | 기본 모델 |
 | `allowed_services` | — | 허용 서비스 목록 (빈 배열 = 모두 허용) |
+| `agent_type` | — | 에이전트 종류 (`openclaw` \| `claude-code` \| `cursor` \| `custom`) |
+| `work_dir` | — | 작업 디렉토리 경로 |
+| `description` | — | 에이전트 설명 |
+| `ip_whitelist` | — | 허용 IP 목록 (생략 또는 빈 배열 = 모두 허용) |
+| `enabled` | — | 활성화 여부 (생략 시 기본값 `true`) |
 
 **응답:** 생성된 `Client` 객체
 
@@ -590,12 +608,17 @@ API 키 삭제.
 
 클라이언트 설정 변경. **SSE를 통해 해당 클라이언트 프록시에 즉시 반영됩니다.**
 
-**요청 바디:**
+**요청 바디 (모든 필드 선택적, 제공된 필드만 갱신):**
 ```json
 {
   "default_service": "openrouter",
   "default_model": "anthropic/claude-3.5-sonnet",
-  "allowed_services": ["google", "openrouter", "ollama"]
+  "allowed_services": ["google", "openrouter", "ollama"],
+  "agent_type": "claude-code",
+  "work_dir": "/home/user/project",
+  "description": "개발 보조 에이전트",
+  "ip_whitelist": ["192.168.1.1"],
+  "enabled": false
 }
 ```
 
@@ -626,6 +649,168 @@ API 키 삭제.
 ```json
 {"status": "deleted"}
 ```
+
+---
+
+### 관리자 API — 서비스
+
+#### `GET /admin/services`
+
+등록된 서비스 목록 조회.
+
+**응답 예시:**
+```json
+[
+  {
+    "id": "google",
+    "name": "Google Gemini",
+    "enabled": true,
+    "custom": false
+  },
+  {
+    "id": "ollama",
+    "name": "Ollama (Local)",
+    "local_url": "http://localhost:11434",
+    "enabled": true,
+    "custom": false
+  },
+  {
+    "id": "my-llm",
+    "name": "사내 LLM 서버",
+    "local_url": "http://10.0.0.50:8080",
+    "enabled": true,
+    "custom": true
+  }
+]
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `id` | string | 서비스 고유 ID |
+| `name` | string | 표시명 |
+| `local_url` | string | 로컬 서버 URL (Ollama/LMStudio/vLLM/커스텀) |
+| `enabled` | bool | 활성화 여부 |
+| `custom` | bool | 사용자가 직접 추가한 서비스 여부 |
+
+기본 제공 서비스 8개: `google`, `openai`, `anthropic`, `openrouter`, `github-copilot`, `ollama`, `lmstudio`, `vllm`
+
+---
+
+#### `POST /admin/services`
+
+커스텀 서비스 추가.
+
+**요청 바디:**
+```json
+{
+  "id": "my-llm",
+  "name": "사내 LLM 서버",
+  "local_url": "http://10.0.0.50:8080",
+  "enabled": true
+}
+```
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| `id` | ✅ | 고유 서비스 ID (영문·숫자·하이픈) |
+| `name` | ✅ | 표시명 |
+| `local_url` | — | OpenAI-호환 API 서버 URL |
+| `enabled` | — | 기본값 `true` |
+
+**응답:**
+```json
+{"status": "ok"}
+```
+
+> 동일 ID가 이미 존재하면 업데이트됩니다 (Upsert).
+
+---
+
+#### `PUT /admin/services/{id}`
+
+서비스 설정 업데이트. 기본 서비스(`custom: false`)도 URL·활성화 여부 변경 가능.
+
+**요청 바디 (변경할 필드만):**
+```json
+{
+  "local_url": "http://192.168.x.x:11434",
+  "enabled": true
+}
+```
+
+**응답:**
+```json
+{"status": "ok"}
+```
+
+---
+
+#### `DELETE /admin/services/{id}`
+
+커스텀 서비스 삭제. 기본 서비스(`custom: false`)는 삭제 불가.
+
+**응답:**
+```json
+{"status": "deleted"}
+```
+
+기본 서비스 삭제 시도:
+```json
+{"error": "기본 서비스는 삭제할 수 없습니다: google"}
+```
+
+---
+
+### 관리자 API — 모델 목록
+
+#### `GET /admin/models`
+
+등록된 서비스의 모델 목록 조회. 내부적으로 TTL 캐시(10분) 사용.
+
+**쿼리 파라미터:**
+
+| 파라미터 | 설명 | 예시 |
+|---------|------|------|
+| `service` | 서비스 필터 | `?service=google` |
+| `q` | 모델 ID/이름 검색 | `?q=gemini` |
+
+**응답 예시:**
+```json
+{
+  "models": [
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "service": "google",
+      "context_length": 1048576,
+      "free": false
+    },
+    {
+      "id": "gpt-4o",
+      "name": "GPT-4o",
+      "service": "openai",
+      "context_length": 128000,
+      "free": false
+    }
+  ],
+  "count": 2,
+  "updated_at": "2026-03-12T10:00:00Z"
+}
+```
+
+**서비스별 모델 조회 방식:**
+
+| 서비스 | 방식 | 비고 |
+|--------|------|------|
+| `google` | 고정 목록 | 6개 |
+| `openai` | 고정 목록 | 8개 |
+| `anthropic` | 고정 목록 | 6개 |
+| `github-copilot` | 고정 목록 | 6개 |
+| `openrouter` | API 동적 조회 | 340+개, 키 있으면 더 많음 |
+| `ollama` | 로컬 서버 동적 조회 | `/api/tags` |
+| `lmstudio` | 로컬 서버 동적 조회 | `/v1/models` |
+| `vllm` | 로컬 서버 동적 조회 | `/v1/models` |
+| 커스텀 | 로컬 서버 동적 조회 | `/v1/models` (OpenAI 호환) |
 
 ---
 
@@ -713,7 +898,26 @@ config_change 수신
 | `default_service` | string | 기본 서비스 |
 | `default_model` | string | 기본 모델 |
 | `allowed_services` | []string | 허용 서비스 (빈 배열 = 모두) |
+| `agent_type` | string | 에이전트 종류: `openclaw` \| `claude-code` \| `cursor` \| `custom` |
+| `work_dir` | string | 에이전트 작업 디렉토리 |
+| `description` | string | 에이전트 설명 |
+| `ip_whitelist` | []string | 허용 IP 목록 (빈 배열 = 모두 허용) |
+| `enabled` | bool | 활성화 여부 (false이면 키 접근 거부) |
 | `created_at` | time.Time | 등록 시각 |
+
+> **`enabled: false`** 상태의 클라이언트는 `/api/keys` 요청 시 `403 Forbidden`이 반환됩니다.
+
+### ServiceConfig
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `id` | string | 서비스 고유 ID |
+| `name` | string | 표시명 |
+| `local_url` | string | 로컬 서버 URL (로컬 서비스만) |
+| `enabled` | bool | 활성화 여부 |
+| `custom` | bool | 사용자 추가 서비스 여부 |
+
+**`IsLocal()` 판별 기준:** `id`가 `ollama` / `lmstudio` / `vllm`이거나, `custom: true`이고 `local_url`이 있는 경우.
 
 ### ProxyStatus (Heartbeat)
 
@@ -826,19 +1030,64 @@ curl -X POST http://localhost:56243/admin/keys/reset \
 # 클라이언트 목록
 curl -H "$ADMIN" http://localhost:56243/admin/clients
 
-# 클라이언트 추가
+# 클라이언트 추가 (기본)
 curl -X POST http://localhost:56243/admin/clients \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"my-bot","name":"내 봇","token":"my-token","default_service":"google","default_model":"gemini-2.5-flash"}'
+
+# 클라이언트 추가 (전체 필드)
+curl -X POST http://localhost:56243/admin/clients \
+  -H "$ADMIN" -H "Content-Type: application/json" \
+  -d '{"id":"dev-agent","name":"개발 에이전트","default_service":"google","default_model":"gemini-2.5-flash","agent_type":"claude-code","work_dir":"/home/user/project","description":"개발 보조","ip_whitelist":["192.168.1.1"],"enabled":true}'
 
 # 클라이언트 모델 변경 (SSE 즉시 반영)
 curl -X PUT http://localhost:56243/admin/clients/bot-a \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"default_service":"openrouter","default_model":"anthropic/claude-3.5-sonnet"}'
 
+# 클라이언트 비활성화
+curl -X PUT http://localhost:56243/admin/clients/my-bot \
+  -H "$ADMIN" -H "Content-Type: application/json" \
+  -d '{"enabled":false}'
+
 # 클라이언트 삭제
 curl -X DELETE http://localhost:56243/admin/clients/my-bot \
   -H "$ADMIN"
+
+# 클라이언트 삭제
+curl -X DELETE http://localhost:56243/admin/clients/my-bot \
+  -H "$ADMIN"
+
+# 서비스 목록
+curl -H "$ADMIN" http://localhost:56243/admin/services
+
+# Ollama 로컬 URL 설정
+curl -X PUT http://localhost:56243/admin/services/ollama \
+  -H "$ADMIN" -H "Content-Type: application/json" \
+  -d '{"local_url":"http://192.168.x.x:11434","enabled":true}'
+
+# LM Studio 활성화
+curl -X PUT http://localhost:56243/admin/services/lmstudio \
+  -H "$ADMIN" -H "Content-Type: application/json" \
+  -d '{"local_url":"http://localhost:1234","enabled":true}'
+
+# 커스텀 서비스 추가
+curl -X POST http://localhost:56243/admin/services \
+  -H "$ADMIN" -H "Content-Type: application/json" \
+  -d '{"id":"my-llm","name":"사내 LLM","local_url":"http://10.0.0.50:8080","enabled":true}'
+
+# 커스텀 서비스 삭제
+curl -X DELETE http://localhost:56243/admin/services/my-llm \
+  -H "$ADMIN"
+
+# 모델 목록 (전체)
+curl -H "$ADMIN" http://localhost:56243/admin/models
+
+# Google 모델만
+curl -H "$ADMIN" "http://localhost:56243/admin/models?service=google"
+
+# 모델 검색
+curl -H "$ADMIN" "http://localhost:56243/admin/models?q=claude"
 
 # 프록시 Heartbeat 상태
 curl -H "$ADMIN" http://localhost:56243/admin/proxies
@@ -874,4 +1123,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*최종 업데이트: 2026-03-11*
+*최종 업데이트: 2026-03-12 — ServiceConfig 추가 (서비스 관리 API), 모델 레지스트리 API, Client 구조체 확장 (agent_type, work_dir, description, ip_whitelist, enabled)*

@@ -15,7 +15,7 @@ import (
 type Config struct {
 	Mode    string       `yaml:"mode"`    // standalone | distributed
 	Lang    string       `yaml:"lang"`    // ko | en | ja
-	Theme   string       `yaml:"theme"`   // sakura | dark | light | ocean
+	Theme   string       `yaml:"theme"`   // dark | light | cherry | ocean
 	Proxy   ProxyConfig  `yaml:"proxy"`
 	Vault   VaultConfig  `yaml:"vault"`
 	Doctor  DoctorConfig `yaml:"doctor"`
@@ -75,7 +75,7 @@ func Default() *Config {
 	return &Config{
 		Mode:  "standalone",
 		Lang:  "ko",
-		Theme: "sakura",
+		Theme: "cherry",
 		Proxy: ProxyConfig{
 			Port:       56244,
 			Host:       "0.0.0.0",

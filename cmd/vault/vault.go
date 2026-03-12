@@ -41,13 +41,18 @@ func Run(args []string) {
 		cfg.Vault.Port = *port
 	}
 
-	runVault(cfg)
+	runVault(cfg, *cfgPath)
 }
 
-func runVault(cfg *config.Config) {
+func runVault(cfg *config.Config, cfgPath string) {
 	srv, err := ivault.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("[vault] 초기화 오류: %v", err)
+	}
+	if cfgPath != "" {
+		srv.SetConfigPath(cfgPath)
+	} else {
+		srv.SetConfigPath("wall-vault.yaml")
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.Vault.Host, cfg.Vault.Port)

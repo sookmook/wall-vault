@@ -32,12 +32,12 @@ func Run(_ []string) {
 
 	// ─── 테마 ────────────────────────────────────────────────────────────────
 	fmt.Println("테마 / Theme / テーマ:")
-	fmt.Println("  1) sakura  🌸 (기본/default)")
-	fmt.Println("  2) dark    🌑")
-	fmt.Println("  3) light   ☀️")
+	fmt.Println("  1) dark    🌑")
+	fmt.Println("  2) light   ☀️")
+	fmt.Println("  3) cherry  🌸 (기본/default)")
 	fmt.Println("  4) ocean   🌊")
-	themeChoice := ask("번호/number", "1")
-	themes := map[string]string{"1": "sakura", "2": "dark", "3": "light", "4": "ocean"}
+	themeChoice := ask("번호/number", "3")
+	themes := map[string]string{"1": "dark", "2": "light", "3": "cherry", "4": "ocean"}
 	if t, ok := themes[themeChoice]; ok {
 		cfg.Theme = t
 	}

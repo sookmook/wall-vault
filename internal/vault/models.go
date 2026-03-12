@@ -48,7 +48,62 @@ type Client struct {
 	DefaultService  string    `json:"default_service"`
 	DefaultModel    string    `json:"default_model"`
 	AllowedServices []string  `json:"allowed_services"`
-	CreatedAt       time.Time `json:"created_at"`
+	// 확장 필드
+	AgentType   string   `json:"agent_type,omitempty"`   // openclaw | claude-code | cursor | custom
+	WorkDir     string   `json:"work_dir,omitempty"`     // 작업 디렉토리
+	Description string   `json:"description,omitempty"`  // 설명
+	IPWhitelist []string `json:"ip_whitelist,omitempty"` // 허용 IP 목록 (빈 배열 = 모두 허용)
+	Enabled     bool     `json:"enabled"`                // 활성화 여부
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// ClientInput: 클라이언트 추가 DTO
+type ClientInput struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Token           string   `json:"token"`
+	DefaultService  string   `json:"default_service"`
+	DefaultModel    string   `json:"default_model"`
+	AllowedServices []string `json:"allowed_services"`
+	AgentType       string   `json:"agent_type"`
+	WorkDir         string   `json:"work_dir"`
+	Description     string   `json:"description"`
+	IPWhitelist     []string `json:"ip_whitelist"`
+	Enabled         *bool    `json:"enabled"` // nil = 기본값 true
+}
+
+// ClientUpdateInput: 클라이언트 수정 DTO
+type ClientUpdateInput struct {
+	Name            *string  `json:"name"`
+	Token           *string  `json:"token"`
+	DefaultService  string   `json:"default_service"`
+	DefaultModel    string   `json:"default_model"`
+	AllowedServices []string `json:"allowed_services"`
+	AgentType       *string  `json:"agent_type"`
+	WorkDir         *string  `json:"work_dir"`
+	Description     *string  `json:"description"`
+	IPWhitelist     []string `json:"ip_whitelist"`
+	Enabled         *bool    `json:"enabled"`
+}
+
+// ─── 서비스 설정 ──────────────────────────────────────────────────────────────
+
+// ServiceConfig: 서비스별 런타임 설정 (로컬 URL, 활성화 여부)
+type ServiceConfig struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	LocalURL string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM 전용
+	Enabled  bool   `json:"enabled"`
+	Custom   bool   `json:"custom,omitempty"` // 사용자가 직접 추가한 서비스
+}
+
+// IsLocal: 로컬 서버 서비스 여부
+func (s *ServiceConfig) IsLocal() bool {
+	switch s.ID {
+	case "ollama", "lmstudio", "vllm":
+		return true
+	}
+	return s.Custom && s.LocalURL != ""
 }
 
 // ─── 프록시 상태 (Heartbeat) ─────────────────────────────────────────────────
@@ -60,6 +115,7 @@ type ProxyStatus struct {
 	Model     string    `json:"model"`
 	SSE       bool      `json:"sse_connected"`
 	Host      string    `json:"host,omitempty"`
+	StartedAt time.Time `json:"started_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Vault     VaultInfo `json:"vault,omitempty"`
 }
@@ -87,7 +143,8 @@ type ConfigChangeEvent struct {
 // ─── 저장소 스냅샷 ────────────────────────────────────────────────────────────
 
 type storeData struct {
-	Keys    []*APIKey      `json:"keys"`
-	Clients []*Client      `json:"clients"`
-	Proxies []*ProxyStatus `json:"proxies"`
+	Keys     []*APIKey       `json:"keys"`
+	Clients  []*Client       `json:"clients"`
+	Proxies  []*ProxyStatus  `json:"proxies"`
+	Services []*ServiceConfig `json:"services,omitempty"`
 }

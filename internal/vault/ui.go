@@ -83,7 +83,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(buildAddServiceModal())
 	sb.WriteString(`</div>
 <div class="footer">
-  wall-vault v0.1.0 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
+  wall-vault v0.1.1 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
   &nbsp;|&nbsp; <a href="https://sookmook.org/">sookmook.org</a>
   &nbsp;|&nbsp; <a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
   &nbsp;|&nbsp; ⏱ <span id="uptime"></span>
@@ -598,6 +598,14 @@ function deleteKey(id) {
   });
 }
 
+// ── 에이전트 카드 모델 목록 초기화 (페이지 로드 시) ──
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.agent-svc-sel').forEach(function(el) {
+    const id = el.id.replace('svc-', '');
+    if (id && el.value) onAgentServiceChange('mdl-'+id, 'mdl-sel-'+id, el.value);
+  });
+});
+
 // ── 모달 공통 유틸 ──
 function closeModal(prefix) {
   document.getElementById('modal-'+prefix).classList.remove('open');
@@ -941,11 +949,11 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
     <div class="agent-name">%s <span style="color:var(--text-muted);font-size:.72rem">%s</span>%s</div>
     %s%s%s
     <div class="model-form">
-      <select id="svc-%s" onchange="onServiceChange('mdl-%s',this.value,'mdl-list-%s')">%s</select>
-      <div style="position:relative">
-        <input id="mdl-%s" type="text" list="mdl-list-%s" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s">
-        <datalist id="mdl-list-%s"></datalist>
-      </div>
+      <select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>
+      <select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')" style="margin-bottom:.25rem">
+        <option value="">— 모델 선택 —</option>
+      </select>
+      <input id="mdl-%s" type="text" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s" oninput="document.getElementById('mdl-sel-%s').value=''">
       <button class="btn" onclick="changeModel('%s')" data-i18n="apply">적용</button>
     </div>
   </div>
@@ -960,8 +968,8 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			displayName, c.ID, typeBadge,
 			descLine, metaLines, liveDetail,
 			c.ID, c.ID, c.ID, buildServiceOptions(services, c.DefaultService),
-			c.ID, c.ID, c.DefaultModel,
-			c.ID,
+			c.ID, c.ID, c.ID,
+			c.ID, c.DefaultModel, c.ID,
 			c.ID,
 			c.ID,
 			c.ID,

@@ -20,7 +20,7 @@ import (
 	ivault "github.com/sookmook/wall-vault/internal/vault"
 )
 
-const version = "v0.1.0"
+const version = "v0.1.1"
 
 func main() {
 	i18n.Init()

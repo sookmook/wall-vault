@@ -3,20 +3,63 @@ package vault
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
 	"github.com/sookmook/wall-vault/internal/middleware"
+	"github.com/sookmook/wall-vault/internal/models"
 	"github.com/sookmook/wall-vault/internal/theme"
 )
 
+// authLimiter: IP별 인증 실패 횟수 추적 (rate limiting)
+type authLimiter struct {
+	mu    sync.Mutex
+	fails map[string][]time.Time
+}
+
+func newAuthLimiter() *authLimiter { return &authLimiter{fails: make(map[string][]time.Time)} }
+
+// blocked: 15분 내 10회 이상 실패 시 차단
+func (al *authLimiter) blocked(ip string) bool {
+	al.mu.Lock()
+	defer al.mu.Unlock()
+	cutoff := time.Now().Add(-15 * time.Minute)
+	var recent []time.Time
+	for _, t := range al.fails[ip] {
+		if t.After(cutoff) {
+			recent = append(recent, t)
+		}
+	}
+	al.fails[ip] = recent
+	return len(recent) >= 10
+}
+
+func (al *authLimiter) record(ip string) {
+	al.mu.Lock()
+	defer al.mu.Unlock()
+	al.fails[ip] = append(al.fails[ip], time.Now())
+}
+
 // Server: 키 금고 HTTP 서버
 type Server struct {
-	cfg    *config.Config
-	store  *Store
-	broker *Broker
+	cfg       *config.Config
+	store     *Store
+	broker    *Broker
+	registry  *models.Registry // 모델 캐시
+	cfgPath   string           // 테마 변경 시 저장할 설정 파일 경로
+	startedAt time.Time        // 가동 시작 시각
+	limiter   *authLimiter     // 인증 실패 rate limiter
+}
+
+// SetConfigPath: 테마 저장에 사용할 설정 파일 경로 지정
+func (s *Server) SetConfigPath(path string) {
+	s.cfgPath = path
 }
 
 func NewServer(cfg *config.Config) (*Server, error) {
@@ -25,9 +68,12 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		return nil, err
 	}
 	srv := &Server{
-		cfg:    cfg,
-		store:  store,
-		broker: NewBroker(),
+		cfg:       cfg,
+		store:     store,
+		broker:    NewBroker(),
+		registry:  models.NewRegistry(10 * time.Minute),
+		startedAt: time.Now(),
+		limiter:   newAuthLimiter(),
 	}
 	// 일일 사용량 자정 리셋 시작
 	go srv.startDailyReset()
@@ -47,6 +93,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))  // Heartbeat 수신
 
 	// 관리자
+	mux.HandleFunc("/admin/theme", s.adminAuth(s.handleAdminTheme))
+	mux.HandleFunc("/admin/lang", s.adminAuth(s.handleAdminLang))
 	mux.HandleFunc("/admin/clients", s.adminAuth(s.handleAdminClients))
 	mux.HandleFunc("/admin/clients/", s.adminAuth(s.handleAdminClientsID))
 	mux.HandleFunc("/admin/keys", s.adminAuth(s.handleAdminKeys))
@@ -54,6 +102,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/keys/reset", s.adminAuth(s.handleResetUsage))
 	mux.HandleFunc("/admin/heartbeat", s.adminAuth(s.handleHeartbeat)) // 관리자도 가능
 	mux.HandleFunc("/admin/proxies", s.adminAuth(s.handleAdminProxies))
+	mux.HandleFunc("/admin/services", s.adminAuth(s.handleAdminServices))
+	mux.HandleFunc("/admin/services/", s.adminAuth(s.handleAdminServicesID))
+	mux.HandleFunc("/admin/models", s.adminAuth(s.handleAdminModels))
+
+	// 로고
+	mux.HandleFunc("/logo", s.handleLogo)
 
 	// 대시보드 UI
 	mux.HandleFunc("/", s.handleDashboard)
@@ -73,8 +127,14 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 			return
 		}
+		ip := realIP(r)
+		if s.limiter.blocked(ip) {
+			jsonError(w, "too many failed attempts", http.StatusTooManyRequests)
+			return
+		}
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if token != s.cfg.Vault.AdminToken {
+			s.limiter.record(ip)
 			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -136,22 +196,15 @@ func (s *Server) handleAdminClients(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		jsonOK(w, s.store.ListClients())
 	case http.MethodPost:
-		var body struct {
-			ID              string   `json:"id"`
-			Name            string   `json:"name"`
-			Token           string   `json:"token"`
-			DefaultService  string   `json:"default_service"`
-			DefaultModel    string   `json:"default_model"`
-			AllowedServices []string `json:"allowed_services"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		var inp ClientInput
+		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
 			return
 		}
-		if body.Token == "" {
-			body.Token = newID() + newID()
+		if inp.Token == "" {
+			inp.Token = newID() + newID()
 		}
-		c, err := s.store.AddClient(body.ID, body.Name, body.Token, body.DefaultService, body.DefaultModel, body.AllowedServices)
+		c, err := s.store.AddClient(inp)
 		if err != nil {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -177,23 +230,19 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonOK(w, c)
 	case http.MethodPut:
-		var body struct {
-			DefaultService  string   `json:"default_service"`
-			DefaultModel    string   `json:"default_model"`
-			AllowedServices []string `json:"allowed_services"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		var inp ClientUpdateInput
+		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
 			return
 		}
-		if err := s.store.UpdateClient(id, body.DefaultService, body.DefaultModel, body.AllowedServices); err != nil {
+		if err := s.store.UpdateClient(id, inp); err != nil {
 			jsonError(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		// SSE 브로드캐스트
 		s.broker.Broadcast(SSEEvent{
 			Type: "config_change",
-			Data: ConfigChangeEvent{ClientID: id, Service: body.DefaultService, Model: body.DefaultModel},
+			Data: ConfigChangeEvent{ClientID: id, Service: inp.DefaultService, Model: inp.DefaultModel},
 		})
 		jsonOK(w, map[string]string{"status": "updated"})
 	case http.MethodDelete:
@@ -308,6 +357,18 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 	// 요청 클라이언트 확인
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	client := s.store.GetClientByToken(token)
+	// 비활성화된 클라이언트는 키 접근 거부
+	if client != nil && !client.Enabled {
+		jsonError(w, "client disabled", http.StatusForbidden)
+		return
+	}
+	// IP 화이트리스트 확인
+	if client != nil && len(client.IPWhitelist) > 0 {
+		if !ipAllowed(realIP(r), client.IPWhitelist) {
+			jsonError(w, "ip not allowed", http.StatusForbidden)
+			return
+		}
+	}
 	serviceFilter := r.URL.Query().Get("service")
 
 	keys := s.store.ListKeys()
@@ -364,6 +425,146 @@ func (s *Server) handleResetUsage(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "reset", "time": time.Now().Format(time.RFC3339)})
 }
 
+// ─── 언어 변경 ────────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminLang(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Lang string `json:"lang"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	valid := map[string]bool{"ko": true, "en": true, "zh": true, "es": true,
+		"hi": true, "ar": true, "pt": true, "fr": true, "de": true, "ja": true}
+	if !valid[body.Lang] {
+		jsonError(w, "unknown lang", http.StatusBadRequest)
+		return
+	}
+	s.cfg.Lang = body.Lang
+	if s.cfgPath != "" {
+		_ = config.Save(s.cfg, s.cfgPath)
+	}
+	jsonOK(w, map[string]string{"lang": body.Lang})
+}
+
+// ─── 테마 변경 ────────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Theme string `json:"theme"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	valid := map[string]bool{"cherry": true, "dark": true, "light": true, "ocean": true, "gold": true}
+	if !valid[body.Theme] {
+		jsonError(w, "unknown theme (dark|light|cherry|ocean)", http.StatusBadRequest)
+		return
+	}
+	s.cfg.Theme = body.Theme
+	if s.cfgPath != "" {
+		_ = config.Save(s.cfg, s.cfgPath)
+	}
+	jsonOK(w, map[string]string{"theme": body.Theme})
+}
+
+// ─── 서비스 관리 ─────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		jsonOK(w, s.store.ListServices())
+	case http.MethodPost:
+		var inp ServiceConfig
+		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil || inp.ID == "" {
+			jsonError(w, "id 필수", http.StatusBadRequest)
+			return
+		}
+		inp.Custom = true
+		if err := s.store.UpsertService(&inp); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, map[string]string{"status": "ok"})
+	default:
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/admin/services/")
+	if id == "" {
+		jsonError(w, "service id required", http.StatusBadRequest)
+		return
+	}
+	switch r.Method {
+	case http.MethodPut:
+		var inp ServiceConfig
+		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
+			jsonError(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		inp.ID = id
+		if err := s.store.UpsertService(&inp); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, map[string]string{"status": "updated"})
+	case http.MethodDelete:
+		if err := s.store.DeleteService(id); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonOK(w, map[string]string{"status": "deleted"})
+	default:
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleAdminModels: 서비스별 모델 목록 조회 (TTL 캐시)
+func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "GET required", http.StatusMethodNotAllowed)
+		return
+	}
+	svcFilter := r.URL.Query().Get("service")
+
+	if s.registry.NeedsRefresh() {
+		svcs := s.store.ListServices()
+		svcIDs := make([]string, 0, len(svcs))
+		for _, sv := range svcs {
+			if sv.Enabled {
+				svcIDs = append(svcIDs, sv.ID)
+			}
+		}
+		// OpenRouter 키 조회
+		var orKey string
+		keys := s.store.ListKeys()
+		for _, k := range keys {
+			if k.Service == "openrouter" && k.IsAvailable() {
+				if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
+					orKey = plain
+					break
+				}
+			}
+		}
+		_ = s.registry.Refresh(svcIDs, s.store.ServiceURLMap(), orKey)
+	}
+
+	result := s.registry.All(svcFilter)
+	jsonOK(w, map[string]interface{}{"models": result, "count": len(result)})
+}
+
 // ─── 일일 자정 리셋 ───────────────────────────────────────────────────────────
 
 func (s *Server) startDailyReset() {
@@ -377,6 +578,34 @@ func (s *Server) startDailyReset() {
 			Data: map[string]string{"time": time.Now().Format("2006-01-02")},
 		})
 	}
+}
+
+// ─── 로고 ────────────────────────────────────────────────────────────────────
+
+func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {
+	home, _ := os.UserHomeDir()
+	type candidate struct {
+		path string
+		ct   string
+	}
+	candidates := []candidate{
+		{filepath.Join(home, ".wall-vault", "logo.png"), "image/png"},
+		{filepath.Join(home, ".wall-vault", "logo.jpg"), "image/jpeg"},
+		{filepath.Join(home, ".wall-vault", "logo.svg"), "image/svg+xml"},
+		{"logo.png", "image/png"},
+		{"logo.jpg", "image/jpeg"},
+	}
+	for _, c := range candidates {
+		data, err := os.ReadFile(c.path)
+		if err != nil {
+			continue
+		}
+		w.Header().Set("Content-Type", c.ct)
+		w.Header().Set("Cache-Control", "max-age=3600")
+		w.Write(data) //nolint:errcheck
+		return
+	}
+	http.NotFound(w, r)
 }
 
 // ─── 대시보드 UI ──────────────────────────────────────────────────────────────
@@ -402,4 +631,32 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, `{"error":%q}`, msg)
+}
+
+// realIP: X-Forwarded-For 또는 RemoteAddr에서 실제 IP 추출
+func realIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.SplitN(xff, ",", 2)[0]
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip == "" {
+		return r.RemoteAddr
+	}
+	return ip
+}
+
+// ipAllowed: 단일 IP 또는 CIDR 목록과 대조
+func ipAllowed(remoteIP string, whitelist []string) bool {
+	for _, entry := range whitelist {
+		entry = strings.TrimSpace(entry)
+		if entry == remoteIP {
+			return true
+		}
+		if _, cidr, err := net.ParseCIDR(entry); err == nil {
+			if ip := net.ParseIP(remoteIP); ip != nil && cidr.Contains(ip) {
+				return true
+			}
+		}
+	}
+	return false
 }

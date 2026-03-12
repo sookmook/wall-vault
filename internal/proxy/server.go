@@ -105,7 +105,7 @@ func NewServer(cfg *config.Config) *Server {
 	// 모델 레지스트리 초기화 (비동기)
 	go func() {
 		ollamaURL := s.ollamaURL()
-		s.registry.Refresh(cfg.Proxy.Services, ollamaURL, "")
+		s.registry.Refresh(cfg.Proxy.Services, models.ServiceURLs{"ollama": ollamaURL}, "")
 	}()
 
 	return s

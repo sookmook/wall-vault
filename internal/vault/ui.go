@@ -351,7 +351,8 @@ document.addEventListener('click',()=>document.querySelectorAll('.dd-menu').forE
 // 언어 변경
 const LANG_LABELS={'ko':'🌏 한국어','en':'🌍 English','zh':'🌏 中文','ja':'🌏 日本語','es':'🌍 Español','hi':'🌏 हिन्दी','ar':'🌍 العربية','pt':'🌍 Português','fr':'🌍 Français','de':'🌍 Deutsch'};
 function setLang(lang){
-  fetch('/admin/lang',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({lang:lang})})
+  const tok=localStorage.getItem('wv_admin_token')||'';
+  fetch('/admin/lang',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({lang:lang})})
   .then(r=>r.json()).then(d=>{
     if(d.error){alert(T('err')+d.error);return;}
     applyLang(lang);
@@ -489,7 +490,8 @@ function applyThemeCss(name){
 }
 const THEME_LABELS={'light':'☀️ light','dark':'🌑 dark','gold':'✨ gold','cherry':'🌸 cherry','ocean':'🌊 ocean'};
 function setTheme(name){
-  fetch('/admin/theme',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:name})})
+  const tok=localStorage.getItem('wv_admin_token')||'';
+  fetch('/admin/theme',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({theme:name})})
   .then(r=>r.json()).then(d=>{
     if(d.error){alert(T('err')+d.error);return;}
     applyThemeCss(name);

@@ -14,6 +14,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 - `realIP()`, `ipAllowed()` 헬퍼 함수 추가
 
 ### 추가 (Added)
+- 에이전트 모달 기본 모델 선택 UI 개선: 드롭다운으로 서비스별 전체 모델 목록 제공, 직접 입력 병행 지원 (`onAgentServiceChange`, `onModelSelect`)
 - 에이전트 상태 4단계 표시: 🟢 실행 중 (<3분) / 🟡 지연 (3-10분) / 🔴 오프라인 (>10분) / ⚫ 비활성·미연결
 - `.dot-yellow` CSS 클래스 추가 (+ glow effect)
 - `.dot-red` CSS glow effect 추가

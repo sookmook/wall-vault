@@ -624,11 +624,14 @@ function _clearClientForm(prefix) {
   const at=document.getElementById(prefix+'-agent-type');if(at)at.value='';
   const en=document.getElementById(prefix+'-enabled');if(en)en.checked=true;
   const msg=document.getElementById(prefix+'-msg');if(msg)msg.textContent='';
+  const ms=document.getElementById(prefix+'-mdl-sel');
+  if(ms) ms.innerHTML='<option value="">— 모델 선택 또는 직접 입력 —</option>';
 }
 
 // ── 에이전트 추가 모달 ──
 function openAddClient() {
   _clearClientForm('ac');
+  onAgentServiceChange('ac-mdl', 'ac-mdl-sel', 'google');
   document.getElementById('modal-ac').classList.add('open');
 }
 function submitModal(prefix) {
@@ -673,7 +676,7 @@ function openEditClient(id) {
     document.getElementById('ec-enabled').checked = c.enabled!==false;
     document.getElementById('ec-msg').textContent = '';
     // 모델 목록 로드
-    onServiceChange('ec-mdl', c.default_service||'google', 'ec-mdl-list');
+    onAgentServiceChange('ec-mdl', 'ec-mdl-sel', c.default_service||'google');
     document.getElementById('modal-ec').classList.add('open');
   }).catch(e=>alert(T('err')+e));
 }
@@ -691,7 +694,7 @@ function onAgentTypeChange(type, wdId) {
   el.placeholder = hints[type] || '/path/to/workdir';
 }
 
-// ── 모델 드롭다운 (서비스 변경 시 datalist 업데이트) ──
+// ── 모델 드롭다운 (서비스 카드 등 datalist용 — 기존 호환) ──
 function onServiceChange(inputId, service, listId) {
   fetch('/admin/models?service='+service, {headers:{'Authorization':'Bearer '+(localStorage.getItem('wv_admin_token')||'')}})
   .then(r=>r.json()).then(data=>{
@@ -702,6 +705,32 @@ function onServiceChange(inputId, service, listId) {
       const opt=document.createElement('option');opt.value=m.id;opt.label=m.name||m.id;dl.appendChild(opt);
     });
   }).catch(()=>{});
+}
+// ── 에이전트 모달 전용: 서비스 변경 시 모델 select 채움 ──
+function onAgentServiceChange(inputId, selId, service) {
+  const sel = document.getElementById(selId);
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— 로딩 중... —</option>';
+  fetch('/admin/models?service='+service, {headers:{'Authorization':'Bearer '+(localStorage.getItem('wv_admin_token')||'')}})
+  .then(r=>r.json()).then(data=>{
+    sel.innerHTML = '<option value="">— 모델 선택 또는 직접 입력 —</option>';
+    (data.models||[]).forEach(m=>{
+      const opt=document.createElement('option');
+      opt.value=m.id;
+      opt.textContent=(m.name&&m.name!==m.id)?(m.name+' · '+m.id):m.id;
+      sel.appendChild(opt);
+    });
+    const inp=document.getElementById(inputId);
+    if(inp&&inp.value) sel.value=inp.value;
+  }).catch(()=>{
+    sel.innerHTML='<option value="">— 선택 또는 직접 입력 —</option>';
+  });
+}
+// ── 모델 select 선택 시 input에 반영 ──
+function onModelSelect(selId, inputId) {
+  const sel=document.getElementById(selId);
+  const inp=document.getElementById(inputId);
+  if(sel&&inp&&sel.value) inp.value=sel.value;
 }
 
 // ── 서비스 관리 ──
@@ -1101,8 +1130,8 @@ func buildServicesCard(services []*ServiceConfig) string {
 
 func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) string {
 	svcOpts := buildServiceOptions(services, "google")
-	// 필드 순서: ID → 이름 → 에이전트 종류 → 작업 디렉토리 → 기본 서비스 → 기본 모델 → 설명 → 허용 IP → 토큰 → 활성화
-	// %s 20개, args 20개 (1 titleKey + 1 svcOpts + 18 prefix)
+	// Fields: ID → name → agent type → workdir → service → model (select+input) → desc → IP → token → enabled
+	// %s: 22 total (1 titleKey + 1 svcOpts + 20 prefix)
 	return fmt.Sprintf(`
 <div class="modal">
   <h3 data-i18n="%s">🤖 에이전트</h3>
@@ -1122,12 +1151,12 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
   <label data-i18n="lbl_work_dir">작업 디렉토리</label>
   <input id="%s-workdir" type="text" placeholder="/home/user/project">
   <label data-i18n="lbl_defsvc">기본 서비스</label>
-  <select id="%s-service" onchange="onServiceChange('%s-mdl',this.value,'%s-mdl-list')">%s</select>
+  <select id="%s-service" onchange="onAgentServiceChange('%s-mdl','%s-mdl-sel',this.value)">%s</select>
   <label data-i18n="lbl_defmdl">기본 모델</label>
-  <div style="position:relative">
-    <input id="%s-mdl" type="text" list="%s-mdl-list" data-i18n-ph="ph_mdl" placeholder="gemini-2.5-flash">
-    <datalist id="%s-mdl-list"></datalist>
-  </div>
+  <select id="%s-mdl-sel" onchange="onModelSelect('%s-mdl-sel','%s-mdl')" style="margin-bottom:.3rem">
+    <option value="">— 모델 선택 또는 직접 입력 —</option>
+  </select>
+  <input id="%s-mdl" type="text" data-i18n-ph="ph_mdl" placeholder="gemini-2.5-flash" oninput="document.getElementById('%s-mdl-sel').value=''">
   <label data-i18n="lbl_description">설명</label>
   <input id="%s-desc" type="text" data-i18n-ph="ph_desc">
   <label data-i18n="lbl_ip_whitelist">허용 IP</label>
@@ -1150,6 +1179,7 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
 		prefix,
 		prefix, prefix, prefix, svcOpts,
 		prefix, prefix, prefix,
+		prefix, prefix,
 		prefix, prefix, prefix, prefix,
 		prefix, prefix,
 		prefix,

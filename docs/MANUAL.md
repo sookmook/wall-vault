@@ -264,7 +264,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | 3 | **에이전트 종류** | openclaw / claude-code / cursor / vscode / custom |
 | 4 | **작업 디렉토리** | 에이전트 종류 선택 시 힌트 자동 제안 |
 | 5 | 기본 서비스 | google / openai / openrouter 등 |
-| 6 | 기본 모델 | gemini-2.5-flash 등 (자동완성) |
+| 6 | 기본 모델 | **드롭다운** 선택 (서비스 변경 시 자동 로드) + 직접 입력 병행 가능 |
 | 7 | 설명 | 선택 사항 |
 | 8 | **허용 IP** | 쉼표 구분, CIDR 지원 (`10.0.0.0/24`) |
 | 9 | 토큰 | 빈칸이면 자동 생성 |

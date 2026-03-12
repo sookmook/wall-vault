@@ -588,7 +588,7 @@ API 키 삭제.
 | `default_service` | — | 기본 서비스 |
 | `default_model` | — | 기본 모델 |
 | `allowed_services` | — | 허용 서비스 목록 (빈 배열 = 모두 허용) |
-| `agent_type` | — | 에이전트 종류 (`openclaw` \| `claude-code` \| `cursor` \| `custom`) |
+| `agent_type` | — | 에이전트 종류 (`openclaw` \| `claude-code` \| `cursor` \| `vscode` \| `custom`) |
 | `work_dir` | — | 작업 디렉토리 경로 |
 | `description` | — | 에이전트 설명 |
 | `ip_whitelist` | — | 허용 IP 목록 (생략 또는 빈 배열 = 모두 허용) |
@@ -898,7 +898,7 @@ config_change 수신
 | `default_service` | string | 기본 서비스 |
 | `default_model` | string | 기본 모델 |
 | `allowed_services` | []string | 허용 서비스 (빈 배열 = 모두) |
-| `agent_type` | string | 에이전트 종류: `openclaw` \| `claude-code` \| `cursor` \| `custom` |
+| `agent_type` | string | 에이전트 종류: `openclaw` \| `claude-code` \| `cursor` \| `vscode` \| `custom` |
 | `work_dir` | string | 에이전트 작업 디렉토리 |
 | `description` | string | 에이전트 설명 |
 | `ip_whitelist` | []string | 허용 IP 목록 (빈 배열 = 모두 허용) |
@@ -1123,4 +1123,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*최종 업데이트: 2026-03-12 — ServiceConfig 추가 (서비스 관리 API), 모델 레지스트리 API, Client 구조체 확장 (agent_type, work_dir, description, ip_whitelist, enabled)*
+*최종 업데이트: 2026-03-13 — agent_type에 `vscode` 추가, 에이전트 모달 모델 드롭다운+직접입력 콤보 UI 적용*

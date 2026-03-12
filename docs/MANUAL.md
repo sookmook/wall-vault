@@ -93,7 +93,7 @@ wall-vault setup
 
 ```
 1. 언어 선택 (10개 언어)
-2. 테마 선택 (sakura / dark / light / ocean)
+2. 테마 선택 (light / dark / gold / cherry / ocean)
 3. 운용 모드 (standalone / distributed)
 4. 봇 이름 입력
 5. 포트 설정 (기본: 프록시 56244, 금고 56243)
@@ -452,7 +452,7 @@ wall-vault doctor all
 | 변수 | 설명 | 예시 |
 |------|------|------|
 | `WV_LANG` | 언어 | `ko`, `en`, `ja` |
-| `WV_THEME` | 테마 | `sakura`, `dark` |
+| `WV_THEME` | 테마 | `light`, `dark`, `gold`, `cherry`, `ocean` |
 | `WV_KEY_GOOGLE` | Google API 키 (쉼표로 여러 개) | `AIza...,AIza...` |
 | `WV_KEY_OPENROUTER` | OpenRouter API 키 | `sk-or-v1-...` |
 | `WV_VAULT_URL` | 금고 서버 URL (distributed) | `http://192.168.x.x:56243` |

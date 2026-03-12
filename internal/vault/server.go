@@ -466,9 +466,9 @@ func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	valid := map[string]bool{"cherry": true, "dark": true, "light": true, "ocean": true, "gold": true}
+	valid := map[string]bool{"light": true, "dark": true, "gold": true, "cherry": true, "ocean": true}
 	if !valid[body.Theme] {
-		jsonError(w, "unknown theme (dark|light|cherry|ocean)", http.StatusBadRequest)
+		jsonError(w, "unknown theme (light|dark|gold|cherry|ocean)", http.StatusBadRequest)
 		return
 	}
 	s.cfg.Theme = body.Theme

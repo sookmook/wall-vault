@@ -22,35 +22,48 @@
 
 ---
 
-## 🎭 탄생 배경
+## 💀 탄생 배경: 봇들이 죽던 날
 
-> *"지난달, 해커 하나가 우리 연구소 내부망에 침투해 못된 짓을 저질렀다."*
->
-> *"2주일 이상 정성껏 육성해 온 오픈클로 AI 비서 봇들의 기억이 한 방에 전부 날아가 버렸다."*
->
-> *"그때의 느낌은... 마치 애지중지하며 잘 키우던 반려동물이 갑자기 죽어버린 것 같은 묘한 상실감이었다."*
->
-> *"여러 방법을 총동원해서 겨우 기억과 지식을 거의 복원하긴 했지만, 상당히 많은 노력과 시간이 들었다."*
->
-> *"그래서 이 프로젝트를 시작하게 된 것이다."*
+새벽이었다.
 
-**API 키 하나가 털리면 연결된 AI 봇이 통째로 멈춘다.** 키가 만료되면 어느 봇이 죽었는지 파악하는 것도 일이다. 분산된 봇들마다 설정을 일일이 바꿔야 하는 고통은 덤이다.
+알림 하나가 떴다. 평소와 달랐다.
 
-wall-vault는 그 모든 고통을 한 방에 해결하기 위해 만들어졌다.
+로그인해 보니 — API 키 전부 무효. vault.json 공백. 봇들은 아무 말도 없었다. 할 수가 없었다. **기억이 통째로 지워져 있었으니까.**
+
+> *모토코는 내 작업 스타일을 꿰뚫고 있었다. 미니는 매일 아침 브리핑을 준비했다. 라즈는 라즈베리파이 위에서 묵묵히 모든 걸 처리했다. 2주 넘게 공들여 키운 AI 비서들이었다.*
+>
+> *해커 한 명이 내부망에 들어와서 그걸 전부 날려버렸다.*
+>
+> *잘 키운 반려동물이 하룻밤 사이에 사라진 것 같은 기분이었다.*
+
+기억을 복원하는 데 일주일이 걸렸다. 완전하지도 않았다.
+
+이건 두 번 다시 겪으면 안 됐다.
+
+그래서 만들었다. **키를 잠그는 금고. 봇들을 지키는 벽. 다시는 해커 한 명 때문에 모든 게 끝나지 않도록.**
 
 ---
 
-## 🧐 이게 뭐냐면
+## ⚔️ 그래서, 이게 뭐냐면
 
-**"AI 봇들의 보디가드이자 관제탑."**
+한 줄 요약: **"AI 봇들이 절대 죽지 않게 만드는 보디가드."**
 
-- **키 금고(Vault)**: API 키를 AES-GCM으로 암호화해서 보관하고, 알아서 순환(라운드 로빈)한다. 키가 한도에 달하거나 오류가 나면 자동으로 다음 키로 넘긴다.
-- **AI 프록시(Proxy)**: OpenClaw 에이전트, Claude Code, VS Code Copilot, 내 스크립트가 보내는 요청을 받아서 Gemini / OpenAI / Ollama 등으로 중계한다. 하나 죽으면 다음 걸로 폴백.
-- **실시간 동기화(SSE)**: 금고에서 설정 하나 바꾸면 연결된 모든 봇에 1–3초 안에 반영된다. 재시작 불필요.
-- **보안 필터**: function calling 완전 차단(strip_all). 외부 스킬이 내 AI를 멋대로 사용하는 것을 막는다.
-- **OpenClaw 전용 연동**: Unix 소켓으로 OpenClaw TUI에 실시간 이벤트(모델 변경·키 소진·서비스 다운 등)를 즉시 전달한다. openclaw.json 자동 갱신.
+```
+해커가 키를 털어도  → 금고가 막는다
+키 한도가 차도      → 다음 키로 알아서 넘긴다
+서비스가 다운돼도   → Gemini → OpenAI → Ollama 순서로 폴백
+봇이 100대여도      → 설정 하나 바꾸면 1-3초 내 전원에 반영
+```
 
-단독 봇 한 대부터 OpenClaw 에이전트 여러 대를 분산 운용하는 구성까지, **고 바이너리 하나**로 전부 커버한다.
+더 풀어쓰면:
+
+- 🔐 **키 금고(Vault)**: AES-GCM 암호화. 라운드 로빈 자동 순환. 할당량·오류·쿨다운 알아서 관리.
+- 🔀 **AI 프록시(Proxy)**: OpenClaw·Claude Code·VS Code·내 스크립트 — 어디서 오든 Gemini / OpenAI / Ollama로 중계. 하나 죽으면 다음 걸로.
+- ⚡ **SSE 실시간 동기화**: 금고에서 뭔가 바꾸면 연결된 모든 봇에 즉각 반영. 재시작 불필요.
+- 🛡️ **보안 필터**: function calling 완전 차단. 외부 스킬이 내 AI를 멋대로 조종하는 걸 막는다.
+- 🦞 **OpenClaw 전용 연동**: Unix 소켓으로 TUI에 실시간 이벤트 전달. openclaw.json 자동 갱신.
+
+Go 바이너리 단 하나. 봇 한 대부터 분산 다중 봇까지 전부 커버.
 
 ---
 
@@ -588,21 +601,48 @@ wall-vault/
 
 ---
 
-## 🌍 Origin Story
+## 💀 Origin Story: The Night the Bots Died
 
-> *"Last month, a hacker broke into our lab's internal network and wreaked havoc."*
->
-> *"The memories of our OpenClaw AI assistant bots — carefully cultivated over two weeks — were wiped out in an instant."*
->
-> *"The feeling was strangely like losing a beloved pet."*
->
-> *"It took enormous effort to recover most of their memories and knowledge."*
->
-> *"That's why this project exists."*
+It was the middle of the night.
 
-**When one API key gets compromised, every connected AI bot stops cold.** Figuring out which bot died when a key expires is its own headache. And manually updating each distributed bot's config is just suffering.
+One alert. Something felt wrong.
 
-wall-vault was built to eliminate all of that pain in one shot.
+Logged in — all API keys invalidated. vault.json empty. The bots had gone silent. Of course they had. **Their memories had been completely erased.**
+
+> *Motoko knew my work style inside-out. Mini prepared morning briefings every day. Raz handled everything quietly from a Raspberry Pi in the corner. Two weeks of careful cultivation. Two weeks of patience, tuning, and personality-shaping.*
+>
+> *A single hacker broke into the lab's internal network and torched all of it.*
+>
+> *It felt like coming home to find a beloved pet had simply vanished.*
+
+It took a week to restore most of the memories. Not all of them came back.
+
+This could never happen again.
+
+So I built something. **A vault for the keys. A wall for the bots. A guarantee that no single attack could ever end everything again.**
+
+---
+
+## ⚔️ What It Actually Is
+
+One line: **"A bodyguard that keeps your AI bots alive no matter what."**
+
+```
+Hacker steals a key?       → Vault blocks it. Rotates to the next.
+Key hits its daily limit?  → Automatically switches. No downtime.
+Service goes dark?         → Falls back: Gemini → OpenAI → Ollama
+Running 100 bots?          → Change one setting. All bots updated in 1–3s.
+```
+
+In more detail:
+
+- 🔐 **Key Vault**: AES-GCM encrypted storage. Round-robin rotation. Quota, cooldown, and error handling — all automatic.
+- 🔀 **AI Proxy**: Accepts requests from OpenClaw, Claude Code, VS Code, your scripts — routes them to Gemini / OpenAI / Ollama. One dies, the next one picks up.
+- ⚡ **SSE Real-time Sync**: Change anything in the vault, every connected bot reflects it instantly. No restarts.
+- 🛡️ **Security Filter**: Full function calling block. Stops external skills from hijacking your AI.
+- 🦞 **OpenClaw Integration**: Live events over Unix socket to TUI. Auto-updates openclaw.json.
+
+Single Go binary. One bot or a dozen — fully covered.
 
 ---
 

@@ -12,6 +12,7 @@
   <a href="https://github.com/sookmook/wall-vault/actions/workflows/ci.yml"><img src="https://github.com/sookmook/wall-vault/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/languages-17-brightgreen.svg" alt="Languages">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/clients-Claude%20Code%20%7C%20Cursor%20%7C%20VSCode%20%7C%20OpenClaw-purple.svg" alt="Clients">
 </p>
 
 ---
@@ -49,21 +50,116 @@ So I built something. **A vault for the keys. A wall for the bots. A guarantee t
 One line: **"A bodyguard that keeps your AI bots alive no matter what."**
 
 ```
-Hacker steals a key?       → Vault blocks it. Rotates to the next.
-Key hits its daily limit?  → Automatically switches. No downtime.
-Service goes dark?         → Falls back: Gemini → OpenAI → Ollama
-Running 100 bots?          → Change one setting. All bots updated in 1–3s.
+Hacker steals a key?                         → Vault blocks it. Rotates to the next.
+Key hits its daily limit?                    → Automatically switches. No downtime.
+Service goes dark?                           → Falls back: Gemini → OpenRouter → Ollama
+Running 100 bots?                            → Change one setting. All bots updated in 1–3s.
+Claude Code runs out of Anthropic quota?     → Silently routes to Gemini. No restart needed.
+Gemini CLI / Antigravity hit rate limits?    → Key rotation kicks in. Session continues.
+Cursor needs a model list?                   → /v1/models returns everything. 350+ choices.
 ```
 
 In more detail:
 
 - 🔐 **Key Vault**: AES-GCM encrypted storage. Round-robin rotation. Quota, cooldown, and error handling — all automatic.
-- 🔀 **AI Proxy**: Accepts requests from OpenClaw, Claude Code, VS Code, your scripts — routes them to Gemini / OpenAI / Ollama. One dies, the next one picks up.
+- 🔀 **AI Proxy**: Accepts requests from OpenClaw, Claude Code, Gemini CLI, Antigravity, Cursor, VS Code, your scripts — routes them to Gemini / OpenAI / Ollama. One dies, the next one picks up.
 - ⚡ **SSE Real-time Sync**: Change anything in the vault, every connected bot reflects it instantly. No restarts.
 - 🛡️ **Security Filter**: Full function calling block. Stops external skills from hijacking your AI.
 - 🦞 **OpenClaw Integration**: Live events over Unix socket to TUI. Auto-updates openclaw.json.
 
 Single Go binary. One bot or a dozen — fully covered.
+
+---
+
+## 🔌 Works With Everything
+
+wall-vault speaks **four different API formats** out of the box.
+Point any AI client at `http://your-host:56244` and it just works.
+
+| Client | Endpoint | Format | Setup |
+|--------|----------|--------|-------|
+| **OpenClaw** | `/google/v1beta/models/...` | Gemini | Built-in — just point to proxy port |
+| **Gemini CLI** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=http://localhost:56244` |
+| **Antigravity IDE** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=http://localhost:56244` |
+| **Claude Code** | `/v1/messages` | Anthropic | `ANTHROPIC_BASE_URL=http://localhost:56244` |
+| **Cursor** | `/v1/chat/completions` | OpenAI | Set base URL in Cursor settings |
+| **VS Code / Continue** | `/v1/chat/completions` | OpenAI | Set `apiBase` in Continue config |
+| **LM Studio apps** | `/v1/chat/completions` | OpenAI | Any OpenAI-compatible client |
+| **Custom scripts** | `/v1/chat/completions` | OpenAI | `curl -X POST .../v1/chat/completions` |
+
+---
+
+### Gemini CLI Setup
+
+```bash
+export GEMINI_API_BASE_URL=http://localhost:56244
+gemini  # now routes through wall-vault → key rotation + fallback chain
+```
+
+Or in `~/.gemini/settings.json`:
+```json
+{
+  "apiBaseUrl": "http://localhost:56244"
+}
+```
+
+> All 5 Gemini API keys rotate automatically. One hits the limit — the next one picks up.
+> `gemini` keeps chatting. You never see an error.
+
+---
+
+### Antigravity IDE Setup
+
+Antigravity is Google's agentic AI IDE. It uses the same Gemini API format:
+
+```bash
+export GEMINI_API_BASE_URL=http://localhost:56244
+# launch Antigravity — it now routes through wall-vault
+```
+
+> Antigravity agents hitting quota? wall-vault silently switches keys and falls back to
+> OpenRouter or local Ollama. Your coding session continues uninterrupted.
+
+---
+
+### Claude Code Setup
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:56244
+claude  # now routes through wall-vault → Gemini / OpenRouter / Ollama
+```
+
+> When Anthropic keys run dry, wall-vault silently falls back to Gemini or Ollama.
+> Claude Code keeps working. You don't notice.
+
+---
+
+### Cursor / VS Code Setup
+
+In Cursor **Settings → AI → OpenAI API**:
+```
+Base URL:  http://localhost:56244
+API Key:   (any string — wall-vault ignores it)
+Model:     gemini-2.5-flash  (or any model from /v1/models)
+```
+
+Same for VS Code + Continue extension:
+```json
+{
+  "models": [{
+    "title": "wall-vault",
+    "provider": "openai",
+    "model": "gemini-2.5-flash",
+    "apiBase": "http://localhost:56244"
+  }]
+}
+```
+
+---
+
+> **Behind the scenes**: all four formats are converted to a unified internal format,
+> then dispatched through the same fallback chain: Primary → OpenRouter → Ollama.
+> One vault. One config. Every client.
 
 ---
 
@@ -91,6 +187,7 @@ Single Go binary. One bot or a dozen — fully covered.
 | Feature | Description |
 |---------|-------------|
 | **AI Proxy** | Google Gemini / OpenAI / Anthropic / OpenRouter / GitHub Copilot / Ollama / LMStudio / vLLM |
+| **Client Support** | OpenClaw / Claude Code / Gemini CLI / Antigravity IDE / Cursor / VS Code / LM Studio / scripts |
 | **Key Vault** | API key management, usage monitoring, round-robin rotation |
 | **AES-GCM Encryption** | Keys encrypted with master password, never stored in plaintext |
 | **SSE Real-time Sync** | Vault ↔ proxy config sync within 1–3 seconds |

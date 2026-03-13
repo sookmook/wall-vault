@@ -183,6 +183,12 @@ func (s *Server) Handler() http.Handler {
 	// OpenAI compatible
 	mux.HandleFunc("/v1/chat/completions", s.handleOpenAI)
 
+	// Anthropic API (Claude Code, etc.)
+	mux.HandleFunc("/v1/messages", s.handleAnthropic)
+
+	// OpenAI-compatible model list (Cursor, VS Code, LM Studio, etc.)
+	mux.HandleFunc("/v1/models", s.handleOpenAIModels)
+
 	return middleware.Chain(mux,
 		middleware.Recovery,
 		middleware.CORS,
@@ -393,6 +399,72 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(oaiResp)
+}
+
+// ─── Anthropic API Handler (/v1/messages) ─────────────────────────────────────
+
+func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req AnthropicRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	s.mu.RLock()
+	svc := s.service
+	mdl := s.model
+	s.mu.RUnlock()
+	if mdl == "" {
+		mdl = req.Model
+	}
+	// Parse provider/model form (e.g. "anthropic/claude-opus-4-6")
+	svc, mdl = parseProviderModel(svc, mdl)
+
+	geminiReq := AnthropicToGemini(&req)
+	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
+	if err != nil {
+		log.Printf("[anthropic] dispatch error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"type":  "error",
+			"error": map[string]string{"type": "api_error", "message": err.Error()},
+		})
+		return
+	}
+
+	resp := GeminiRespToAnthropic(mdl, geminiResp)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// ─── OpenAI-compatible model list (/v1/models) ────────────────────────────────
+
+func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
+	all := s.registry.All("")
+	type oaiModel struct {
+		ID      string `json:"id"`
+		Object  string `json:"object"`
+		OwnedBy string `json:"owned_by"`
+	}
+	var data []oaiModel
+	for _, m := range all {
+		data = append(data, oaiModel{
+			ID:      m.ID,
+			Object:  "model",
+			OwnedBy: m.Service,
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"object": "list",
+		"data":   data,
+	})
 }
 
 // ─── Request Dispatch ─────────────────────────────────────────────────────────

@@ -1,6 +1,10 @@
 package proxy
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // ─── Gemini → OpenAI ─────────────────────────────────────────────────────────
 
@@ -138,6 +142,74 @@ func GeminiToOllama(model string, req *GeminiRequest) *OllamaRequest {
 		ollama.Options = opts
 	}
 	return ollama
+}
+
+// ─── Anthropic → Gemini ───────────────────────────────────────────────────────
+
+func AnthropicToGemini(req *AnthropicRequest) *GeminiRequest {
+	gemini := &GeminiRequest{}
+
+	if req.System != "" {
+		gemini.SystemInstruction = &GeminiContent{
+			Parts: []GeminiPart{{Text: req.System}},
+		}
+	}
+
+	for _, msg := range req.Messages {
+		role := msg.Role
+		if role == "assistant" {
+			role = "model"
+		}
+		text := msg.ContentText()
+		gemini.Contents = append(gemini.Contents, GeminiContent{
+			Role:  role,
+			Parts: []GeminiPart{{Text: text}},
+		})
+	}
+
+	if req.Temperature != nil || req.MaxTokens > 0 {
+		cfg := &GenerationConfig{}
+		if req.Temperature != nil {
+			cfg.Temperature = req.Temperature
+		}
+		if req.MaxTokens > 0 {
+			cfg.MaxOutputTokens = &req.MaxTokens
+		}
+		gemini.GenerationConfig = cfg
+	}
+
+	return gemini
+}
+
+// ─── Gemini → Anthropic ───────────────────────────────────────────────────────
+
+func GeminiRespToAnthropic(model string, resp *GeminiResponse) *AnthropicResponse {
+	ar := &AnthropicResponse{
+		ID:         fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+		Type:       "message",
+		Role:       "assistant",
+		Model:      model,
+		StopReason: "end_turn",
+	}
+
+	for _, c := range resp.Candidates {
+		text := extractText(c.Content.Parts)
+		ar.Content = append(ar.Content, AnthropicContent{
+			Type: "text",
+			Text: text,
+		})
+	}
+	if len(ar.Content) == 0 {
+		ar.Content = []AnthropicContent{{Type: "text", Text: ""}}
+	}
+
+	if resp.UsageMetadata != nil {
+		ar.Usage = AnthropicUsage{
+			InputTokens:  resp.UsageMetadata.PromptTokenCount,
+			OutputTokens: resp.UsageMetadata.CandidatesTokenCount,
+		}
+	}
+	return ar
 }
 
 // ─── Util ─────────────────────────────────────────────────────────────────────

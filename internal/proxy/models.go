@@ -180,3 +180,72 @@ type OllamaResponse struct {
 	Message OpenAIMessage `json:"message"`
 	Done    bool          `json:"done"`
 }
+
+// ─── Anthropic Request/Response Structures ────────────────────────────────────
+
+// AnthropicRequest: POST /v1/messages request (Claude API format)
+type AnthropicRequest struct {
+	Model       string             `json:"model"`
+	Messages    []AnthropicMessage `json:"messages"`
+	System      string             `json:"system,omitempty"`
+	MaxTokens   int                `json:"max_tokens,omitempty"`
+	Temperature *float64           `json:"temperature,omitempty"`
+	Stream      bool               `json:"stream,omitempty"`
+	Tools       []interface{}      `json:"tools,omitempty"`
+}
+
+type AnthropicMessage struct {
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"` // string or []AnthropicContent
+}
+
+// ContentText extracts plain text from Anthropic content (string or parts array)
+func (m AnthropicMessage) ContentText() string {
+	var s string
+	if json.Unmarshal(m.Content, &s) == nil {
+		return s
+	}
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(m.Content, &parts) == nil {
+		var sb strings.Builder
+		for _, p := range parts {
+			if p.Type == "text" {
+				sb.WriteString(p.Text)
+			}
+		}
+		return sb.String()
+	}
+	return string(m.Content)
+}
+
+type AnthropicContent struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+}
+
+// AnthropicResponse: /v1/messages response
+type AnthropicResponse struct {
+	ID         string             `json:"id"`
+	Type       string             `json:"type"`
+	Role       string             `json:"role"`
+	Content    []AnthropicContent `json:"content"`
+	Model      string             `json:"model"`
+	StopReason string             `json:"stop_reason"`
+	Usage      AnthropicUsage     `json:"usage"`
+}
+
+type AnthropicUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
+// AnthropicStreamEvent: SSE event for streaming /v1/messages
+type AnthropicStreamEvent struct {
+	Type  string      `json:"type"`
+	Index int         `json:"index,omitempty"`
+	Delta interface{} `json:"delta,omitempty"`
+	Usage interface{} `json:"usage,omitempty"`
+}

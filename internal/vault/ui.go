@@ -99,7 +99,7 @@ func langLabel(code string) string {
 	return i18n.LangLabel("ko")
 }
 
-// buildI18NJS: locales/*.json에서 JS I18N 및 LANG_LABELS 동적 생성
+// buildI18NJS: dynamically generate JS I18N and LANG_LABELS from locales/*.json
 func buildI18NJS() string {
 	var sb strings.Builder
 	sb.WriteString("// ── I18N ──\nconst I18N={\n")
@@ -295,12 +295,12 @@ a{color:var(--accent);text-decoration:none}
 }
 
 func buildJS(currentTheme, currentLang string, startedAt int64, services []*ServiceConfig, keys []*APIKey, adminToken string) string {
-	// 서비스별 키 개수
+	// key count per service
 	keyCounts := map[string]int{}
 	for _, k := range keys {
 		keyCounts[k.Service]++
 	}
-	// 서비스 목록을 JS 객체로 직렬화 (ID, Name, IsLocal, LocalURL, KeyCount)
+	// serialize service list as JS object (ID, Name, IsLocal, LocalURL, KeyCount)
 	var svcJSParts []string
 	for _, sv := range services {
 		isLocal := "false"
@@ -1131,7 +1131,7 @@ function onAgentServiceChange(inputId, selId, service) {
     (data.models||[]).forEach(m=>{
       const opt=document.createElement('option');
       opt.value=m.id;
-      opt.textContent=(m.name&&m.name!==m.id)?(m.name+' · '+m.id):m.id;
+      opt.textContent=m.name||m.id;
       sel.appendChild(opt);
     });
     const inp=document.getElementById(inputId);
@@ -1278,7 +1278,7 @@ function changeModel(clientId) {
 }`
 }
 
-// buildServiceOptions: 서비스 select 옵션 HTML 생성
+// buildServiceOptions: generate HTML options for service select element
 func buildServiceOptions(services []*ServiceConfig, selected string) string {
 	var sb strings.Builder
 	for _, sv := range services {
@@ -1294,7 +1294,16 @@ func buildServiceOptions(services []*ServiceConfig, selected string) string {
 	return sb.String()
 }
 
-// buildAgentsCard: 에이전트 카드 (등록 클라이언트 + 실시간 heartbeat 통합)
+// trimServicePrefix strips "service/" prefix from model ID to avoid displaying "openrouter / openrouter/anthropic/..."
+func trimServicePrefix(service, model string) string {
+	prefix := service + "/"
+	if strings.HasPrefix(model, prefix) {
+		return model[len(prefix):]
+	}
+	return model
+}
+
+// buildAgentsCard: agent card (registered clients + live heartbeat integration)
 func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*ServiceConfig) string {
 	pmap := make(map[string]*ProxyStatus, len(proxies))
 	for _, p := range proxies {
@@ -1350,13 +1359,13 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 				dotClass = "dot-green"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-live"><span data-i18n="st_running">● 실행 중</span> — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%.0f초 전</span></span> <span class="status-version">%s</span></div>`,
-					p.Service, p.Model, ageSec, age.Seconds(), p.Version,
+					p.Service, trimServicePrefix(p.Service, p.Model), ageSec, age.Seconds(), p.Version,
 				)
 			case age < 10*time.Minute:
 				dotClass = "dot-yellow"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-delay"><span data-i18n="st_delayed">◑ 지연</span> <span class="bot-ago" data-ago-sec="%d">%.0f분 전</span> — %s / %s</span></div>`,
-					ageSec, age.Minutes(), p.Service, p.Model,
+					ageSec, age.Minutes(), p.Service, trimServicePrefix(p.Service, p.Model),
 				)
 			default:
 				dotClass = "dot-red"
@@ -1565,7 +1574,7 @@ func sel(b bool) string {
 	return ""
 }
 
-// buildServicesCard: 서비스 관리 카드
+// buildServicesCard: service management card
 func buildServicesCard(services []*ServiceConfig) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(
@@ -1709,7 +1718,7 @@ func buildEditClientModal(services []*ServiceConfig) string {
 	return `<div class="modal-overlay" id="modal-ec" onclick="if(event.target===this)closeModal('ec')">` + body + `</div>`
 }
 
-// buildAddServiceModal: 커스텀 서비스 추가 모달
+// buildAddServiceModal: custom service add modal
 func buildAddServiceModal() string {
 	return `<div class="modal-overlay" id="modal-addsvc" onclick="if(event.target===this)closeModal('addsvc')">
 <div class="modal">

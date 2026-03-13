@@ -19,7 +19,7 @@ func TestT_English(t *testing.T) {
 }
 
 func TestT_FallbackToEnglish(t *testing.T) {
-	// 지원하지 않는 언어 → 영어 폴백
+	// unsupported language → fallback to English
 	SetLang("xx")
 	if got := T("health_ok"); got != "ok" {
 		t.Errorf("fallback health_ok = %q, want %q", got, "ok")
@@ -28,7 +28,7 @@ func TestT_FallbackToEnglish(t *testing.T) {
 
 func TestT_MissingKey(t *testing.T) {
 	SetLang("ko")
-	// 존재하지 않는 키 → 키 이름 반환
+	// nonexistent key → return key name itself
 	if got := T("__nonexistent_key__"); got != "__nonexistent_key__" {
 		t.Errorf("missing key = %q, want key itself", got)
 	}
@@ -62,7 +62,7 @@ func TestSupported(t *testing.T) {
 	if len(Supported) != 10 {
 		t.Errorf("Supported 언어 수 = %d, want 10", len(Supported))
 	}
-	// 모든 지원 언어에 setup_welcome 키가 있는지 확인
+	// verify setup_welcome key exists in all supported languages
 	for _, code := range Supported {
 		SetLang(code)
 		msg := T("setup_welcome")
@@ -73,7 +73,7 @@ func TestSupported(t *testing.T) {
 }
 
 func TestAllLanguagesHaveAllKeys(t *testing.T) {
-	// 영어 키 목록을 기준으로 다른 언어 누락 키 검사
+	// check missing keys in other languages against the English key list
 	enKeys := make([]string, 0, len(messages["en"]))
 	for k := range messages["en"] {
 		enKeys = append(enKeys, k)

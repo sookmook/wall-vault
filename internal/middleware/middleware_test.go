@@ -52,7 +52,7 @@ func TestRecovery_Panic(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
-	// 패닉이 외부로 전파되지 않아야 함
+	// panic must not propagate outside
 	h.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
@@ -105,7 +105,7 @@ func TestLogger_Normal(t *testing.T) {
 }
 
 func TestChain_Order(t *testing.T) {
-	// 미들웨어 적용 순서: Chain(h, A, B, C) → A(B(C(h)))
+	// middleware application order: Chain(h, A, B, C) → A(B(C(h)))
 	order := []string{}
 
 	makeMiddleware := func(name string) func(http.Handler) http.Handler {
@@ -129,7 +129,7 @@ func TestChain_Order(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
-	// 기대 순서: A→B→C→handler→C→B→A
+	// expected order: A→B→C→handler→C→B→A
 	expected := []string{
 		"A-before", "B-before", "C-before",
 		"handler",

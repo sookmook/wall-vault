@@ -1,5 +1,5 @@
-// Package i18n: 언어 파일 자동 로드 기반 다국어 지원
-// locales/*.json 파일을 추가하면 자동으로 지원 언어에 포함됩니다.
+// Package i18n: multi-language support based on automatic locale file loading
+// adding locales/*.json files automatically includes them in supported languages.
 package i18n
 
 import (
@@ -15,7 +15,7 @@ var localeFS embed.FS
 
 var lang = "en"
 
-// Supported: 지원 언어 코드 목록 (locales/*.json 파일에서 자동 결정)
+// Supported: list of supported language codes (auto-determined from locales/*.json files)
 var Supported []string
 
 var messages = map[string]map[string]string{}
@@ -41,7 +41,7 @@ func init() {
 		messages[code] = m
 		Supported = append(Supported, code)
 	}
-	// 우선 순서: ko, en 앞에 배치
+	// sort order: place ko, en at front
 	sort.Slice(Supported, func(i, j int) bool {
 		order := map[string]int{"ko": 0, "en": 1}
 		oi, ok1 := order[Supported[i]]
@@ -59,7 +59,7 @@ func init() {
 	})
 }
 
-// Init: 환경변수 또는 시스템 로케일에서 언어 결정
+// Init: determine language from env var or system locale
 func Init() {
 	if v := os.Getenv("WV_LANG"); v != "" {
 		SetLang(v)
@@ -71,7 +71,7 @@ func Init() {
 	}
 }
 
-// SetLang: 언어 코드 설정 (외부 패키지에서 호출 가능)
+// SetLang: set language code (callable from external packages)
 func SetLang(v string) {
 	v = strings.ToLower(v)
 	for _, code := range Supported {
@@ -90,7 +90,7 @@ func SetLang(v string) {
 	}
 }
 
-// T: 현재 언어로 메시지 반환 (영어 폴백)
+// T: return message in current language (English fallback)
 func T(key string) string {
 	if m, ok := messages[lang]; ok {
 		if s, ok := m[key]; ok {
@@ -105,10 +105,10 @@ func T(key string) string {
 	return key
 }
 
-// Lang: 현재 언어 코드 반환
+// Lang: return current language code
 func Lang() string { return lang }
 
-// LangLabel: 언어 표시 문자열 반환 (드롭다운용)
+// LangLabel: return language display string (for dropdowns)
 func LangLabel(code string) string {
 	if m, ok := messages[code]; ok {
 		emoji := m["lang_emoji"]
@@ -120,7 +120,7 @@ func LangLabel(code string) string {
 	return "🌍 " + code
 }
 
-// AllLangs: 웹 UI JS I18N 객체 생성용 — 전체 언어 맵 반환
+// AllLangs: return full language map — for building web UI JS I18N object
 func AllLangs() map[string]map[string]string {
 	return messages
 }

@@ -9,7 +9,7 @@ func GeminiToOpenAI(model string, req *GeminiRequest) *OpenAIRequest {
 		Model: model,
 	}
 
-	// 시스템 프롬프트
+	// system prompt
 	if req.SystemInstruction != nil {
 		text := extractText(req.SystemInstruction.Parts)
 		if text != "" {
@@ -20,7 +20,7 @@ func GeminiToOpenAI(model string, req *GeminiRequest) *OpenAIRequest {
 		}
 	}
 
-	// 대화 내용
+	// conversation contents
 	for _, c := range req.Contents {
 		role := c.Role
 		if role == "model" {
@@ -33,7 +33,7 @@ func GeminiToOpenAI(model string, req *GeminiRequest) *OpenAIRequest {
 		})
 	}
 
-	// 생성 파라미터
+	// generation parameters
 	if req.GenerationConfig != nil {
 		oai.Temperature = req.GenerationConfig.Temperature
 		oai.MaxTokens = req.GenerationConfig.MaxOutputTokens
@@ -74,7 +74,7 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 	return gemini
 }
 
-// ─── OpenAI 응답 → Gemini 응답 ───────────────────────────────────────────────
+// ─── OpenAI Response → Gemini Response ───────────────────────────────────────
 
 func OpenAIRespToGemini(resp *OpenAIResponse) *GeminiResponse {
 	gr := &GeminiResponse{}
@@ -102,7 +102,7 @@ func OpenAIRespToGemini(resp *OpenAIResponse) *GeminiResponse {
 	return gr
 }
 
-// ─── Ollama 응답 → Gemini 응답 ───────────────────────────────────────────────
+// ─── Ollama Response → Gemini Response ───────────────────────────────────────
 
 func OllamaRespToGemini(resp *OllamaResponse) *GeminiResponse {
 	return &GeminiResponse{
@@ -140,7 +140,7 @@ func GeminiToOllama(model string, req *GeminiRequest) *OllamaRequest {
 	return ollama
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 func extractText(parts []GeminiPart) string {
 	var sb strings.Builder

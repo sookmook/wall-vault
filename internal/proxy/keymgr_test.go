@@ -11,7 +11,7 @@ func TestKeyManager_RoundRobin(t *testing.T) {
 	km.AddKey("google", "id2", "key-B", 0)
 	km.AddKey("google", "id3", "key-C", 0)
 
-	// 3번 연속 조회 → A → B → C → A 순환
+	// 3 consecutive gets → A → B → C → A cycle
 	got := make([]string, 4)
 	for i := range got {
 		k, err := km.Get("google")
@@ -33,11 +33,11 @@ func TestKeyManager_SkipCooldown(t *testing.T) {
 	km.AddKey("google", "id1", "key-A", 0)
 	km.AddKey("google", "id2", "key-B", 0)
 
-	// 첫 번째 키에 쿨다운 설정
+	// set cooldown on first key
 	k1, _ := km.Get("google")
 	km.RecordError(k1, 429)
 
-	// 두 번째 조회 → 쿨다운된 key-A를 건너뛰고 key-B 반환
+	// second get → skips cooled-down key-A and returns key-B
 	k2, err := km.Get("google")
 	if err != nil {
 		t.Fatalf("쿨다운 건너뛰기 실패: %v", err)
@@ -52,7 +52,7 @@ func TestKeyManager_AllCooldown(t *testing.T) {
 	km.AddKey("google", "id1", "key-A", 0)
 	km.AddKey("google", "id2", "key-B", 0)
 
-	// 두 키 모두 쿨다운
+	// both keys on cooldown
 	k1, _ := km.Get("google")
 	km.RecordError(k1, 429)
 	k2, _ := km.Get("google")
@@ -101,12 +101,12 @@ func TestKeyManager_LoadFromEnv(t *testing.T) {
 
 func TestKeyManager_SyncReplacesVaultKeys(t *testing.T) {
 	km := NewKeyManager("", "", "test")
-	// 환경변수 키
+	// env var key
 	km.AddKey("google", "env-google-0", "env-key", 0)
-	// 금고 키 시뮬레이션 (직접 추가)
+	// simulate vault key (added directly)
 	km.AddKey("google", "vault-1", "vault-key", 100)
 
-	// 금고 키만 제거하고 환경변수 키는 유지하는 로직 확인
+	// verify logic: remove only vault keys, keep env var keys
 	km.mu.Lock()
 	var kept []*localKey
 	for _, k := range km.keys["google"] {

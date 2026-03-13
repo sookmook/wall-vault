@@ -29,7 +29,7 @@ func TestLoadPlugins_NotExist(t *testing.T) {
 func TestLoadPlugins_Valid(t *testing.T) {
 	dir := t.TempDir()
 
-	// google.yaml 작성
+	// write google.yaml
 	googleYAML := `
 id: google
 name: Google Gemini
@@ -90,9 +90,9 @@ func TestPluginByID(t *testing.T) {
 
 func TestLoadPlugins_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
-	// 유효한 플러그인
+	// valid plugin
 	os.WriteFile(filepath.Join(dir, "good.yaml"), []byte("id: good\nname: Good\nenabled: true\nrequest_format: openai\n"), 0644)
-	// 깨진 YAML (파싱 실패 → 건너뜀)
+	// broken YAML (parse failure → skip)
 	os.WriteFile(filepath.Join(dir, "bad.yaml"), []byte("id: [broken: yaml: :::"), 0644)
 
 	plugins, err := LoadPlugins(dir)

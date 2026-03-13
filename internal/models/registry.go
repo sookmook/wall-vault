@@ -98,8 +98,12 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 // Google models use a fixed list (ListModels API requires authentication)
 func fetchGoogle() []Model {
 	return []Model{
-		{ID: "gemini-3.1-pro-preview",        Name: "Gemini 3.1 Pro Preview",        Service: "google", Context: 1048576},
-		{ID: "gemini-2.5-pro",                Name: "Gemini 2.5 Pro",                Service: "google", Context: 1048576},
+		{ID: "gemini-3.1-pro-preview",             Name: "Gemini 3.1 Pro Preview",             Service: "google", Context: 1048576},
+		{ID: "gemini-3.1-pro-preview-customtools", Name: "Gemini 3.1 Pro Preview (Custom Tools)", Service: "google", Context: 1048576},
+		{ID: "gemini-3.1-flash-image-preview",     Name: "Gemini 3.1 Flash Image Preview",     Service: "google", Context: 1048576},
+		{ID: "gemini-3.1-flash-lite-preview",      Name: "Gemini 3.1 Flash Lite Preview",      Service: "google", Context: 1048576},
+		{ID: "gemini-3-flash-preview",             Name: "Gemini 3 Flash Preview",             Service: "google", Context: 1048576},
+		{ID: "gemini-2.5-pro",                     Name: "Gemini 2.5 Pro",                     Service: "google", Context: 1048576},
 		{ID: "gemini-2.5-flash",              Name: "Gemini 2.5 Flash",              Service: "google", Context: 1048576},
 		{ID: "gemini-2.5-flash-8b",           Name: "Gemini 2.5 Flash 8B",           Service: "google", Context: 1048576},
 		{ID: "gemini-2.0-flash",              Name: "Gemini 2.0 Flash",              Service: "google", Context: 1048576},

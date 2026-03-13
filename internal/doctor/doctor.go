@@ -1,4 +1,4 @@
-// Package doctor: 헬스체크 및 자동 복구 로직
+// Package doctor: health check and auto-recovery logic
 package doctor
 
 import (
@@ -16,7 +16,7 @@ import (
 	"github.com/sookmook/wall-vault/internal/config"
 )
 
-// ─── 상태 구조 ────────────────────────────────────────────────────────────────
+// ─── Status Structure ─────────────────────────────────────────────────────────
 
 type ServiceStatus struct {
 	Name    string
@@ -27,7 +27,7 @@ type ServiceStatus struct {
 	Detail  string
 }
 
-// ─── 상태 확인 ────────────────────────────────────────────────────────────────
+// ─── Status Check ─────────────────────────────────────────────────────────────
 
 func Check(cfg *config.Config) []ServiceStatus {
 	services := []ServiceStatus{
@@ -61,7 +61,7 @@ func Check(cfg *config.Config) []ServiceStatus {
 	return services
 }
 
-// ─── 자동 복구 ────────────────────────────────────────────────────────────────
+// ─── Auto-Recovery ────────────────────────────────────────────────────────────
 
 func Fix(cfg *config.Config) error {
 	statuses := Check(cfg)
@@ -77,35 +77,35 @@ func Fix(cfg *config.Config) error {
 		return nil
 	}
 
-	// 1순위: systemd (Linux/WSL)
+	// 1st priority: systemd (Linux/WSL)
 	if isSystemd() {
 		return fixSystemd(cfg)
 	}
 
-	// 2순위: launchd (macOS)
+	// 2nd priority: launchd (macOS)
 	if runtime.GOOS == "darwin" {
 		return fixLaunchd()
 	}
 
-	// 3순위: NSSM (Windows 네이티브)
+	// 3rd priority: NSSM (Windows native)
 	if runtime.GOOS == "windows" {
 		if err := fixNSSM(); err == nil {
 			return nil
 		}
 	}
 
-	// 4순위: 직접 프로세스 시작
+	// 4th priority: start process directly
 	return fixDirect(cfg)
 }
 
-// ─── systemd 복구 ─────────────────────────────────────────────────────────────
+// ─── systemd Recovery ─────────────────────────────────────────────────────────
 
 func isSystemd() bool {
 	_, err := exec.LookPath("systemctl")
 	if err != nil {
 		return false
 	}
-	// 서비스 파일 존재 여부 확인
+	// check service file existence
 	home, _ := os.UserHomeDir()
 	svcFile := filepath.Join(home, ".config", "systemd", "user", "wall-vault.service")
 	_, err = os.Stat(svcFile)
@@ -126,7 +126,7 @@ func fixSystemd(cfg *config.Config) error {
 	return nil
 }
 
-// ─── launchd 복구 (macOS) ─────────────────────────────────────────────────────
+// ─── launchd Recovery (macOS) ────────────────────────────────────────────────
 
 func fixLaunchd() error {
 	home, _ := os.UserHomeDir()
@@ -142,7 +142,7 @@ func fixLaunchd() error {
 	return cmd.Run()
 }
 
-// ─── NSSM 복구 (Windows) ──────────────────────────────────────────────────────
+// ─── NSSM Recovery (Windows) ──────────────────────────────────────────────────
 
 func fixNSSM() error {
 	if _, err := exec.LookPath("nssm"); err != nil {
@@ -155,10 +155,10 @@ func fixNSSM() error {
 	return cmd.Run()
 }
 
-// ─── 직접 프로세스 시작 ───────────────────────────────────────────────────────
+// ─── Direct Process Start ─────────────────────────────────────────────────────
 
 func fixDirect(cfg *config.Config) error {
-	// wall-vault 바이너리 경로 탐색
+	// locate wall-vault binary
 	bin := findBinary()
 	if bin == "" {
 		return fmt.Errorf("wall-vault 바이너리를 찾을 수 없음 — PATH 또는 ~/.local/bin 확인")
@@ -176,11 +176,11 @@ func fixDirect(cfg *config.Config) error {
 }
 
 func findBinary() string {
-	// 1. 현재 실행파일
+	// 1. current executable
 	if exe, err := os.Executable(); err == nil {
 		return exe
 	}
-	// 2. 플랫폼별 후보 경로
+	// 2. platform-specific candidate paths
 	home, _ := os.UserHomeDir()
 	candidates := []string{
 		// Linux / WSL
@@ -188,6 +188,7 @@ func findBinary() string {
 		filepath.Join(home, "go", "bin", "wall-vault"),
 		"/usr/local/bin/wall-vault",
 		// macOS (Homebrew prefix)
+
 		"/opt/homebrew/bin/wall-vault",
 		"/usr/local/bin/wall-vault",
 	}
@@ -214,9 +215,9 @@ func findBinary() string {
 	return ""
 }
 
-// ─── 서비스 파일 생성 ─────────────────────────────────────────────────────────
+// ─── Service File Generation ──────────────────────────────────────────────────
 
-// GenerateSystemdService: ~/.config/systemd/user/wall-vault.service 생성
+// GenerateSystemdService: generate ~/.config/systemd/user/wall-vault.service
 func GenerateSystemdService(cfg *config.Config) error {
 	bin := findBinary()
 	if bin == "" {
@@ -255,7 +256,7 @@ WantedBy=default.target
 	return nil
 }
 
-// GenerateLaunchdPlist: ~/Library/LaunchAgents/com.wall-vault.plist 생성 (macOS)
+// GenerateLaunchdPlist: generate ~/Library/LaunchAgents/com.wall-vault.plist (macOS)
 func GenerateLaunchdPlist(cfg *config.Config) error {
 	bin := findBinary()
 	if bin == "" {
@@ -308,7 +309,7 @@ func GenerateLaunchdPlist(cfg *config.Config) error {
 	return nil
 }
 
-// GenerateNSSMScript: Windows NSSM 서비스 등록 스크립트 생성
+// GenerateNSSMScript: generate Windows NSSM service registration script
 func GenerateNSSMScript(cfg *config.Config) error {
 	bin := findBinary()
 	if bin == "" {
@@ -344,7 +345,7 @@ echo 관리: nssm start/stop/restart %s
 	return nil
 }
 
-// ─── 보고서 출력 ──────────────────────────────────────────────────────────────
+// ─── Status Report Output ─────────────────────────────────────────────────────
 
 func PrintStatus(cfg *config.Config) {
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -384,7 +385,7 @@ func PrintStatus(cfg *config.Config) {
 		cfg.Vault.Port, strings.Join(cfg.Proxy.Services, ", "))
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 func extractVersion(body []byte) string {
 	var m map[string]interface{}

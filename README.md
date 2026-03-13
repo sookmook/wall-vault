@@ -78,6 +78,7 @@ Single Go binary. One bot or a dozen — fully covered.
 - [API Reference](#api-reference)
 - [Modes](#modes)
 - [Auto-Start](#auto-start)
+- [Internal Network Setup](#internal-network-setup)
 - [OpenClaw Integration](#openclaw-integration)
 - [Build](#build)
 - [Project Structure](#project-structure)
@@ -412,6 +413,153 @@ Dashboard changes model
 
 ---
 
+## Internal Network Setup
+
+One vault. Multiple proxies. All machines on the same internal network.
+
+```
+Internal Network (e.g. 10.0.0.x)
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  [Mac Mini :56243]          [WSL / Linux]               │
+│  Key Vault                  Proxy A (bot-a)            │
+│  vault.json                 → VAULT_URL=192.168.x.x     │
+│                                                         │
+│                             [Raspberry Pi]              │
+│                             Proxy B (bot-c)             │
+│                             → VAULT_URL=192.168.x.x     │
+│                                                         │
+│                             [Windows / Mac]             │
+│                             Proxy C (mini)              │
+│                             → VAULT_URL=127.0.0.1       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Step 1: Run the vault (on the host machine)
+
+```bash
+# On the machine that will host the vault (e.g. 192.168.x.x)
+./wall-vault vault
+
+# Or with explicit config
+./wall-vault vault --config ~/.wall-vault/vault.yaml
+```
+
+Default: vault listens on `0.0.0.0:56243` — accessible from all network interfaces.
+
+### Step 2: Create client tokens (from the dashboard)
+
+Open `http://192.168.x.x:56243` → **Add Agent**:
+
+| Field | Example |
+|-------|---------|
+| ID | `bot-a` |
+| Name | `봇 A` |
+| Agent Type | `openclaw` |
+| Default Service | `google` |
+| Token | leave blank → auto-generated, shown once |
+| IP Whitelist | `<proxy-ip>` (WSL IP) — optional but recommended |
+
+Copy the generated token. You will need it for each proxy.
+
+> **Tip:** Set IP whitelist per client to prevent token abuse if a machine is compromised.
+
+### Step 3: Deploy each proxy
+
+```bash
+# Proxy on WSL (bot-a)
+VAULT_URL=http://192.168.x.x:56243 \
+VAULT_CLIENT_ID=bot-a \
+VAULT_TOKEN=your-bot-a-token \
+./wall-vault proxy
+
+# Proxy on Raspberry Pi (bot-c)
+VAULT_URL=http://192.168.x.x:56243 \
+VAULT_CLIENT_ID=bot-c \
+VAULT_TOKEN=your-bot-c-token \
+./wall-vault proxy
+
+# Proxy on the same machine as vault (mini — use localhost)
+VAULT_URL=http://127.0.0.1:56243 \
+VAULT_CLIENT_ID=mini \
+VAULT_TOKEN=your-bot-b-token \
+./wall-vault proxy
+```
+
+Each proxy:
+1. Connects to the vault on startup
+2. Subscribes to the SSE stream (`/api/events`)
+3. Fetches the active API key for its assigned service
+4. Reports heartbeat every 60 seconds
+
+### Step 4: Verify SSE sync
+
+```bash
+# Watch the SSE stream from vault
+curl -s http://192.168.x.x:56243/api/events --max-time 10
+
+# Check proxy status (shows SSE connection state)
+curl http://localhost:56244/status
+
+# Change model on vault → confirm proxy reflects it within 3s
+curl -X PUT http://192.168.x.x:56243/admin/clients/bot-a \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"default_model":"gemini-2.5-pro"}'
+
+curl http://localhost:56244/status | grep model
+```
+
+### Firewall / Port Guide
+
+| Port | Service | Open to |
+|------|---------|---------|
+| 56243 | Key Vault (dashboard + API) | internal network only |
+| 56244 | AI Proxy (per machine) | localhost only (or per-bot clients) |
+| 11434 | Ollama (if shared) | internal network |
+
+```bash
+# Linux — allow vault from internal network only
+sudo ufw allow from 10.0.0.0/24 to any port 56243
+sudo ufw deny 56243
+
+# macOS — block vault from external
+# In System Settings → Firewall, allow wall-vault only on LAN interface
+```
+
+> **Security note:** Never expose port 56243 to the internet. The vault stores encrypted API keys and admin credentials. Use a VPN or SSH tunnel if remote access is needed.
+
+### Config file approach (recommended for production)
+
+Instead of environment variables, use a config file per machine:
+
+```yaml
+# ~/.wall-vault/proxy-bot-a.yaml
+mode: distributed
+proxy:
+  port: 56244
+  client_id: bot-a
+  vault_url: http://192.168.x.x:56243
+  vault_token: your-bot-a-token
+  tool_filter: strip_all
+```
+
+```bash
+./wall-vault proxy --config ~/.wall-vault/proxy-bot-a.yaml
+```
+
+### What syncs, what doesn't
+
+| Setting | Syncs via SSE? | Stored where |
+|---------|---------------|--------------|
+| Active API key | ✅ Yes | vault.json (encrypted) |
+| Service / Model per agent | ✅ Yes | vault.json |
+| Proxy port | ❌ No | local config |
+| Tool filter mode | ❌ No | local config |
+| Theme / Language | ❌ No | vault.json (per vault) |
+
+---
+
 ## Auto-Start
 
 ### Linux — systemd
@@ -709,6 +857,118 @@ make build
 ```
 
 빌드만 다시 하면 새 언어가 마법사·대시보드·UI 전체에 자동 반영됩니다.
+
+---
+
+### 내부망 분산 운영 (금고 1대 + 프록시 N대)
+
+내부망에서 금고 한 대를 두고 여러 프록시를 연결하는 구성입니다.
+
+```
+내부망 (예: 10.0.0.x)
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  [맥미니 :56243]            [WSL / Linux]               │
+│  키 금고 (vault)            프록시 모토코                │
+│  vault.json 저장            VAULT_URL=192.168.x.x       │
+│                                                         │
+│                             [라즈베리파이]              │
+│                             프록시 라즈                  │
+│                             VAULT_URL=192.168.x.x       │
+│                                                         │
+│                             [맥미니 로컬]               │
+│                             프록시 미니                  │
+│                             VAULT_URL=127.0.0.1         │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 1단계: 금고 실행 (호스트 머신)
+
+```bash
+# 금고 호스트 (예: 192.168.x.x)
+./wall-vault vault
+```
+
+기본값으로 `0.0.0.0:56243`에서 수신 — 내부망 전체에서 접근 가능.
+
+#### 2단계: 클라이언트 토큰 생성 (대시보드)
+
+`http://192.168.x.x:56243` → **에이전트 추가**:
+
+| 항목 | 예시 |
+|------|------|
+| ID | `bot-a` |
+| 이름 | `봇 A` |
+| 에이전트 종류 | `openclaw` |
+| 기본 서비스 | `google` |
+| 토큰 | 빈칸 → 자동 생성 (한 번만 표시) |
+| 허용 IP | `<proxy-ip>` (WSL IP) — 선택, 권장 |
+
+생성된 토큰을 복사해 각 프록시에 사용합니다.
+
+#### 3단계: 각 머신에서 프록시 실행
+
+```bash
+# WSL (모토코)
+VAULT_URL=http://192.168.x.x:56243 \
+VAULT_CLIENT_ID=bot-a \
+VAULT_TOKEN=your-bot-a-token \
+./wall-vault proxy
+
+# 라즈베리파이 (라즈)
+VAULT_URL=http://192.168.x.x:56243 \
+VAULT_CLIENT_ID=bot-c \
+VAULT_TOKEN=your-bot-c-token \
+./wall-vault proxy
+
+# 맥미니 로컬 (미니)
+VAULT_URL=http://127.0.0.1:56243 \
+VAULT_CLIENT_ID=mini \
+VAULT_TOKEN=your-bot-b-token \
+./wall-vault proxy
+```
+
+#### 4단계: SSE 동기화 확인
+
+```bash
+# SSE 스트림 직접 확인
+curl -s http://192.168.x.x:56243/api/events --max-time 10
+
+# 프록시 상태 확인 (SSE 연결 포함)
+curl http://localhost:56244/status
+
+# 금고에서 모델 변경 → 3초 내 프록시에 반영되는지 확인
+curl -X PUT http://192.168.x.x:56243/admin/clients/bot-a \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"default_model":"gemini-2.5-pro"}'
+```
+
+#### 포트 방화벽 설정
+
+| 포트 | 서비스 | 오픈 범위 |
+|------|--------|-----------|
+| 56243 | 키 금고 (대시보드+API) | 내부망만 |
+| 56244 | AI 프록시 (머신별) | localhost 권장 |
+| 11434 | Ollama (공유 시) | 내부망 |
+
+```bash
+# Linux: 내부망에서만 금고 접근 허용
+sudo ufw allow from 10.0.0.0/24 to any port 56243
+sudo ufw deny 56243
+```
+
+> ⚠️ **보안 주의**: 56243 포트는 절대 인터넷에 노출하지 마세요. 암호화된 API 키와 관리자 자격증명이 저장되어 있습니다. 원격 접근이 필요하면 VPN 또는 SSH 터널을 사용하세요.
+
+#### 동기화 범위
+
+| 설정 | SSE 동기화 | 저장 위치 |
+|------|-----------|----------|
+| 활성 API 키 | ✅ 실시간 | vault.json (암호화) |
+| 서비스·모델 (에이전트별) | ✅ 실시간 | vault.json |
+| 프록시 포트 | ❌ 없음 | 로컬 설정 |
+| 도구 필터 모드 | ❌ 없음 | 로컬 설정 |
+| 테마·언어 | ❌ 없음 | vault.json (금고별) |
 
 ---
 

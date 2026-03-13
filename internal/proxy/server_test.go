@@ -10,13 +10,13 @@ import (
 	"github.com/sookmook/wall-vault/internal/config"
 )
 
-// newTestServer: 테스트용 프록시 서버 생성 (금고 연결 없음)
+// newTestServer: create a test proxy server (no vault connection)
 func newTestServer() *Server {
 	cfg := config.Default()
 	cfg.Mode = "standalone"
 	cfg.Proxy.Services = []string{"ollama"}
 	cfg.Proxy.ToolFilter = "strip_all"
-	cfg.Proxy.VaultURL = "" // 금고 연결 비활성화
+	cfg.Proxy.VaultURL = "" // disable vault connection
 	return NewServer(cfg)
 }
 
@@ -118,7 +118,7 @@ func TestHandleConfigModel(t *testing.T) {
 		t.Errorf("model = %q, want gemini-2.5-flash", resp["model"])
 	}
 
-	// 변경 후 /status에서 반영 확인
+	// verify change is reflected in /status
 	req2 := httptest.NewRequest("GET", "/status", nil)
 	w2 := httptest.NewRecorder()
 	h.ServeHTTP(w2, req2)
@@ -193,7 +193,7 @@ func TestHandleGemini_ToolStripping(t *testing.T) {
 	srv := newTestServer()
 	h := srv.Handler()
 
-	// 도구가 포함된 Gemini 요청
+	// Gemini request containing tools
 	body := `{
 		"contents": [{"role":"user","parts":[{"text":"안녕"}]}],
 		"tools": [{"functionDeclarations":[{"name":"search"}]}]
@@ -205,7 +205,7 @@ func TestHandleGemini_ToolStripping(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
-	// strip_all 필터: 도구 제거 후 처리 (업스트림 없으므로 502 예상)
+	// strip_all filter: tools removed before processing (502 expected since no upstream)
 	if w.Code != http.StatusBadGateway {
 		t.Logf("status = %d (업스트림 없이 502 예상)", w.Code)
 	}

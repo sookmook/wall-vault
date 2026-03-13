@@ -1,4 +1,4 @@
-// Package middleware: 공통 HTTP 미들웨어
+// Package middleware: common HTTP middleware
 package middleware
 
 import (
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// responseWriter: 응답 상태 코드 캡처
+// responseWriter: captures response status code
 type responseWriter struct {
 	http.ResponseWriter
 	status int
@@ -25,14 +25,14 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// Flush: http.Flusher 구현 — SSE가 올바르게 동작하기 위해 필요
+// Flush: implements http.Flusher — required for SSE to work correctly
 func (rw *responseWriter) Flush() {
 	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-// Logger: 요청 로깅 미들웨어
+// Logger: request logging middleware
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -40,7 +40,7 @@ func Logger(next http.Handler) http.Handler {
 		next.ServeHTTP(rw, r)
 		elapsed := time.Since(start)
 
-		// /api/events (SSE) 와 /health는 로그 생략
+		// skip logging for /api/events (SSE) and /health
 		if r.URL.Path == "/api/events" || r.URL.Path == "/health" {
 			return
 		}
@@ -52,7 +52,7 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// CORS: CORS 헤더 미들웨어
+// CORS: CORS header middleware
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -66,7 +66,7 @@ func CORS(next http.Handler) http.Handler {
 	})
 }
 
-// Recovery: 패닉 복구 미들웨어
+// Recovery: panic recovery middleware
 func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -79,7 +79,7 @@ func Recovery(next http.Handler) http.Handler {
 	})
 }
 
-// Chain: 미들웨어 체인 (역순 적용)
+// Chain: middleware chain (applied in reverse order)
 func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		h = middlewares[i](h)

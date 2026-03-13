@@ -44,7 +44,7 @@ func Run(args []string) {
 		log.Fatalf("설정 오류: %v", err)
 	}
 
-	// 플래그 덮어쓰기 (우선순위: 플래그 > 환경변수 > 설정 파일)
+	// flag override (priority: flag > env var > config file)
 	if *port > 0 {
 		cfg.Proxy.Port = *port
 	}
@@ -61,7 +61,7 @@ func Run(args []string) {
 		cfg.Proxy.ToolFilter = *filter
 	}
 
-	// API 키: 플래그 → 환경변수 순서로 적용
+	// API keys: flag → env var order of precedence
 	if v := *keyGoogle; v == "" {
 		v = os.Getenv("WV_KEY_GOOGLE")
 		_ = v
@@ -78,7 +78,7 @@ func Run(args []string) {
 	runProxy(cfg)
 }
 
-// RunStandalone: wall-vault start (proxy 부분)
+// RunStandalone: wall-vault start (proxy portion)
 func RunStandalone() {
 	cfg, err := config.Load("")
 	if err != nil {

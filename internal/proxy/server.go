@@ -18,7 +18,7 @@ import (
 	"github.com/sookmook/wall-vault/internal/models"
 )
 
-// Server: 프록시 HTTP 서버
+// Server: proxy HTTP server
 type Server struct {
 	cfg      *config.Config
 	mu       sync.RWMutex
@@ -29,11 +29,11 @@ type Server struct {
 	sse      *SSEClient
 	registry *models.Registry
 	hooksMgr *hooks.Manager
-	ollamaMu sync.Mutex // 단일 Ollama 동시 요청 보호
+	ollamaMu sync.Mutex // protect single concurrent Ollama request
 }
 
 func NewServer(cfg *config.Config) *Server {
-	// 기본 서비스 결정
+	// determine default service
 	defaultSvc := "ollama"
 	if len(cfg.Proxy.Services) > 0 {
 		defaultSvc = cfg.Proxy.Services[0]
@@ -49,7 +49,7 @@ func NewServer(cfg *config.Config) *Server {
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
 	s.filter = NewToolFilter(FilterMode(cfg.Proxy.ToolFilter), cfg.Proxy.AllowedTools)
 
-	// 훅 관리자 초기화
+	// initialize hooks manager
 	shellCmds := map[hooks.EventType]string{
 		hooks.EventModelChanged: cfg.Hooks.OnModelChange,
 		hooks.EventKeyExhausted: cfg.Hooks.OnKeyExhausted,
@@ -58,10 +58,10 @@ func NewServer(cfg *config.Config) *Server {
 	}
 	s.hooksMgr = hooks.NewManager(shellCmds, cfg.Hooks.OpenClawSocket)
 
-	// 환경변수에서 키 로드 (standalone 모드)
+	// load keys from env vars (standalone mode)
 	s.keyMgr.LoadFromEnv()
 
-	// distributed 모드: 금고에서 키 동기화
+	// distributed mode: sync keys from vault
 	if cfg.Proxy.VaultURL != "" {
 		s.sse = NewSSEClient(cfg.Proxy.VaultURL, cfg.Proxy.ClientID, func(svc, mdl string) {
 			s.mu.Lock()
@@ -83,13 +83,13 @@ func NewServer(cfg *config.Config) *Server {
 		})
 		s.sse.Start()
 
-		// 금고에서 클라이언트 설정 및 키 초기 로드
+		// initial load of client config and keys from vault
 		go func() {
 			time.Sleep(2 * time.Second)
 			s.syncFromVault()
 		}()
 
-		// 주기적 키 동기화 (5분마다)
+		// periodic key sync (every 5 minutes)
 		go func() {
 			ticker := time.NewTicker(5 * time.Minute)
 			defer ticker.Stop()
@@ -98,11 +98,11 @@ func NewServer(cfg *config.Config) *Server {
 			}
 		}()
 
-		// Heartbeat 시작
+		// start heartbeat
 		s.startHeartbeat()
 	}
 
-	// 모델 레지스트리 초기화 (비동기)
+	// initialize model registry (async)
 	go func() {
 		ollamaURL := s.ollamaURL()
 		s.registry.Refresh(cfg.Proxy.Services, models.ServiceURLs{"ollama": ollamaURL}, "")
@@ -111,9 +111,9 @@ func NewServer(cfg *config.Config) *Server {
 	return s
 }
 
-// syncFromVault: 금고에서 클라이언트 설정·키 동기화
+// syncFromVault: sync client config and keys from vault
 func (s *Server) syncFromVault() {
-	// 클라이언트 설정 조회
+	// fetch client config
 	url := fmt.Sprintf("%s/api/clients", s.cfg.Proxy.VaultURL)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -145,13 +145,13 @@ func (s *Server) syncFromVault() {
 		}
 	}
 
-	// 키 동기화
+	// sync keys
 	if err := s.keyMgr.SyncFromVault(); err != nil {
 		log.Printf("[sync] 키 동기화 실패: %v", err)
 	}
 }
 
-// ollamaURL: 설정·환경변수에서 Ollama URL 반환
+// ollamaURL: return Ollama URL from config or env var
 func (s *Server) ollamaURL() string {
 	if v := os.Getenv("OLLAMA_URL"); v != "" {
 		return v
@@ -171,7 +171,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/config/think-mode", s.handleThinkMode)
 	mux.HandleFunc("/reload", s.handleReload)
 
-	// Gemini API
+	// Gemini API handler
 	mux.HandleFunc("/google/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "streamGenerateContent") {
 			s.handleGeminiStream(w, r)
@@ -180,7 +180,7 @@ func (s *Server) Handler() http.Handler {
 		}
 	})
 
-	// OpenAI 호환
+	// OpenAI compatible
 	mux.HandleFunc("/v1/chat/completions", s.handleOpenAI)
 
 	return middleware.Chain(mux,
@@ -190,7 +190,7 @@ func (s *Server) Handler() http.Handler {
 	)
 }
 
-// ─── 헬스 / 상태 ─────────────────────────────────────────────────────────────
+// ─── Health / Status ──────────────────────────────────────────────────────────
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{
@@ -253,8 +253,8 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 	}
 	newSvc, newMdl := s.service, s.model
 	s.mu.Unlock()
-	log.Printf("[config] 모델 변경: %s/%s", newSvc, newMdl)
-	// vault에 write-through (비동기, best-effort)
+	log.Printf("[config] model changed: %s/%s", newSvc, newMdl)
+	// write-through to vault (async, best-effort)
 	if newSvc != oldSvc || newMdl != oldMdl {
 		go s.pushConfigToVault(newSvc, newMdl)
 		s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
@@ -265,7 +265,7 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "ok", "service": newSvc, "model": newMdl})
 }
 
-// pushConfigToVault: 프록시 모델 변경을 vault에 write-through (양방향 동기화)
+// pushConfigToVault: write-through proxy model change to vault (bidirectional sync)
 func (s *Server) pushConfigToVault(service, model string) {
 	if s.cfg.Proxy.VaultURL == "" || s.cfg.Proxy.VaultToken == "" {
 		return
@@ -298,7 +298,7 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "reloading"})
 }
 
-// ─── Gemini API 핸들러 (비스트리밍) ──────────────────────────────────────────
+// ─── Gemini API Handler (non-streaming) ──────────────────────────────────────
 
 func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -320,7 +320,7 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 
 	stripped := s.filter.FilterGemini(&req)
 	if stripped > 0 {
-		log.Printf("[Security] 요청에서 %d개 도구 차단 (client=%s)", stripped, s.cfg.Proxy.ClientID)
+		log.Printf("[Security] blocked %d tools from request (client=%s)", stripped, s.cfg.Proxy.ClientID)
 	}
 
 	s.mu.RLock()
@@ -349,7 +349,7 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// ─── OpenAI API 핸들러 ────────────────────────────────────────────────────────
+// ─── OpenAI API Handler ───────────────────────────────────────────────────────
 
 func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -395,11 +395,11 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(oaiResp)
 }
 
-// ─── 요청 분배 ────────────────────────────────────────────────────────────────
+// ─── Request Dispatch ─────────────────────────────────────────────────────────
 
 func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	var lastErr error
-	// 지정 서비스 먼저 시도
+	// try the specified service first
 	tryOrder := []string{service}
 	for _, svc := range s.cfg.Proxy.Services {
 		if svc != service {
@@ -420,7 +420,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		case "openai":
 			resp, err = s.callOpenAI(model, req)
 		case "anthropic":
-			// Anthropic API는 다른 형식 — OpenRouter 경유 (anthropic/model 경로 유지)
+			// Anthropic API uses a different format — route via OpenRouter (keep anthropic/model path)
 			resp, err = s.callOpenRouter("anthropic/"+model, req)
 		default:
 			continue
@@ -428,7 +428,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		if err == nil {
 			return resp, nil
 		}
-		log.Printf("[proxy] %s 실패 → 폴백: %v", svc, err)
+		log.Printf("[proxy] %s failed → fallback: %v", svc, err)
 		lastErr = err
 	}
 	s.hooksMgr.Fire(hooks.EventServiceDown, map[string]string{
@@ -520,7 +520,7 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 	return OpenAIRespToGemini(&oaiResp), nil
 }
 
-// ─── OpenAI 직접 호출 ─────────────────────────────────────────────────────────
+// ─── OpenAI Direct Call ───────────────────────────────────────────────────────
 
 func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	key, plainKey, err := s.getKey("openai")
@@ -562,9 +562,14 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 	return OpenAIRespToGemini(&oaiResp), nil
 }
 
-// ─── Ollama (뮤텍스로 단일 동시 요청) ────────────────────────────────────────
+// ─── Ollama (single concurrent request via mutex) ────────────────────────────
 
-func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, error) {
+	// always use the configured Ollama model, ignoring the upstream service's model name
+	model := os.Getenv("OLLAMA_MODEL")
+	if model == "" {
+		model = os.Getenv("WV_OLLAMA_MODEL")
+	}
 	if model == "" {
 		model = "qwen3.5:35b"
 	}
@@ -594,7 +599,7 @@ func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, 
 	return OllamaRespToGemini(&ollamaResp), nil
 }
 
-// ─── 공통 HTTP 요청 ──────────────────────────────────────────────────────────
+// ─── Common HTTP Request ──────────────────────────────────────────────────────
 
 func (s *Server) doRequest(method, url string, body []byte, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, bytes.NewReader(body))
@@ -617,7 +622,7 @@ func (s *Server) getKey(service string) (*localKey, string, error) {
 	return k, k.plaintext, nil
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 // parseProviderModel handles OpenClaw's "provider/model-id" format.
 //

@@ -2,16 +2,16 @@ package proxy
 
 import "encoding/json"
 
-// FilterMode: 도구 필터 모드
+// FilterMode: tool filter mode
 type FilterMode string
 
 const (
-	FilterStripAll   FilterMode = "strip_all"   // 모든 외부 도구 차단
-	FilterWhitelist  FilterMode = "whitelist"   // 허용 목록만 통과
-	FilterPassthrough FilterMode = "passthrough" // 필터 없음
+	FilterStripAll   FilterMode = "strip_all"   // block all external tools
+	FilterWhitelist  FilterMode = "whitelist"   // only allowed list passes through
+	FilterPassthrough FilterMode = "passthrough" // no filter
 )
 
-// ToolFilter: Gemini / OpenAI 요청에서 도구 제거
+// ToolFilter: remove tools from Gemini / OpenAI requests
 type ToolFilter struct {
 	mode         FilterMode
 	allowedTools map[string]bool
@@ -25,7 +25,7 @@ func NewToolFilter(mode FilterMode, allowed []string) *ToolFilter {
 	return &ToolFilter{mode: mode, allowedTools: m}
 }
 
-// FilterGemini: Gemini 요청에서 tools/toolConfig 처리
+// FilterGemini: handle tools/toolConfig in Gemini requests
 func (f *ToolFilter) FilterGemini(req *GeminiRequest) int {
 	if f.mode == FilterPassthrough {
 		return 0
@@ -54,7 +54,7 @@ func (f *ToolFilter) FilterGemini(req *GeminiRequest) int {
 	return stripped
 }
 
-// FilterOpenAI: OpenAI 요청에서 tools/tool_choice 처리
+// FilterOpenAI: handle tools/tool_choice in OpenAI requests
 func (f *ToolFilter) FilterOpenAI(req *OpenAIRequest) int {
 	if f.mode == FilterPassthrough {
 		return 0
@@ -87,7 +87,7 @@ func (f *ToolFilter) toolAllowed(t interface{}) bool {
 	if len(f.allowedTools) == 0 {
 		return false
 	}
-	// JSON 직렬화 후 name 필드 추출
+	// serialize to JSON then extract name field
 	data, err := json.Marshal(t)
 	if err != nil {
 		return false

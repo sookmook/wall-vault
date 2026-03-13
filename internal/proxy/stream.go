@@ -11,9 +11,9 @@ import (
 	"strings"
 )
 
-// ─── Gemini 스트리밍 핸들러 ──────────────────────────────────────────────────
+// ─── Gemini Streaming Handler ────────────────────────────────────────────────
 
-// handleGeminiStream: streamGenerateContent 엔드포인트 처리
+// handleGeminiStream: handle the streamGenerateContent endpoint
 func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
@@ -34,7 +34,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 
 	stripped := s.filter.FilterGemini(&req)
 	if stripped > 0 {
-		log.Printf("[Security] 스트림 요청에서 %d개 도구 차단", stripped)
+		log.Printf("[Security] blocked %d tools from stream request", stripped)
 	}
 
 	s.mu.RLock()
@@ -49,7 +49,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// SSE 헤더 설정
+	// set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -69,7 +69,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ─── Google 스트리밍 패스스루 ────────────────────────────────────────────────
+// ─── Google Streaming Pass-Through ───────────────────────────────────────────
 
 func (s *Server) streamGoogle(w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
 	key, plainKey, err := s.getKey("google")
@@ -99,7 +99,7 @@ func (s *Server) streamGoogle(w http.ResponseWriter, f http.Flusher, model strin
 		return
 	}
 
-	// Google SSE 패스스루: 그대로 클라이언트에 전달
+	// Google SSE pass-through: forward as-is to client
 	tokens := 0
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -108,7 +108,7 @@ func (s *Server) streamGoogle(w http.ResponseWriter, f http.Flusher, model strin
 		if f != nil {
 			f.Flush()
 		}
-		// 토큰 수 추정 (usageMetadata 파싱)
+		// estimate token count (parse usageMetadata)
 		if strings.HasPrefix(line, "data: ") {
 			var chunk GeminiResponse
 			if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &chunk); err == nil {
@@ -121,7 +121,7 @@ func (s *Server) streamGoogle(w http.ResponseWriter, f http.Flusher, model strin
 	s.keyMgr.RecordSuccess(key, tokens)
 }
 
-// ─── OpenRouter 스트리밍 변환 ────────────────────────────────────────────────
+// ─── OpenRouter Streaming Conversion ─────────────────────────────────────────
 
 func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
 	key, plainKey, err := s.getKey("openrouter")
@@ -155,7 +155,7 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 		return
 	}
 
-	// OpenAI SSE → Gemini SSE 변환
+	// convert OpenAI SSE → Gemini SSE
 	totalTokens := 0
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -205,7 +205,7 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 	s.keyMgr.RecordSuccess(key, totalTokens)
 }
 
-// ─── Ollama 스트리밍 ──────────────────────────────────────────────────────────
+// ─── Ollama Streaming ─────────────────────────────────────────────────────────
 
 func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
 	if model == "" {
@@ -213,7 +213,7 @@ func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model strin
 	}
 	ollamaURL := s.ollamaURL()
 
-	// Ollama 동시 요청 제한
+	// limit concurrent Ollama requests
 	s.ollamaMu.Lock()
 	defer s.ollamaMu.Unlock()
 
@@ -237,7 +237,7 @@ func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model strin
 		return
 	}
 
-	// Ollama 스트리밍: 한 줄씩 JSON 파싱 → Gemini SSE 변환
+	// Ollama streaming: parse JSON line-by-line → convert to Gemini SSE
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -275,7 +275,7 @@ func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model strin
 	}
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 func writeGeminiChunk(w io.Writer, f http.Flusher, resp *GeminiResponse, final bool) {
 	if final && len(resp.Candidates) > 0 {

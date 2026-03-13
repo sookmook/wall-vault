@@ -1,4 +1,4 @@
-// Package setup: 초보자용 대화형 설치 마법사
+// Package setup: interactive setup wizard for beginners
 package setup
 
 import (
@@ -19,7 +19,7 @@ var reader = bufio.NewReader(os.Stdin)
 
 // Run: wall-vault setup
 func Run(_ []string) {
-	// 시스템 언어 자동 감지 후 선택
+	// auto-detect system language then prompt selection
 	i18n.Init()
 	selectLanguage()
 
@@ -30,7 +30,7 @@ func Run(_ []string) {
 
 	cfg := config.Default()
 
-	// ─── 테마 ────────────────────────────────────────────────────────────────
+	// ─── Theme ───────────────────────────────────────────────────────────────
 	fmt.Println("테마 / Theme / テーマ:")
 	fmt.Println("  1) dark    🌑")
 	fmt.Println("  2) light   ☀️")
@@ -42,7 +42,7 @@ func Run(_ []string) {
 		cfg.Theme = t
 	}
 
-	// ─── 모드 ────────────────────────────────────────────────────────────────
+	// ─── Mode ────────────────────────────────────────────────────────────────
 	fmt.Println("\n운용 방식 / Mode:")
 	fmt.Println("  1) standalone  — 이 기기 하나에서 프록시+금고 모두 실행 (권장)")
 	fmt.Println("  2) distributed — 금고는 다른 기기, 여기서는 프록시만")
@@ -53,10 +53,10 @@ func Run(_ []string) {
 		cfg.Proxy.VaultToken = ask("프록시 인증 토큰 / Vault token", "")
 	}
 
-	// ─── 클라이언트 ID ────────────────────────────────────────────────────────
+	// ─── Client ID ───────────────────────────────────────────────────────────
 	cfg.Proxy.ClientID = ask("\n봇 이름 / Bot name (e.g. my-bot)", "my-bot")
 
-	// ─── 포트 ────────────────────────────────────────────────────────────────
+	// ─── Port ────────────────────────────────────────────────────────────────
 	portStr := ask("프록시 포트 / Proxy port", "56244")
 	fmt.Sscanf(portStr, "%d", &cfg.Proxy.Port)
 	if cfg.Mode == "standalone" {
@@ -64,7 +64,7 @@ func Run(_ []string) {
 		fmt.Sscanf(vaultPortStr, "%d", &cfg.Vault.Port)
 	}
 
-	// ─── 서비스 선택 ──────────────────────────────────────────────────────────
+	// ─── Service Selection ────────────────────────────────────────────────────
 	fmt.Println("\nAI 서비스 선택 / Select AI services:")
 
 	useGoogle := askYN("Google Gemini", false)
@@ -86,7 +86,7 @@ func Run(_ []string) {
 		fmt.Println("  → 서비스 미선택, Ollama로 설정합니다.")
 	}
 
-	// ─── Ollama 설정 ──────────────────────────────────────────────────────────
+	// ─── Ollama Configuration ─────────────────────────────────────────────────
 	if useOllama {
 		ollamaURL := ask("\nOllama 서버 URL", "http://localhost:11434")
 		fmt.Printf("  → %s 에서 모델 목록 조회 중...\n", ollamaURL)
@@ -109,7 +109,7 @@ func Run(_ []string) {
 		}
 	}
 
-	// ─── 도구 필터 ────────────────────────────────────────────────────────────
+	// ─── Tool Filter ──────────────────────────────────────────────────────────
 	fmt.Println("\n도구 보안 필터 / Tool filter:")
 	fmt.Println("  1) strip_all   — 외부 도구 전부 차단 (권장)")
 	fmt.Println("  2) passthrough — 필터 없음")
@@ -118,7 +118,7 @@ func Run(_ []string) {
 		cfg.Proxy.ToolFilter = "passthrough"
 	}
 
-	// ─── 금고 보안 설정 ───────────────────────────────────────────────────────
+	// ─── Vault Security Settings ──────────────────────────────────────────────
 	if cfg.Mode == "standalone" {
 		fmt.Println("\n금고 보안 설정 / Vault security:")
 
@@ -138,7 +138,7 @@ func Run(_ []string) {
 		}
 	}
 
-	// ─── 저장 ────────────────────────────────────────────────────────────────
+	// ─── Save ────────────────────────────────────────────────────────────────
 	savePath := ask("\n설정 파일 저장 경로 / Save path", "wall-vault.yaml")
 
 	if err := config.Save(cfg, savePath); err != nil {
@@ -168,14 +168,14 @@ func Run(_ []string) {
 	}
 }
 
-// selectLanguage: 지원 언어 선택 프롬프트 (locales/*.json 파일에서 자동 목록 생성)
+// selectLanguage: language selection prompt (list auto-generated from locales/*.json files)
 func selectLanguage() {
 	fmt.Println("언어 선택 / Select Language:")
 	supported := i18n.Supported
 	for idx, code := range supported {
 		fmt.Printf("  %2d) %s (%s)\n", idx+1, i18n.LangLabel(code), code)
 	}
-	// 현재 감지된 언어를 기본값으로
+	// use currently detected language as default
 	currentIdx := 1
 	for i, code := range supported {
 		if code == i18n.Lang() {
@@ -194,7 +194,7 @@ func selectLanguage() {
 	_ = cfg
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 func ask(prompt, defaultVal string) string {
 	if defaultVal != "" {
@@ -224,11 +224,11 @@ func askYN(prompt string, defaultYes bool) bool {
 	return line == "y" || line == "yes" || line == "네" || line == "是" || line == "oui" || line == "ja" || line == "si" || line == "sí"
 }
 
-// generateToken: 암호학적으로 안전한 랜덤 토큰 생성
+// generateToken: generate a cryptographically secure random token
 func generateToken(bytes int) string {
 	b := make([]byte, bytes)
 	if _, err := rand.Read(b); err != nil {
-		// 폴백: 타임스탬프 기반 (드문 경우)
+		// fallback: timestamp-based (rare case)
 		return fmt.Sprintf("wv-%x", b)
 	}
 	return hex.EncodeToString(b)

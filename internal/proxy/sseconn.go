@@ -12,13 +12,13 @@ import (
 	"time"
 )
 
-// SSEClient: 금고 SSE 스트림 구독 클라이언트
+// SSEClient: vault SSE stream subscription client
 type SSEClient struct {
 	mu        sync.RWMutex
 	vaultURL  string
 	clientID  string
 	connected bool
-	onConfig  func(service, model string) // 설정 변경 콜백
+	onConfig  func(service, model string) // config change callback
 }
 
 func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string)) *SSEClient {
@@ -29,7 +29,7 @@ func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string
 	}
 }
 
-// Start: 백그라운드 SSE 연결 시작 (자동 재연결)
+// Start: start background SSE connection (auto-reconnect)
 func (c *SSEClient) Start() {
 	go c.loop()
 }
@@ -48,7 +48,7 @@ func (c *SSEClient) loop() {
 		c.connected = false
 		c.mu.Unlock()
 		if err != nil && err != io.EOF {
-			log.Printf("[SSE] 연결 오류: %v — %v 후 재시도", err, backoff)
+			log.Printf("[SSE] connection error: %v — retrying in %v", err, backoff)
 		}
 		time.Sleep(backoff)
 		if backoff < 30*time.Second {
@@ -71,7 +71,7 @@ func (c *SSEClient) connect() error {
 	c.mu.Lock()
 	c.connected = true
 	c.mu.Unlock()
-	log.Printf("[SSE] ✅ 금고 연결됨: %s", url)
+	log.Printf("[SSE] ✅ vault connected: %s", url)
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -100,12 +100,12 @@ func (c *SSEClient) handleEvent(data string) {
 	switch evt.Type {
 	case "config_change":
 		if evt.Data.ClientID == c.clientID || evt.Data.ClientID == "" {
-			log.Printf("[SSE] 🔔 설정 변경 수신: %s/%s", evt.Data.Service, evt.Data.Model)
+			log.Printf("[SSE] 🔔 config change received: %s/%s", evt.Data.Service, evt.Data.Model)
 			if c.onConfig != nil {
 				c.onConfig(evt.Data.Service, evt.Data.Model)
 			}
 		}
 	case "connected":
-		log.Printf("[SSE] 연결 확인됨")
+		log.Printf("[SSE] connection confirmed")
 	}
 }

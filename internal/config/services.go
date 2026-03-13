@@ -1,4 +1,4 @@
-// Package config: 서비스 플러그인 로더
+// Package config: service plugin loader
 package config
 
 import (
@@ -9,9 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ─── 서비스 플러그인 구조 ─────────────────────────────────────────────────────
+// ─── Service Plugin Structure ─────────────────────────────────────────────────
 
-// ServicePlugin: configs/services/*.yaml 형식
+// ServicePlugin: configs/services/*.yaml format
 type ServicePlugin struct {
 	ID            string                 `yaml:"id"`
 	Name          string                 `yaml:"name"`
@@ -34,7 +34,7 @@ type ServiceEndpoints struct {
 
 type ServiceAuth struct {
 	Type  string `yaml:"type"`  // bearer | query_param | header | none
-	Param string `yaml:"param"` // query_param 이름 (e.g. "key")
+	Param string `yaml:"param"` // query_param name (e.g. "key")
 }
 
 type ServiceModelFetch struct {
@@ -67,9 +67,9 @@ type ServiceConcurrency struct {
 	WaitNotify  bool `yaml:"wait_notify"`
 }
 
-// ─── 로더 ─────────────────────────────────────────────────────────────────────
+// ─── Loader ───────────────────────────────────────────────────────────────────
 
-// LoadPlugins: ServicesDir에서 *.yaml 로드, enabled=true인 것만 반환
+// LoadPlugins: load *.yaml from ServicesDir, return only those with enabled=true
 func LoadPlugins(servicesDir string) ([]ServicePlugin, error) {
 	if servicesDir == "" {
 		return nil, nil
@@ -102,7 +102,7 @@ func LoadPlugins(servicesDir string) ([]ServicePlugin, error) {
 	return plugins, nil
 }
 
-// PluginByID: ID로 플러그인 검색
+// PluginByID: find plugin by ID
 func PluginByID(plugins []ServicePlugin, id string) *ServicePlugin {
 	for i := range plugins {
 		if plugins[i].ID == id {

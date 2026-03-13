@@ -87,6 +87,7 @@ type OpenAIRequest struct {
 	Stream      bool            `json:"stream,omitempty"`
 	Tools       []interface{}   `json:"tools,omitempty"`
 	ToolChoice  interface{}     `json:"tool_choice,omitempty"`
+	ServiceTier string          `json:"service_tier,omitempty"` // OpenClaw fast mode (strip before forwarding)
 }
 
 type OpenAIMessage struct {
@@ -110,6 +111,7 @@ func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
 }
 
 // rawContentToString converts OpenAI content (string or parts array) to plain text.
+// Handles: string, text parts, image_url parts (v2026.3.7+), and tool_result parts.
 func rawContentToString(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
@@ -119,16 +121,20 @@ func rawContentToString(raw json.RawMessage) string {
 	if json.Unmarshal(raw, &s) == nil {
 		return s
 	}
-	// array form: [{"type":"text","text":"hello"}, ...]
+	// array form: [{"type":"text","text":"..."}, {"type":"image_url","image_url":{...}}, ...]
 	var parts []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type     string          `json:"type"`
+		Text     string          `json:"text"`
+		ImageURL json.RawMessage `json:"image_url"` // image_url — skip (text-only proxy)
 	}
 	if json.Unmarshal(raw, &parts) == nil {
 		var sb strings.Builder
 		for _, p := range parts {
-			if p.Type == "text" {
+			switch p.Type {
+			case "text":
 				sb.WriteString(p.Text)
+			case "image_url":
+				sb.WriteString("[이미지]") // placeholder — proxy는 텍스트 전달만 지원
 			}
 		}
 		return sb.String()
@@ -192,6 +198,8 @@ type AnthropicRequest struct {
 	Temperature *float64           `json:"temperature,omitempty"`
 	Stream      bool               `json:"stream,omitempty"`
 	Tools       []interface{}      `json:"tools,omitempty"`
+	ServiceTier string             `json:"service_tier,omitempty"` // OpenClaw v2026.3.12 fast mode (strip before forwarding)
+	Thinking    interface{}        `json:"thinking,omitempty"`     // Claude extended thinking (ignore)
 }
 
 type AnthropicMessage struct {

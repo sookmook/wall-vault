@@ -234,6 +234,7 @@ a{color:var(--accent);text-decoration:none}
 .atb-claude{background:#e07020}
 .atb-cursor{background:#2471b0}
 .atb-vscode{background:#2471b0}
+.atb-gemini{background:#1a73e8}
 .atb-custom{background:var(--text-muted)}
 /* ── 에이전트 상태 행 ── */
 .agent-status{font-size:.72rem;margin:.18rem 0 .3rem;display:flex;align-items:flex-start;gap:.45rem;flex-wrap:wrap}
@@ -993,6 +994,30 @@ function copyAgentConfig(clientId, agentType) {
         +'    "apiKey": "'+tok+'"\n'
         +'  }]\n'
         +'}';
+    } else if(agentType==='gemini-cli'){
+      const geminiBase = location.protocol+'//'+location.hostname+':56244';
+      title='Gemini CLI 설정이 복사되었습니다.';
+      hint='터미널에서 실행하거나 ~/.gemini/settings.json 에 추가하세요.';
+      cfg='# 환경변수로 설정 (터미널에 붙여넣기):\n'
+        +'export GEMINI_API_BASE_URL='+geminiBase+'\n'
+        +'export GEMINI_API_KEY='+tok+'\n\n'
+        +'# 또는 ~/.gemini/settings.json 에 추가:\n'
+        +'{\n'
+        +'  "apiBaseUrl": "'+geminiBase+'",\n'
+        +'  "apiKey": "'+tok+'"\n'
+        +'}';
+    } else if(agentType==='antigravity'){
+      const geminiBase = location.protocol+'//'+location.hostname+':56244';
+      title='Antigravity IDE 설정이 복사되었습니다.';
+      hint='터미널에서 실행하거나 Antigravity 설정에 추가하세요.';
+      cfg='# 환경변수로 설정:\n'
+        +'export GEMINI_API_BASE_URL='+geminiBase+'\n'
+        +'export GEMINI_API_KEY='+tok+'\n\n'
+        +'# 또는 ~/.gemini/settings.json 에 추가:\n'
+        +'{\n'
+        +'  "apiBaseUrl": "'+geminiBase+'",\n'
+        +'  "apiKey": "'+tok+'"\n'
+        +'}';
     }
     if(!cfg) return;
     navigator.clipboard.writeText(cfg).then(()=>{
@@ -1315,6 +1340,8 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		"claude-code": "🟠",
 		"cursor":      "⌨",
 		"vscode":      "💻",
+		"gemini-cli":  "💎",
+		"antigravity": "🚀",
 		"custom":      "⚙",
 	}
 	typeCls := map[string]string{
@@ -1322,6 +1349,8 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		"claude-code": "atb-claude",
 		"cursor":      "atb-cursor",
 		"vscode":      "atb-vscode",
+		"gemini-cli":  "atb-gemini",
+		"antigravity": "atb-gemini",
 		"custom":      "atb-custom",
 	}
 
@@ -1347,10 +1376,28 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		if !c.Enabled {
 			statusChip = `<div class="agent-status"><span class="status-muted" data-i18n="st_disabled">— 비활성화됨</span></div>`
 		} else if p == nil {
-			statusChip = `<div class="agent-status">` +
-				`<span class="status-dc" data-i18n="st_no_proxy">● 프록시 미연결</span>` +
-				`<span class="status-hint" data-i18n="st_proxy_hint">프록시를 VAULT_TOKEN으로 실행하면 연결됩니다</span>` +
-				`</div>`
+			switch c.AgentType {
+			case "claude-code":
+				statusChip = `<div class="agent-status">` +
+					`<span class="status-dc">◎ Claude Code</span>` +
+					`<span class="status-hint" data-i18n="st_claude_hint">ANTHROPIC_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
+					`</div>`
+			case "cursor", "vscode":
+				statusChip = `<div class="agent-status">` +
+					`<span class="status-dc">◎ ` + c.AgentType + `</span>` +
+					`<span class="status-hint" data-i18n="st_editor_hint">Base URL을 http://localhost:56244 로 설정하세요</span>` +
+					`</div>`
+			case "gemini-cli", "antigravity":
+				statusChip = `<div class="agent-status">` +
+					`<span class="status-dc">◎ ` + c.AgentType + `</span>` +
+					`<span class="status-hint">GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
+					`</div>`
+			default:
+				statusChip = `<div class="agent-status">` +
+					`<span class="status-dc" data-i18n="st_no_proxy">● 프록시 미연결</span>` +
+					`<span class="status-hint" data-i18n="st_proxy_hint">프록시를 VAULT_TOKEN으로 실행하면 연결됩니다</span>` +
+					`</div>`
+			}
 		} else {
 			age := time.Since(p.UpdatedAt)
 			ageSec := int(age.Seconds())
@@ -1430,7 +1477,15 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyAgentConfig('%s','vscode')" data-i18n-title="cfg_vscode_title" title="VS Code / Continue 프록시 설정 복사" data-i18n="cfg_vscode">💻 VSCode 설정 복사</button>`,
 				c.ID)
-		default:
+		case "gemini-cli":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','gemini-cli')" title="Gemini CLI 프록시 설정 복사">💎 Gemini CLI 설정 복사</button>`,
+				c.ID)
+		case "antigravity":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','antigravity')" title="Antigravity IDE 프록시 설정 복사">🚀 Antigravity 설정 복사</button>`,
+				c.ID)
+				default:
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_copy_title" title="프록시 설정 복사" data-i18n="cfg_copy">📋 설정 복사</button>`,
 				c.ID)
@@ -1654,6 +1709,8 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
     <option value="" data-i18n="opt_select">— 선택 —</option>
     <option value="openclaw">openclaw</option>
     <option value="claude-code">claude-code</option>
+    <option value="gemini-cli">gemini-cli</option>
+    <option value="antigravity">antigravity</option>
     <option value="cursor">cursor</option>
     <option value="vscode">vscode</option>
     <option value="custom">custom</option>

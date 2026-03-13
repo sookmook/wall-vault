@@ -920,9 +920,22 @@ function changeModel(clientId) {
       // 저장 성공 — 버튼에 ✓ 표시 후 원래 텍스트로 복귀
       if(btn){
         btn.disabled=false;
-        btn.textContent='✓';
+        btn.textContent='\u2713';
         btn.style.color='var(--green)';
         setTimeout(()=>{btn.textContent=T('apply');btn.style.color='';},2000);
+      }
+      // agent-live 영역에도 저장 확인 표시 (미연결 상태여도 저장됐음을 알림)
+      const agentItem = btn ? btn.closest('.agent-item') : null;
+      if(agentItem){
+        const liveDiv = agentItem.querySelector('.agent-live');
+        if(liveDiv){
+          const orig = liveDiv.innerHTML;
+          const saved = document.createElement('span');
+          saved.style.cssText='color:var(--green);font-size:.7rem;margin-left:.4rem';
+          saved.textContent='\u2713 \uc800\uc7a5\ub428';
+          liveDiv.appendChild(saved);
+          setTimeout(()=>{ try{liveDiv.removeChild(saved);}catch(e){liveDiv.innerHTML=orig;} },3000);
+        }
       }
     }
   }).catch(e=>{

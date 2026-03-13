@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 wall-vault를 처음 사용하는 분을 위한 단계별 가이드입니다.
-*(최종 갱신: 2026-03-13 — 에이전트 관리, 보안, 상태 표시 업데이트)*
+*(최종 갱신: 2026-03-13 — v0.1.2: OpenClaw provider/model 형식, 실시간 드롭다운 동기화, ✓ 저장 피드백, GLM·DeepSeek 제어 토큰 정리)*
 
 ---
 
@@ -169,16 +169,48 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 
 ## 프록시 사용법
 
-### Claude Code에서 사용
+### Claude Code / OpenClaw에서 사용
 
-`~/.claude/settings.json` 또는 환경변수:
+`~/.claude/settings.json` 또는 `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "apiProvider": "openai",
+  "baseUrl": "http://localhost:56244/v1",
+  "apiKey": "not-needed"
+}
+```
+
+OpenClaw 3.11+ `provider/model` 형식으로 모델 지정:
+
+```json
+{
+  "model": "google/gemini-2.5-flash",
+  "model": "openai/gpt-4o",
+  "model": "anthropic/claude-opus-4",
+  "model": "openrouter/meta-llama/llama-3.3-70b-instruct",
+  "model": "qwen3.5:35b:cloud"
+}
+```
+
+**provider/model 라우팅 규칙:**
+
+| 형식 | 라우팅 |
+|------|--------|
+| `google/모델명` | Google Gemini 직접 |
+| `openai/모델명` | OpenAI 직접 |
+| `anthropic/모델명` | OpenRouter → `anthropic/모델명` |
+| `openrouter/경로` | OpenRouter 직접 |
+| `모델명:cloud` | `:cloud` 제거 후 OpenRouter |
+| 나머지 | 서비스 설정 또는 OpenRouter |
+
+### Gemini API 형식 (기존 호환)
 
 ```bash
-# Gemini API 형식
 export ANTHROPIC_BASE_URL=http://localhost:56244/google
 ```
 
-또는 직접 URL 지정:
+또는 직접 URL:
 
 ```
 http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
@@ -195,7 +227,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gemini-2.5-flash",
+    model="google/gemini-2.5-flash",   # provider/model 형식
     messages=[{"role": "user", "content": "안녕하세요"}]
 )
 ```
@@ -230,6 +262,15 @@ curl "http://localhost:56244/api/models?service=google"
 curl "http://localhost:56244/api/models?q=claude"
 ```
 
+**지원 모델 요약 (v0.1.2):**
+
+| 서비스 | 주요 모델 |
+|--------|----------|
+| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash, gemini-embedding-2-preview |
+| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
+| OpenRouter | 346개+ (Hunter Alpha 1M ctx 무료, Healer Alpha, Kimi K2.5, GLM-5, DeepSeek R1/V3, Qwen 2.5 등) |
+| Ollama | 로컬 서버 자동 감지 (폴백: glm-4.7-flash, qwen3.5:35b, deepseek-r1:7b) |
+
 ---
 
 ## 키 금고 대시보드
@@ -248,11 +289,19 @@ curl "http://localhost:56244/api/models?q=claude"
 
 - 연결된 프록시 에이전트 목록
 - **에이전트 상태 4단계 표시:**
-  - 🟢 **실행 중** — 3분 이내 heartbeat 수신
+  - 🟢 **실행 중** — 3분 이내 heartbeat 수신 (서비스/모델 실시간 표시)
   - 🟡 **지연** — 3-10분 전 마지막 heartbeat
   - 🔴 **오프라인** — 10분 이상 응답 없음
-  - ⚫ **비활성/미연결** — 비활성화 또는 한 번도 heartbeat 없음
-- 인라인 서비스·모델 변경 폼 (적용 즉시 SSE로 반영)
+  - ⚫ **미연결** — 활성화되어 있으나 프록시가 아직 heartbeat를 보내지 않음
+  - ⚫ **비활성화** — 클라이언트 비활성 상태
+
+> **"미연결"이란?** 클라이언트 설정은 저장되어 있지만, 해당 ID의 프록시 프로세스가 아직 vault에 접속하지 않은 상태입니다. [적용] 버튼으로 저장에 성공하면 **✓ 저장됨** 메시지가 표시됩니다 — "미연결"과는 무관합니다.
+
+- **인라인 서비스·모델 변경 폼:**
+  - 서비스 드롭다운 변경 시 → 해당 서비스 모델 목록 자동 로드
+  - 서비스/키 변경 이벤트 수신 시 → 드롭다운 실시간 갱신 (페이지 새로고침 없음)
+  - `[적용]` 클릭 후 성공 시 → 버튼에 **✓** 표시 + "✓ 저장됨" 인라인 알림 (3초)
+- `[🐾]` — OpenClaw `openclaw.json` 설정 클립보드 복사
 - `[✎]` — 편집, `[✕]` — 삭제
 
 ### 에이전트 추가/편집 모달 필드 순서
@@ -356,6 +405,16 @@ curl -X PUT http://192.168.x.x:56243/admin/clients/botA \
 # 봇A 프록시에서 즉시 확인
 curl http://봇A주소:56244/status
 ```
+
+**SSE 이벤트 종류:**
+
+| 이벤트 | 트리거 | 대시보드 반응 |
+|--------|--------|--------------|
+| `config_change` | 클라이언트 모델/서비스 변경 | 모델 드롭다운 갱신 |
+| `service_changed` | 서비스 추가/수정/삭제 | 서비스 select + 모델 드롭다운 갱신 |
+| `key_added` / `key_deleted` | API 키 추가/삭제 | 모델 드롭다운 갱신 |
+| `usage_reset` | 일일 사용량 초기화 | 페이지 새로고침 |
+| `heartbeat` | 프록시 60초마다 | 에이전트 상태 업데이트 |
 
 ---
 
@@ -503,6 +562,23 @@ sudo ufw allow 56243/tcp
 # 프록시 SSE 상태
 curl http://localhost:56244/status | python3 -c "import sys,json; d=json.load(sys.stdin); print('SSE:', d['sse'])"
 ```
+
+### 에이전트가 "미연결"로 표시됨
+
+"미연결"은 프록시 프로세스가 vault에 heartbeat를 보내지 않는 상태입니다. 설정 저장([적용] 버튼)과는 **무관**합니다.
+
+프록시를 연결하려면 다음 환경변수로 실행하세요:
+
+```bash
+WV_VAULT_URL=http://금고서버:56243 \
+WV_VAULT_TOKEN=클라이언트토큰 \
+WV_VAULT_CLIENT_ID=클라이언트ID \
+wall-vault proxy
+```
+
+연결 성공 시 대시보드에서 🟢 실행 중으로 바뀝니다 (약 60초 이내).
+
+> **[적용] 후 ✓ 저장됨이 표시되면** 설정은 정상 저장된 것입니다. "미연결"은 프록시 연결 여부를 뜻할 뿐입니다.
 
 ### 모델이 변경되지 않음
 

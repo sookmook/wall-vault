@@ -1,4 +1,4 @@
-// wall-vault: AI 프록시 + 키 금고 통합 시스템
+// wall-vault: AI proxy + key vault integrated system
 // GitHub: https://github.com/sookmook/wall-vault
 package main
 
@@ -52,14 +52,14 @@ func main() {
 	}
 }
 
-// runAll: proxy + vault 동시 시작 (wall-vault start)
+// runAll: start proxy + vault simultaneously (wall-vault start)
 func runAll() {
 	cfg, err := config.Load("")
 	if err != nil {
 		log.Fatalf("설정 오류: %v", err)
 	}
 
-	// 금고 시작
+	// start vault
 	vaultSrv, err := ivault.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("[vault] 초기화 오류: %v", err)
@@ -73,7 +73,7 @@ func runAll() {
 		}
 	}()
 
-	// 프록시 시작
+	// start proxy
 	proxySrv := iproxy.NewServer(cfg)
 	proxyAddr := fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port)
 	go func() {

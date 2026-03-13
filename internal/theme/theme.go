@@ -95,20 +95,20 @@ var themes = map[string]*Theme{
 		Accent:      "#0098d8",
 		AccentHover: "#20b8f8",
 	},
-	// 가을 테마 — 밝고 옅은 브라운 계통, 단풍잎 가을
+	// 가을 테마 — 짙은 황갈색, 낙엽 진 깊은 가을
 	"autumn": {
 		Name:        "autumn",
-		Background:  "#fff8f0",
-		Surface:     "#ffffff",
-		Border:      "#e8c8a0",
-		Text:        "#3a2010",
-		TextMuted:   "#9a6030",
-		Green:       "#6a9a20",
-		Yellow:      "#c08000",
-		Red:         "#c83020",
-		Blue:        "#4060a0",
-		Accent:      "#d04010",
-		AccentHover: "#e85820",
+		Background:  "#ede0c8",
+		Surface:     "#f5e8d2",
+		Border:      "#b88848",
+		Text:        "#201008",
+		TextMuted:   "#6a3e18",
+		Green:       "#4a7810",
+		Yellow:      "#986000",
+		Red:         "#a82010",
+		Blue:        "#284070",
+		Accent:      "#b03008",
+		AccentHover: "#cc4818",
 	},
 	// 겨울 테마 — 하얀 배경, 눈사람과 트리 뱅글벵글
 	"winter": {

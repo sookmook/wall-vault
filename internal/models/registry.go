@@ -62,7 +62,12 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 		case "google":
 			all = append(all, fetchGoogle()...)
 		case "openrouter":
-			all = append(all, fetchOpenRouter(openRouterKey)...)
+			fetched := fetchOpenRouter(openRouterKey)
+			if len(fetched) == 0 {
+				// API unreachable — use curated known models as fallback
+				fetched = fetchOpenRouterKnown()
+			}
+			all = append(all, fetched...)
 		case "ollama":
 			all = append(all, fetchOllama(localURLs["ollama"])...)
 		case "openai":
@@ -182,7 +187,8 @@ func fetchOllama(ollamaURL string) []Model {
 			return models
 		}
 	}
-	return nil
+	// Ollama 서버 미응답 — 추천 모델 목록으로 폴백
+	return OllamaRecommended()
 }
 
 func tryFetchOllama(client *http.Client, base string) ([]Model, error) {
@@ -247,8 +253,37 @@ func fetchOpenAI() []Model {
 		{ID: "gpt-3.5-turbo",      Name: "GPT-3.5 Turbo",      Service: "openai", Context: 16385},
 		{ID: "o1",                 Name: "o1",                 Service: "openai", Context: 200000},
 		{ID: "o1-mini",            Name: "o1-mini",            Service: "openai", Context: 128000},
+		{ID: "o3",                 Name: "o3",                 Service: "openai", Context: 200000},
 		{ID: "o3-mini",            Name: "o3-mini",            Service: "openai", Context: 200000},
 		{ID: "o4-mini",            Name: "o4-mini",            Service: "openai", Context: 200000},
+	}
+}
+
+// ─── Notable OpenRouter models (OpenClaw 3.11) ────────────────────────────────
+
+// fetchOpenRouterKnown returns a curated list of notable OpenRouter models
+// that are shown in the UI even before a live model fetch. The full list is
+// fetched dynamically from the OpenRouter API at runtime.
+func fetchOpenRouterKnown() []Model {
+	return []Model{
+		// Free 1M-context models (OpenClaw 3.11)
+		{ID: "openrouter/hunter-alpha",              Name: "Hunter Alpha (1M ctx, free)",       Service: "openrouter", Context: 1048576, Free: true},
+		{ID: "openrouter/healer-alpha",              Name: "Healer Alpha (omni-modal, free)",   Service: "openrouter", Context: 1048576, Free: true},
+		// Kimi / Moonshot
+		{ID: "moonshot/kimi-k2.5",                  Name: "Kimi K2.5",                         Service: "openrouter", Context: 256000},
+		{ID: "moonshot/kimi-k2-turbo-preview",      Name: "Kimi K2 Turbo Preview",             Service: "openrouter", Context: 256000},
+		// GLM / Z.AI
+		{ID: "z-ai/glm-5",                          Name: "GLM-5",                             Service: "openrouter"},
+		{ID: "z-ai/glm-4.7-flash",                  Name: "GLM-4.7 Flash",                     Service: "openrouter"},
+		// DeepSeek
+		{ID: "deepseek/deepseek-r1",                Name: "DeepSeek R1",                       Service: "openrouter", Context: 65536},
+		{ID: "deepseek/deepseek-chat",              Name: "DeepSeek V3",                       Service: "openrouter", Context: 65536},
+		// Qwen / Alibaba
+		{ID: "qwen/qwen-2.5-72b-instruct",          Name: "Qwen 2.5 72B",                      Service: "openrouter", Context: 131072},
+		// MiniMax
+		{ID: "minimax/minimax-m2.5",                Name: "MiniMax M2.5",                      Service: "openrouter"},
+		// Meta Llama
+		{ID: "meta-llama/llama-3.3-70b-instruct",  Name: "Llama 3.3 70B",                     Service: "openrouter", Context: 131072},
 	}
 }
 
@@ -337,6 +372,20 @@ func compatFallback(service string) []Model {
 		}
 	default:
 		return nil
+	}
+}
+
+// OllamaRecommended: OpenClaw 3.11 기준 로컬 추천 Ollama 모델 목록
+// (Ollama 서버 미응답 시 UI 힌트용)
+func OllamaRecommended() []Model {
+	return []Model{
+		{ID: "glm-4.7-flash",   Name: "GLM-4.7 Flash (추천)",   Service: "ollama"},
+		{ID: "qwen3.5:35b",     Name: "Qwen3.5 35B",            Service: "ollama"},
+		{ID: "qwen2.5:7b",      Name: "Qwen2.5 7B",             Service: "ollama"},
+		{ID: "llama3.3:70b",    Name: "Llama 3.3 70B",          Service: "ollama"},
+		{ID: "llama3.3",        Name: "Llama 3.3",              Service: "ollama"},
+		{ID: "deepseek-r1:7b",  Name: "DeepSeek R1 7B",         Service: "ollama"},
+		{ID: "phi4",            Name: "Phi-4",                  Service: "ollama"},
 	}
 }
 

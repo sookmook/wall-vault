@@ -499,9 +499,13 @@ wall-vault를 OpenClaw의 커스텀 프로바이더로 등록하면 에이전트
 - `baseUrl`: wall-vault 프록시 주소 (포트 56244)
 - `apiKey`: 에이전트 카드의 **토큰** 값
 - 모델 ID 앞에 `wall-vault/` 접두어를 붙여 자동 라우팅
-- `wall-vault/gemini-*` → Google Gemini, `wall-vault/gpt-*` → OpenAI, `wall-vault/claude-*` → Anthropic
+- `wall-vault/gemini-*` → Google Gemini 직접 호출
+- `wall-vault/gpt-*`, `wall-vault/o3` 등 → OpenAI 직접 호출
+- `wall-vault/claude-*` → OpenRouter 경유 Anthropic
 - `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` → OpenRouter (OpenClaw 3.11 무료 1M context 모델)
-- `opencode-go/`, `moonshot/`, `kimi-coding/`, `minimax/` 등 OpenClaw 3.11 신규 프로바이더 접두어 모두 지원
+- `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` 등 → OpenRouter
+- OpenClaw 3.11 프로바이더 접두어 모두 지원: `opencode/`, `opencode-go/`, `moonshot/`, `kimi-coding/`, `minimax/`, `groq/`, `mistral/`, `deepseek/`, `qwen/`, `meta-llama/` 등
+- Ollama `:cloud` 접미사 자동 처리 (`kimi-k2.5:cloud` → OpenRouter 경유)
 
 ### SSE 자동 동기화
 
@@ -737,9 +741,13 @@ Register wall-vault as a custom provider in OpenClaw. Use the **🐾 button** on
 - `baseUrl`: wall-vault proxy address (port 56244)
 - `apiKey`: the **token** value from the agent card
 - Prefix model IDs with `wall-vault/` for automatic routing
-- `wall-vault/gemini-*` → Google Gemini, `wall-vault/gpt-*` → OpenAI, `wall-vault/claude-*` → Anthropic
+- `wall-vault/gemini-*` → Google Gemini (direct)
+- `wall-vault/gpt-*`, `wall-vault/o3`, etc. → OpenAI (direct)
+- `wall-vault/claude-*` → Anthropic via OpenRouter
 - `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` → OpenRouter (OpenClaw 3.11 free 1M-context models)
-- All OpenClaw 3.11 provider prefixes supported: `opencode-go/`, `moonshot/`, `kimi-coding/`, `minimax/`, `groq/`, `mistral/`
+- `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*`, etc. → OpenRouter
+- All OpenClaw 3.11 provider prefixes: `opencode/`, `opencode-go/`, `moonshot/`, `kimi-coding/`, `minimax/`, `groq/`, `mistral/`, `deepseek/`, `qwen/`, `meta-llama/`, and more
+- Ollama `:cloud` suffix auto-handled (`kimi-k2.5:cloud` → OpenRouter)
 
 ### SSE Auto-Sync
 

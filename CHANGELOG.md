@@ -8,13 +8,30 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 ## [0.1.2] — 2026-03-13
 
 ### Added
-- `parseProviderModel()`: OpenClaw 3.11 provider prefixes — `opencode-go`, `opencode-zen`, `moonshot`, `kimi-coding`, `groq`, `mistral`, `minimax`, `cohere`, `perplexity`
-- `wall-vault/` prefix auto-detection extended: `hunter-alpha`, `healer-alpha`, `kimi-*`, `deepseek-*`, `glm-*`, `qwen*` → OpenRouter routing
+- `callOpenAI()`: direct OpenAI API handler (separate from OpenRouter)
+- `dispatch()`: `openai` case (direct), `anthropic` case (via OpenRouter with `anthropic/model` path)
+- `parseProviderModel()` comprehensive rewrite (OpenClaw 3.11 compatibility):
+  - `anthropic/` → OpenRouter `anthropic/model` (Anthropic API format differs)
+  - `openai/` → direct OpenAI
+  - `:cloud` suffix (Ollama cloud tags) → strip + route to OpenRouter
+  - New prefixes: `opencode`, `opencode-go`, `opencode-zen`, `moonshot`, `kimi-coding`,
+    `groq`, `mistral`, `cohere`, `perplexity`, `minimax`, `together`, `huggingface`,
+    `nvidia`, `venice`, `meta-llama`, `qwen`, `deepseek`, `01-ai`
+  - `wall-vault/claude-*` → OpenRouter `anthropic/model` (was incorrectly routing to `anthropic` service)
 - `stripControlTokens()`: removes GLM-5 / DeepSeek / ChatML control tokens from responses (`<|im_start|>`, `[gMASK]`, `[sop]`, etc.)
+- `fetchOpenRouterKnown()`: curated fallback model list — Hunter Alpha (1M ctx, free), Healer Alpha, Kimi K2.5, GLM-5, GLM-4.7 Flash, DeepSeek R1/V3, Qwen 2.5, MiniMax M2.5, Llama 3.3
+- `OllamaRecommended()`: Ollama 서버 미응답 시 추천 모델 폴백 (glm-4.7-flash, qwen3.5:35b, deepseek-r1:7b 등)
 - Google model list: `gemini-2.5-flash-8b`, `gemini-embedding-2-preview` (OpenClaw 3.11 memorySearch)
+- OpenAI model list: `o3` 추가
 
 ### Changed
+- OpenRouter fetch 실패 시 `fetchOpenRouterKnown()` 폴백 적용
+- Ollama 서버 미응답 시 `OllamaRecommended()` 폴백 적용
 - Response text in `/v1/chat/completions` now passes through `stripControlTokens()`
+
+### Fixed
+- `anthropic` / `openai` 서비스가 `dispatch()`에서 묵묵히 무시되던 버그 수정
+- `wall-vault/claude-*` 모델이 실제로 호출되지 않던 버그 수정
 
 ---
 

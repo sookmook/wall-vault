@@ -20,7 +20,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	agentCard := buildAgentsCard(clients, proxies, services)
 	keyCard := buildKeysCard(keys, services)
 	svcCard := buildServicesCard(services)
-	js := buildJS(t.Name, s.cfg.Lang, s.startedAt.Unix(), services)
+	js := buildJS(t.Name, s.cfg.Lang, s.startedAt.Unix(), services, keys)
 
 	var sb strings.Builder
 	sb.WriteString(`<!DOCTYPE html>
@@ -285,15 +285,21 @@ a{color:var(--accent);text-decoration:none}
 .snowflake{position:fixed;pointer-events:none;z-index:9997;color:rgba(180,220,255,.8);font-size:14px;line-height:1}`
 }
 
-func buildJS(currentTheme, currentLang string, startedAt int64, services []*ServiceConfig) string {
-	// 서비스 목록을 JS 객체로 직렬화 (ID, Name, IsLocal)
+func buildJS(currentTheme, currentLang string, startedAt int64, services []*ServiceConfig, keys []*APIKey) string {
+	// 서비스별 키 개수
+	keyCounts := map[string]int{}
+	for _, k := range keys {
+		keyCounts[k.Service]++
+	}
+	// 서비스 목록을 JS 객체로 직렬화 (ID, Name, IsLocal, LocalURL, KeyCount)
 	var svcJSParts []string
 	for _, sv := range services {
 		isLocal := "false"
 		if sv.IsLocal() {
 			isLocal = "true"
 		}
-		svcJSParts = append(svcJSParts, fmt.Sprintf(`%q:{name:%q,local:%s}`, sv.ID, sv.Name, isLocal))
+		kc := keyCounts[sv.ID]
+		svcJSParts = append(svcJSParts, fmt.Sprintf(`%q:{name:%q,local:%s,localUrl:%q,keyCount:%d}`, sv.ID, sv.Name, isLocal, sv.LocalURL, kc))
 	}
 	svcJSMap := "{" + strings.Join(svcJSParts, ",") + "}"
 
@@ -770,8 +776,52 @@ function deleteKey(id) {
   });
 }
 
+// ── 서비스 자동 체크 (페이지 로드 시 실행) ──
+// 클라우드: 키 없는 서비스 자동 비활성화
+// 로컬: URL 프로브 후 응답 여부에 따라 활성/비활성
+async function _setSvcEnabled(id, enabled, token) {
+  const urlEl = document.getElementById('svc-url-'+id);
+  try {
+    await fetch('/admin/services/'+id, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({enabled, local_url: urlEl ? urlEl.value : ''})
+    });
+    const cb = document.getElementById('svc-en-'+id);
+    if (cb) cb.checked = enabled;
+  } catch {}
+}
+async function _checkLocalSvc(id, token) {
+  const cb = document.getElementById('svc-en-'+id);
+  if (!cb) return;
+  try {
+    const resp = await fetch('/admin/models?service='+id, {headers:{'Authorization':'Bearer '+token}});
+    if (resp.ok) {
+      const data = await resp.json();
+      const up = (data.models||[]).length > 0;
+      if (up !== cb.checked) await _setSvcEnabled(id, up, token);
+    } else {
+      if (cb.checked) await _setSvcEnabled(id, false, token);
+    }
+  } catch { if (cb && cb.checked) await _setSvcEnabled(id, false, token); }
+}
+async function autoCheckServices() {
+  const token = localStorage.getItem('wv_admin_token');
+  if (!token) return;
+  const checks = [];
+  for (const [id, svc] of Object.entries(_SERVICES)) {
+    if (svc.local) {
+      checks.push(_checkLocalSvc(id, token));
+    } else if (svc.keyCount === 0) {
+      const cb = document.getElementById('svc-en-'+id);
+      if (cb && cb.checked) checks.push(_setSvcEnabled(id, false, token));
+    }
+  }
+  await Promise.all(checks);
+}
+
 // ── 에이전트 카드 모델 목록 초기화 (페이지 로드 시) ──
-document.addEventListener('DOMContentLoaded', function() { refreshModelDropdowns(); });
+document.addEventListener('DOMContentLoaded', function() { refreshModelDropdowns(); autoCheckServices(); });
 
 // ── 모달 공통 유틸 ──
 function closeModal(prefix) {

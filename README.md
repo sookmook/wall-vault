@@ -866,4 +866,4 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 
 ---
 
-*Last updated · 최종 업데이트: 2026-03-14*
+*Last updated · 최종 업데이트: 2026-03-13*

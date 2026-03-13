@@ -314,10 +314,19 @@ func (s *Server) handleAdminKeysID(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// 삭제 전 서비스 정보 기록
+	deletedSvc := ""
+	for _, k := range s.store.ListKeys() {
+		if k.ID == id {
+			deletedSvc = k.Service
+			break
+		}
+	}
 	if err := s.store.DeleteKey(id); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	s.broker.Broadcast(SSEEvent{Type: "key_deleted", Data: map[string]string{"service": deletedSvc}})
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -495,6 +504,7 @@ func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]string{"action": "added", "id": inp.ID}})
 		jsonOK(w, map[string]string{"status": "ok"})
 	default:
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -519,12 +529,14 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]string{"action": "updated", "id": id}})
 		jsonOK(w, map[string]string{"status": "updated"})
 	case http.MethodDelete:
 		if err := s.store.DeleteService(id); err != nil {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]string{"action": "deleted", "id": id}})
 		jsonOK(w, map[string]string{"status": "deleted"})
 	default:
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)

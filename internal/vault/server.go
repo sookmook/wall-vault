@@ -67,6 +67,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	// vault.json에 저장된 테마/언어가 있으면 cfg보다 우선 적용
+	if st := store.GetSettings(); st.Theme != "" || st.Lang != "" {
+		if st.Theme != "" {
+			cfg.Theme = st.Theme
+		}
+		if st.Lang != "" {
+			cfg.Lang = st.Lang
+		}
+	}
 	srv := &Server{
 		cfg:       cfg,
 		store:     store,
@@ -302,6 +311,8 @@ func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// 키 추가 후 클라우드 서비스 활성화 상태 즉시 반영
+		s.store.ReconcileCloudServices()
 		s.broker.Broadcast(SSEEvent{Type: "key_added", Data: map[string]string{"service": body.Service}})
 		jsonOK(w, k)
 	default:
@@ -327,6 +338,8 @@ func (s *Server) handleAdminKeysID(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	// 키 삭제 후 클라우드 서비스 활성화 상태 즉시 반영
+	s.store.ReconcileCloudServices()
 	s.broker.Broadcast(SSEEvent{Type: "key_deleted", Data: map[string]string{"service": deletedSvc}})
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
@@ -496,6 +509,7 @@ func (s *Server) handleAdminLang(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cfg.Lang = body.Lang
+	_ = s.store.SetLang(body.Lang)
 	if s.cfgPath != "" {
 		_ = config.Save(s.cfg, s.cfgPath)
 	}
@@ -522,6 +536,7 @@ func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cfg.Theme = body.Theme
+	_ = s.store.SetTheme(body.Theme)
 	if s.cfgPath != "" {
 		_ = config.Save(s.cfg, s.cfgPath)
 	}

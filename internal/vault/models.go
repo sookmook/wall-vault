@@ -143,8 +143,15 @@ type ConfigChangeEvent struct {
 // ─── 저장소 스냅샷 ────────────────────────────────────────────────────────────
 
 type storeData struct {
-	Keys     []*APIKey       `json:"keys"`
-	Clients  []*Client       `json:"clients"`
-	Proxies  []*ProxyStatus  `json:"proxies"`
+	Keys     []*APIKey        `json:"keys"`
+	Clients  []*Client        `json:"clients"`
+	Proxies  []*ProxyStatus   `json:"proxies"`
 	Services []*ServiceConfig `json:"services,omitempty"`
+	Settings *StoreSettings   `json:"settings,omitempty"`
+}
+
+// StoreSettings: vault.json에 영속화되는 UI 설정 (테마, 언어)
+type StoreSettings struct {
+	Theme string `json:"theme,omitempty"`
+	Lang  string `json:"lang,omitempty"`
 }

@@ -72,6 +72,37 @@ install: build
 	cp bin/$(BINARY) ~/.local/bin/$(BINARY)
 	@echo "설치 완료: ~/.local/bin/$(BINARY)"
 
+# ─── 배포 ────────────────────────────────────────────────────────────────────
+
+MINI_HOST = 192.168.x.x
+RASPI_HOST = bot-c
+
+.PHONY: deploy-mini
+deploy-mini: build-darwin-arm64
+	scp bin/$(BINARY)-darwin-arm64 $(MINI_HOST):~/.openclaw/$(BINARY).new
+	ssh $(MINI_HOST) 'pkill -f "wall-vault vault" 2>/dev/null || true; sleep 1; \
+	  cp ~/.openclaw/$(BINARY).new ~/.openclaw/$(BINARY); \
+	  codesign --sign - --force ~/.openclaw/$(BINARY); \
+	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.proxy.plist 2>/dev/null || true; \
+	  launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist; \
+	  WV_ADMIN_TOKEN=REDACTED WV_MASTER_PASS=REDACTED WV_VAULT_PORT=56243 \
+	    nohup ~/.openclaw/$(BINARY) vault >> /tmp/wall-vault.err 2>&1 &'
+	@echo "미니 배포 완료 (코드 서명 포함)"
+
+.PHONY: deploy-bot-c
+deploy-bot-c: build-linux-arm64
+	ssh $(RASPI_HOST) 'systemctl --user stop wall-vault-proxy 2>/dev/null || true; sleep 1'
+	scp bin/$(BINARY)-linux-arm64 $(RASPI_HOST):~/.openclaw/$(BINARY)
+	ssh $(RASPI_HOST) 'systemctl --user start wall-vault-proxy'
+	@echo "Charlie 배포 완료"
+
+.PHONY: deploy-all
+deploy-all: build deploy-bot-c deploy-mini
+	systemctl --user stop wall-vault-proxy; \
+	  cp bin/$(BINARY) ~/.openclaw/$(BINARY); \
+	  systemctl --user start wall-vault-proxy
+	@echo "전체 배포 완료"
+
 # ─── 도움말 ──────────────────────────────────────────────────────────────────
 
 .PHONY: help

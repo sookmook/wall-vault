@@ -5,6 +5,32 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.3] — 2026-03-13
+
+### Added
+- Agent card redesign — per-type icons & config copy buttons:
+  - `openclaw` → 🦞 (red lobster) + "OpenClaw 설정 복사" button
+  - `claude-code` → 🟠 + "Claude Code 설정 복사" (copies `~/.claude/settings.json` snippet)
+  - `cursor` → ⌨ + "Cursor 설정 복사" (copies Cursor AI API settings)
+  - `vscode` → 💻 + "VSCode 설정 복사" (copies Continue extension `config.json` snippet)
+  - generic/custom → 📋 "설정 복사" (OpenClaw format)
+- `copyAgentConfig(clientId, agentType)`: per-type proxy config generator (JS)
+- Connection status chip with context hint ("● 프록시 미연결" + heartbeat explanation)
+- `💾 저장` button replaces bare "적용" — intent is now explicit
+- After save: `✓ 저장됨` inline indicator in status area (3s) + `✓` on button (2s)
+- New CSS: `.atbadge`, `.atb-openclaw/claude/cursor/vscode/custom`, `.agent-status`,
+  `.status-live/delay/offline/dc/hint/version`, `.btn-cfg`, `.btn-cfg-openclaw/claude`, `.btn-save`
+
+### Changed
+- `buildAgentsCard()`: fully rewritten with per-item `strings.Builder` (no more single large `Sprintf`)
+- Agent type badge: colored pill per type (red=openclaw, orange=claude-code, blue=cursor/vscode)
+- Status display: `미연결` → `● 프록시 미연결 — heartbeat 미수신` with guidance
+
+### Fixed
+- "미연결" ambiguity: users can now distinguish proxy connection state from config-save result
+
+---
+
 ## [0.1.2] — 2026-03-13
 
 ### Added
@@ -184,7 +210,8 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/sookmook/wall-vault/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/sookmook/wall-vault/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/sookmook/wall-vault/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sookmook/wall-vault/releases/tag/v0.1.0

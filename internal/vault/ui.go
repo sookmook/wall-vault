@@ -83,7 +83,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(buildAddServiceModal())
 	sb.WriteString(`</div>
 <div class="footer">
-  wall-vault v0.1.2 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
+  wall-vault v0.1.3 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
   &nbsp;|&nbsp; <a href="https://sookmook.org/">sookmook.org</a>
   &nbsp;|&nbsp; <a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
   &nbsp;|&nbsp; ⏱ <span id="uptime"></span>
@@ -203,6 +203,31 @@ a{color:var(--accent);text-decoration:none}
 .btn-action{background:transparent;color:var(--text-muted);border:1px solid var(--border);cursor:pointer;font-size:.82rem;padding:.24rem .5rem;line-height:1.2;border-radius:5px;font-family:inherit;transition:all .15s}
 .btn-action:hover{color:var(--accent);border-color:var(--accent);background:var(--bg)}
 .btn-action-del:hover{color:var(--red);border-color:var(--red)}
+/* ── 에이전트 종류 뱃지 (타입별 색상) ── */
+.atbadge{display:inline-flex;align-items:center;font-size:.6rem;padding:.05rem .32rem;border-radius:4px;color:#fff;font-weight:600;opacity:.85;margin-left:.3rem;vertical-align:middle}
+.atb-openclaw{background:#c0392b}
+.atb-claude{background:#e07020}
+.atb-cursor{background:#2471b0}
+.atb-vscode{background:#2471b0}
+.atb-custom{background:var(--text-muted)}
+/* ── 에이전트 상태 행 ── */
+.agent-status{font-size:.72rem;margin:.18rem 0 .3rem;display:flex;align-items:flex-start;gap:.45rem;flex-wrap:wrap}
+.status-live{color:var(--green);font-weight:500}
+.status-delay{color:var(--yellow)}
+.status-offline{color:var(--red)}
+.status-muted,.status-dc{color:var(--text-muted)}
+.status-hint{color:var(--text-muted);font-size:.67rem;font-style:italic}
+.status-version{color:var(--text-muted);font-size:.67rem}
+/* ── 에이전트 우측 액션 영역 ── */
+.agent-actions{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0;margin-left:.5rem}
+/* ── 설정 복사 버튼 ── */
+.btn-cfg{display:inline-flex;align-items:center;gap:.28rem;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:.22rem .55rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-cfg:hover{background:var(--bg);color:var(--accent);border-color:var(--accent)}
+.btn-cfg-openclaw:hover{color:#c0392b;border-color:#c0392b}
+.btn-cfg-claude:hover{color:#e07020;border-color:#e07020}
+/* ── 모델 저장 버튼 ── */
+.btn-save{background:var(--accent);color:#fff;border:none;padding:.26rem .65rem;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:inherit;font-weight:500;transition:all .15s;white-space:nowrap}
+.btn-save:hover{background:var(--accent-hover);transform:translateY(-1px)}
 /* ── 푸터 ── */
 .footer{text-align:center;color:var(--text-muted);font-size:.7rem;padding:.7rem 1.5rem;border-top:1px solid var(--border)}
 /* ── 모달 ── */
@@ -709,6 +734,57 @@ function copyOpenClawConfig(clientId) {
   }).catch(e=>alert(T('err')+e));
 }
 
+// ── 에이전트 타입별 설정 복사 (claude-code / cursor / vscode) ──
+function copyAgentConfig(clientId, agentType) {
+  const token = getAdminToken(); if(!token) return;
+  fetch('/admin/clients/'+clientId, {headers:{'Authorization':'Bearer '+token}})
+  .then(r=>r.json()).then(c=>{
+    if(c.error){alert(T('err')+c.error);return;}
+    const baseUrl = location.protocol+'//'+location.hostname+':56244/v1';
+    const tok = c.token||'YOUR_AGENT_TOKEN';
+    const mdl = c.default_model||'gemini-2.5-flash';
+    let cfg='', title='', hint='';
+    if(agentType==='claude-code'){
+      title='Claude Code 설정이 복사되었습니다.';
+      hint='~/.claude/settings.json 에 붙여넣으세요.';
+      cfg='// ~/.claude/settings.json\n'
+        +'{\n'
+        +'  "apiProvider": "openai",\n'
+        +'  "baseUrl": "'+baseUrl+'",\n'
+        +'  "apiKey": "'+tok+'"\n'
+        +'}';
+    } else if(agentType==='cursor'){
+      title='Cursor 설정이 복사되었습니다.';
+      hint='Cursor > Settings > AI > Override OpenAI Base URL 에 입력하세요.';
+      cfg='// Cursor: Settings > AI > OpenAI API\n'
+        +'Base URL : '+baseUrl+'\n'
+        +'API Key  : '+tok+'\n\n'
+        +'// 또는 환경변수:\n'
+        +'OPENAI_BASE_URL='+baseUrl+'\n'
+        +'OPENAI_API_KEY='+tok;
+    } else if(agentType==='vscode'){
+      title='VSCode / Continue 설정이 복사되었습니다.';
+      hint='~/.continue/config.json 에 붙여넣으세요.';
+      cfg='// ~/.continue/config.json  (Continue 확장)\n'
+        +'{\n'
+        +'  "models": [{\n'
+        +'    "title": "wall-vault proxy",\n'
+        +'    "provider": "openai",\n'
+        +'    "model": "'+mdl+'",\n'
+        +'    "apiBase": "'+baseUrl+'",\n'
+        +'    "apiKey": "'+tok+'"\n'
+        +'  }]\n'
+        +'}';
+    }
+    if(!cfg) return;
+    navigator.clipboard.writeText(cfg).then(()=>{
+      alert(title+'\n'+hint);
+    }).catch(()=>{
+      prompt('\uc544\ub798 \ub0b4\uc6a9\uc744 \ubcf5\uc0ac\ud558\uc138\uc694:', cfg);
+    });
+  }).catch(e=>alert(T('err')+e));
+}
+
 // ── 에이전트 추가 모달 ──
 function openAddClient() {
   _clearClientForm('ac');
@@ -963,12 +1039,25 @@ func buildServiceOptions(services []*ServiceConfig, selected string) string {
 
 // buildAgentsCard: 에이전트 카드 (등록 클라이언트 + 실시간 heartbeat 통합)
 func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*ServiceConfig) string {
-	// clientID → ProxyStatus 맵
 	pmap := make(map[string]*ProxyStatus, len(proxies))
 	for _, p := range proxies {
 		pmap[p.ClientID] = p
 	}
 
+	typeIcons := map[string]string{
+		"openclaw":    "🦞",
+		"claude-code": "🟠",
+		"cursor":      "⌨",
+		"vscode":      "💻",
+		"custom":      "⚙",
+	}
+	typeCls := map[string]string{
+		"openclaw":    "atb-openclaw",
+		"claude-code": "atb-claude",
+		"cursor":      "atb-cursor",
+		"vscode":      "atb-vscode",
+		"custom":      "atb-custom",
+	}
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(
@@ -983,13 +1072,16 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 	for _, c := range clients {
 		p := pmap[c.ID]
 
-		// 온라인 상태 판별 — 4단계: green(<3분)/yellow(3-10분)/red(>10분)/gray(비활성·미연결)
+		// ── 연결 상태 칩 ──
 		dotClass := "dot-gray"
-		liveDetail := ""
+		var statusChip string
 		if !c.Enabled {
-			liveDetail = `<div class="agent-live" style="color:var(--text-muted)">비활성화</div>`
+			statusChip = `<div class="agent-status"><span class="status-muted">— 비활성화됨</span></div>`
 		} else if p == nil {
-			liveDetail = `<div class="agent-live" style="color:var(--text-muted)">미연결</div>`
+			statusChip = `<div class="agent-status">` +
+				`<span class="status-dc">● 프록시 미연결</span>` +
+				`<span class="status-hint">heartbeat 미수신 — VAULT_TOKEN 으로 프록시를 실행하면 연결됩니다</span>` +
+				`</div>`
 		} else {
 			age := time.Since(p.UpdatedAt)
 			ageSec := int(age.Seconds())
@@ -1002,20 +1094,20 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			switch {
 			case age < 3*time.Minute:
 				dotClass = "dot-green"
-				liveDetail = fmt.Sprintf(
-					`<div class="agent-live">%s / %s <span style="color:var(--text-muted)">— <span class="bot-ago" data-ago-sec="%d">%s</span></span> <span style="color:var(--text-muted);font-size:.7rem">%s</span></div>`,
+				statusChip = fmt.Sprintf(
+					`<div class="agent-status"><span class="status-live">● 실행 중 — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%s</span></span> <span class="status-version">%s</span></div>`,
 					p.Service, p.Model, ageSec, ago, p.Version,
 				)
 			case age < 10*time.Minute:
 				dotClass = "dot-yellow"
-				liveDetail = fmt.Sprintf(
-					`<div class="agent-live" style="color:var(--yellow)">지연 %s — %s / %s</div>`,
+				statusChip = fmt.Sprintf(
+					`<div class="agent-status"><span class="status-delay">◑ 지연 %s — %s / %s</span></div>`,
 					ago, p.Service, p.Model,
 				)
 			default:
 				dotClass = "dot-red"
-				liveDetail = fmt.Sprintf(
-					`<div class="agent-live" style="color:var(--red)">오프라인 (%s)</div>`,
+				statusChip = fmt.Sprintf(
+					`<div class="agent-status"><span class="status-offline">✕ 오프라인 (%s)</span></div>`,
 					ago,
 				)
 			}
@@ -1025,26 +1117,30 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		if displayName == "" {
 			displayName = c.ID
 		}
-
-		// 비활성화 클래스
 		disabledClass := ""
 		if !c.Enabled {
 			disabledClass = " agent-disabled"
 		}
 
-		// agent_type 뱃지
+		// ── 에이전트 종류 아이콘 & 뱃지 ──
+		typeIcon := "🤖"
+		if ic, ok := typeIcons[c.AgentType]; ok {
+			typeIcon = ic
+		}
 		typeBadge := ""
 		if c.AgentType != "" {
-			typeBadge = fmt.Sprintf(`<span class="agent-type-badge">%s</span>`, c.AgentType)
+			cls := "atb-custom"
+			if bc, ok := typeCls[c.AgentType]; ok {
+				cls = bc
+			}
+			typeBadge = fmt.Sprintf(`<span class="atbadge %s">%s</span>`, cls, c.AgentType)
 		}
 
-		// 설명
+		// ── 설명 & 메타 ──
 		descLine := ""
 		if c.Description != "" {
 			descLine = fmt.Sprintf(`<div class="agent-desc">%s</div>`, c.Description)
 		}
-
-		// 메타 정보 (work_dir, ip_whitelist)
 		metaLines := ""
 		if c.WorkDir != "" {
 			metaLines += fmt.Sprintf(`<div class="agent-meta">📁 %s</div>`, c.WorkDir)
@@ -1053,47 +1149,68 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			metaLines += fmt.Sprintf(`<div class="agent-meta">🔒 %s</div>`, strings.Join(c.IPWhitelist, ", "))
 		}
 
-		startedAtSec := int64(0)
-		if p != nil && !p.StartedAt.IsZero() {
-			startedAtSec = p.StartedAt.Unix()
+		// ── 타입별 설정 복사 버튼 ──
+		var cfgButton string
+		switch c.AgentType {
+		case "openclaw":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg btn-cfg-openclaw" onclick="copyOpenClawConfig('%s')" title="~/.openclaw/openclaw.json 에 붙여넣을 설정 복사">🦞 OpenClaw 설정 복사</button>`,
+				c.ID)
+		case "claude-code":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg btn-cfg-claude" onclick="copyAgentConfig('%s','claude-code')" title="~/.claude/settings.json 프록시 설정 복사">🟠 Claude Code 설정 복사</button>`,
+				c.ID)
+		case "cursor":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cursor')" title="Cursor AI 프록시 API 설정 복사">⌨ Cursor 설정 복사</button>`,
+				c.ID)
+		case "vscode":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','vscode')" title="VS Code / Continue 확장 프록시 설정 복사">💻 VSCode 설정 복사</button>`,
+				c.ID)
+		default:
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg" onclick="copyOpenClawConfig('%s')" title="프록시 연결 설정 복사 (OpenClaw 형식)">📋 설정 복사</button>`,
+				c.ID)
 		}
+
+		// ── uptime 속성 ──
 		uptimeAttr := ""
-		if startedAtSec > 0 {
-			uptimeAttr = fmt.Sprintf(` data-started-sec="%d"`, startedAtSec)
+		if p != nil && !p.StartedAt.IsZero() {
+			uptimeAttr = fmt.Sprintf(` data-started-sec="%d"`, p.StartedAt.Unix())
 		}
-		sb.WriteString(fmt.Sprintf(`<div class="agent-item%s"%s>
-<div class="agent-header">
-  <div class="dot %s" style="margin-top:.15rem;flex-shrink:0"></div>
-  <div style="flex:1;min-width:0">
-    <div class="agent-name">%s <span style="color:var(--text-muted);font-size:.72rem">%s</span>%s</div>
-    %s%s%s
-    <div class="model-form">
-      <select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>
-      <select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')" style="margin-bottom:.25rem">
-        <option value="">— 모델 선택 —</option>
-      </select>
-      <input id="mdl-%s" type="text" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s" oninput="document.getElementById('mdl-sel-%s').value=''">
-      <button class="btn" onclick="changeModel('%s')" data-i18n="apply">적용</button>
-    </div>
-  </div>
-  <div style="display:flex;flex-direction:row;gap:.35rem;flex-shrink:0;align-items:flex-start">
-    <button class="btn-action" onclick="copyOpenClawConfig('%s')" title="OpenClaw 설정 복사">🐾</button>
-    <button class="btn-action" onclick="openEditClient('%s')" title="편집">✎</button>
-    <button class="btn-action btn-action-del" onclick="deleteClient('%s')" title="삭제">✕</button>
-  </div>
-</div>
-</div>`,
-			disabledClass, uptimeAttr,
-			dotClass,
-			displayName, c.ID, typeBadge,
-			descLine, metaLines, liveDetail,
-			c.ID, c.ID, c.ID, buildServiceOptions(services, c.DefaultService),
-			c.ID, c.ID, c.ID,
-			c.ID, c.DefaultModel, c.ID,
-			c.ID,
-			c.ID,
-			c.ID, c.ID,
-		))
+
+		// ── 카드 아이템 조립 ──
+		var item strings.Builder
+		item.WriteString(fmt.Sprintf(`<div class="agent-item%s"%s>`, disabledClass, uptimeAttr))
+		item.WriteString(`<div class="agent-header">`)
+		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.28rem;flex-shrink:0"></div>`, dotClass))
+		item.WriteString(`<div style="flex:1;min-width:0">`)
+		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s %s <span style="color:var(--text-muted);font-size:.72rem">(%s)</span>%s</div>`,
+			typeIcon, displayName, c.ID, typeBadge))
+		item.WriteString(descLine)
+		item.WriteString(metaLines)
+		item.WriteString(statusChip)
+		item.WriteString(`<div class="model-form">`)
+		item.WriteString(fmt.Sprintf(`<select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>`,
+			c.ID, c.ID, c.ID, buildServiceOptions(services, c.DefaultService)))
+		item.WriteString(fmt.Sprintf(`<select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')" style="margin-bottom:.25rem"><option value="">— 모델 선택 —</option></select>`,
+			c.ID, c.ID, c.ID))
+		item.WriteString(fmt.Sprintf(`<input id="mdl-%s" type="text" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s" oninput="document.getElementById('mdl-sel-%s').value=''">`,
+			c.ID, c.DefaultModel, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn btn-save" onclick="changeModel('%s')" data-i18n="apply">💾 저장</button>`, c.ID))
+		item.WriteString(`</div>`) // model-form
+		item.WriteString(`</div>`) // flex:1
+		item.WriteString(`<div class="agent-actions">`)
+		item.WriteString(cfgButton)
+		item.WriteString(`<div style="display:flex;gap:.3rem;margin-top:.3rem">`)
+		item.WriteString(fmt.Sprintf(`<button class="btn-action" onclick="openEditClient('%s')" title="편집">✎</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action btn-action-del" onclick="deleteClient('%s')" title="삭제">✕</button>`, c.ID))
+		item.WriteString(`</div>`)  // gap row
+		item.WriteString(`</div>`)  // agent-actions
+		item.WriteString(`</div>`)  // agent-header
+		item.WriteString(`</div>`)  // agent-item
+		sb.WriteString(item.String())
 	}
 	sb.WriteString(`</div>`)
 	return sb.String()

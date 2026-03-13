@@ -167,7 +167,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	clients := s.store.ListClients()
 	jsonOK(w, map[string]interface{}{
 		"status":  "ok",
-		"version": "v0.1.2",
+		"version": "v0.1.3",
 		"keys":    len(keys),
 		"clients": len(clients),
 		"sse":     s.broker.Count(),

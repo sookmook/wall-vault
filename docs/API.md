@@ -66,7 +66,7 @@
 ```json
 {
   "status": "ok",
-  "version": "v0.1.2",
+  "version": "v0.1.3",
   "client": "bot-a"
 }
 ```
@@ -81,7 +81,7 @@
 ```json
 {
   "status": "ok",
-  "version": "v0.1.2",
+  "version": "v0.1.3",
   "client": "bot-a",
   "service": "google",
   "model": "gemini-2.5-flash",
@@ -319,7 +319,7 @@ OpenAI 호환 API. 내부적으로 Gemini 형식으로 변환 후 처리합니�
 ```json
 {
   "status": "ok",
-  "version": "v0.1.2",
+  "version": "v0.1.3",
   "keys": 3,
   "clients": 2,
   "sse": 2
@@ -405,7 +405,7 @@ data: {"type":"usage_reset","data":{"time":"2026-03-13T00:00:30Z"}}
 ```json
 {
   "client_id": "bot-a",
-  "version": "v0.1.2",
+  "version": "v0.1.3",
   "service": "google",
   "model": "gemini-2.5-flash",
   "sse_connected": true,
@@ -1032,7 +1032,7 @@ curl http://localhost:56243/api/keys \
 curl -X POST http://localhost:56243/api/heartbeat \
   -H "Authorization: Bearer your-bot-a-token" \
   -H "Content-Type: application/json" \
-  -d '{"client_id":"bot-a","version":"v0.1.2","service":"google","model":"gemini-2.5-flash","sse_connected":true}'
+  -d '{"client_id":"bot-a","version":"v0.1.3","service":"google","model":"gemini-2.5-flash","sse_connected":true}'
 ```
 
 ---
@@ -1049,4 +1049,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*최종 업데이트: 2026-03-13 — v0.1.2: OpenClaw 3.11 provider routing, direct OpenAI, control token stripping, real-time SSE dropdown sync*
+*최종 업데이트: 2026-03-13 — v0.1.3: OpenClaw 3.11 provider routing, direct OpenAI, control token stripping, real-time SSE dropdown sync*

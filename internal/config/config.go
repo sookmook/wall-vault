@@ -1,4 +1,4 @@
-// Package config: wall-vault 설정 로드·저장
+// Package config: load and save wall-vault configuration
 package config
 
 import (
@@ -10,65 +10,65 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ─── 최상위 설정 ────────────────────────────────────────────────────────────
+// ─── Top-Level Config ────────────────────────────────────────────────────────
 
 type Config struct {
 	Mode    string       `yaml:"mode"`    // standalone | distributed
-	Lang    string       `yaml:"lang"`    // ko | en | ja
-	Theme   string       `yaml:"theme"`   // dark | light | cherry | ocean
+	Lang    string       `yaml:"lang"`    // ko | en | ja | ...
+	Theme   string       `yaml:"theme"`   // dark | light | cherry | ocean | ...
 	Proxy   ProxyConfig  `yaml:"proxy"`
 	Vault   VaultConfig  `yaml:"vault"`
 	Doctor  DoctorConfig `yaml:"doctor"`
 	Hooks   HooksConfig  `yaml:"hooks"`
 
-	// 런타임 전용 — YAML 직렬화 제외 (LoadPlugins로 채워짐)
+	// runtime-only — excluded from YAML serialization (populated by LoadPlugins)
 	Plugins []ServicePlugin `yaml:"-"`
 }
 
-// ─── 프록시 설정 ─────────────────────────────────────────────────────────────
+// ─── Proxy Config ─────────────────────────────────────────────────────────────
 
 type ProxyConfig struct {
-	Port         int           `yaml:"port"`          // 기본 56244
-	Host         string        `yaml:"host"`          // 기본 0.0.0.0
-	ClientID     string        `yaml:"client_id"`     // bot-a | mini | bot-c | 자유
-	VaultURL     string        `yaml:"vault_url"`     // distributed 모드
+	Port         int           `yaml:"port"`          // default 56244
+	Host         string        `yaml:"host"`          // default 0.0.0.0
+	ClientID     string        `yaml:"client_id"`     // bot-a | mini | bot-c | free
+	VaultURL     string        `yaml:"vault_url"`     // distributed mode
 	VaultToken   string        `yaml:"vault_token"`
 	ToolFilter   string        `yaml:"tool_filter"`   // strip_all | whitelist | passthrough
-	AllowedTools []string      `yaml:"allowed_tools"` // whitelist 모드용
-	Services     []string      `yaml:"services"`      // 활성 서비스 목록
-	Timeout      time.Duration `yaml:"timeout"`       // API 타임아웃
+	AllowedTools []string      `yaml:"allowed_tools"` // for whitelist mode
+	Services     []string      `yaml:"services"`      // active service list
+	Timeout      time.Duration `yaml:"timeout"`       // API timeout
 }
 
-// ─── 키 금고 설정 ─────────────────────────────────────────────────────────────
+// ─── Key Vault Config ─────────────────────────────────────────────────────────
 
 type VaultConfig struct {
-	Port        int    `yaml:"port"`         // 기본 56243
-	Host        string `yaml:"host"`         // 기본 0.0.0.0
+	Port        int    `yaml:"port"`         // default 56243
+	Host        string `yaml:"host"`         // default 0.0.0.0
 	AdminToken  string `yaml:"admin_token"`
 	MasterPass  string `yaml:"master_password"`
-	DataDir     string `yaml:"data_dir"`     // 기본 ~/.wall-vault/data
-	ServicesDir string `yaml:"services_dir"` // YAML 서비스 플러그인 폴더
+	DataDir     string `yaml:"data_dir"`     // default ~/.wall-vault/data
+	ServicesDir string `yaml:"services_dir"` // YAML service plugin folder
 }
 
-// ─── 주치의 설정 ─────────────────────────────────────────────────────────────
+// ─── Doctor Config ────────────────────────────────────────────────────────────
 
 type DoctorConfig struct {
-	Interval  time.Duration `yaml:"interval"`   // 기본 5분
-	AutoFix   bool          `yaml:"auto_fix"`   // 기본 true
-	LogFile   string        `yaml:"log_file"`   // 기본 /tmp/wall-vault-doctor.log
+	Interval  time.Duration `yaml:"interval"`   // default 5 minutes
+	AutoFix   bool          `yaml:"auto_fix"`   // default true
+	LogFile   string        `yaml:"log_file"`   // default /tmp/wall-vault-doctor.log
 }
 
-// ─── 훅 설정 ────────────────────────────────────────────────────────────────
+// ─── Hooks Config ─────────────────────────────────────────────────────────────
 
 type HooksConfig struct {
-	OnModelChange    string `yaml:"on_model_change"`    // 셸 명령
+	OnModelChange    string `yaml:"on_model_change"`    // shell command
 	OnKeyExhausted   string `yaml:"on_key_exhausted"`
 	OnServiceDown    string `yaml:"on_service_down"`
 	OnDoctorFix      string `yaml:"on_doctor_fix"`
-	OpenClawSocket   string `yaml:"openclaw_socket"`    // OpenClaw TUI 소켓 경로
+	OpenClawSocket   string `yaml:"openclaw_socket"`    // OpenClaw TUI socket path
 }
 
-// ─── 기본값 ──────────────────────────────────────────────────────────────────
+// ─── Defaults ────────────────────────────────────────────────────────────────
 
 func Default() *Config {
 	home, _ := os.UserHomeDir()
@@ -98,10 +98,10 @@ func Default() *Config {
 	}
 }
 
-// ─── 로드 ────────────────────────────────────────────────────────────────────
+// ─── Load ─────────────────────────────────────────────────────────────────────
 
-// Load: 설정 파일 탐색 순서
-//  1. 인수로 전달된 경로
+// Load: config file search order
+//  1. path passed as argument
 //  2. ./wall-vault.yaml
 //  3. ~/.wall-vault/config.yaml
 func Load(path string) (*Config, error) {
@@ -123,14 +123,14 @@ func Load(path string) (*Config, error) {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			return nil, fmt.Errorf("설정 파싱 오류 (%s): %w", p, err)
 		}
-		// 환경변수 덮어쓰기
+		// override with env vars
 		applyEnv(cfg)
-		// 서비스 플러그인 로드
+		// load service plugins
 		cfg.Plugins, _ = LoadPlugins(cfg.Vault.ServicesDir)
 		return cfg, nil
 	}
 
-	// 설정 파일 없음 — 기본값
+	// no config file found — use defaults
 	applyEnv(cfg)
 	cfg.Plugins, _ = LoadPlugins(cfg.Vault.ServicesDir)
 	return cfg, nil
@@ -169,7 +169,7 @@ func applyEnv(cfg *Config) {
 			cfg.Vault.Port = p
 		}
 	}
-	// 레거시 호환 (OpenClaw 환경변수)
+	// legacy compatibility (OpenClaw env vars)
 	if v := os.Getenv("VAULT_URL"); v != "" && cfg.Proxy.VaultURL == "" {
 		cfg.Proxy.VaultURL = v
 	}
@@ -179,7 +179,7 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("VAULT_CLIENT_ID"); v != "" {
 		cfg.Proxy.ClientID = v
 	}
-	// Windows: APPDATA 기반 데이터 경로 자동 설정
+	// Windows: auto-set data path based on APPDATA
 	if cfg.Vault.DataDir == "" {
 		if appdata := os.Getenv("APPDATA"); appdata != "" {
 			cfg.Vault.DataDir = filepath.Join(appdata, "wall-vault", "data")
@@ -187,7 +187,7 @@ func applyEnv(cfg *Config) {
 	}
 }
 
-// Save: 설정 파일 저장
+// Save: save config file
 func Save(cfg *Config, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err

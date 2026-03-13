@@ -10,7 +10,7 @@ import (
 )
 
 func TestFire_ShellCommand(t *testing.T) {
-	// 파일 존재 여부로 셸 명령 실행 확인
+	// verify shell command execution by checking file existence
 	tmpFile := t.TempDir() + "/hooks_test_flag"
 
 	m := NewManager(map[EventType]string{
@@ -19,7 +19,7 @@ func TestFire_ShellCommand(t *testing.T) {
 
 	m.Fire(EventModelChanged, map[string]string{"model": "gemini-2.5-flash"})
 
-	// 비동기 실행이므로 짧게 대기
+	// brief wait since execution is async
 	time.Sleep(200 * time.Millisecond)
 
 	if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
@@ -28,14 +28,14 @@ func TestFire_ShellCommand(t *testing.T) {
 }
 
 func TestFire_NoCommand(t *testing.T) {
-	// 등록되지 않은 이벤트 — 패닉 없이 처리
+	// unregistered event — handled without panic
 	m := NewManager(map[EventType]string{}, "")
 	m.Fire(EventKeyExhausted, nil)
 	time.Sleep(50 * time.Millisecond)
 }
 
 func TestFire_EmptyCommand(t *testing.T) {
-	// 빈 문자열 명령 — 실행 안 함
+	// empty string command — not executed
 	m := NewManager(map[EventType]string{
 		EventServiceDown: "",
 	}, "")
@@ -44,7 +44,7 @@ func TestFire_EmptyCommand(t *testing.T) {
 }
 
 func TestNotifySocket(t *testing.T) {
-	// Unix 소켓 서버 시작
+	// start Unix socket server
 	sockPath := t.TempDir() + "/test.sock"
 	ln, err := net.Listen("unix", sockPath)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestNotifySocket(t *testing.T) {
 
 	select {
 	case msg := <-received:
-		// JSON 파싱 검증
+		// validate JSON parsing
 		var evt Event
 		if err := json.Unmarshal([]byte(strings.TrimSpace(msg)), &evt); err != nil {
 			t.Fatalf("소켓 메시지 파싱 실패: %v — msg: %q", err, msg)
@@ -121,7 +121,7 @@ func TestTUIFooter(t *testing.T) {
 }
 
 func TestTUIFooter_NoSocket(t *testing.T) {
-	// 소켓 없이 호출 — 패닉 없어야 함
+	// called without socket — must not panic
 	m := NewManager(map[EventType]string{}, "")
 	m.TUIFooter("테스트")
 }

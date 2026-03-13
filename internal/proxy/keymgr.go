@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// ─── 쿨다운 시간 ─────────────────────────────────────────────────────────────
+// ─── Cooldown Durations ───────────────────────────────────────────────────────
 
 var cooldownDurations = map[int]time.Duration{
 	429: 30 * time.Minute,
@@ -29,7 +29,7 @@ func cooldownFor(errCode int) time.Duration {
 	return 10 * time.Minute
 }
 
-// ─── 로컬 키 ─────────────────────────────────────────────────────────────────
+// ─── Local Key ────────────────────────────────────────────────────────────────
 
 type localKey struct {
 	id            string
@@ -50,12 +50,12 @@ func (k *localKey) isAvailable() bool {
 	return true
 }
 
-// ─── KeyManager ──────────────────────────────────────────────────────────────
+// ─── KeyManager ───────────────────────────────────────────────────────────────
 
 type KeyManager struct {
 	mu       sync.Mutex
 	keys     map[string][]*localKey
-	idx      map[string]int // 서비스별 라운드 로빈 인덱스
+	idx      map[string]int // round-robin index per service
 	vaultURL string
 	token    string
 	clientID string
@@ -71,7 +71,7 @@ func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 	}
 }
 
-// AddKey: 직접 키 추가
+// AddKey: directly add a key
 func (km *KeyManager) AddKey(service, id, plaintext string, dailyLimit int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
@@ -83,8 +83,8 @@ func (km *KeyManager) AddKey(service, id, plaintext string, dailyLimit int) {
 	})
 }
 
-// Get: 사용 가능한 키 반환 (라운드 로빈)
-// 마지막으로 사용한 인덱스 다음부터 순환하여 가용 키를 반환
+// Get: return an available key (round-robin)
+// cycles from the index after the last used one to find an available key
 func (km *KeyManager) Get(service string) (*localKey, error) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
@@ -104,14 +104,14 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개, 모두 쿨다운/소진)", service, n)
 }
 
-// RecordSuccess: 사용량 기록
+// RecordSuccess: record usage
 func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	k.todayUsage += tokens
 }
 
-// RecordError: 쿨다운 설정
+// RecordError: set cooldown
 func (km *KeyManager) RecordError(k *localKey, errCode int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
@@ -120,18 +120,18 @@ func (km *KeyManager) RecordError(k *localKey, errCode int) {
 	log.Printf("[key] 쿨다운 설정: service=%s, 오류=%d, %.0f분", k.service, errCode, d.Minutes())
 }
 
-// ─── 환경변수에서 로드 ────────────────────────────────────────────────────────
-// 형식: WV_KEY_GOOGLE=AIza...         (단일 키)
-//       WV_KEY_GOOGLE=AIza...,AIzb... (쉼표 구분 복수 키)
-//       WV_KEY_GOOGLE=AIza...:500,AIzb...:1500 (키:일일한도)
+// ─── Load from Environment Variables ─────────────────────────────────────────
+// format: WV_KEY_GOOGLE=AIza...         (single key)
+//         WV_KEY_GOOGLE=AIza...,AIzb... (comma-separated multiple keys)
+//         WV_KEY_GOOGLE=AIza...:500,AIzb...:1500 (key:daily_limit)
 
 func (km *KeyManager) LoadFromEnv() {
 	serviceEnvMap := map[string]string{
 		"google":      "WV_KEY_GOOGLE",
 		"openrouter":  "WV_KEY_OPENROUTER",
-		"ollama":      "", // Ollama는 키 불필요
+		"ollama":      "", // Ollama requires no key
 	}
-	// 레거시 호환
+	// legacy compatibility
 	legacyEnvMap := map[string]string{
 		"google":     "GOOGLE_API_KEY",
 		"openrouter": "OPENROUTER_API_KEY",
@@ -144,7 +144,7 @@ func (km *KeyManager) LoadFromEnv() {
 		}
 		val := os.Getenv(envName)
 		if val == "" {
-			// 레거시 환경변수 시도
+			// try legacy env var
 			if legacy, ok := legacyEnvMap[svc]; ok {
 				val = os.Getenv(legacy)
 			}
@@ -175,8 +175,8 @@ func (km *KeyManager) LoadFromEnv() {
 	}
 }
 
-// SyncFromVault: 금고에서 키 동기화 (/api/keys 엔드포인트)
-// 금고가 복호화된 키를 반환 (프록시는 마스터 비밀번호 불필요)
+// SyncFromVault: sync keys from vault (/api/keys endpoint)
+// vault returns decrypted keys (proxy does not need the master password)
 func (km *KeyManager) SyncFromVault() error {
 	if km.vaultURL == "" {
 		return nil
@@ -217,7 +217,7 @@ func (km *KeyManager) SyncFromVault() error {
 	}
 
 	km.mu.Lock()
-	// 금고에서 받은 키만 교체 (환경변수 키는 유지)
+	// replace only vault-sourced keys (env var keys are kept)
 	for svc := range km.keys {
 		var kept []*localKey
 		for _, k := range km.keys[svc] {

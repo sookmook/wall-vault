@@ -12,7 +12,7 @@ import (
 	"github.com/sookmook/wall-vault/internal/config"
 )
 
-// newTestVaultServer: 임시 디렉터리 사용하는 테스트 금고 서버
+// newTestVaultServer: test vault server using a temporary directory
 func newTestVaultServer(t *testing.T) (*Server, func()) {
 	t.Helper()
 	dir := t.TempDir()
@@ -29,7 +29,7 @@ func newTestVaultServer(t *testing.T) (*Server, func()) {
 	return srv, cleanup
 }
 
-// ─── 공개 API ────────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 func TestVaultStatus(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
@@ -63,14 +63,14 @@ func TestVaultPublicClients(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	// 빈 배열이어야 함
+	// should be empty array
 	var body []interface{}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("파싱 실패: %v", err)
 	}
 }
 
-// ─── 관리자 인증 ─────────────────────────────────────────────────────────────
+// ─── Admin Authentication ─────────────────────────────────────────────────────
 
 func TestVaultAdminAuth_Unauthorized(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
@@ -99,14 +99,14 @@ func TestVaultAdminAuth_WrongToken(t *testing.T) {
 	}
 }
 
-// ─── 키 CRUD ─────────────────────────────────────────────────────────────────
+// ─── Key CRUD ─────────────────────────────────────────────────────────────────
 
 func TestVaultKeyAddAndList(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
 	defer cleanup()
 	h := srv.Handler()
 
-	// 키 추가
+	// add key
 	body := `{"service":"google","key":"AIzaSy-test-key","label":"테스트","daily_limit":100}`
 	req := httptest.NewRequest("POST", "/admin/keys", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer test-admin")
@@ -118,7 +118,7 @@ func TestVaultKeyAddAndList(t *testing.T) {
 		t.Fatalf("키 추가 status = %d, want 200: %s", w.Code, w.Body.String())
 	}
 
-	// 키 목록 조회
+	// list keys
 	req2 := httptest.NewRequest("GET", "/admin/keys", nil)
 	req2.Header.Set("Authorization", "Bearer test-admin")
 	w2 := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestVaultKeyAddAndList(t *testing.T) {
 	if keys[0]["label"] != "테스트" {
 		t.Errorf("label = %v", keys[0]["label"])
 	}
-	// 평문 키는 /admin/keys 응답에 포함되지 않아야 함
+	// plaintext key must not be included in /admin/keys response
 	if _, ok := keys[0]["plain_key"]; ok {
 		t.Error("plain_key가 관리자 목록에 노출됨")
 	}
@@ -164,7 +164,7 @@ func TestVaultKeyDelete(t *testing.T) {
 	defer cleanup()
 	h := srv.Handler()
 
-	// 키 추가
+	// add key
 	body := `{"service":"openrouter","key":"sk-or-test","label":"OR 키"}`
 	req := httptest.NewRequest("POST", "/admin/keys", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer test-admin")
@@ -176,7 +176,7 @@ func TestVaultKeyDelete(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
-	// 삭제
+	// delete
 	req2 := httptest.NewRequest("DELETE", "/admin/keys/"+id, nil)
 	req2.Header.Set("Authorization", "Bearer test-admin")
 	w2 := httptest.NewRecorder()
@@ -186,7 +186,7 @@ func TestVaultKeyDelete(t *testing.T) {
 		t.Fatalf("삭제 status = %d", w2.Code)
 	}
 
-	// 목록에서 사라졌는지 확인
+	// verify it is gone from the list
 	req3 := httptest.NewRequest("GET", "/admin/keys", nil)
 	req3.Header.Set("Authorization", "Bearer test-admin")
 	w3 := httptest.NewRecorder()
@@ -213,14 +213,14 @@ func TestVaultKeyDelete_NotFound(t *testing.T) {
 	}
 }
 
-// ─── 클라이언트 CRUD ──────────────────────────────────────────────────────────
+// ─── Client CRUD ──────────────────────────────────────────────────────────────
 
 func TestVaultClientAddAndList(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
 	defer cleanup()
 	h := srv.Handler()
 
-	// 클라이언트 추가
+	// add client
 	body := `{"id":"bot1","name":"봇 원","token":"bot1-token","default_service":"google","default_model":"gemini-2.5-flash"}`
 	req := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer test-admin")
@@ -232,7 +232,7 @@ func TestVaultClientAddAndList(t *testing.T) {
 		t.Fatalf("클라이언트 추가 status = %d: %s", w.Code, w.Body.String())
 	}
 
-	// 관리자 목록 (토큰 포함)
+	// admin list (includes token)
 	req2 := httptest.NewRequest("GET", "/admin/clients", nil)
 	req2.Header.Set("Authorization", "Bearer test-admin")
 	w2 := httptest.NewRecorder()
@@ -256,14 +256,14 @@ func TestVaultClientUpdate_SSE(t *testing.T) {
 	defer cleanup()
 	h := srv.Handler()
 
-	// 클라이언트 등록
+	// register client
 	addBody := `{"id":"bot2","name":"봇 투","token":"bot2-token","default_service":"google","default_model":"gemini-2.0-flash"}`
 	req := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(addBody))
 	req.Header.Set("Authorization", "Bearer test-admin")
 	req.Header.Set("Content-Type", "application/json")
 	h.ServeHTTP(httptest.NewRecorder(), req)
 
-	// 모델 변경
+	// change model
 	upBody := `{"default_service":"openrouter","default_model":"anthropic/claude-3.5-sonnet"}`
 	req2 := httptest.NewRequest("PUT", "/admin/clients/bot2", strings.NewReader(upBody))
 	req2.Header.Set("Authorization", "Bearer test-admin")
@@ -275,7 +275,7 @@ func TestVaultClientUpdate_SSE(t *testing.T) {
 		t.Fatalf("업데이트 status = %d: %s", w2.Code, w2.Body.String())
 	}
 
-	// 변경 내용 확인
+	// verify changes
 	req3 := httptest.NewRequest("GET", "/admin/clients/bot2", nil)
 	req3.Header.Set("Authorization", "Bearer test-admin")
 	w3 := httptest.NewRecorder()
@@ -309,28 +309,28 @@ func TestVaultClientDelete(t *testing.T) {
 	}
 }
 
-// ─── 프록시 전용 API ──────────────────────────────────────────────────────────
+// ─── Proxy-Only API ───────────────────────────────────────────────────────────
 
 func TestVaultProxyKeys_ClientAuth(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
 	defer cleanup()
 	h := srv.Handler()
 
-	// 클라이언트 등록
+	// register client
 	addC := `{"id":"proxyclient","name":"프록시","token":"proxy-tok"}`
 	req := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(addC))
 	req.Header.Set("Authorization", "Bearer test-admin")
 	req.Header.Set("Content-Type", "application/json")
 	h.ServeHTTP(httptest.NewRecorder(), req)
 
-	// 키 등록
+	// register key
 	addK := `{"service":"google","key":"AIza-proxy-test","daily_limit":0}`
 	req2 := httptest.NewRequest("POST", "/admin/keys", strings.NewReader(addK))
 	req2.Header.Set("Authorization", "Bearer test-admin")
 	req2.Header.Set("Content-Type", "application/json")
 	h.ServeHTTP(httptest.NewRecorder(), req2)
 
-	// 클라이언트 토큰으로 /api/keys 조회
+	// query /api/keys with client token
 	req3 := httptest.NewRequest("GET", "/api/keys", nil)
 	req3.Header.Set("Authorization", "Bearer proxy-tok")
 	w3 := httptest.NewRecorder()
@@ -371,14 +371,14 @@ func TestVaultHeartbeat(t *testing.T) {
 	defer cleanup()
 	h := srv.Handler()
 
-	// 클라이언트 등록
+	// register client
 	addC := fmt.Sprintf(`{"id":"hbclient","name":"HB","token":"hb-tok"}`)
 	req := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(addC))
 	req.Header.Set("Authorization", "Bearer test-admin")
 	req.Header.Set("Content-Type", "application/json")
 	h.ServeHTTP(httptest.NewRecorder(), req)
 
-	// Heartbeat 전송
+	// send Heartbeat
 	hbBody := `{"client_id":"hbclient","version":"v0.1.0","service":"google","model":"gemini-2.5-flash","sse_connected":true}`
 	req2 := httptest.NewRequest("POST", "/api/heartbeat", strings.NewReader(hbBody))
 	req2.Header.Set("Authorization", "Bearer hb-tok")
@@ -390,7 +390,7 @@ func TestVaultHeartbeat(t *testing.T) {
 		t.Fatalf("heartbeat status = %d: %s", w2.Code, w2.Body.String())
 	}
 
-	// admin/proxies에서 확인
+	// verify in admin/proxies
 	req3 := httptest.NewRequest("GET", "/admin/proxies", nil)
 	req3.Header.Set("Authorization", "Bearer test-admin")
 	w3 := httptest.NewRecorder()
@@ -406,7 +406,7 @@ func TestVaultHeartbeat(t *testing.T) {
 	}
 }
 
-// ─── 사용량 초기화 ────────────────────────────────────────────────────────────
+// ─── Usage Reset ──────────────────────────────────────────────────────────────
 
 func TestVaultResetUsage(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
@@ -428,7 +428,7 @@ func TestVaultResetUsage(t *testing.T) {
 	}
 }
 
-// ─── 대시보드 UI ──────────────────────────────────────────────────────────────
+// ─── Dashboard UI ─────────────────────────────────────────────────────────────
 
 func TestVaultDashboard(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)

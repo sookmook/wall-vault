@@ -75,13 +75,13 @@ func TestEncryptDecrypt_Randomness(t *testing.T) {
 }
 
 func TestDecryptKey_PlaintextFallback(t *testing.T) {
-	// base64가 아닌 평문이 들어오면 그대로 반환
+	// if non-base64 plaintext is given, return it as-is
 	plain := "not-base64-!!!"
 	result, err := decryptKey(plain, "some-password")
 	if err != nil {
 		t.Fatalf("예상치 못한 오류: %v", err)
 	}
-	// base64 디코드 실패 → 평문 반환
+	// base64 decode failure → return plaintext
 	if !strings.Contains(result, plain) && result != plain {
 		t.Fatalf("평문 폴백 기대, got %q", result)
 	}

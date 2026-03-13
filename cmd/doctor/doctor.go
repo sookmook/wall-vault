@@ -1,4 +1,4 @@
-// Package doctor: 헬스체크 및 자동 복구 커맨드
+// Package doctor: health check and auto-recovery command
 package doctor
 
 import (

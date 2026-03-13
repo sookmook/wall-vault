@@ -1,4 +1,4 @@
-// Package hooks: OpenClaw 연동 훅 및 이벤트 시스템
+// Package hooks: OpenClaw integration hooks and event system
 package hooks
 
 import (
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// EventType: 훅 이벤트 종류
+// EventType: hook event type
 type EventType string
 
 const (
@@ -21,14 +21,14 @@ const (
 	EventOllamaDone    EventType = "ollama_done"
 )
 
-// Event: 훅 이벤트 데이터
+// Event: hook event data
 type Event struct {
 	Type      EventType         `json:"type"`
 	Timestamp time.Time         `json:"timestamp"`
 	Data      map[string]string `json:"data,omitempty"`
 }
 
-// Manager: 훅 관리자
+// Manager: hook manager
 type Manager struct {
 	shellCmds    map[EventType]string
 	openClawSock string
@@ -41,7 +41,7 @@ func NewManager(shellCmds map[EventType]string, sockPath string) *Manager {
 	}
 }
 
-// Fire: 이벤트 발생 (비동기)
+// Fire: fire event (async)
 func (m *Manager) Fire(evt EventType, data map[string]string) {
 	go m.fire(evt, data)
 }
@@ -53,12 +53,12 @@ func (m *Manager) fire(evt EventType, data map[string]string) {
 		Data:      data,
 	}
 
-	// 1. 셸 명령 실행
+	// 1. execute shell command
 	if cmd, ok := m.shellCmds[evt]; ok && cmd != "" {
 		exec.Command("sh", "-c", cmd).Run() //nolint:errcheck
 	}
 
-	// 2. OpenClaw TUI 소켓 알림
+	// 2. notify OpenClaw TUI socket
 	if m.openClawSock != "" {
 		m.notifySocket(e)
 	}
@@ -75,8 +75,8 @@ func (m *Manager) notifySocket(e Event) {
 	fmt.Fprintf(conn, "%s\n", data)
 }
 
-// TUIFooter: OpenClaw TUI 푸터 메시지 전송 (짧은 상태 표시용)
-// 예: "⏳ Ollama 대기 중..." 또는 "✅ 모델 변경됨: gemini-2.5-flash"
+// TUIFooter: send footer message to OpenClaw TUI (for brief status display)
+// e.g. "⏳ Ollama waiting..." or "✅ model changed: gemini-2.5-flash"
 func (m *Manager) TUIFooter(msg string) {
 	if m.openClawSock == "" {
 		return
@@ -88,10 +88,10 @@ func (m *Manager) TUIFooter(msg string) {
 	})
 }
 
-// DoctorFixGuard: doctor --fix가 설정을 덮어쓰지 않도록 보호
-// OpenClaw doctor가 wall-vault 설정 파일을 수정하려 할 때 차단
+// DoctorFixGuard: protect against doctor --fix overwriting config
+// blocks OpenClaw doctor from modifying wall-vault config files
 func (m *Manager) DoctorFixGuard(configPath string) {
-	// doctor fix 이벤트 수신 시 현재 설정 백업 후 복원
+	// on doctor fix event: backup and restore current config
 	m.fire(EventDoctorFix, map[string]string{
 		"config": configPath,
 		"action": "guard",

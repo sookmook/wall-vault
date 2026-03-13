@@ -43,7 +43,7 @@ func TestFilterGemini_Passthrough(t *testing.T) {
 func TestFilterGemini_Whitelist(t *testing.T) {
 	f := NewToolFilter(FilterWhitelist, []string{"allowed_func"})
 
-	// Gemini 도구 형식: functionDeclarations
+	// Gemini tool format: functionDeclarations
 	allowedTool := map[string]interface{}{
 		"functionDeclarations": []interface{}{
 			map[string]interface{}{"name": "allowed_func"},

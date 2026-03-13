@@ -1,9 +1,9 @@
-// Package theme: UI 테마 (dark/light/cherry/ocean)
+// Package theme: UI themes (dark/light/cherry/ocean/gold/autumn/winter)
 package theme
 
 import "os"
 
-// Theme: CSS 변수 세트
+// Theme: CSS variable set
 type Theme struct {
 	Name        string
 	Background  string
@@ -20,7 +20,7 @@ type Theme struct {
 }
 
 var themes = map[string]*Theme{
-	// 체리 테마 — 봄날 벚꽃, 밝고 화사한 핑크 계열
+	// cherry theme — spring cherry blossoms, bright and vivid pink tones
 	"cherry": {
 		Name:        "cherry",
 		Background:  "#fff5f8",
@@ -35,7 +35,7 @@ var themes = map[string]*Theme{
 		Accent:      "#f0106a",
 		AccentHover: "#ff3d85",
 	},
-	// 다크 테마
+	// dark theme
 	"dark": {
 		Name:        "dark",
 		Background:  "#0d0d0d",
@@ -50,7 +50,7 @@ var themes = map[string]*Theme{
 		Accent:      "#bb86fc",
 		AccentHover: "#cf9fff",
 	},
-	// 골드 테마 — 밝고 화려한 황금빛
+	// gold theme — bright and dazzling golden tones
 	"gold": {
 		Name:        "gold",
 		Background:  "#fffce8",
@@ -65,7 +65,7 @@ var themes = map[string]*Theme{
 		Accent:      "#b87800",
 		AccentHover: "#d49000",
 	},
-	// 라이트 테마
+	// light theme
 	"light": {
 		Name:        "light",
 		Background:  "#f0f2f5",
@@ -80,7 +80,7 @@ var themes = map[string]*Theme{
 		Accent:      "#5c5fc4",
 		AccentHover: "#4a4db0",
 	},
-	// 오션 테마 — 맑은 하늘과 에메랄드 바다
+	// ocean theme — clear sky and emerald sea
 	"ocean": {
 		Name:        "ocean",
 		Background:  "#e8f8ff",
@@ -95,7 +95,7 @@ var themes = map[string]*Theme{
 		Accent:      "#0098d8",
 		AccentHover: "#20b8f8",
 	},
-	// 가을 테마 — 짙은 황갈색, 낙엽 진 깊은 가을
+	// autumn theme — deep amber-brown, fallen leaves in late autumn
 	"autumn": {
 		Name:        "autumn",
 		Background:  "#ede0c8",
@@ -110,7 +110,7 @@ var themes = map[string]*Theme{
 		Accent:      "#b03008",
 		AccentHover: "#cc4818",
 	},
-	// 겨울 테마 — 하얀 배경, 눈사람과 트리 뱅글벵글
+	// winter theme — white background, spinning snowmen and trees
 	"winter": {
 		Name:        "winter",
 		Background:  "#f4f8ff",
@@ -127,7 +127,7 @@ var themes = map[string]*Theme{
 	},
 }
 
-// Get: 테마 반환 (없으면 cherry)
+// Get: return theme (falls back to cherry if not found)
 func Get(name string) *Theme {
 	if t, ok := themes[name]; ok {
 		return t
@@ -135,7 +135,7 @@ func Get(name string) *Theme {
 	return themes["cherry"]
 }
 
-// Current: 환경변수 또는 기본값으로 테마 반환
+// Current: return theme from env var or default
 func Current() *Theme {
 	name := os.Getenv("WV_THEME")
 	if name == "" {
@@ -144,7 +144,7 @@ func Current() *Theme {
 	return Get(name)
 }
 
-// CSSVars: HTML <style> 태그용 CSS 변수 문자열 생성
+// CSSVars: generate CSS variable string for HTML <style> tag
 func (t *Theme) CSSVars() string {
 	return `
   --bg: ` + t.Background + `;
@@ -160,7 +160,7 @@ func (t *Theme) CSSVars() string {
   --accent-hover: ` + t.AccentHover + `;`
 }
 
-// List: 사용 가능한 테마 목록
+// List: list of available themes
 func List() []string {
 	return []string{"light", "dark", "gold", "cherry", "ocean", "autumn", "winter"}
 }

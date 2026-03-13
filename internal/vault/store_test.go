@@ -14,7 +14,7 @@ func newTestStore(t *testing.T) *Store {
 	return s
 }
 
-// ─── 키 CRUD ─────────────────────────────────────────────────────────────────
+// ─── Key CRUD ─────────────────────────────────────────────────────────────────
 
 func TestStore_AddListDeleteKey(t *testing.T) {
 	s := newTestStore(t)
@@ -102,7 +102,7 @@ func TestStore_GetAvailableKey(t *testing.T) {
 	}
 }
 
-// ─── 클라이언트 CRUD ──────────────────────────────────────────────────────────
+// ─── Client CRUD ──────────────────────────────────────────────────────────────
 
 func TestStore_AddUpdateDeleteClient(t *testing.T) {
 	s := newTestStore(t)
@@ -152,17 +152,17 @@ func TestStore_UpdateClient_NotFound(t *testing.T) {
 	}
 }
 
-// ─── 영속화 ───────────────────────────────────────────────────────────────────
+// ─── Persistence ──────────────────────────────────────────────────────────────
 
 func TestStore_Persistence(t *testing.T) {
 	dir := t.TempDir()
 
-	// 저장
+	// save
 	s1, _ := NewStore(dir, "password123")
 	s1.AddKey("google", "secret-key", "my-key", 500)
 	s1.AddClient("bot", "봇", "tok", "google", "gemini-2.5-flash", nil)
 
-	// 재로드
+	// reload
 	s2, err := NewStore(dir, "password123")
 	if err != nil {
 		t.Fatalf("재로드 실패: %v", err)
@@ -174,7 +174,7 @@ func TestStore_Persistence(t *testing.T) {
 		t.Fatalf("클라이언트 영속화 실패: got %d", len(s2.ListClients()))
 	}
 
-	// 암호화된 키 복호화 확인
+	// verify decryption of encrypted key
 	_, plain, err := s2.GetAvailableKey("google")
 	if err != nil {
 		t.Fatalf("재로드 후 키 조회 실패: %v", err)
@@ -184,7 +184,7 @@ func TestStore_Persistence(t *testing.T) {
 	}
 }
 
-// ─── 프록시 상태 ──────────────────────────────────────────────────────────────
+// ─── Proxy Status ─────────────────────────────────────────────────────────────
 
 func TestStore_ProxyStatus(t *testing.T) {
 	s := newTestStore(t)

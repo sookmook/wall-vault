@@ -17,13 +17,13 @@ type heartbeatPayload struct {
 	Host     string `json:"host,omitempty"`
 }
 
-// startHeartbeat: 60초마다 금고에 상태 전송 (비동기)
+// startHeartbeat: send status to vault every 60 seconds (async)
 func (s *Server) startHeartbeat() {
 	if s.cfg.Proxy.VaultURL == "" {
 		return
 	}
 	go func() {
-		// 최초 전송은 15초 후 (서비스가 뜰 시간)
+		// first send after 15 seconds (allow service to start up)
 		time.Sleep(15 * time.Second)
 		s.sendHeartbeat()
 

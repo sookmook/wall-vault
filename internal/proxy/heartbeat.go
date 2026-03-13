@@ -45,7 +45,7 @@ func (s *Server) sendHeartbeat() {
 
 	payload := heartbeatPayload{
 		ClientID: s.cfg.Proxy.ClientID,
-		Version:  "v0.1.1",
+		Version:  "v0.1.2",
 		Service:  svc,
 		Model:    mdl,
 		SSE:      sseConn,

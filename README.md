@@ -500,6 +500,8 @@ wall-vault를 OpenClaw의 커스텀 프로바이더로 등록하면 에이전트
 - `apiKey`: 에이전트 카드의 **토큰** 값
 - 모델 ID 앞에 `wall-vault/` 접두어를 붙여 자동 라우팅
 - `wall-vault/gemini-*` → Google Gemini, `wall-vault/gpt-*` → OpenAI, `wall-vault/claude-*` → Anthropic
+- `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` → OpenRouter (OpenClaw 3.11 무료 1M context 모델)
+- `opencode-go/`, `moonshot/`, `kimi-coding/`, `minimax/` 등 OpenClaw 3.11 신규 프로바이더 접두어 모두 지원
 
 ### SSE 자동 동기화
 
@@ -736,6 +738,8 @@ Register wall-vault as a custom provider in OpenClaw. Use the **🐾 button** on
 - `apiKey`: the **token** value from the agent card
 - Prefix model IDs with `wall-vault/` for automatic routing
 - `wall-vault/gemini-*` → Google Gemini, `wall-vault/gpt-*` → OpenAI, `wall-vault/claude-*` → Anthropic
+- `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` → OpenRouter (OpenClaw 3.11 free 1M-context models)
+- All OpenClaw 3.11 provider prefixes supported: `opencode-go/`, `moonshot/`, `kimi-coding/`, `minimax/`, `groq/`, `mistral/`
 
 ### SSE Auto-Sync
 

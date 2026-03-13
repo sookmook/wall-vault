@@ -352,7 +352,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	oaiResp := &OpenAIResponse{}
 	for _, c := range geminiResp.Candidates {
 		oaiResp.Choices = append(oaiResp.Choices, OpenAIChoice{
-			Message:      OpenAIMessage{Role: "assistant", Content: extractText(c.Content.Parts)},
+			Message:      OpenAIMessage{Role: "assistant", Content: stripControlTokens(extractText(c.Content.Parts))},
 			FinishReason: strings.ToLower(c.FinishReason),
 			Index:        c.Index,
 		})
@@ -542,6 +542,7 @@ func (s *Server) getKey(service string) (*localKey, string, error) {
 // Known service prefixes are mapped directly; "wall-vault/" prefix is stripped
 // and the service is auto-detected from the model ID.
 // OpenRouter-style paths (e.g. "meta-llama/llama-3.1-8b") are kept intact.
+// Supports OpenClaw 3.11 providers: opencode-go, moonshot, kimi-coding, groq, mistral.
 func parseProviderModel(svc, mdl string) (string, string) {
 	if !strings.Contains(mdl, "/") {
 		return svc, mdl
@@ -559,6 +560,15 @@ func parseProviderModel(svc, mdl string) (string, string) {
 		return "ollama", bare
 	case "openrouter":
 		return "openrouter", bare
+	// OpenClaw 3.11: opencode-go, opencode-zen → OpenRouter
+	case "opencode-go", "opencode-zen", "opencode":
+		return "openrouter", bare
+	// OpenClaw 3.11: moonshot / kimi-coding → route via OpenRouter
+	case "moonshot", "kimi-coding":
+		return "openrouter", mdl // keep full "moonshot/kimi-k2.5" path for OpenRouter
+	// Common providers available on OpenRouter
+	case "groq", "mistral", "cohere", "perplexity", "minimax", "minimax-text":
+		return "openrouter", bare
 	case "wall-vault":
 		// Our own provider prefix — auto-detect service from bare model ID
 		autoSvc := svc
@@ -571,12 +581,36 @@ func parseProviderModel(svc, mdl string) (string, string) {
 			bare == "o1", bare == "o1-mini",
 			strings.HasPrefix(bare, "o3"), strings.HasPrefix(bare, "o4"):
 			autoSvc = "openai"
+		// OpenClaw 3.11 free models via OpenRouter
+		case bare == "hunter-alpha", bare == "healer-alpha",
+			strings.HasPrefix(bare, "kimi-"), strings.HasPrefix(bare, "deepseek-"),
+			strings.HasPrefix(bare, "glm-"), strings.HasPrefix(bare, "qwen"):
+			autoSvc = "openrouter"
 		}
 		return autoSvc, bare
 	default:
 		// OpenRouter-style "org/model" — keep full path for OpenRouter
 		return "openrouter", mdl
 	}
+}
+
+// stripControlTokens removes model-internal delimiter tokens that should not
+// be exposed to users. Handles DeepSeek im_start/im_end markers and GLM-5
+// special tokens (OpenClaw 3.11 security requirement).
+func stripControlTokens(s string) string {
+	// DeepSeek / ChatML delimiters
+	for _, tok := range []string{
+		"<|im_start|>", "<|im_end|>",
+		"<|user|>", "<|assistant|>", "<|system|>",
+		"<|endoftext|>", "<|end|>",
+	} {
+		s = strings.ReplaceAll(s, tok, "")
+	}
+	// GLM-5 special tokens
+	for _, tok := range []string{"[gMASK]", "[sop]", "[EOP]", "[eop]", "[MASK]"} {
+		s = strings.ReplaceAll(s, tok, "")
+	}
+	return strings.TrimSpace(s)
 }
 
 func extractModelFromPath(path string) string {

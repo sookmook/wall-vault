@@ -83,7 +83,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(buildAddServiceModal())
 	sb.WriteString(`</div>
 <div class="footer">
-  wall-vault v0.1.1 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
+  wall-vault v0.1.2 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
   &nbsp;|&nbsp; <a href="https://sookmook.org/">sookmook.org</a>
   &nbsp;|&nbsp; <a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
   &nbsp;|&nbsp; ⏱ <span id="uptime"></span>

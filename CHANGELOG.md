@@ -5,6 +5,19 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.2] — 2026-03-13
+
+### Added
+- `parseProviderModel()`: OpenClaw 3.11 provider prefixes — `opencode-go`, `opencode-zen`, `moonshot`, `kimi-coding`, `groq`, `mistral`, `minimax`, `cohere`, `perplexity`
+- `wall-vault/` prefix auto-detection extended: `hunter-alpha`, `healer-alpha`, `kimi-*`, `deepseek-*`, `glm-*`, `qwen*` → OpenRouter routing
+- `stripControlTokens()`: removes GLM-5 / DeepSeek / ChatML control tokens from responses (`<|im_start|>`, `[gMASK]`, `[sop]`, etc.)
+- Google model list: `gemini-2.5-flash-8b`, `gemini-embedding-2-preview` (OpenClaw 3.11 memorySearch)
+
+### Changed
+- Response text in `/v1/chat/completions` now passes through `stripControlTokens()`
+
+---
+
 ## [0.1.1] — 2026-03-13
 
 ### Added
@@ -154,6 +167,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/sookmook/wall-vault/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/sookmook/wall-vault/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sookmook/wall-vault/releases/tag/v0.1.0

@@ -93,12 +93,15 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 // Google 모델은 고정 목록 사용 (ListModels API 인증 필요)
 func fetchGoogle() []Model {
 	return []Model{
-		{ID: "gemini-2.5-pro",          Name: "Gemini 2.5 Pro",          Service: "google", Context: 1048576},
-		{ID: "gemini-2.5-flash",        Name: "Gemini 2.5 Flash",        Service: "google", Context: 1048576},
-		{ID: "gemini-2.0-flash",        Name: "Gemini 2.0 Flash",        Service: "google", Context: 1048576},
-		{ID: "gemini-2.0-flash-lite",   Name: "Gemini 2.0 Flash Lite",   Service: "google", Context: 1048576},
-		{ID: "gemini-1.5-pro",          Name: "Gemini 1.5 Pro",          Service: "google", Context: 2097152},
-		{ID: "gemini-1.5-flash",        Name: "Gemini 1.5 Flash",        Service: "google", Context: 1048576},
+		{ID: "gemini-2.5-pro",                Name: "Gemini 2.5 Pro",                Service: "google", Context: 1048576},
+		{ID: "gemini-2.5-flash",              Name: "Gemini 2.5 Flash",              Service: "google", Context: 1048576},
+		{ID: "gemini-2.5-flash-8b",           Name: "Gemini 2.5 Flash 8B",           Service: "google", Context: 1048576},
+		{ID: "gemini-2.0-flash",              Name: "Gemini 2.0 Flash",              Service: "google", Context: 1048576},
+		{ID: "gemini-2.0-flash-lite",         Name: "Gemini 2.0 Flash Lite",         Service: "google", Context: 1048576},
+		{ID: "gemini-1.5-pro",                Name: "Gemini 1.5 Pro",                Service: "google", Context: 2097152},
+		{ID: "gemini-1.5-flash",              Name: "Gemini 1.5 Flash",              Service: "google", Context: 1048576},
+		// Embedding (OpenClaw 3.11 memorySearch)
+		{ID: "gemini-embedding-2-preview",    Name: "Gemini Embedding 2 Preview",    Service: "google", Context: 8192},
 	}
 }
 

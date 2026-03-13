@@ -80,13 +80,14 @@ RASPI_HOST = bot-c
 .PHONY: deploy-mini
 deploy-mini: build-darwin-arm64
 	scp bin/$(BINARY)-darwin-arm64 $(MINI_HOST):~/.openclaw/$(BINARY).new
-	ssh $(MINI_HOST) 'pkill -f "wall-vault vault" 2>/dev/null || true; sleep 1; \
+	ssh $(MINI_HOST) '\
+	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.vault.plist 2>/dev/null || true; \
+	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.proxy.plist 2>/dev/null || true; \
+	  pkill -f "wall-vault" 2>/dev/null || true; sleep 1; \
 	  cp ~/.openclaw/$(BINARY).new ~/.openclaw/$(BINARY); \
 	  codesign --sign - --force ~/.openclaw/$(BINARY); \
-	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.proxy.plist 2>/dev/null || true; \
-	  launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist; \
-	  WV_ADMIN_TOKEN=dhvmszmffh WV_MASTER_PASS=dhvmszmffh WV_VAULT_PORT=56243 \
-	    nohup ~/.openclaw/$(BINARY) vault >> /tmp/wall-vault.err 2>&1 &'
+	  launchctl load ~/Library/LaunchAgents/com.wall-vault.vault.plist; \
+	  launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist'
 	@echo "미니 배포 완료 (코드 서명 포함)"
 
 .PHONY: deploy-bot-c

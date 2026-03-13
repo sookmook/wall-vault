@@ -36,7 +36,6 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 <body>
 <div class="topbar">
   <div class="topbar-brand">
-    <img src="/logo" alt="wall-vault" class="topbar-logo">
     <span class="topbar-title">wall-vault</span>
   </div>
   <div class="topbar-controls">

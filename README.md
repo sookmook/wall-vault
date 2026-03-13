@@ -55,7 +55,7 @@ Key hits its daily limit?                    → Automatically switches. No down
 Service goes dark?                           → Falls back: Gemini → OpenRouter → Ollama
 Running 100 bots?                            → Change one setting. All bots updated in 1–3s.
 Claude Code runs out of Anthropic quota?     → Silently routes to Gemini. No restart needed.
-Gemini CLI / Antigravity hit rate limits?    → Key rotation kicks in. Session continues.
+Gemini CLI / Antigravity hit rate limits?    → Key rotation kicks in. (native proxy support coming in CLI v0.26+)
 Cursor needs a model list?                   → /v1/models returns everything. 350+ choices.
 ```
 
@@ -91,34 +91,48 @@ Point any AI client at `http://your-host:56244` and it just works.
 
 ### Gemini CLI Setup
 
-```bash
-export GEMINI_API_BASE_URL=http://localhost:56244
-gemini  # now routes through wall-vault → key rotation + fallback chain
-```
+> **Note**: Gemini CLI v0.25.0 does not yet support custom API endpoints natively.
+> Native support is tracked in [google-gemini/gemini-cli#1679](https://github.com/google-gemini/gemini-cli/issues/1679).
+> Once merged, the setup will be one line:
+> ```bash
+> export GOOGLE_GEMINI_BASE_URL=http://localhost:56244
+> gemini  # routes through wall-vault → key rotation + fallback
+> ```
 
-Or in `~/.gemini/settings.json`:
-```json
+Current workaround — use `mitmproxy` to intercept Gemini API traffic:
+
+```bash
+# 1. Install mitmproxy
+pip install mitmproxy
+
+# 2. Run mitmproxy that forwards googleapis.com to wall-vault (port 56244)
+mitmdump --mode reverse:https://generativelanguage.googleapis.com --listen-port 8080
+
+# 3. Point Gemini CLI at the interceptor
+# ~/.gemini/settings.json:
 {
-  "apiBaseUrl": "http://localhost:56244"
+  "proxy": "http://localhost:8080"
 }
 ```
 
-> All 5 Gemini API keys rotate automatically. One hits the limit — the next one picks up.
-> `gemini` keeps chatting. You never see an error.
+> Once Gemini CLI adds native base URL support, this will simplify to a single env var.
 
 ---
 
 ### Antigravity IDE Setup
 
-Antigravity is Google's agentic AI IDE. It uses the same Gemini API format:
+Antigravity is Google's agentic AI IDE (similar position to Claude Code). It uses the Gemini API format. Configuration depends on the version:
 
 ```bash
-export GEMINI_API_BASE_URL=http://localhost:56244
-# launch Antigravity — it now routes through wall-vault
+# If Antigravity respects GEMINI_API_KEY + endpoint env vars:
+export GEMINI_API_KEY=<your-vault-agent-token>
+export GOOGLE_GEMINI_BASE_URL=http://localhost:56244
+# Then launch Antigravity
 ```
 
-> Antigravity agents hitting quota? wall-vault silently switches keys and falls back to
-> OpenRouter or local Ollama. Your coding session continues uninterrupted.
+> Check Antigravity's documentation for the exact env var name — it varies by version.
+> If it supports `GOOGLE_GEMINI_BASE_URL`, wall-vault handles the rest:
+> key rotation, fallback to OpenRouter/Ollama, and live model switching.
 
 ---
 

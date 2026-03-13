@@ -20,7 +20,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	agentCard := buildAgentsCard(clients, proxies, services)
 	keyCard := buildKeysCard(keys, services)
 	svcCard := buildServicesCard(services)
-	js := buildJS(t.Name, s.cfg.Lang, s.startedAt.Unix(), services, keys)
+	js := buildJS(t.Name, s.cfg.Lang, s.startedAt.Unix(), services, keys, s.cfg.Vault.AdminToken)
 
 	var sb strings.Builder
 	sb.WriteString(`<!DOCTYPE html>
@@ -46,7 +46,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
       <div class="dd-menu" id="dd-lang">`)
 	for _, code := range i18n.Supported {
 		label := i18n.LangLabel(code)
-		sb.WriteString(fmt.Sprintf(`        <div class="dd-item" data-val=%q onclick="setLang(%q)">%s</div>`+"\n", code, code, label))
+		sb.WriteString(fmt.Sprintf(`        <div class="dd-item" data-val=%q onclick="setLang('%s')">%s</div>`+"\n", code, code, label))
 	}
 	sb.WriteString(`      </div>
     </div>
@@ -56,7 +56,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(` ▾</button>
       <div class="dd-menu" id="dd-theme">`)
 	for _, name := range theme.List() {
-		sb.WriteString(fmt.Sprintf(`        <div class="dd-item" data-val=%q onclick="setTheme(%q)">%s</div>`+"\n", name, name, themeLabel(name)))
+		sb.WriteString(fmt.Sprintf(`        <div class="dd-item" data-val=%q onclick="setTheme('%s')">%s</div>`+"\n", name, name, themeLabel(name)))
 	}
 	sb.WriteString(`      </div>
     </div>
@@ -163,10 +163,22 @@ a{color:var(--accent);text-decoration:none}
 /* ── Badge ── */
 .badge{display:inline-block;background:var(--surface);border:1px solid var(--green);color:var(--green);padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.3px}
 /* ── Grid & Cards ── */
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;margin-bottom:1rem;padding:1.2rem 1.4rem}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.2rem;box-shadow:0 1px 4px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.02)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:1rem;padding:1.2rem 1.4rem}
+.card{position:relative;z-index:2;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.2rem;box-shadow:0 1px 4px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.02)}
 .card h2{color:var(--accent);font-size:.88rem;font-weight:700;margin-bottom:.75rem;padding-bottom:.55rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;letter-spacing:.2px}
 .card h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}
+/* ── 에이전트 섹션 (전체 폭) ── */
+.agents-section{grid-column:1/-1;position:relative;z-index:2}
+.section-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
+.section-hdr h2{color:var(--accent);font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:.4rem;letter-spacing:.2px;flex:1}
+.section-hdr h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}
+.agents-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+/* ── 에이전트 개별 카드 ── */
+.agent-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:.45rem}
+.agent-card.agent-disabled{opacity:.4;filter:grayscale(.6)}
+.ac-top{display:flex;align-items:flex-start;gap:.5rem}
+.ac-info{flex:1;min-width:0}
+.ac-btns{display:flex;gap:.25rem;flex-shrink:0;margin-top:.05rem}
 /* ── 기본 유틸 ── */
 .row{display:flex;justify-content:space-between;align-items:center;margin:.3rem 0;font-size:.82rem;gap:.5rem}
 .label{color:var(--text-muted);flex-shrink:0}
@@ -188,12 +200,8 @@ a{color:var(--accent);text-decoration:none}
 .dot-yellow{background:var(--yellow);box-shadow:0 0 4px var(--yellow)}
 .dot-red{background:var(--red);box-shadow:0 0 4px var(--red)}
 .dot-gray{background:var(--border)}
-/* ── 에이전트 카드 ── */
-.agent-item{padding:.65rem 0;border-bottom:1px solid var(--border)}
-.agent-item:last-child{border-bottom:none;padding-bottom:0}
-.agent-disabled{opacity:.4;filter:grayscale(.6)}
-.agent-header{display:flex;align-items:flex-start;gap:.6rem}
-.agent-name{font-size:.84rem;color:var(--text);font-weight:600;margin-bottom:.08rem;line-height:1.3}
+/* ── 에이전트 카드 (레거시 호환 — agent-card에서 사용) ── */
+.agent-name{font-size:.84rem;color:var(--text);font-weight:600;margin-bottom:.06rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .agent-live{font-size:.72rem;color:var(--green);margin-bottom:.3rem;font-weight:500}
 .agent-type-badge{display:inline-block;font-size:.62rem;padding:.02rem .28rem;border-radius:4px;background:var(--accent);color:#fff;opacity:.75;margin-left:.35rem;vertical-align:middle;font-weight:600;letter-spacing:.3px}
 .agent-desc{font-size:.72rem;color:var(--text-muted);margin:.1rem 0 .15rem;font-style:italic}
@@ -204,10 +212,11 @@ a{color:var(--accent);text-decoration:none}
 .svc-item:last-child{border-bottom:none}
 /* ── SSE 인디케이터 ── */
 .sse-indicator{position:fixed;bottom:.8rem;right:.8rem;font-size:.7rem;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);padding:.22rem .6rem;border-radius:6px;z-index:400;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-/* ── 모델 폼 (가로 배치) ── */
-.model-form{margin-top:.65rem;display:flex;gap:.35rem;align-items:center;flex-wrap:wrap}
-.model-form select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.28rem .5rem;border-radius:6px;font-size:.76rem;font-family:inherit;flex:0 0 auto;min-width:110px;max-width:160px;cursor:pointer}
-.model-form input{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.28rem .5rem;border-radius:6px;font-size:.76rem;font-family:inherit;flex:1;min-width:90px}
+/* ── 모델 폼 (카드 내 수직 배치) ── */
+.model-form{display:flex;flex-direction:column;gap:.3rem;border-top:1px solid var(--border);padding-top:.5rem;margin-top:.1rem}
+.model-form-row{display:flex;gap:.3rem;align-items:center}
+.model-form select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.26rem .4rem;border-radius:6px;font-size:.75rem;font-family:inherit;flex:1;min-width:0;cursor:pointer}
+.model-form input{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.26rem .4rem;border-radius:6px;font-size:.75rem;font-family:inherit;flex:1;min-width:0}
 .model-form select:focus,.model-form input:focus{outline:none;border-color:var(--accent)}
 /* ── 버튼 ── */
 .btn{background:var(--accent);color:#fff;border:none;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-size:.76rem;font-family:inherit;font-weight:500;transition:background .15s,opacity .15s;white-space:nowrap}
@@ -234,10 +243,10 @@ a{color:var(--accent);text-decoration:none}
 .status-muted,.status-dc{color:var(--text-muted)}
 .status-hint{color:var(--text-muted);font-size:.67rem;font-style:italic}
 .status-version{color:var(--text-muted);font-size:.67rem}
-/* ── 에이전트 우측 액션 영역 ── */
-.agent-actions{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0;margin-left:.5rem}
+/* ── 에이전트 설정 복사 버튼 (카드 하단, 전체 폭) ── */
+.ac-cfg{margin-top:.1rem}
 /* ── 설정 복사 버튼 ── */
-.btn-cfg{display:inline-flex;align-items:center;gap:.28rem;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:.22rem .55rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-cfg{display:flex;align-items:center;justify-content:center;gap:.28rem;width:100%;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:.28rem .55rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-family:inherit;transition:all .15s;white-space:nowrap}
 .btn-cfg:hover{background:var(--bg);color:var(--accent);border-color:var(--accent)}
 .btn-cfg-openclaw:hover{color:#c0392b;border-color:#c0392b}
 .btn-cfg-claude:hover{color:#e07020;border-color:#e07020}
@@ -257,7 +266,7 @@ a{color:var(--accent);text-decoration:none}
 .modal-btns{display:flex;gap:.6rem;margin-top:1.1rem;justify-content:flex-end}
 .msg{font-size:.76rem;margin-top:.5rem;min-height:1rem;color:var(--red)}
 /* ── Cherry 꽃잎 — 애니메이션은 JS에서 고유 keyframe 생성 ── */
-.cherry-petal{position:fixed;top:0;pointer-events:none;z-index:9999;border-radius:50% 0 50% 0;background:radial-gradient(ellipse at 30% 20%,#ffe8f4 0%,#ff80b8 50%,#f01870 100%);box-shadow:0 0 6px #ff90c038}
+.cherry-petal{position:fixed;top:0;pointer-events:none;z-index:1;border-radius:50% 0 50% 0;background:radial-gradient(ellipse at 30% 20%,#ffe8f4 0%,#ff80b8 50%,#f01870 100%);box-shadow:0 0 6px #ff90c038}
 /* ── Ocean 효과 ── */
 @keyframes wave1{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 @keyframes wave2{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
@@ -265,27 +274,27 @@ a{color:var(--accent);text-decoration:none}
 @keyframes cloud-bob{0%,100%{transform:translateY(0) rotate(-1deg)}35%{transform:translateY(-24px) rotate(2deg)}68%{transform:translateY(-10px) rotate(-2deg)}}
 @keyframes bubble-rise{0%{transform:translate(0,0);opacity:0}12%{opacity:.55}45%{transform:translate(16px,-40vh)}70%{transform:translate(-12px,-65vh)}92%{opacity:.35}100%{transform:translate(8px,-105vh);opacity:0}}
 @keyframes ocean-sparkle{0%,100%{opacity:0;transform:scale(0)}50%{opacity:.8;transform:scale(1)}}
-.ocean-fx{position:fixed;bottom:0;left:0;width:100%;height:160px;pointer-events:none;z-index:9999;overflow:hidden}
+.ocean-fx{position:fixed;bottom:0;left:0;width:100%;height:160px;pointer-events:none;z-index:1;overflow:hidden}
 .ocean-wave{position:absolute;left:-100%;width:300%;border-radius:42% 42% 0 0}
-.ocean-cloud{position:fixed;pointer-events:none;z-index:9998;white-space:nowrap;line-height:1}
-.ocean-bubble{position:fixed;pointer-events:none;z-index:9997;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.55),rgba(90,200,240,.18));border:1px solid rgba(90,200,240,.38)}
-.ocean-sparkle{position:fixed;pointer-events:none;z-index:9996;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle,#90eeff,#0098d8);animation:ocean-sparkle ease-in-out infinite}
+.ocean-cloud{position:fixed;pointer-events:none;z-index:1;white-space:nowrap;line-height:1}
+.ocean-bubble{position:fixed;pointer-events:none;z-index:1;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.55),rgba(90,200,240,.18));border:1px solid rgba(90,200,240,.38)}
+.ocean-sparkle{position:fixed;pointer-events:none;z-index:1;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle,#90eeff,#0098d8);animation:ocean-sparkle ease-in-out infinite}
 /* ── Gold 반짝임 ── */
 @keyframes gold-twinkle{0%,100%{opacity:0;transform:scale(0) rotate(0deg)}45%{opacity:.25}50%{opacity:1;transform:scale(1) rotate(15deg)}55%{opacity:.25}}
 @keyframes gold-drift{0%,100%{transform:translate(0,0)}25%{transform:translate(14px,-18px)}75%{transform:translate(-12px,14px)}}
-.gold-spark{position:fixed;pointer-events:none;z-index:9999;color:#c89000;text-shadow:0 0 6px #ffd70090,0 0 18px #ffaa0060}
+.gold-spark{position:fixed;pointer-events:none;z-index:1;color:#c89000;text-shadow:0 0 6px #ffd70090,0 0 18px #ffaa0060}
 /* ── Autumn 단풍잎 ── */
-.autumn-leaf{position:fixed;top:0;pointer-events:none;z-index:9999;font-size:18px;line-height:1}
+.autumn-leaf{position:fixed;top:0;pointer-events:none;z-index:1;font-size:18px;line-height:1;filter:sepia(1) hue-rotate(-20deg) saturate(1.6) brightness(0.55)}
 /* ── Winter 뱅글벵글 ── */
 @keyframes winter-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes winter-drift{0%{left:-8vw;opacity:0}5%{opacity:.9}95%{opacity:.9}100%{left:108vw;opacity:0}}
 @keyframes winter-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-28px)}}
 @keyframes snowfall{0%{transform:translateY(-10vh) translateX(0) rotate(0deg);opacity:0}5%{opacity:.8}95%{opacity:.8}100%{transform:translateY(110vh) translateX(40px) rotate(720deg);opacity:0}}
-.winter-char{position:fixed;pointer-events:none;z-index:9999;line-height:1;white-space:nowrap}
-.snowflake{position:fixed;pointer-events:none;z-index:9997;color:rgba(180,220,255,.8);font-size:14px;line-height:1}`
+.winter-char{position:fixed;pointer-events:none;z-index:1;line-height:1;white-space:nowrap}
+.snowflake{position:fixed;pointer-events:none;z-index:1;color:rgba(180,220,255,.8);font-size:14px;line-height:1}`
 }
 
-func buildJS(currentTheme, currentLang string, startedAt int64, services []*ServiceConfig, keys []*APIKey) string {
+func buildJS(currentTheme, currentLang string, startedAt int64, services []*ServiceConfig, keys []*APIKey, adminToken string) string {
 	// 서비스별 키 개수
 	keyCounts := map[string]int{}
 	for _, k := range keys {
@@ -303,7 +312,9 @@ func buildJS(currentTheme, currentLang string, startedAt int64, services []*Serv
 	}
 	svcJSMap := "{" + strings.Join(svcJSParts, ",") + "}"
 
-	return fmt.Sprintf(`const _SERVICES=%s;`+"\n", svcJSMap) + buildI18NJS() + fmt.Sprintf(`
+	return fmt.Sprintf(`const _SERVICES=%s;`+"\n", svcJSMap) +
+		"const _SERVER_TOKEN=`" + adminToken + "`;\n" +
+		buildI18NJS() + fmt.Sprintf(`
 let curLang='ko';
 function T(k){return(I18N[curLang]||I18N.ko)[k]||k;}
 function applyLang(lang){
@@ -313,6 +324,8 @@ function applyLang(lang){
   document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(t[k]!==undefined)el.textContent=t[k];});
   // placeholders
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{const k=el.dataset.i18nPh;if(t[k]!==undefined)el.placeholder=t[k];});
+  // title 속성
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{const k=el.dataset.i18nTitle;if(t[k]!==undefined)el.title=t[k];});
   // 카운트 접미사 (3개/3件/3个/3)
   document.querySelectorAll('[data-i18n-cnt]').forEach(el=>{el.textContent=el.dataset.count+t.cnt;});
   // 봇 ago 텍스트 재포맷
@@ -363,15 +376,15 @@ function fmtAgentUptime(sec) {
 }
 function updateAgentUptimes() {
   const now = Math.floor(Date.now()/1000);
-  document.querySelectorAll('.agent-item[data-started-sec]').forEach(el => {
+  document.querySelectorAll('.agent-card[data-started-sec]').forEach(el => {
     const started = parseInt(el.dataset.startedSec);
     if (!started) return;
     let up = el.querySelector('.agent-uptime');
     if (!up) {
       up = document.createElement('div');
       up.className = 'agent-uptime';
-      const live = el.querySelector('.agent-live');
-      if (live) live.after(up); else {
+      const status = el.querySelector('.agent-status');
+      if (status) status.after(up); else {
         const name = el.querySelector('.agent-name');
         if (name) name.after(up);
       }
@@ -410,7 +423,7 @@ const THEMES = {
   gold:   {'--bg':'#faf8ee','--surface':'#fffff8','--border':'#e0cc70','--text':'#2a1e00','--text-muted':'#806a14','--green':'#2a8020','--yellow':'#b07000','--red':'#c03020','--blue':'#1850a0','--accent':'#a06800','--accent-hover':'#c07800'},
   cherry: {'--bg':'#fff4f7','--surface':'#fffbfd','--border':'#f0c0d0','--text':'#320820','--text-muted':'#9a5068','--green':'#0e9040','--yellow':'#c86800','--red':'#d81040','--blue':'#0e58b0','--accent':'#d8105e','--accent-hover':'#f0206e'},
   ocean:  {'--bg':'#e6f4ff','--surface':'#f8fdff','--border':'#70c4e8','--text':'#052038','--text-muted':'#26789a','--green':'#007858','--yellow':'#b06800','--red':'#c82828','--blue':'#0070b8','--accent':'#0086c8','--accent-hover':'#10a0e0'},
-  autumn: {'--bg':'#fff8f0','--surface':'#ffffff','--border':'#e8c8a0','--text':'#3a2010','--text-muted':'#9a6030','--green':'#6a9a20','--yellow':'#c08000','--red':'#c83020','--blue':'#4060a0','--accent':'#d04010','--accent-hover':'#e85820'},
+  autumn: {'--bg':'#ede0c8','--surface':'#f5e8d2','--border':'#b88848','--text':'#201008','--text-muted':'#6a3e18','--green':'#4a7810','--yellow':'#986000','--red':'#a82010','--blue':'#284070','--accent':'#b03008','--accent-hover':'#cc4818'},
   winter: {'--bg':'#f4f8ff','--surface':'#ffffff','--border':'#b8d4f0','--text':'#1a2840','--text-muted':'#5878a0','--green':'#087850','--yellow':'#d89800','--red':'#c82020','--blue':'#1868c0','--accent':'#1870d8','--accent-hover':'#3090f8'}
 };
 
@@ -447,7 +460,7 @@ function createCherryFx(){
     const p=document.createElement('div');
     p.className='cherry-petal';
     const sz=9+Math.random()*14;
-    const dur=22+Math.random()*16;
+    const dur=38+Math.random()*22;
     const startY=Math.random()*100;
     const br=Math.random()>0.5?'50% 0 50% 0':'0 50% 0 50%';
     p.style.cssText=
@@ -526,7 +539,7 @@ function createGoldFx(){
 // ── Autumn: 단풍잎 솔솔 ──
 function createAutumnFx(){
   clearFx();
-  const leaves=['🍂','🍁','🍃','🍂','🍁'];
+  const leaves=['🍂','🍂','🍁','🍂','🍂'];
   const N=28;
   const style=document.createElement('style');
   let css='';
@@ -550,7 +563,7 @@ function createAutumnFx(){
   for(let i=0;i<N;i++){
     const l=document.createElement('div');
     l.className='autumn-leaf';
-    const dur=18+Math.random()*14;
+    const dur=32+Math.random()*20;
     const startY=Math.random()*100;
     l.textContent=leaves[Math.floor(Math.random()*leaves.length)];
     l.style.cssText=
@@ -715,8 +728,12 @@ function refreshModelDropdowns() {
   });
 }
 
-// Admin Token 헬퍼
+// 에이전트 편집 시 원본 데이터 보관 (변경된 필드만 PUT 전송하기 위함)
+let _ecOrig = {};
+
+// Admin Token 헬퍼 (서버 내장 토큰 우선, 없으면 localStorage, 그것도 없으면 prompt)
 function getAdminToken() {
+  if (typeof _SERVER_TOKEN !== 'undefined' && _SERVER_TOKEN) return _SERVER_TOKEN;
   let token = localStorage.getItem('wv_admin_token');
   if (!token) {
     token = prompt(T('admin_prompt'));
@@ -802,7 +819,7 @@ function applyAgentConfigChange(clientId, service, model) {
   if (curSvc) onAgentServiceChange('mdl-'+clientId, 'mdl-sel-'+clientId, curSvc);
   // 해당 에이전트 카드의 status-live 텍스트 업데이트 (실행 중인 경우)
   if (svcSel && service && model) {
-    const card = svcSel.closest('.agent-item');
+    const card = svcSel.closest('.agent-card');
     if (card) {
       const live = card.querySelector('.status-live');
       if (live) {
@@ -899,7 +916,7 @@ function _clearClientForm(prefix) {
   const en=document.getElementById(prefix+'-enabled');if(en)en.checked=true;
   const msg=document.getElementById(prefix+'-msg');if(msg)msg.textContent='';
   const ms=document.getElementById(prefix+'-mdl-sel');
-  if(ms) ms.innerHTML='<option value="">— 모델 선택 또는 직접 입력 —</option>';
+  if(ms) ms.innerHTML='<option value="">'+T('sel_model_or_enter')+'</option>';
 }
 
 // ── OpenClaw 설정 복사 ──
@@ -997,12 +1014,41 @@ function submitModal(prefix) {
   const data = _readClientForm(prefix);
   const isEdit = (prefix === 'ec');
   if (!data.id && !isEdit) { document.getElementById(prefix+'-msg').textContent = T('err_id'); return; }
+  if (!data.name.trim()) { document.getElementById(prefix+'-msg').textContent = T('err_name')||'이름을 입력하세요'; return; }
   document.getElementById(prefix+'-msg').textContent = isEdit ? T('saving') : T('adding');
   const url = isEdit ? '/admin/clients/'+data.id : '/admin/clients';
   const method = isEdit ? 'PUT' : 'POST';
-  const body = isEdit
-    ? {name:data.name, token:data.token||undefined, default_service:data.default_service, default_model:data.default_model, agent_type:data.agent_type, work_dir:data.work_dir, description:data.description, ip_whitelist:data.ip_whitelist, enabled:data.enabled}
-    : data;
+  let body;
+  if (isEdit) {
+    // 변경된 필드만 전송 — 보내지 않은 필드는 Go에서 nil로 해석 = 변경 없음
+    const o = _ecOrig;
+    const origId = document.getElementById('ec-orig-id').value;
+    const url2 = '/admin/clients/' + origId;
+    body = { enabled: data.enabled }; // enabled는 항상 전송 (체크박스 의도 명확)
+    if (data.token) body.token = data.token; // 토큰: 입력 시만 전송 (공백=기존 유지)
+    if (data.id && data.id !== origId) body.new_id = data.id; // ID 변경
+    if (data.name !== (o.name||'')) body.name = data.name;
+    if (data.default_service && data.default_service !== (o.default_service||'')) body.default_service = data.default_service;
+    if (data.default_model !== (o.default_model||'')) body.default_model = data.default_model;
+    if (data.agent_type !== (o.agent_type||'')) body.agent_type = data.agent_type;
+    if (data.work_dir !== (o.work_dir||'')) body.work_dir = data.work_dir;
+    if (data.description !== (o.description||'')) body.description = data.description;
+    const newIps = data.ip_whitelist.join(','), oldIps = (o.ip_whitelist||[]).join(',');
+    if (newIps !== oldIps) body.ip_whitelist = data.ip_whitelist;
+    fetch(url2, {method:'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify(body)})
+    .then(r=>r.json()).then(d=>{
+      if (d.error) {
+        if (d.error==='unauthorized'){clearAdminToken();alert(T('err_token'));}
+        else document.getElementById(prefix+'-msg').textContent=T('err')+d.error;
+      } else {
+        closeModal(prefix);
+        setTimeout(()=>location.reload(),500);
+      }
+    }).catch(e=>{document.getElementById(prefix+'-msg').textContent=T('err')+e;});
+    return;
+  } else {
+    body = data;
+  }
   fetch(url, {method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify(body)})
   .then(r=>r.json()).then(d=>{
     if (d.error) {
@@ -1022,9 +1068,14 @@ function openEditClient(id) {
   fetch('/admin/clients/'+id, {headers:{'Authorization':'Bearer '+token}})
   .then(r=>r.json()).then(c=>{
     if(c.error){if(c.error==='unauthorized'){clearAdminToken();alert(T('err_token'));}else alert(T('err')+c.error);return;}
+    _ecOrig = c; // 원본 보관 — submitModal에서 변경된 필드만 전송하기 위함
     document.getElementById('ec-id').value = c.id||'';
+    document.getElementById('ec-orig-id').value = c.id||'';
     document.getElementById('ec-name').value = c.name||'';
-    document.getElementById('ec-token').value = '';
+    // 토큰: 항상 빈칸, 플레이스홀더로 상태 표시
+    const tokenEl = document.getElementById('ec-token');
+    tokenEl.value = '';
+    tokenEl.placeholder = c.token ? '●●●● (변경하려면 입력, 공백=기존 유지)' : (T('ph_auto')||'자동 생성');
     document.getElementById('ec-service').value = c.default_service||'google';
     document.getElementById('ec-mdl').value = c.default_model||'';
     document.getElementById('ec-agent-type').value = c.agent_type||'';
@@ -1039,17 +1090,22 @@ function openEditClient(id) {
   }).catch(e=>alert(T('err')+e));
 }
 
-// ── 에이전트 종류 변경 시 작업 디렉토리 힌트 ──
+// ── 에이전트 종류 변경 시 작업 디렉토리 처리 ──
+// • 필드가 비어있으면 → 새 타입의 기본값으로 자동 채움
+// • 필드에 값이 있어도 → 플레이스홀더는 항상 새 타입 힌트로 업데이트
 function onAgentTypeChange(type, wdId) {
   const el = document.getElementById(wdId);
-  if (!el || el.value) return; // 이미 값이 있으면 덮어쓰지 않음
-  const hints = {
+  if (!el) return;
+  const defaults = {
     'openclaw':    '~/.openclaw',
     'claude-code': '~/.claude',
     'cursor':      '~/projects',
     'vscode':      '~/projects',
   };
-  el.placeholder = hints[type] || '/path/to/workdir';
+  const d = defaults[type] || '';
+  el.placeholder = d || '/path/to/workdir';
+  // 비어있을 때만 자동 채움 — 이미 입력된 값(커스텀 경로)은 건드리지 않음
+  if (!el.value && d) el.value = d;
 }
 
 // ── 모델 드롭다운 (서비스 카드 등 datalist용 — 기존 호환) ──
@@ -1068,10 +1124,10 @@ function onServiceChange(inputId, service, listId) {
 function onAgentServiceChange(inputId, selId, service) {
   const sel = document.getElementById(selId);
   if(!sel) return;
-  sel.innerHTML = '<option value="">— 로딩 중... —</option>';
-  fetch('/admin/models?service='+service, {headers:{'Authorization':'Bearer '+(localStorage.getItem('wv_admin_token')||'')}})
+  sel.innerHTML = '<option value="">'+T('detecting')+'</option>';
+  fetch('/admin/models?service='+service, {headers:{'Authorization':'Bearer '+(localStorage.getItem('wv_admin_token')||_SERVER_TOKEN||'')}})
   .then(r=>r.json()).then(data=>{
-    sel.innerHTML = '<option value="">— 모델 선택 또는 직접 입력 —</option>';
+    sel.innerHTML = '<option value="">'+T('sel_model_or_enter')+'</option>';
     (data.models||[]).forEach(m=>{
       const opt=document.createElement('option');
       opt.value=m.id;
@@ -1202,7 +1258,7 @@ function changeModel(clientId) {
         setTimeout(()=>{btn.textContent=T('apply');btn.style.color='';},2000);
       }
       // agent-live 영역에도 저장 확인 표시 (미연결 상태여도 저장됐음을 알림)
-      const agentItem = btn ? btn.closest('.agent-item') : null;
+      const agentItem = btn ? btn.closest('.agent-card') : null;
       if(agentItem){
         const liveDiv = agentItem.querySelector('.agent-live');
         if(liveDiv){
@@ -1261,14 +1317,17 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 	}
 
 	var sb strings.Builder
+	// ── 섹션 헤더 (카드 없이 섹션 전체 폭) ──
 	sb.WriteString(fmt.Sprintf(
-		`<div class="card"><h2><span data-i18n="agents">🤖 에이전트</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span><button class="btn-sm" onclick="openAddClient()" data-i18n="add">+ 추가</button></h2>`,
+		`<div class="agents-section"><div class="section-hdr"><h2><span data-i18n="agents">🤖 에이전트</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span></h2><button class="btn-sm" onclick="openAddClient()" data-i18n="add">+ 추가</button></div>`,
 		len(clients), len(clients),
 	))
 	if len(clients) == 0 {
 		sb.WriteString(`<div style="color:var(--text-muted);font-size:.82rem" data-i18n="no_agents">등록된 에이전트 없음</div></div>`)
 		return sb.String()
 	}
+
+	sb.WriteString(`<div class="agents-grid">`)
 
 	for _, c := range clients {
 		p := pmap[c.ID]
@@ -1277,39 +1336,33 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		dotClass := "dot-gray"
 		var statusChip string
 		if !c.Enabled {
-			statusChip = `<div class="agent-status"><span class="status-muted">— 비활성화됨</span></div>`
+			statusChip = `<div class="agent-status"><span class="status-muted" data-i18n="st_disabled">— 비활성화됨</span></div>`
 		} else if p == nil {
 			statusChip = `<div class="agent-status">` +
-				`<span class="status-dc">● 프록시 미연결</span>` +
-				`<span class="status-hint">heartbeat 미수신 — VAULT_TOKEN 으로 프록시를 실행하면 연결됩니다</span>` +
+				`<span class="status-dc" data-i18n="st_no_proxy">● 프록시 미연결</span>` +
+				`<span class="status-hint" data-i18n="st_proxy_hint">프록시를 VAULT_TOKEN으로 실행하면 연결됩니다</span>` +
 				`</div>`
 		} else {
 			age := time.Since(p.UpdatedAt)
 			ageSec := int(age.Seconds())
-			var ago string
-			if age < time.Minute {
-				ago = fmt.Sprintf("%.0f초 전", age.Seconds())
-			} else {
-				ago = fmt.Sprintf("%.0f분 전", age.Minutes())
-			}
 			switch {
 			case age < 3*time.Minute:
 				dotClass = "dot-green"
 				statusChip = fmt.Sprintf(
-					`<div class="agent-status"><span class="status-live">● 실행 중 — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%s</span></span> <span class="status-version">%s</span></div>`,
-					p.Service, p.Model, ageSec, ago, p.Version,
+					`<div class="agent-status"><span class="status-live"><span data-i18n="st_running">● 실행 중</span> — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%.0f초 전</span></span> <span class="status-version">%s</span></div>`,
+					p.Service, p.Model, ageSec, age.Seconds(), p.Version,
 				)
 			case age < 10*time.Minute:
 				dotClass = "dot-yellow"
 				statusChip = fmt.Sprintf(
-					`<div class="agent-status"><span class="status-delay">◑ 지연 %s — %s / %s</span></div>`,
-					ago, p.Service, p.Model,
+					`<div class="agent-status"><span class="status-delay"><span data-i18n="st_delayed">◑ 지연</span> <span class="bot-ago" data-ago-sec="%d">%.0f분 전</span> — %s / %s</span></div>`,
+					ageSec, age.Minutes(), p.Service, p.Model,
 				)
 			default:
 				dotClass = "dot-red"
 				statusChip = fmt.Sprintf(
-					`<div class="agent-status"><span class="status-offline">✕ 오프라인 (%s)</span></div>`,
-					ago,
+					`<div class="agent-status"><span class="status-offline"><span data-i18n="st_offline">✕ 오프라인</span> (<span class="bot-ago" data-ago-sec="%d">%.0f분 전</span>)</span></div>`,
+					ageSec, age.Minutes(),
 				)
 			}
 		}
@@ -1338,13 +1391,12 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		}
 
 		// ── 설명 & 메타 ──
-		descLine := ""
-		if c.Description != "" {
-			descLine = fmt.Sprintf(`<div class="agent-desc">%s</div>`, c.Description)
-		}
 		metaLines := ""
 		if c.WorkDir != "" {
 			metaLines += fmt.Sprintf(`<div class="agent-meta">📁 %s</div>`, c.WorkDir)
+		}
+		if c.Description != "" {
+			metaLines += fmt.Sprintf(`<div class="agent-desc">%s</div>`, c.Description)
 		}
 		if len(c.IPWhitelist) > 0 {
 			metaLines += fmt.Sprintf(`<div class="agent-meta">🔒 %s</div>`, strings.Join(c.IPWhitelist, ", "))
@@ -1355,23 +1407,23 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		switch c.AgentType {
 		case "openclaw":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg btn-cfg-openclaw" onclick="copyOpenClawConfig('%s')" title="~/.openclaw/openclaw.json 에 붙여넣을 설정 복사">🦞 OpenClaw 설정 복사</button>`,
+				`<button class="btn-cfg btn-cfg-openclaw" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_openclaw_title" title="~/.openclaw/openclaw.json 설정 복사" data-i18n="cfg_openclaw">🦞 OpenClaw 설정 복사</button>`,
 				c.ID)
 		case "claude-code":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg btn-cfg-claude" onclick="copyAgentConfig('%s','claude-code')" title="~/.claude/settings.json 프록시 설정 복사">🟠 Claude Code 설정 복사</button>`,
+				`<button class="btn-cfg btn-cfg-claude" onclick="copyAgentConfig('%s','claude-code')" data-i18n-title="cfg_claude_title" title="~/.claude/settings.json 설정 복사" data-i18n="cfg_claude">🟠 Claude Code 설정 복사</button>`,
 				c.ID)
 		case "cursor":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cursor')" title="Cursor AI 프록시 API 설정 복사">⌨ Cursor 설정 복사</button>`,
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cursor')" data-i18n-title="cfg_cursor_title" title="Cursor AI 프록시 설정 복사" data-i18n="cfg_cursor">⌨ Cursor 설정 복사</button>`,
 				c.ID)
 		case "vscode":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','vscode')" title="VS Code / Continue 확장 프록시 설정 복사">💻 VSCode 설정 복사</button>`,
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','vscode')" data-i18n-title="cfg_vscode_title" title="VS Code / Continue 프록시 설정 복사" data-i18n="cfg_vscode">💻 VSCode 설정 복사</button>`,
 				c.ID)
 		default:
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyOpenClawConfig('%s')" title="프록시 연결 설정 복사 (OpenClaw 형식)">📋 설정 복사</button>`,
+				`<button class="btn-cfg" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_copy_title" title="프록시 설정 복사" data-i18n="cfg_copy">📋 설정 복사</button>`,
 				c.ID)
 		}
 
@@ -1381,39 +1433,42 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			uptimeAttr = fmt.Sprintf(` data-started-sec="%d"`, p.StartedAt.Unix())
 		}
 
-		// ── 카드 아이템 조립 ──
+		// ── 개별 에이전트 카드 조립 ──
 		var item strings.Builder
-		item.WriteString(fmt.Sprintf(`<div class="agent-item%s"%s>`, disabledClass, uptimeAttr))
-		item.WriteString(`<div class="agent-header">`)
-		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.28rem;flex-shrink:0"></div>`, dotClass))
-		item.WriteString(`<div style="flex:1;min-width:0">`)
-		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s %s <span style="color:var(--text-muted);font-size:.72rem">(%s)</span>%s</div>`,
+		item.WriteString(fmt.Sprintf(`<div class="agent-card%s"%s>`, disabledClass, uptimeAttr))
+		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
+		item.WriteString(`<div class="ac-top">`)
+		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
+		item.WriteString(`<div class="ac-info">`)
+		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s %s <span style="color:var(--text-muted);font-size:.7rem">(%s)</span>%s</div>`,
 			typeIcon, displayName, c.ID, typeBadge))
-		item.WriteString(descLine)
-		item.WriteString(metaLines)
 		item.WriteString(statusChip)
+		if metaLines != "" {
+			item.WriteString(metaLines)
+		}
+		item.WriteString(`</div>`) // ac-info
+		item.WriteString(`<div class="ac-btns">`)
+		item.WriteString(fmt.Sprintf(`<button class="btn-action" onclick="openEditClient('%s')" data-i18n-title="edit" title="편집">✎</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action btn-action-del" onclick="deleteClient('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, c.ID))
+		item.WriteString(`</div>`) // ac-btns
+		item.WriteString(`</div>`) // ac-top
+		// 모델 폼 (카드 하단, 구분선 위)
 		item.WriteString(`<div class="model-form">`)
-		item.WriteString(fmt.Sprintf(`<select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>`,
+		item.WriteString(fmt.Sprintf(`<div class="model-form-row"><select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>`,
 			c.ID, c.ID, c.ID, buildServiceOptions(services, c.DefaultService)))
-		item.WriteString(fmt.Sprintf(`<select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')" style="margin-bottom:.25rem"><option value="">— 모델 선택 —</option></select>`,
+		item.WriteString(fmt.Sprintf(`<select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')"><option value="" data-i18n="sel_model">— 모델 선택 —</option></select></div>`,
 			c.ID, c.ID, c.ID))
-		item.WriteString(fmt.Sprintf(`<input id="mdl-%s" type="text" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s" oninput="document.getElementById('mdl-sel-%s').value=''">`,
+		item.WriteString(fmt.Sprintf(`<div class="model-form-row"><input id="mdl-%s" type="text" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s" oninput="document.getElementById('mdl-sel-%s').value=''">`,
 			c.ID, c.DefaultModel, c.ID))
-		item.WriteString(fmt.Sprintf(`<button class="btn btn-save" onclick="changeModel('%s')" data-i18n="apply">💾 저장</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn btn-save" onclick="changeModel('%s')" data-i18n="apply">💾 저장</button></div>`, c.ID))
 		item.WriteString(`</div>`) // model-form
-		item.WriteString(`</div>`) // flex:1
-		item.WriteString(`<div class="agent-actions">`)
-		item.WriteString(cfgButton)
-		item.WriteString(`<div style="display:flex;gap:.3rem;margin-top:.3rem">`)
-		item.WriteString(fmt.Sprintf(`<button class="btn-action" onclick="openEditClient('%s')" title="편집">✎</button>`, c.ID))
-		item.WriteString(fmt.Sprintf(`<button class="btn-action btn-action-del" onclick="deleteClient('%s')" title="삭제">✕</button>`, c.ID))
-		item.WriteString(`</div>`)  // gap row
-		item.WriteString(`</div>`)  // agent-actions
-		item.WriteString(`</div>`)  // agent-header
-		item.WriteString(`</div>`)  // agent-item
+		// 설정 복사 버튼 (카드 맨 아래, 전체 폭)
+		item.WriteString(fmt.Sprintf(`<div class="ac-cfg">%s</div>`, cfgButton))
+		item.WriteString(`</div>`) // agent-card
 		sb.WriteString(item.String())
 	}
-	sb.WriteString(`</div>`)
+	sb.WriteString(`</div>`) // agents-grid
+	sb.WriteString(`</div>`) // agents-section
 	return sb.String()
 }
 
@@ -1484,15 +1539,15 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig) string {
 			if k.DailyLimit > 0 {
 				meta = fmt.Sprintf("%d/%d", k.TodayUsage, k.DailyLimit)
 			} else {
-				meta = fmt.Sprintf("%d 요청", k.TodayUsage)
+				meta = fmt.Sprintf(`%d <span data-i18n="key_reqs">요청</span>`, k.TodayUsage)
 			}
 			if k.IsOnCooldown() {
 				remain := time.Until(k.CooldownUntil)
-				meta += fmt.Sprintf(" (%.0f분 후)", remain.Minutes())
+				meta += fmt.Sprintf(` (%.0f<span data-i18n="key_in_min">분 후</span>)`, remain.Minutes())
 			}
 
 			sb.WriteString(fmt.Sprintf(
-				`<div class="key-item"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
+				`<div class="key-item"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
 				statusIcon, label, meta, k.ID, barClass, barPct,
 			))
 		}
@@ -1542,14 +1597,14 @@ func buildServicesCard(services []*ServiceConfig) string {
 				`<div style="display:flex;gap:.4rem;margin-top:.3rem">
   <input id="svc-url-%s" type="text" style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.25rem .5rem;border-radius:4px;font-size:.75rem;font-family:inherit" placeholder="%s" value="%s">
   <button class="btn-sm" onclick="saveServiceURL('%s')" data-i18n="save">저장</button>
-  <button class="btn-sm" onclick="detectLocalModels('%s')" title="자동 감지">🔍</button>
+  <button class="btn-sm" onclick="detectLocalModels('%s')" data-i18n-title="auto_detect" title="자동 감지">🔍</button>
 </div>`,
 				sv.ID, placeholder, sv.LocalURL, sv.ID, sv.ID,
 			)
 		}
 		deleteBtn := ""
 		if sv.Custom {
-			deleteBtn = fmt.Sprintf(`<button class="btn-del" onclick="deleteService('%s')" title="삭제">✕</button>`, sv.ID)
+			deleteBtn = fmt.Sprintf(`<button class="btn-del" onclick="deleteService('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, sv.ID)
 		}
 		sb.WriteString(fmt.Sprintf(
 			`<div class="svc-item" id="svc-item-%s">
@@ -1600,7 +1655,7 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
   <select id="%s-service" onchange="onAgentServiceChange('%s-mdl','%s-mdl-sel',this.value)">%s</select>
   <label data-i18n="lbl_defmdl">기본 모델</label>
   <select id="%s-mdl-sel" onchange="onModelSelect('%s-mdl-sel','%s-mdl')" style="margin-bottom:.3rem">
-    <option value="">— 모델 선택 또는 직접 입력 —</option>
+    <option value="" data-i18n="sel_model_or_enter">— 모델 선택 또는 직접 입력 —</option>
   </select>
   <input id="%s-mdl" type="text" data-i18n-ph="ph_mdl" placeholder="gemini-2.5-flash" oninput="document.getElementById('%s-mdl-sel').value=''">
   <label data-i18n="lbl_description">설명</label>
@@ -1639,10 +1694,10 @@ func buildAddClientModal(services []*ServiceConfig) string {
 
 func buildEditClientModal(services []*ServiceConfig) string {
 	body := buildClientModalBody("ec", "m_edit_client", services)
-	// ID 필드는 편집 시 읽기 전용
+	// ID 필드는 편집 시 수정 가능 (변경 시 new_id로 전송)
 	body = strings.Replace(body,
 		`<input id="ec-id" type="text" placeholder="my-bot">`,
-		`<input id="ec-id" type="text" readonly style="opacity:.6">`,
+		`<input id="ec-id" type="text" placeholder="my-bot"><input id="ec-orig-id" type="hidden">`,
 		1,
 	)
 	// 추가 버튼 텍스트를 "저장"으로 변경

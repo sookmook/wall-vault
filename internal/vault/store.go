@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-// defaultServiceList: 기본 서비스 목록 (vault.json에 없으면 자동 seed)
-// 클라우드 서비스는 키 유무로 활성화 결정 → 모두 false로 시작
-// 로컬 서비스는 연결 검사 후 결정 → 모두 false로 시작
+// defaultServiceList: default service list (auto-seeded if missing from vault.json)
+// cloud services: enabled based on key presence → all start as false
+// local services: enabled based on connectivity check → all start as false
 var defaultServiceList = []*ServiceConfig{
 	{ID: "google",         Name: "Google Gemini",     Enabled: false},
 	{ID: "openai",         Name: "OpenAI",            Enabled: false},
@@ -25,7 +25,7 @@ var defaultServiceList = []*ServiceConfig{
 	{ID: "vllm",           Name: "vLLM (Local)",      Enabled: false},
 }
 
-// Store: 스레드 안전 데이터 저장소 (메모리 + JSON 영속화)
+// Store: thread-safe data store (in-memory + JSON persistence)
 type Store struct {
 	mu         sync.RWMutex
 	keys       []*APIKey
@@ -54,7 +54,7 @@ func NewStore(dataDir, masterPass string) (*Store, error) {
 	return s, nil
 }
 
-// ─── 영속화 ──────────────────────────────────────────────────────────────────
+// ─── Persistence ─────────────────────────────────────────────────────────────
 
 func (s *Store) load() error {
 	data, err := os.ReadFile(s.dataFile)
@@ -70,13 +70,13 @@ func (s *Store) load() error {
 	if snap.Settings != nil {
 		s.settings = *snap.Settings
 	}
-	// 서비스 목록 로드 + 기본 서비스 seed
+	// load service list + seed default services
 	s.services = snap.Services
 	if len(s.services) == 0 {
 		s.services = make([]*ServiceConfig, len(defaultServiceList))
 		copy(s.services, defaultServiceList)
 	} else {
-		// 기본 서비스 중 없는 것을 마이그레이션으로 추가 (Custom=false인 것만)
+		// add missing default services via migration (only Custom=false ones)
 		existing := make(map[string]bool)
 		for _, sv := range s.services {
 			existing[sv.ID] = true
@@ -88,17 +88,17 @@ func (s *Store) load() error {
 			}
 		}
 	}
-	// 마이그레이션: 기존 클라이언트 Enabled 기본값 true
+	// migration: default Enabled=true for existing clients
 	needsSave := false
 	for _, c := range s.clients {
 		if !c.Enabled && c.CreatedAt.Before(time.Now().Add(-time.Second)) {
-			// 이미 저장된 레코드 중 Enabled=false인 것은 마이그레이션
-			// JSON에 "enabled":false가 명시된 경우와 누락된 경우 구분 불가
-			// → raw JSON으로 확인
-			// 간단히: 기존 클라이언트는 enabled=true로 설정
+			// among saved records where Enabled=false, perform migration
+			// cannot distinguish "enabled":false explicitly set vs. field missing in JSON
+			// → check via raw JSON
+			// simplification: set existing clients to enabled=true
 		}
 	}
-	// raw JSON을 파싱해서 enabled 필드 누락 여부 확인
+	// parse raw JSON to check whether the enabled field is absent
 	var rawSnap struct {
 		Clients []json.RawMessage `json:"clients"`
 	}
@@ -121,8 +121,8 @@ func (s *Store) load() error {
 			s.proxies[p.ClientID] = p
 		}
 	}
-	// 클라우드 서비스 활성화 상태를 키 유무로 조정
-	// (env var 키 주입 또는 이미 키가 있는 경우 자동 반영)
+	// adjust cloud service enabled state based on key presence
+	// (auto-reflected when env var keys are injected or keys already exist)
 	if s.reconcileCloudServices() {
 		needsSave = true
 	}
@@ -132,14 +132,14 @@ func (s *Store) load() error {
 	return nil
 }
 
-// ReconcileCloudServices: 외부에서 호출 가능한 버전 (락 획득 후 처리).
+// ReconcileCloudServices: externally callable version (acquires lock before processing).
 func (s *Store) ReconcileCloudServices() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.reconcileCloudServices()
 }
 
-// reconcileCloudServices: 락이 이미 잡힌 상태에서 호출 (load() 내부 또는 ReconcileCloudServices).
+// reconcileCloudServices: called while lock is already held (inside load() or ReconcileCloudServices).
 func (s *Store) reconcileCloudServices() bool {
 	keyCounts := map[string]int{}
 	for _, k := range s.keys {
@@ -148,7 +148,7 @@ func (s *Store) reconcileCloudServices() bool {
 	changed := false
 	for _, sv := range s.services {
 		if sv.IsLocal() || sv.Custom {
-			continue // 로컬/커스텀은 건드리지 않음 (사용자 또는 probe 결정)
+			continue // do not touch local/custom (decided by user or probe)
 		}
 		want := keyCounts[sv.ID] > 0
 		if sv.Enabled != want {
@@ -176,7 +176,7 @@ func (s *Store) save() error {
 	if err != nil {
 		return err
 	}
-	// 원자적 쓰기
+	// atomic write
 	tmp := s.dataFile + ".tmp"
 	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		return err
@@ -184,7 +184,7 @@ func (s *Store) save() error {
 	return os.Rename(tmp, s.dataFile)
 }
 
-// ─── 키 관리 ─────────────────────────────────────────────────────────────────
+// ─── Key Management ───────────────────────────────────────────────────────────
 
 func (s *Store) ListKeys() []*APIKey {
 	s.mu.RLock()
@@ -279,7 +279,7 @@ func (s *Store) ResetDailyUsage() {
 	_ = s.save()
 }
 
-// ─── 클라이언트 관리 ──────────────────────────────────────────────────────────
+// ─── Client Management ────────────────────────────────────────────────────────
 
 func (s *Store) ListClients() []*Client {
 	s.mu.RLock()
@@ -341,17 +341,28 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 	defer s.mu.Unlock()
 	for _, c := range s.clients {
 		if c.ID == id {
+			if inp.NewID != nil && *inp.NewID != "" && *inp.NewID != id {
+				// check for duplicate ID
+				for _, other := range s.clients {
+					if other.ID == *inp.NewID {
+						return fmt.Errorf("이미 사용 중인 ID: %s", *inp.NewID)
+					}
+				}
+				c.ID = *inp.NewID
+			}
 			if inp.Name != nil {
 				c.Name = *inp.Name
 			}
 			if inp.Token != nil && *inp.Token != "" {
 				c.Token = *inp.Token
 			}
-			if inp.DefaultService != "" {
-				c.DefaultService = inp.DefaultService
+			// DefaultService: nil = no change, value present = update (empty value ignored — service-less state is invalid)
+			if inp.DefaultService != nil && *inp.DefaultService != "" {
+				c.DefaultService = *inp.DefaultService
 			}
-			if inp.DefaultModel != "" {
-				c.DefaultModel = inp.DefaultModel
+			// DefaultModel: nil = no change, "" also allowed (means revert to service default model)
+			if inp.DefaultModel != nil {
+				c.DefaultModel = *inp.DefaultModel
 			}
 			if inp.AllowedServices != nil {
 				c.AllowedServices = inp.AllowedServices
@@ -377,7 +388,7 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 	return fmt.Errorf("클라이언트 없음: %s", id)
 }
 
-// ─── 서비스 관리 ──────────────────────────────────────────────────────────────
+// ─── Service Management ───────────────────────────────────────────────────────
 
 func (s *Store) ListServices() []*ServiceConfig {
 	s.mu.RLock()
@@ -398,7 +409,7 @@ func (s *Store) GetService(id string) *ServiceConfig {
 	return nil
 }
 
-// UpsertService: ID 기준으로 있으면 업데이트, 없으면 추가
+// UpsertService: update if exists by ID, otherwise add
 func (s *Store) UpsertService(inp *ServiceConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -412,7 +423,7 @@ func (s *Store) UpsertService(inp *ServiceConfig) error {
 			return s.save()
 		}
 	}
-	// 없으면 추가 (커스텀 서비스)
+	// not found — add (custom service)
 	clone := *inp
 	clone.Custom = true
 	s.services = append(s.services, &clone)
@@ -434,7 +445,7 @@ func (s *Store) DeleteService(id string) error {
 	return fmt.Errorf("서비스 없음: %s", id)
 }
 
-// ServiceURLMap: 서비스 ID → LocalURL 맵 반환 (models.Registry.Refresh용)
+// ServiceURLMap: returns service ID → LocalURL map (for models.Registry.Refresh)
 func (s *Store) ServiceURLMap() map[string]string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -459,7 +470,7 @@ func (s *Store) DeleteClient(id string) error {
 	return fmt.Errorf("클라이언트 없음: %s", id)
 }
 
-// ─── 프록시 상태 ──────────────────────────────────────────────────────────────
+// ─── Proxy Status ─────────────────────────────────────────────────────────────
 
 func (s *Store) UpdateProxyStatus(ps *ProxyStatus) {
 	s.mu.Lock()
@@ -484,7 +495,7 @@ func (s *Store) ListProxies() []*ProxyStatus {
 	return result
 }
 
-// ─── UI 설정 (테마·언어) ──────────────────────────────────────────────────────
+// ─── UI Settings (theme/language) ────────────────────────────────────────────
 
 func (s *Store) GetSettings() StoreSettings {
 	s.mu.RLock()
@@ -506,7 +517,7 @@ func (s *Store) SetLang(lang string) error {
 	return s.save()
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 func newID() string {
 	b := make([]byte, 8)

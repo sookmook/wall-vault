@@ -2,7 +2,7 @@ package vault
 
 import "time"
 
-// ─── API 키 ──────────────────────────────────────────────────────────────────
+// ─── API Key ──────────────────────────────────────────────────────────────────
 
 type APIKey struct {
 	ID            string    `json:"id"`
@@ -10,7 +10,7 @@ type APIKey struct {
 	EncryptedKey  string    `json:"encrypted_key"`
 	Label         string    `json:"label"`
 	TodayUsage    int       `json:"today_usage"`
-	DailyLimit    int       `json:"daily_limit"`    // 0 = 무제한
+	DailyLimit    int       `json:"daily_limit"`    // 0 = unlimited
 	CooldownUntil time.Time `json:"cooldown_until"`
 	LastError     int       `json:"last_error"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -39,7 +39,7 @@ func (k *APIKey) IsAvailable() bool {
 	return !k.IsOnCooldown() && !k.IsExhausted()
 }
 
-// ─── 클라이언트 ───────────────────────────────────────────────────────────────
+// ─── Client ───────────────────────────────────────────────────────────────────
 
 type Client struct {
 	ID              string    `json:"id"`
@@ -48,16 +48,16 @@ type Client struct {
 	DefaultService  string    `json:"default_service"`
 	DefaultModel    string    `json:"default_model"`
 	AllowedServices []string  `json:"allowed_services"`
-	// 확장 필드
+	// extended fields
 	AgentType   string   `json:"agent_type,omitempty"`   // openclaw | claude-code | cursor | custom
-	WorkDir     string   `json:"work_dir,omitempty"`     // 작업 디렉토리
-	Description string   `json:"description,omitempty"`  // 설명
-	IPWhitelist []string `json:"ip_whitelist,omitempty"` // 허용 IP 목록 (빈 배열 = 모두 허용)
-	Enabled     bool     `json:"enabled"`                // 활성화 여부
+	WorkDir     string   `json:"work_dir,omitempty"`     // working directory
+	Description string   `json:"description,omitempty"`  // description
+	IPWhitelist []string `json:"ip_whitelist,omitempty"` // allowed IP list (empty array = allow all)
+	Enabled     bool     `json:"enabled"`                // enabled status
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// ClientInput: 클라이언트 추가 DTO
+// ClientInput: client add DTO
 type ClientInput struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
@@ -69,15 +69,17 @@ type ClientInput struct {
 	WorkDir         string   `json:"work_dir"`
 	Description     string   `json:"description"`
 	IPWhitelist     []string `json:"ip_whitelist"`
-	Enabled         *bool    `json:"enabled"` // nil = 기본값 true
+	Enabled         *bool    `json:"enabled"` // nil = default true
 }
 
-// ClientUpdateInput: 클라이언트 수정 DTO
+// ClientUpdateInput: client update DTO
+// All fields are pointers/slices — nil/omitted = no change, value present = update
 type ClientUpdateInput struct {
+	NewID           *string  `json:"new_id"`
 	Name            *string  `json:"name"`
 	Token           *string  `json:"token"`
-	DefaultService  string   `json:"default_service"`
-	DefaultModel    string   `json:"default_model"`
+	DefaultService  *string  `json:"default_service"`
+	DefaultModel    *string  `json:"default_model"`
 	AllowedServices []string `json:"allowed_services"`
 	AgentType       *string  `json:"agent_type"`
 	WorkDir         *string  `json:"work_dir"`
@@ -86,18 +88,18 @@ type ClientUpdateInput struct {
 	Enabled         *bool    `json:"enabled"`
 }
 
-// ─── 서비스 설정 ──────────────────────────────────────────────────────────────
+// ─── Service Config ───────────────────────────────────────────────────────────
 
-// ServiceConfig: 서비스별 런타임 설정 (로컬 URL, 활성화 여부)
+// ServiceConfig: per-service runtime settings (local URL, enabled status)
 type ServiceConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	LocalURL string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM 전용
+	LocalURL string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
 	Enabled  bool   `json:"enabled"`
-	Custom   bool   `json:"custom,omitempty"` // 사용자가 직접 추가한 서비스
+	Custom   bool   `json:"custom,omitempty"` // user-added service
 }
 
-// IsLocal: 로컬 서버 서비스 여부
+// IsLocal: whether this is a local server service
 func (s *ServiceConfig) IsLocal() bool {
 	switch s.ID {
 	case "ollama", "lmstudio", "vllm":
@@ -106,7 +108,7 @@ func (s *ServiceConfig) IsLocal() bool {
 	return s.Custom && s.LocalURL != ""
 }
 
-// ─── 프록시 상태 (Heartbeat) ─────────────────────────────────────────────────
+// ─── Proxy Status (Heartbeat) ────────────────────────────────────────────────
 
 type ProxyStatus struct {
 	ClientID  string    `json:"client_id"`
@@ -127,7 +129,7 @@ type VaultInfo struct {
 	KeyStatus     string `json:"key_status,omitempty"` // active | cooldown | exhausted
 }
 
-// ─── SSE 이벤트 ───────────────────────────────────────────────────────────────
+// ─── SSE Event ────────────────────────────────────────────────────────────────
 
 type SSEEvent struct {
 	Type string      `json:"type"`
@@ -140,7 +142,7 @@ type ConfigChangeEvent struct {
 	Model    string `json:"model"`
 }
 
-// ─── 저장소 스냅샷 ────────────────────────────────────────────────────────────
+// ─── Store Snapshot ───────────────────────────────────────────────────────────
 
 type storeData struct {
 	Keys     []*APIKey        `json:"keys"`
@@ -150,7 +152,7 @@ type storeData struct {
 	Settings *StoreSettings   `json:"settings,omitempty"`
 }
 
-// StoreSettings: vault.json에 영속화되는 UI 설정 (테마, 언어)
+// StoreSettings: UI settings persisted in vault.json (theme, language)
 type StoreSettings struct {
 	Theme string `json:"theme,omitempty"`
 	Lang  string `json:"lang,omitempty"`

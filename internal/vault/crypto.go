@@ -17,7 +17,7 @@ func deriveKey(password string) []byte {
 
 func encryptKey(plaintext, password string) (string, error) {
 	if password == "" {
-		return plaintext, nil // 마스터 비밀번호 없으면 평문 저장
+		return plaintext, nil // no master password — store as plaintext
 	}
 	key := deriveKey(password)
 	block, err := aes.NewCipher(key)
@@ -43,7 +43,7 @@ func decryptKey(ciphertext64, password string) (string, error) {
 	key := deriveKey(password)
 	data, err := base64.StdEncoding.DecodeString(ciphertext64)
 	if err != nil {
-		// base64 디코드 실패 = 이미 평문
+		// base64 decode failed = already plaintext
 		return ciphertext64, nil
 	}
 	block, err := aes.NewCipher(key)
@@ -56,7 +56,7 @@ func decryptKey(ciphertext64, password string) (string, error) {
 	}
 	nonceSize := gcm.NonceSize()
 	if len(data) < nonceSize {
-		return ciphertext64, nil // 짧으면 평문으로 취급
+		return ciphertext64, nil // too short — treat as plaintext
 	}
 	nonce, ct := data[:nonceSize], data[nonceSize:]
 	plain, err := gcm.Open(nil, nonce, ct, nil)

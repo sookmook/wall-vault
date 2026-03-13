@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Broker: SSE 이벤트 브로드캐스터
+// Broker: SSE event broadcaster
 type Broker struct {
 	mu      sync.RWMutex
 	clients map[chan string]struct{}
@@ -19,7 +19,7 @@ func NewBroker() *Broker {
 	}
 }
 
-// Subscribe: 새 SSE 클라이언트 채널 등록
+// Subscribe: register a new SSE client channel
 func (b *Broker) Subscribe() chan string {
 	ch := make(chan string, 8)
 	b.mu.Lock()
@@ -28,7 +28,7 @@ func (b *Broker) Subscribe() chan string {
 	return ch
 }
 
-// Unsubscribe: 클라이언트 채널 해제
+// Unsubscribe: deregister a client channel
 func (b *Broker) Unsubscribe(ch chan string) {
 	b.mu.Lock()
 	delete(b.clients, ch)
@@ -36,7 +36,7 @@ func (b *Broker) Unsubscribe(ch chan string) {
 	close(ch)
 }
 
-// Broadcast: 모든 구독 클라이언트에 이벤트 전송
+// Broadcast: send event to all subscribed clients
 func (b *Broker) Broadcast(evt SSEEvent) {
 	data, err := json.Marshal(evt)
 	if err != nil {
@@ -50,19 +50,19 @@ func (b *Broker) Broadcast(evt SSEEvent) {
 		select {
 		case ch <- msg:
 		default:
-			// 꽉 찬 채널은 스킵 (클라이언트가 느린 경우)
+			// skip full channels (slow client)
 		}
 	}
 }
 
-// Count: 연결된 클라이언트 수
+// Count: number of connected clients
 func (b *Broker) Count() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return len(b.clients)
 }
 
-// ServeHTTP: SSE 엔드포인트 핸들러
+// ServeHTTP: SSE endpoint handler
 func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -78,7 +78,7 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ch := b.Subscribe()
 	defer b.Unsubscribe(ch)
 
-	// 연결 즉시 ping 전송
+	// send ping immediately on connect
 	fmt.Fprintf(w, "data: {\"type\":\"connected\",\"clients\":%d}\n\n", b.Count())
 	flusher.Flush()
 

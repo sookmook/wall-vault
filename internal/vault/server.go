@@ -17,7 +17,7 @@ import (
 	"github.com/sookmook/wall-vault/internal/theme"
 )
 
-// authLimiter: IP별 인증 실패 횟수 추적 (rate limiting)
+// authLimiter: tracks auth failure count per IP (rate limiting)
 type authLimiter struct {
 	mu    sync.Mutex
 	fails map[string][]time.Time
@@ -25,7 +25,7 @@ type authLimiter struct {
 
 func newAuthLimiter() *authLimiter { return &authLimiter{fails: make(map[string][]time.Time)} }
 
-// blocked: 15분 내 10회 이상 실패 시 차단
+// blocked: block if 10 or more failures within 15 minutes
 func (al *authLimiter) blocked(ip string) bool {
 	al.mu.Lock()
 	defer al.mu.Unlock()
@@ -46,18 +46,18 @@ func (al *authLimiter) record(ip string) {
 	al.fails[ip] = append(al.fails[ip], time.Now())
 }
 
-// Server: 키 금고 HTTP 서버
+// Server: key vault HTTP server
 type Server struct {
 	cfg       *config.Config
 	store     *Store
 	broker    *Broker
-	registry  *models.Registry // 모델 캐시
-	cfgPath   string           // 테마 변경 시 저장할 설정 파일 경로
-	startedAt time.Time        // 가동 시작 시각
-	limiter   *authLimiter     // 인증 실패 rate limiter
+	registry  *models.Registry // model cache
+	cfgPath   string           // config file path to save on theme change
+	startedAt time.Time        // service start time
+	limiter   *authLimiter     // auth failure rate limiter
 }
 
-// SetConfigPath: 테마 저장에 사용할 설정 파일 경로 지정
+// SetConfigPath: specify the config file path to use for saving theme
 func (s *Server) SetConfigPath(path string) {
 	s.cfgPath = path
 }
@@ -67,7 +67,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	// vault.json에 저장된 테마/언어가 있으면 cfg보다 우선 적용
+	// if theme/language is saved in vault.json, it takes priority over cfg
 	if st := store.GetSettings(); st.Theme != "" || st.Lang != "" {
 		if st.Theme != "" {
 			cfg.Theme = st.Theme
@@ -84,7 +84,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		startedAt: time.Now(),
 		limiter:   newAuthLimiter(),
 	}
-	// 일일 사용량 자정 리셋 시작
+	// start midnight daily usage reset
 	go srv.startDailyReset()
 	return srv, nil
 }
@@ -92,17 +92,17 @@ func NewServer(cfg *config.Config) (*Server, error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	// 공개
+	// public
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/events", s.broker.ServeHTTP)
 	mux.HandleFunc("/api/clients", s.handlePublicClients)
 
-	// 프록시 전용 (클라이언트 토큰 인증)
-	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))       // 복호화된 키 목록
-	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))  // Heartbeat 수신
-	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))  // 클라이언트 자기 설정 변경
+	// proxy-only (client token auth)
+	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))       // decrypted key list
+	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))  // heartbeat receiver
+	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))  // client self-config change
 
-	// 관리자
+	// admin
 	mux.HandleFunc("/admin/theme", s.adminAuth(s.handleAdminTheme))
 	mux.HandleFunc("/admin/lang", s.adminAuth(s.handleAdminLang))
 	mux.HandleFunc("/admin/clients", s.adminAuth(s.handleAdminClients))
@@ -110,16 +110,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/keys", s.adminAuth(s.handleAdminKeys))
 	mux.HandleFunc("/admin/keys/", s.adminAuth(s.handleAdminKeysID))
 	mux.HandleFunc("/admin/keys/reset", s.adminAuth(s.handleResetUsage))
-	mux.HandleFunc("/admin/heartbeat", s.adminAuth(s.handleHeartbeat)) // 관리자도 가능
+	mux.HandleFunc("/admin/heartbeat", s.adminAuth(s.handleHeartbeat)) // admin also allowed
 	mux.HandleFunc("/admin/proxies", s.adminAuth(s.handleAdminProxies))
 	mux.HandleFunc("/admin/services", s.adminAuth(s.handleAdminServices))
 	mux.HandleFunc("/admin/services/", s.adminAuth(s.handleAdminServicesID))
 	mux.HandleFunc("/admin/models", s.adminAuth(s.handleAdminModels))
 
-	// 로고
+	// logo
 	mux.HandleFunc("/logo", s.handleLogo)
 
-	// 대시보드 UI
+	// dashboard UI
 	mux.HandleFunc("/", s.handleDashboard)
 
 	return middleware.Chain(mux,
@@ -129,7 +129,7 @@ func (s *Server) Handler() http.Handler {
 	)
 }
 
-// ─── 미들웨어 ────────────────────────────────────────────────────────────────
+// ─── Middleware ───────────────────────────────────────────────────────────────
 
 func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -152,16 +152,16 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// clientAuth: 등록된 클라이언트 토큰으로 인증
+// clientAuth: authenticate with a registered client token
 func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		// 관리자 토큰도 허용
+		// admin token also accepted
 		if s.cfg.Vault.AdminToken != "" && token == s.cfg.Vault.AdminToken {
 			next(w, r)
 			return
 		}
-		// 클라이언트 토큰 확인
+		// verify client token
 		if s.cfg.Vault.AdminToken == "" || s.store.GetClientByToken(token) != nil {
 			next(w, r)
 			return
@@ -170,7 +170,7 @@ func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// ─── 공개 API ────────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	keys := s.store.ListKeys()
@@ -199,7 +199,7 @@ func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, result)
 }
 
-// ─── 클라이언트 CRUD ──────────────────────────────────────────────────────────
+// ─── Client CRUD ──────────────────────────────────────────────────────────────
 
 func (s *Server) handleAdminClients(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -249,10 +249,17 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		// SSE 브로드캐스트
+		// SSE broadcast
+		svc, mdl := "", ""
+		if inp.DefaultService != nil {
+			svc = *inp.DefaultService
+		}
+		if inp.DefaultModel != nil {
+			mdl = *inp.DefaultModel
+		}
 		s.broker.Broadcast(SSEEvent{
 			Type: "config_change",
-			Data: ConfigChangeEvent{ClientID: id, Service: inp.DefaultService, Model: inp.DefaultModel},
+			Data: ConfigChangeEvent{ClientID: id, Service: svc, Model: mdl},
 		})
 		jsonOK(w, map[string]string{"status": "updated"})
 	case http.MethodDelete:
@@ -266,13 +273,13 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ─── 키 CRUD ─────────────────────────────────────────────────────────────────
+// ─── Key CRUD ─────────────────────────────────────────────────────────────────
 
 func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		keys := s.store.ListKeys()
-		// 암호화된 키는 내려주지 않음
+		// do not expose encrypted keys
 		type safe struct {
 			ID            string    `json:"id"`
 			Service       string    `json:"service"`
@@ -311,7 +318,7 @@ func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// 키 추가 후 클라우드 서비스 활성화 상태 즉시 반영
+		// immediately reflect cloud service enabled state after key add
 		s.store.ReconcileCloudServices()
 		s.broker.Broadcast(SSEEvent{Type: "key_added", Data: map[string]string{"service": body.Service}})
 		jsonOK(w, k)
@@ -326,7 +333,7 @@ func (s *Server) handleAdminKeysID(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// 삭제 전 서비스 정보 기록
+	// record service info before deletion
 	deletedSvc := ""
 	for _, k := range s.store.ListKeys() {
 		if k.ID == id {
@@ -338,7 +345,7 @@ func (s *Server) handleAdminKeysID(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	// 키 삭제 후 클라우드 서비스 활성화 상태 즉시 반영
+	// immediately reflect cloud service enabled state after key deletion
 	s.store.ReconcileCloudServices()
 	s.broker.Broadcast(SSEEvent{Type: "key_deleted", Data: map[string]string{"service": deletedSvc}})
 	jsonOK(w, map[string]string{"status": "deleted"})
@@ -368,15 +375,15 @@ func (s *Server) handleAdminProxies(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, s.store.ListProxies())
 }
 
-// ─── 프록시 전용 API ──────────────────────────────────────────────────────────
+// ─── Proxy-Only API ───────────────────────────────────────────────────────────
 
-// handleClientConfig: 클라이언트가 자신의 서비스/모델 설정을 변경 (양방향 동기화 지원)
+// handleClientConfig: client changes its own service/model config (bidirectional sync supported)
 func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
 		return
 	}
-	// 클라이언트 식별: 토큰으로 찾거나, 관리자 토큰이면 쿼리 파라미터 client_id 사용
+	// identify client: find by token, or use query param client_id if admin token
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	clientID := ""
 	if c := s.store.GetClientByToken(token); c != nil {
@@ -397,8 +404,8 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.UpdateClient(clientID, ClientUpdateInput{
-		DefaultService: inp.Service,
-		DefaultModel:   inp.Model,
+		DefaultService: &inp.Service,
+		DefaultModel:   &inp.Model,
 	}); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
@@ -410,22 +417,22 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "updated", "client_id": clientID})
 }
 
-// handleProxyKeys: 프록시에게 복호화된 키 목록 제공 (클라이언트 토큰 인증)
+// handleProxyKeys: provide decrypted key list to proxy (client token auth)
 func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		jsonError(w, "GET required", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 요청 클라이언트 확인
+	// identify requesting client
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	client := s.store.GetClientByToken(token)
-	// 비활성화된 클라이언트는 키 접근 거부
+	// deny key access to disabled clients
 	if client != nil && !client.Enabled {
 		jsonError(w, "client disabled", http.StatusForbidden)
 		return
 	}
-	// IP 화이트리스트 확인
+	// check IP whitelist
 	if client != nil && len(client.IPWhitelist) > 0 {
 		if !ipAllowed(realIP(r), client.IPWhitelist) {
 			jsonError(w, "ip not allowed", http.StatusForbidden)
@@ -444,11 +451,11 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]safeKey, 0, len(keys))
 	for _, k := range keys {
-		// 서비스 필터
+		// service filter
 		if serviceFilter != "" && k.Service != serviceFilter {
 			continue
 		}
-		// 클라이언트의 허용 서비스 확인
+		// check client's allowed services
 		if client != nil && len(client.AllowedServices) > 0 {
 			allowed := false
 			for _, svc := range client.AllowedServices {
@@ -461,7 +468,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 		}
-		// 키 복호화
+		// decrypt key
 		plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass)
 		if err != nil {
 			continue
@@ -476,7 +483,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, result)
 }
 
-// ─── 사용량 초기화 ────────────────────────────────────────────────────────────
+// ─── Usage Reset ──────────────────────────────────────────────────────────────
 
 func (s *Server) handleResetUsage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -488,7 +495,7 @@ func (s *Server) handleResetUsage(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "reset", "time": time.Now().Format(time.RFC3339)})
 }
 
-// ─── 언어 변경 ────────────────────────────────────────────────────────────────
+// ─── Language Change ──────────────────────────────────────────────────────────
 
 func (s *Server) handleAdminLang(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -516,7 +523,7 @@ func (s *Server) handleAdminLang(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"lang": body.Lang})
 }
 
-// ─── 테마 변경 ────────────────────────────────────────────────────────────────
+// ─── Theme Change ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -543,7 +550,7 @@ func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"theme": body.Theme})
 }
 
-// ─── 서비스 관리 ─────────────────────────────────────────────────────────────
+// ─── Service Management ───────────────────────────────────────────────────────
 
 func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -599,7 +606,7 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAdminModels: 서비스별 모델 목록 조회 (TTL 캐시)
+// handleAdminModels: query model list per service (TTL cache)
 func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		jsonError(w, "GET required", http.StatusMethodNotAllowed)
@@ -615,7 +622,7 @@ func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 				svcIDs = append(svcIDs, sv.ID)
 			}
 		}
-		// OpenRouter 키 조회
+		// look up OpenRouter key
 		var orKey string
 		keys := s.store.ListKeys()
 		for _, k := range keys {
@@ -633,7 +640,7 @@ func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]interface{}{"models": result, "count": len(result)})
 }
 
-// ─── 일일 자정 리셋 ───────────────────────────────────────────────────────────
+// ─── Daily Midnight Reset ─────────────────────────────────────────────────────
 
 func (s *Server) startDailyReset() {
 	for {
@@ -648,7 +655,7 @@ func (s *Server) startDailyReset() {
 	}
 }
 
-// ─── 로고 ────────────────────────────────────────────────────────────────────
+// ─── Logo ─────────────────────────────────────────────────────────────────────
 
 func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {
 	home, _ := os.UserHomeDir()
@@ -676,7 +683,7 @@ func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// ─── 대시보드 UI ──────────────────────────────────────────────────────────────
+// ─── Dashboard UI ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -688,7 +695,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, buildDashboard(s, t))
 }
 
-// ─── 유틸 ────────────────────────────────────────────────────────────────────
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 func jsonOK(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -701,7 +708,7 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 	fmt.Fprintf(w, `{"error":%q}`, msg)
 }
 
-// realIP: X-Forwarded-For 또는 RemoteAddr에서 실제 IP 추출
+// realIP: extract real IP from X-Forwarded-For or RemoteAddr
 func realIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		return strings.SplitN(xff, ",", 2)[0]
@@ -713,7 +720,7 @@ func realIP(r *http.Request) string {
 	return ip
 }
 
-// ipAllowed: 단일 IP 또는 CIDR 목록과 대조
+// ipAllowed: compare against a list of single IPs or CIDRs
 func ipAllowed(remoteIP string, whitelist []string) bool {
 	for _, entry := range whitelist {
 		entry = strings.TrimSpace(entry)

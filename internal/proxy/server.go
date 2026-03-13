@@ -79,6 +79,7 @@ func NewServer(cfg *config.Config) *Server {
 					"service": newSvc,
 					"model":   newMdl,
 				})
+				go updateOpenClawJSON(newSvc, newMdl)
 			}
 		})
 		s.sse.Start()
@@ -267,6 +268,7 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 			"service": newSvc,
 			"model":   newMdl,
 		})
+		go updateOpenClawJSON(newSvc, newMdl)
 	}
 	jsonOK(w, map[string]string{"status": "ok", "service": newSvc, "model": newMdl})
 }

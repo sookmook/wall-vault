@@ -1,4 +1,4 @@
-// Package models: 서비스별 모델 자동 조회 및 레지스트리
+// Package models: automatic model discovery and registry per service
 package models
 
 import (
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Model: 단일 모델 정보
+// Model: single model info
 type Model struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -19,7 +19,7 @@ type Model struct {
 	Free     bool   `json:"free,omitempty"`
 }
 
-// Registry: 전체 모델 캐시
+// Registry: full model cache
 type Registry struct {
 	models    []Model
 	updatedAt time.Time
@@ -33,7 +33,7 @@ func NewRegistry(ttl time.Duration) *Registry {
 	return &Registry{ttl: ttl}
 }
 
-// All: 전체 모델 반환 (서비스 필터 옵션)
+// All: return all models (optional service filter)
 func (r *Registry) All(service string) []Model {
 	if service == "" {
 		return r.models
@@ -47,10 +47,10 @@ func (r *Registry) All(service string) []Model {
 	return out
 }
 
-// ServiceURLs: 로컬 서비스별 URL 맵 (service ID → base URL)
+// ServiceURLs: local service URL map (service ID → base URL)
 type ServiceURLs map[string]string
 
-// Refresh: 모든 서비스에서 모델 재조회
+// Refresh: re-fetch models from all services
 func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterKey string) error {
 	if localURLs == nil {
 		localURLs = ServiceURLs{}
@@ -81,7 +81,7 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 		case "vllm":
 			all = append(all, fetchOpenAICompat(svc, localURLs["vllm"], "http://localhost:8000")...)
 		default:
-			// 커스텀 서비스: URL이 있으면 OpenAI-호환 목록 조회 시도
+			// custom service: try OpenAI-compatible model list if URL is present
 			if u := localURLs[svc]; u != "" {
 				all = append(all, fetchOpenAICompat(svc, u, "")...)
 			}
@@ -95,9 +95,10 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 
 // ─── Google ──────────────────────────────────────────────────────────────────
 
-// Google 모델은 고정 목록 사용 (ListModels API 인증 필요)
+// Google models use a fixed list (ListModels API requires authentication)
 func fetchGoogle() []Model {
 	return []Model{
+		{ID: "gemini-3.1-pro-preview",        Name: "Gemini 3.1 Pro Preview",        Service: "google", Context: 1048576},
 		{ID: "gemini-2.5-pro",                Name: "Gemini 2.5 Pro",                Service: "google", Context: 1048576},
 		{ID: "gemini-2.5-flash",              Name: "Gemini 2.5 Flash",              Service: "google", Context: 1048576},
 		{ID: "gemini-2.5-flash-8b",           Name: "Gemini 2.5 Flash 8B",           Service: "google", Context: 1048576},
@@ -167,14 +168,14 @@ type ollamaTagsResp struct {
 	} `json:"models"`
 }
 
-// FetchOllama: Ollama 서버에서 모델 목록 자동 조회
-// ollamaURL 이 빈 문자열이면 일반적인 주소들을 순서대로 시도
+// FetchOllama: auto-fetch model list from Ollama server
+// if ollamaURL is empty, tries common addresses in order
 func fetchOllama(ollamaURL string) []Model {
 	candidates := []string{}
 	if ollamaURL != "" {
 		candidates = append(candidates, strings.TrimRight(ollamaURL, "/"))
 	}
-	// 자동 탐지 후보
+	// auto-detection candidates
 	candidates = append(candidates,
 		"http://localhost:11434",
 		"http://127.0.0.1:11434",
@@ -187,7 +188,7 @@ func fetchOllama(ollamaURL string) []Model {
 			return models
 		}
 	}
-	// Ollama 서버 미응답 — 추천 모델 목록으로 폴백
+	// Ollama server not responding — fallback to recommended model list
 	return OllamaRecommended()
 }
 
@@ -215,12 +216,12 @@ func tryFetchOllama(client *http.Client, base string) ([]Model, error) {
 	return out, nil
 }
 
-// NeedsRefresh: TTL이 만료됐거나 한 번도 갱신되지 않았으면 true
+// NeedsRefresh: returns true if TTL has expired or never refreshed
 func (r *Registry) NeedsRefresh() bool {
 	return r.updatedAt.IsZero() || time.Since(r.updatedAt) >= r.ttl
 }
 
-// Search: 모델 ID·이름에서 query(대소문자 무시) 포함 여부로 필터링
+// Search: filter models by whether model ID or name contains query (case-insensitive)
 func (r *Registry) Search(query string) []Model {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
@@ -236,7 +237,7 @@ func (r *Registry) Search(query string) []Model {
 	return out
 }
 
-// FetchOllamaPublic: 설정 없이도 Ollama 목록 조회 (초보자용 setup wizard)
+// FetchOllamaPublic: fetch Ollama list without configuration (for beginner setup wizard)
 func FetchOllamaPublic(ollamaURL string) ([]Model, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	base := strings.TrimRight(ollamaURL, "/")
@@ -313,9 +314,9 @@ func fetchGitHubCopilot() []Model {
 	}
 }
 
-// ─── OpenAI-compatible (LM Studio / vLLM / 커스텀) ──────────────────────────
+// ─── OpenAI-compatible (LM Studio / vLLM / custom) ───────────────────────────
 
-// fetchOpenAICompat: OpenAI /v1/models 호환 엔드포인트에서 모델 목록 조회
+// fetchOpenAICompat: fetch model list from OpenAI /v1/models compatible endpoint
 func fetchOpenAICompat(service, primaryURL, fallbackURL string) []Model {
 	candidates := []string{}
 	if primaryURL != "" {
@@ -332,7 +333,7 @@ func fetchOpenAICompat(service, primaryURL, fallbackURL string) []Model {
 			return models
 		}
 	}
-	// 연결 실패 시 서비스별 폴백
+	// fallback per service on connection failure
 	return compatFallback(service)
 }
 
@@ -375,11 +376,11 @@ func compatFallback(service string) []Model {
 	}
 }
 
-// OllamaRecommended: OpenClaw 3.11 기준 로컬 추천 Ollama 모델 목록
-// (Ollama 서버 미응답 시 UI 힌트용)
+// OllamaRecommended: local recommended Ollama model list based on OpenClaw 3.11
+// (used as UI hints when Ollama server is not responding)
 func OllamaRecommended() []Model {
 	return []Model{
-		{ID: "glm-4.7-flash",   Name: "GLM-4.7 Flash (추천)",   Service: "ollama"},
+		{ID: "glm-4.7-flash",   Name: "GLM-4.7 Flash (recommended)",   Service: "ollama"},
 		{ID: "qwen3.5:35b",     Name: "Qwen3.5 35B",            Service: "ollama"},
 		{ID: "qwen2.5:7b",      Name: "Qwen2.5 7B",             Service: "ollama"},
 		{ID: "llama3.3:70b",    Name: "Llama 3.3 70B",          Service: "ollama"},
@@ -389,7 +390,7 @@ func OllamaRecommended() []Model {
 	}
 }
 
-// FetchLocalModels: 로컬 서버에서 모델 목록 조회 (UI 자동 감지용)
+// FetchLocalModels: fetch model list from local server (for UI auto-detection)
 func FetchLocalModels(service, serverURL string) ([]Model, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	base := strings.TrimRight(serverURL, "/")

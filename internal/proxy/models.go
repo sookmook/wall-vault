@@ -1,8 +1,12 @@
 package proxy
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
 
-// ─── 현재 설정 ────────────────────────────────────────────────────────────────
+// ─── Current Config ───────────────────────────────────────────────────────────
 
 type RuntimeConfig struct {
 	Service   string
@@ -13,7 +17,7 @@ type RuntimeConfig struct {
 	UpdatedAt time.Time
 }
 
-// ─── Gemini 요청/응답 구조 ───────────────────────────────────────────────────
+// ─── Gemini Request/Response Structures ──────────────────────────────────────
 
 type GeminiRequest struct {
 	Contents         []GeminiContent    `json:"contents"`
@@ -73,7 +77,7 @@ type GeminiError struct {
 	Status  string `json:"status"`
 }
 
-// ─── OpenAI 요청/응답 구조 ───────────────────────────────────────────────────
+// ─── OpenAI Request/Response Structures ──────────────────────────────────────
 
 type OpenAIRequest struct {
 	Model       string          `json:"model"`
@@ -88,6 +92,48 @@ type OpenAIRequest struct {
 type OpenAIMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+// UnmarshalJSON handles content as either a string or an array of content parts.
+// OpenAI spec allows both; many clients (including OpenClaw) use the array form.
+func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	m.Role = raw.Role
+	m.Content = rawContentToString(raw.Content)
+	return nil
+}
+
+// rawContentToString converts OpenAI content (string or parts array) to plain text.
+func rawContentToString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	// string form: "hello"
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	// array form: [{"type":"text","text":"hello"}, ...]
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(raw, &parts) == nil {
+		var sb strings.Builder
+		for _, p := range parts {
+			if p.Type == "text" {
+				sb.WriteString(p.Text)
+			}
+		}
+		return sb.String()
+	}
+	return string(raw)
 }
 
 type OpenAIResponse struct {
@@ -115,7 +161,7 @@ type OpenAIError struct {
 	Code    string `json:"code,omitempty"`
 }
 
-// ─── Ollama 요청/응답 구조 ───────────────────────────────────────────────────
+// ─── Ollama Request/Response Structures ──────────────────────────────────────
 
 type OllamaRequest struct {
 	Model    string          `json:"model"`

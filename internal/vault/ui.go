@@ -36,7 +36,8 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 <body>
 <div class="topbar">
   <div class="topbar-brand">
-    <span class="topbar-title">🔐 wall-vault</span>
+    <svg class="topbar-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <span class="topbar-title">wall-vault</span>
   </div>
   <div class="topbar-controls">
     <div class="dropdown">
@@ -64,7 +65,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
   </div>
 </div>
 <div class="header">
-  <img src="/logo" alt="wall-vault" class="header-logo" onerror="this.style.display='none'">
+  <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></svg>
   <h1 id="page-title" data-i18n="title">AI 프록시 키 금고 대시보드</h1>
 </div>
 <div class="grid">`)
@@ -142,10 +143,10 @@ func buildCSS(t *theme.Theme) string {
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',sans-serif;padding:0;min-height:100vh;font-size:14px}
 a{color:var(--accent);text-decoration:none}
 /* ── Topbar ── */
-.topbar{position:sticky;top:0;z-index:500;display:flex;justify-content:space-between;align-items:center;padding:.45rem 1.4rem;background:var(--surface);border-bottom:1px solid var(--border);gap:.8rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.topbar{position:sticky;top:0;z-index:500;display:flex;justify-content:space-between;align-items:center;padding:.5rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);gap:.8rem;box-shadow:0 1px 5px rgba(0,0,0,.08)}
 .topbar-brand{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-.topbar-logo{height:24px;object-fit:contain}
-.topbar-title{color:var(--accent);font-size:.88rem;font-weight:700;letter-spacing:1px;white-space:nowrap}
+.topbar-logo{height:22px;width:22px;flex-shrink:0;color:var(--accent)}
+.topbar-title{color:var(--accent);font-size:.92rem;font-weight:800;letter-spacing:1.2px;white-space:nowrap}
 .topbar-controls{display:flex;align-items:center;gap:.5rem}
 /* ── Dropdown ── */
 .dropdown{position:relative}
@@ -157,26 +158,38 @@ a{color:var(--accent);text-decoration:none}
 .dd-item:hover{background:var(--bg);color:var(--text)}
 .dd-item.active{color:var(--accent);font-weight:600}
 /* ── Header (슬림) ── */
-.header{display:flex;align-items:center;justify-content:center;gap:.55rem;padding:.45rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
-.header-logo{height:22px;object-fit:contain;flex-shrink:0;display:block;opacity:.8}
-.header h1{color:var(--text-muted);font-size:.82rem;font-weight:500;letter-spacing:.3px;white-space:nowrap}
+.header{display:flex;align-items:center;justify-content:center;gap:.7rem;padding:.55rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
+.header-logo{height:20px;width:20px;flex-shrink:0;display:block;color:var(--accent)}
+.header h1{color:var(--text-muted);font-size:.88rem;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 /* ── Badge ── */
 .badge{display:inline-block;background:var(--surface);border:1px solid var(--green);color:var(--green);padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.3px}
 /* ── Grid & Cards ── */
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:1rem;padding:1.2rem 1.4rem}
-.card{position:relative;z-index:2;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.2rem;box-shadow:0 1px 4px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.02)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem;margin-bottom:1.2rem;padding:1.1rem 1.5rem}
+.card{position:relative;z-index:2;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:10px;padding:1rem 1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.card-hdr h2{color:var(--accent);font-size:.82rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;gap:.4rem}
+.card-hdr h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400;text-transform:none;letter-spacing:0}
 .card h2{color:var(--accent);font-size:.88rem;font-weight:700;margin-bottom:.75rem;padding-bottom:.55rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;letter-spacing:.2px}
 .card h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}
 /* ── 에이전트 섹션 (전체 폭) ── */
-.agents-section{grid-column:1/-1;position:relative;z-index:2;border-bottom:1px solid var(--border);padding-bottom:1.2rem;margin-bottom:.2rem}
+.agents-section{grid-column:1/-1;position:relative;z-index:2;padding-bottom:1.2rem;margin-bottom:.6rem;border-bottom:2px solid var(--border)}
+.section-banner{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:10px;padding:.65rem 1.1rem;margin-bottom:.8rem;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.section-banner h2{font-size:.82rem;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:.4rem}
+.section-banner h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400;text-transform:none;letter-spacing:0}
 .section-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
 .section-hdr h2{color:var(--accent);font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:.4rem;letter-spacing:.2px;flex:1}
 .section-hdr h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}
-.agents-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.8rem}
 /* ── 에이전트 개별 카드 ── */
-.agent-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:.45rem}
-.agent-card.agent-disabled{opacity:.4;filter:grayscale(.6)}
+.agent-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.4rem;transition:box-shadow .18s,transform .18s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.agent-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px)}
+.agent-card.agent-disabled{border-left-color:var(--text-muted);opacity:.5}
+.agent-card.ac-live{border-left-color:var(--green)}
+.agent-card.ac-delay{border-left-color:var(--yellow)}
+.agent-card.ac-offline{border-left-color:var(--red)}
+.agent-card.ac-noconn{border-left-color:var(--text-muted)}
 .ac-top{display:flex;align-items:flex-start;gap:.5rem}
+.ac-type-icon{font-size:3.4rem;line-height:1;flex-shrink:0;margin-top:-.1rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.18))}
 .ac-info{flex:1;min-width:0}
 .ac-btns{display:flex;gap:.25rem;flex-shrink:0;margin-top:.05rem}
 /* ── 기본 유틸 ── */
@@ -201,7 +214,7 @@ a{color:var(--accent);text-decoration:none}
 .dot-red{background:var(--red);box-shadow:0 0 4px var(--red)}
 .dot-gray{background:var(--border)}
 /* ── 에이전트 카드 (레거시 호환 — agent-card에서 사용) ── */
-.agent-name{font-size:.84rem;color:var(--text);font-weight:600;margin-bottom:.06rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-name{font-size:.88rem;color:var(--text);font-weight:700;margin-bottom:.08rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .agent-live{font-size:.72rem;color:var(--green);margin-bottom:.3rem;font-weight:500}
 .agent-type-badge{display:inline-block;font-size:.62rem;padding:.02rem .28rem;border-radius:4px;background:var(--accent);color:#fff;opacity:.75;margin-left:.35rem;vertical-align:middle;font-weight:600;letter-spacing:.3px}
 .agent-desc{font-size:.72rem;color:var(--text-muted);margin:.1rem 0 .15rem;font-style:italic}
@@ -212,8 +225,13 @@ a{color:var(--accent);text-decoration:none}
 .svc-item:last-child{border-bottom:none}
 /* ── SSE 인디케이터 ── */
 .sse-indicator{position:fixed;bottom:.8rem;right:.8rem;font-size:.7rem;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);padding:.22rem .6rem;border-radius:6px;z-index:400;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-/* ── 모델 폼 (카드 내 수직 배치) ── */
-.model-form{display:flex;flex-direction:column;gap:.3rem;border-top:1px solid var(--border);padding-top:.5rem;margin-top:.1rem}
+/* ── 모델 폼 (카드 내 수직 배치, 기본 숨김) ── */
+.model-form{display:none;flex-direction:column;gap:.3rem;border-top:1px solid var(--border);padding-top:.5rem;margin-top:.2rem}
+.model-form.open{display:flex}
+/* ── 에이전트 카드 액션 버튼 행 ── */
+.ac-actions{display:flex;gap:.4rem;margin-top:.45rem}
+.btn-action-wide{flex:1;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:.3rem .5rem;border-radius:6px;cursor:pointer;font-size:.73rem;font-family:inherit;transition:all .18s;white-space:nowrap}
+.btn-action-wide:hover{color:var(--accent);border-color:var(--accent)}
 .model-form-row{display:flex;gap:.3rem;align-items:center}
 .model-form select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.26rem .4rem;border-radius:6px;font-size:.75rem;font-family:inherit;flex:1;min-width:0;cursor:pointer}
 .model-form input{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:.26rem .4rem;border-radius:6px;font-size:.75rem;font-family:inherit;flex:1;min-width:0}
@@ -237,8 +255,8 @@ a{color:var(--accent);text-decoration:none}
 .atb-gemini{background:#1a73e8}
 .atb-custom{background:var(--text-muted)}
 /* ── 에이전트 상태 행 ── */
-.agent-status{font-size:.72rem;margin:.18rem 0 .3rem;display:flex;align-items:flex-start;gap:.45rem;flex-wrap:wrap}
-.status-live{color:var(--green);font-weight:500}
+.agent-status{font-size:.74rem;margin:.2rem 0 .3rem;display:flex;align-items:flex-start;gap:.5rem;flex-wrap:wrap}
+.status-live{color:var(--green);font-weight:600}
 .status-delay{color:var(--yellow)}
 .status-offline{color:var(--red)}
 .status-muted,.status-dc{color:var(--text-muted)}
@@ -1258,6 +1276,13 @@ function deleteClient(id) {
   });
 }
 
+// 모델 폼 토글 (에이전트 카드)
+function toggleModelForm(clientId) {
+  const form = document.querySelector('.model-form[data-client="'+clientId+'"]');
+  if (!form) return;
+  form.classList.toggle('open');
+}
+
 // 모델 변경 (에이전트 카드 인라인) — reload 없이 인라인 피드백
 function changeModel(clientId) {
   const svc = document.getElementById('svc-'+clientId).value;
@@ -1355,9 +1380,9 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 	}
 
 	var sb strings.Builder
-	// ── 섹션 헤더 (카드 없이 섹션 전체 폭) ──
+	// ── 섹션 배너 (전체 폭) ──
 	sb.WriteString(fmt.Sprintf(
-		`<div class="agents-section"><div class="section-hdr"><h2><span data-i18n="agents">🤖 에이전트</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span></h2><button class="btn-sm" onclick="openAddClient()" data-i18n="add">+ 추가</button></div>`,
+		`<div class="agents-section"><div class="section-banner"><h2><span data-i18n="agents">🤖 에이전트</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span></h2><button class="btn-sm" onclick="openAddClient()" data-i18n="add">+ 추가</button></div>`,
 		len(clients), len(clients),
 	))
 	if len(clients) == 0 {
@@ -1372,6 +1397,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 
 		// ── 연결 상태 칩 ──
 		dotClass := "dot-gray"
+		cardStatusCls := "ac-noconn"
 		var statusChip string
 		if !c.Enabled {
 			statusChip = `<div class="agent-status"><span class="status-muted" data-i18n="st_disabled">— 비활성화됨</span></div>`
@@ -1404,18 +1430,21 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			switch {
 			case age < 3*time.Minute:
 				dotClass = "dot-green"
+				cardStatusCls = "ac-live"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-live"><span data-i18n="st_running">● 실행 중</span> — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%.0f초 전</span></span> <span class="status-version">%s</span></div>`,
 					p.Service, trimServicePrefix(p.Service, p.Model), ageSec, age.Seconds(), p.Version,
 				)
 			case age < 10*time.Minute:
 				dotClass = "dot-yellow"
+				cardStatusCls = "ac-delay"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-delay"><span data-i18n="st_delayed">◑ 지연</span> <span class="bot-ago" data-ago-sec="%d">%.0f분 전</span> — %s / %s</span></div>`,
 					ageSec, age.Minutes(), p.Service, trimServicePrefix(p.Service, p.Model),
 				)
 			default:
 				dotClass = "dot-red"
+				cardStatusCls = "ac-offline"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-offline"><span data-i18n="st_offline">✕ 오프라인</span> (<span class="bot-ago" data-ago-sec="%d">%.0f분 전</span>)</span></div>`,
 					ageSec, age.Minutes(),
@@ -1499,13 +1528,14 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 
 		// ── 개별 에이전트 카드 조립 ──
 		var item strings.Builder
-		item.WriteString(fmt.Sprintf(`<div class="agent-card%s"%s>`, disabledClass, uptimeAttr))
+		item.WriteString(fmt.Sprintf(`<div class="agent-card %s%s"%s>`, cardStatusCls, disabledClass, uptimeAttr))
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
 		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
+		item.WriteString(fmt.Sprintf(`<div class="ac-type-icon">%s</div>`, typeIcon))
 		item.WriteString(`<div class="ac-info">`)
-		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s %s <span style="color:var(--text-muted);font-size:.7rem">(%s)</span>%s</div>`,
-			typeIcon, displayName, c.ID, typeBadge))
+		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s <span style="color:var(--text-muted);font-size:.7rem">(%s)</span>%s</div>`,
+			displayName, c.ID, typeBadge))
 		item.WriteString(statusChip)
 		if metaLines != "" {
 			item.WriteString(metaLines)
@@ -1516,8 +1546,15 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		item.WriteString(fmt.Sprintf(`<button class="btn-action btn-action-del" onclick="deleteClient('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, c.ID))
 		item.WriteString(`</div>`) // ac-btns
 		item.WriteString(`</div>`) // ac-top
-		// 모델 폼 (카드 하단, 구분선 위)
-		item.WriteString(`<div class="model-form">`)
+		// 하단 액션 버튼 행 (모델 변경 토글 + 설정 복사)
+		item.WriteString(`<div class="ac-actions">`)
+		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide" onclick="toggleModelForm('%s')">⚙ 모델 변경</button>`, c.ID))
+		// 설정 복사 버튼 (btn-action-wide 스타일 적용)
+		cfgWide := strings.ReplaceAll(cfgButton, `class="btn-cfg`, `class="btn-action-wide btn-cfg`)
+		item.WriteString(cfgWide)
+		item.WriteString(`</div>`) // ac-actions
+		// 모델 폼 (기본 숨김, 토글로 표시)
+		item.WriteString(fmt.Sprintf(`<div class="model-form" data-client="%s">`, c.ID))
 		item.WriteString(fmt.Sprintf(`<div class="model-form-row"><select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>`,
 			c.ID, c.ID, c.ID, buildServiceOptions(services, c.DefaultService)))
 		item.WriteString(fmt.Sprintf(`<select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')"><option value="" data-i18n="sel_model">— 모델 선택 —</option></select></div>`,
@@ -1526,8 +1563,6 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			c.ID, c.DefaultModel, c.ID))
 		item.WriteString(fmt.Sprintf(`<button class="btn btn-save" onclick="changeModel('%s')" data-i18n="apply">💾 저장</button></div>`, c.ID))
 		item.WriteString(`</div>`) // model-form
-		// 설정 복사 버튼 (카드 맨 아래, 전체 폭)
-		item.WriteString(fmt.Sprintf(`<div class="ac-cfg">%s</div>`, cfgButton))
 		item.WriteString(`</div>`) // agent-card
 		sb.WriteString(item.String())
 	}
@@ -1540,7 +1575,7 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig) string {
 	_ = services // 향후 서비스 그룹 표시 확장 가능
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(
-		`<div class="card"><h2><span data-i18n="keys">🔑 API 키</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span><button class="btn-sm" onclick="openAddKey()" data-i18n="add">+ 추가</button></h2>`,
+		`<div class="card"><div class="card-hdr"><h2><span data-i18n="keys">🔑 API 키</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span></h2><button class="btn-sm" onclick="openAddKey()" data-i18n="add">+ 추가</button></div>`,
 		len(keys), len(keys),
 	))
 
@@ -1633,7 +1668,7 @@ func sel(b bool) string {
 func buildServicesCard(services []*ServiceConfig) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(
-		`<div class="card"><h2><span data-i18n="services">⚙️ 서비스</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span><button class="btn-sm" onclick="openAddService()" data-i18n="add">+ 추가</button></h2>`,
+		`<div class="card"><div class="card-hdr"><h2><span data-i18n="services">⚙️ 서비스</span> <span class="count" data-count="%d" data-i18n-cnt="">%d개</span></h2><button class="btn-sm" onclick="openAddService()" data-i18n="add">+ 추가</button></div>`,
 		len(services), len(services),
 	))
 

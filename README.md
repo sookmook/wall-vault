@@ -467,6 +467,40 @@ hooks:
 }
 ```
 
+### openclaw.json 프로바이더 설정
+
+wall-vault를 OpenClaw의 커스텀 프로바이더로 등록하면 에이전트 대시보드의 **🐾 버튼**으로 설정 스니펫을 자동 복사할 수 있습니다.
+
+```json5
+// ~/.openclaw/openclaw.json
+{
+  models: {
+    providers: {
+      "wall-vault": {
+        baseUrl: "http://localhost:56244/v1",
+        apiKey: "YOUR_AGENT_TOKEN",
+        api: "openai-completions",
+        models: [
+          { id: "wall-vault/gemini-2.5-flash" },
+          { id: "wall-vault/gemini-2.5-pro" },
+          { id: "wall-vault/gemini-2.0-flash" }
+        ]
+      }
+    }
+  },
+  agents: {
+    defaults: {
+      model: { primary: "wall-vault/gemini-2.5-flash" }
+    }
+  }
+}
+```
+
+- `baseUrl`: wall-vault 프록시 주소 (포트 56244)
+- `apiKey`: 에이전트 카드의 **토큰** 값
+- 모델 ID 앞에 `wall-vault/` 접두어를 붙여 자동 라우팅
+- `wall-vault/gemini-*` → Google Gemini, `wall-vault/gpt-*` → OpenAI, `wall-vault/claude-*` → Anthropic
+
 ### SSE 자동 동기화
 
 OpenClaw 에이전트는 wall-vault SSE 스트림을 구독해 모델·서비스 변경을 **1–3초** 내에 자동 반영합니다. `openclaw.json` 설정 파일도 자동 업데이트되므로 에이전트를 재시작할 필요가 없습니다.
@@ -668,6 +702,40 @@ Event payload:
   "data": { "model": "gemini-2.5-flash", "service": "google" }
 }
 ```
+
+### openclaw.json Provider Config
+
+Register wall-vault as a custom provider in OpenClaw. Use the **🐾 button** on any agent card to copy the config snippet automatically.
+
+```json5
+// ~/.openclaw/openclaw.json
+{
+  models: {
+    providers: {
+      "wall-vault": {
+        baseUrl: "http://localhost:56244/v1",
+        apiKey: "YOUR_AGENT_TOKEN",
+        api: "openai-completions",
+        models: [
+          { id: "wall-vault/gemini-2.5-flash" },
+          { id: "wall-vault/gemini-2.5-pro" },
+          { id: "wall-vault/gemini-2.0-flash" }
+        ]
+      }
+    }
+  },
+  agents: {
+    defaults: {
+      model: { primary: "wall-vault/gemini-2.5-flash" }
+    }
+  }
+}
+```
+
+- `baseUrl`: wall-vault proxy address (port 56244)
+- `apiKey`: the **token** value from the agent card
+- Prefix model IDs with `wall-vault/` for automatic routing
+- `wall-vault/gemini-*` → Google Gemini, `wall-vault/gpt-*` → OpenAI, `wall-vault/claude-*` → Anthropic
 
 ### SSE Auto-Sync
 

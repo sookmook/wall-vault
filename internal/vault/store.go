@@ -12,13 +12,15 @@ import (
 )
 
 // defaultServiceList: 기본 서비스 목록 (vault.json에 없으면 자동 seed)
+// 클라우드 서비스는 키 유무로 활성화 결정 → 모두 false로 시작
+// 로컬 서비스는 연결 검사 후 결정 → 모두 false로 시작
 var defaultServiceList = []*ServiceConfig{
-	{ID: "google",         Name: "Google Gemini",     Enabled: true},
-	{ID: "openai",         Name: "OpenAI",            Enabled: true},
-	{ID: "anthropic",      Name: "Anthropic",         Enabled: true},
-	{ID: "openrouter",     Name: "OpenRouter",        Enabled: true},
-	{ID: "github-copilot", Name: "GitHub Copilot",    Enabled: true},
-	{ID: "ollama",         Name: "Ollama (Local)",    Enabled: true},
+	{ID: "google",         Name: "Google Gemini",     Enabled: false},
+	{ID: "openai",         Name: "OpenAI",            Enabled: false},
+	{ID: "anthropic",      Name: "Anthropic",         Enabled: false},
+	{ID: "openrouter",     Name: "OpenRouter",        Enabled: false},
+	{ID: "github-copilot", Name: "GitHub Copilot",    Enabled: false},
+	{ID: "ollama",         Name: "Ollama (Local)",    Enabled: false},
 	{ID: "lmstudio",       Name: "LM Studio (Local)", Enabled: false},
 	{ID: "vllm",           Name: "vLLM (Local)",      Enabled: false},
 }
@@ -30,6 +32,7 @@ type Store struct {
 	clients    []*Client
 	proxies    map[string]*ProxyStatus
 	services   []*ServiceConfig
+	settings   StoreSettings
 	masterPass string
 	dataDir    string
 	dataFile   string
@@ -64,6 +67,9 @@ func (s *Store) load() error {
 	}
 	s.keys = snap.Keys
 	s.clients = snap.Clients
+	if snap.Settings != nil {
+		s.settings = *snap.Settings
+	}
 	// 서비스 목록 로드 + 기본 서비스 seed
 	s.services = snap.Services
 	if len(s.services) == 0 {
@@ -115,10 +121,42 @@ func (s *Store) load() error {
 			s.proxies[p.ClientID] = p
 		}
 	}
+	// 클라우드 서비스 활성화 상태를 키 유무로 조정
+	// (env var 키 주입 또는 이미 키가 있는 경우 자동 반영)
+	if s.reconcileCloudServices() {
+		needsSave = true
+	}
 	if needsSave {
 		_ = s.save()
 	}
 	return nil
+}
+
+// ReconcileCloudServices: 외부에서 호출 가능한 버전 (락 획득 후 처리).
+func (s *Store) ReconcileCloudServices() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reconcileCloudServices()
+}
+
+// reconcileCloudServices: 락이 이미 잡힌 상태에서 호출 (load() 내부 또는 ReconcileCloudServices).
+func (s *Store) reconcileCloudServices() bool {
+	keyCounts := map[string]int{}
+	for _, k := range s.keys {
+		keyCounts[k.Service]++
+	}
+	changed := false
+	for _, sv := range s.services {
+		if sv.IsLocal() || sv.Custom {
+			continue // 로컬/커스텀은 건드리지 않음 (사용자 또는 probe 결정)
+		}
+		want := keyCounts[sv.ID] > 0
+		if sv.Enabled != want {
+			sv.Enabled = want
+			changed = true
+		}
+	}
+	return changed
 }
 
 func (s *Store) save() error {
@@ -126,11 +164,13 @@ func (s *Store) save() error {
 	for _, p := range s.proxies {
 		proxies = append(proxies, p)
 	}
+	settings := s.settings
 	snap := storeData{
 		Keys:     s.keys,
 		Clients:  s.clients,
 		Proxies:  proxies,
 		Services: s.services,
+		Settings: &settings,
 	}
 	data, err := json.MarshalIndent(snap, "", "  ")
 	if err != nil {
@@ -442,6 +482,28 @@ func (s *Store) ListProxies() []*ProxyStatus {
 		result = append(result, p)
 	}
 	return result
+}
+
+// ─── UI 설정 (테마·언어) ──────────────────────────────────────────────────────
+
+func (s *Store) GetSettings() StoreSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings
+}
+
+func (s *Store) SetTheme(theme string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings.Theme = theme
+	return s.save()
+}
+
+func (s *Store) SetLang(lang string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings.Lang = lang
+	return s.save()
 }
 
 // ─── 유틸 ────────────────────────────────────────────────────────────────────

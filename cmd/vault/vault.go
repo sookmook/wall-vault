@@ -51,8 +51,6 @@ func runVault(cfg *config.Config, cfgPath string) {
 	}
 	if cfgPath != "" {
 		srv.SetConfigPath(cfgPath)
-	} else {
-		srv.SetConfigPath("wall-vault.yaml")
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.Vault.Host, cfg.Vault.Port)

@@ -98,8 +98,10 @@ Single Go binary. One bot or a dozen — fully covered.
 | **Model Registry** | 340+ OpenRouter models + dynamic local model discovery |
 | **Local AI Support** | Ollama / LM Studio / vLLM auto-detection + manual URL |
 | **Service Management** | Add/edit/delete services from UI, custom service support |
+| **Service Auto-check** | Dashboard load / key change → cloud services auto-enable/disable by key count; local services probed for connectivity |
 | **Agent Management** | Per-agent service / model / IP whitelist / workdir |
 | **Agent Status** | 4-state: 🟢Online / 🟡Delayed / 🔴Offline / ⚫Disconnected |
+| **Bidirectional Model Sync** | TUI model change → vault; vault change → TUI. All sources stay in sync. |
 | **Per-type Config Copy** | 🦞 openclaw / 🟠 claude-code / ⌨ cursor / 💻 vscode — one-click config snippet |
 | **Doctor** | Health check, auto-recovery, systemd/launchd/NSSM registration |
 | **[17 Languages](#languages)** | Drop a JSON file in `locales/` — zero code changes needed |
@@ -313,8 +315,8 @@ Full docs: [docs/API.md](docs/API.md)
 | `GET /health` | Health check |
 | `GET /status` | Status |
 | `GET /api/models` | Model list |
-| `PUT /api/config/model` | Change model |
-| `POST /reload` | Reload config |
+| `PUT /api/config/model` | Change model (write-through to vault) |
+| `POST /reload` | Reload config from vault |
 
 ### Key Vault (`:56243`)
 
@@ -325,12 +327,13 @@ Full docs: [docs/API.md](docs/API.md)
 | `GET /api/events` | — | SSE stream |
 | `GET /api/keys` | Client token | Decrypted key list (IP whitelist applied) |
 | `POST /api/heartbeat` | Client token | Report proxy status |
+| `PUT /api/config` | Client token | **Bidirectional sync** — update own service/model, triggers SSE broadcast |
 | `GET /admin/keys` | Admin | Key list |
 | `POST /admin/keys` | Admin | Add key |
 | `DELETE /admin/keys/{id}` | Admin | Delete key |
 | `GET /admin/clients` | Admin | Client list |
 | `POST /admin/clients` | Admin | Add client |
-| `PUT /admin/clients/{id}` | Admin | Update client |
+| `PUT /admin/clients/{id}` | Admin | Update client + SSE broadcast |
 | `DELETE /admin/clients/{id}` | Admin | Delete client |
 | `GET /admin/services` | Admin | Service list |
 | `POST /admin/services` | Admin | Add custom service |
@@ -366,6 +369,25 @@ WV_VAULT_TOKEN=my-bot-token \
 ```
 
 Change a setting in the vault → all bots update within 1–3 seconds via SSE. **No restart required.**
+
+#### Bidirectional Model Sync
+
+Model changes are fully bidirectional:
+
+```
+TUI (OpenClaw) changes model
+  → PUT /api/config/model on proxy
+  → proxy writes through to vault (PUT /api/config)
+  → vault broadcasts SSE config_change
+  → dashboard agent card updates immediately
+  → all other proxies for that client reflect the change
+
+Dashboard changes model
+  → PUT /admin/clients/{id} on vault
+  → vault broadcasts SSE config_change
+  → proxy receives SSE → updates local state
+  → TUI footer updated via Unix socket event
+```
 
 ---
 

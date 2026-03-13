@@ -636,6 +636,39 @@ function _clearClientForm(prefix) {
   if(ms) ms.innerHTML='<option value="">— 모델 선택 또는 직접 입력 —</option>';
 }
 
+// ── OpenClaw 설정 복사 ──
+function copyOpenClawConfig(clientId) {
+  const token = getAdminToken(); if(!token) return;
+  fetch('/admin/clients/'+clientId, {headers:{'Authorization':'Bearer '+token}})
+  .then(r=>r.json()).then(c=>{
+    if(c.error){alert(T('err')+c.error);return;}
+    const svc = c.default_service||'google';
+    const mdl = c.default_model||'gemini-2.5-flash';
+    const proxyPort = location.port==='56243' ? '56244' : '56244';
+    const baseUrl = location.protocol+'//'+location.hostname+':'+proxyPort+'/v1';
+    const tok = c.token||'YOUR_AGENT_TOKEN';
+    const cfg = '// Add to ~/.openclaw/openclaw.json\n'
+      + '{\n'
+      + '  models: {\n'
+      + '    providers: {\n'
+      + '      "wall-vault": {\n'
+      + '        baseUrl: "' + baseUrl + '",\n'
+      + '        apiKey: "' + tok + '",\n'
+      + '        api: "openai-completions",\n'
+      + '        models: [ { id: "wall-vault/' + mdl + '" } ]\n'
+      + '      }\n'
+      + '    }\n'
+      + '  },\n'
+      + '  agents: { defaults: { model: { primary: "wall-vault/' + mdl + '" } } }\n'
+      + '}';
+    navigator.clipboard.writeText(cfg).then(()=>{
+      alert('OpenClaw 설정이 클립보드에 복사되었습니다.\n~/.openclaw/openclaw.json에 붙여넣으세요.');
+    }).catch(()=>{
+      prompt('아래 내용을 복사하세요:', cfg);
+    });
+  }).catch(e=>alert(T('err')+e));
+}
+
 // ── 에이전트 추가 모달 ──
 function openAddClient() {
   _clearClientForm('ac');
@@ -974,6 +1007,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
     </div>
   </div>
   <div style="display:flex;flex-direction:row;gap:.35rem;flex-shrink:0;align-items:flex-start">
+    <button class="btn-action" onclick="copyOpenClawConfig('%s')" title="OpenClaw 설정 복사">🐾</button>
     <button class="btn-action" onclick="openEditClient('%s')" title="편집">✎</button>
     <button class="btn-action btn-action-del" onclick="deleteClient('%s')" title="삭제">✕</button>
   </div>
@@ -988,7 +1022,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			c.ID, c.DefaultModel, c.ID,
 			c.ID,
 			c.ID,
-			c.ID,
+			c.ID, c.ID,
 		))
 	}
 	sb.WriteString(`</div>`)

@@ -338,6 +338,10 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		mdl = oaiReq.Model
 	}
 
+	// OpenClaw sends models as "provider/model-id" (e.g. "wall-vault/gemini-2.5-flash",
+	// "anthropic/claude-opus-4-6"). Parse and route accordingly.
+	svc, mdl = parseProviderModel(svc, mdl)
+
 	geminiReq := OpenAIToGemini(&oaiReq)
 	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
 	if err != nil {
@@ -533,6 +537,47 @@ func (s *Server) getKey(service string) (*localKey, string, error) {
 }
 
 // ─── 유틸 ────────────────────────────────────────────────────────────────────
+
+// parseProviderModel handles OpenClaw's "provider/model-id" format.
+// Known service prefixes are mapped directly; "wall-vault/" prefix is stripped
+// and the service is auto-detected from the model ID.
+// OpenRouter-style paths (e.g. "meta-llama/llama-3.1-8b") are kept intact.
+func parseProviderModel(svc, mdl string) (string, string) {
+	if !strings.Contains(mdl, "/") {
+		return svc, mdl
+	}
+	parts := strings.SplitN(mdl, "/", 2)
+	prefix, bare := parts[0], parts[1]
+	switch prefix {
+	case "google":
+		return "google", bare
+	case "anthropic":
+		return "anthropic", bare
+	case "openai":
+		return "openai", bare
+	case "ollama":
+		return "ollama", bare
+	case "openrouter":
+		return "openrouter", bare
+	case "wall-vault":
+		// Our own provider prefix — auto-detect service from bare model ID
+		autoSvc := svc
+		switch {
+		case strings.HasPrefix(bare, "gemini-"):
+			autoSvc = "google"
+		case strings.HasPrefix(bare, "claude-"):
+			autoSvc = "anthropic"
+		case strings.HasPrefix(bare, "gpt-"),
+			bare == "o1", bare == "o1-mini",
+			strings.HasPrefix(bare, "o3"), strings.HasPrefix(bare, "o4"):
+			autoSvc = "openai"
+		}
+		return autoSvc, bare
+	default:
+		// OpenRouter-style "org/model" — keep full path for OpenRouter
+		return "openrouter", mdl
+	}
+}
 
 func extractModelFromPath(path string) string {
 	prefix := "/google/v1beta/models/"

@@ -168,28 +168,17 @@ func Run(_ []string) {
 	}
 }
 
-// selectLanguage: 세계 10대 언어 선택 프롬프트
+// selectLanguage: 지원 언어 선택 프롬프트 (locales/*.json 파일에서 자동 목록 생성)
 func selectLanguage() {
-	fmt.Println("언어 / Language / 语言 / Idioma / भाषा / اللغة / Idioma / Langue / Sprache / 言語:")
-	langs := []struct{ code, label string }{
-		{"ko", "한국어"},
-		{"en", "English"},
-		{"zh", "中文"},
-		{"es", "Español"},
-		{"hi", "हिन्दी"},
-		{"ar", "العربية"},
-		{"pt", "Português"},
-		{"fr", "Français"},
-		{"de", "Deutsch"},
-		{"ja", "日本語"},
-	}
-	for i, l := range langs {
-		fmt.Printf("  %2d) %s (%s)\n", i+1, l.label, l.code)
+	fmt.Println("언어 선택 / Select Language:")
+	supported := i18n.Supported
+	for idx, code := range supported {
+		fmt.Printf("  %2d) %s (%s)\n", idx+1, i18n.LangLabel(code), code)
 	}
 	// 현재 감지된 언어를 기본값으로
 	currentIdx := 1
-	for i, l := range langs {
-		if l.code == i18n.Lang() {
+	for i, code := range supported {
+		if code == i18n.Lang() {
 			currentIdx = i + 1
 			break
 		}
@@ -197,8 +186,8 @@ func selectLanguage() {
 	choice := ask(fmt.Sprintf("번호/number (현재 감지: %s)", i18n.Lang()), fmt.Sprintf("%d", currentIdx))
 	var n int
 	fmt.Sscanf(choice, "%d", &n)
-	if n >= 1 && n <= len(langs) {
-		i18n.SetLang(langs[n-1].code)
+	if n >= 1 && n <= len(supported) {
+		i18n.SetLang(supported[n-1])
 	}
 	cfg := config.Default()
 	cfg.Lang = i18n.Lang()

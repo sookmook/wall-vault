@@ -1,10 +1,12 @@
 package vault
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/sookmook/wall-vault/internal/i18n"
 	"github.com/sookmook/wall-vault/internal/theme"
 )
 
@@ -41,18 +43,12 @@ func buildDashboard(s *Server, t *theme.Theme) string {
       <button class="dd-btn" id="dd-btn-lang" onclick="toggleDd(event,'dd-lang')">`)
 	sb.WriteString(langLabel(s.cfg.Lang))
 	sb.WriteString(` ▾</button>
-      <div class="dd-menu" id="dd-lang">
-        <div class="dd-item" data-val="ko" onclick="setLang('ko')">🌏 한국어</div>
-        <div class="dd-item" data-val="en" onclick="setLang('en')">🌍 English</div>
-        <div class="dd-item" data-val="zh" onclick="setLang('zh')">🌏 中文</div>
-        <div class="dd-item" data-val="ja" onclick="setLang('ja')">🌏 日本語</div>
-        <div class="dd-item" data-val="es" onclick="setLang('es')">🌍 Español</div>
-        <div class="dd-item" data-val="hi" onclick="setLang('hi')">🌏 हिन्दी</div>
-        <div class="dd-item" data-val="ar" onclick="setLang('ar')">🌍 العربية</div>
-        <div class="dd-item" data-val="pt" onclick="setLang('pt')">🌍 Português</div>
-        <div class="dd-item" data-val="fr" onclick="setLang('fr')">🌍 Français</div>
-        <div class="dd-item" data-val="de" onclick="setLang('de')">🌍 Deutsch</div>
-      </div>
+      <div class="dd-menu" id="dd-lang">`)
+	for _, code := range i18n.Supported {
+		label := i18n.LangLabel(code)
+		sb.WriteString(fmt.Sprintf(`        <div class="dd-item" data-val=%q onclick="setLang(%q)">%s</div>`+"\n", code, code, label))
+	}
+	sb.WriteString(`      </div>
     </div>
     <div class="dropdown">
       <button class="dd-btn" id="dd-btn-theme" onclick="toggleDd(event,'dd-theme')">`)
@@ -75,15 +71,15 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 </div>
 <div class="grid">`)
 	sb.WriteString(agentCard)
-	sb.WriteString(keyCard)
 	sb.WriteString(svcCard)
+	sb.WriteString(keyCard)
 	sb.WriteString(buildAddClientModal(services))
 	sb.WriteString(buildAddKeyModal(services))
 	sb.WriteString(buildEditClientModal(services))
 	sb.WriteString(buildAddServiceModal())
 	sb.WriteString(`</div>
 <div class="footer">
-  wall-vault v0.1.3 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
+  wall-vault v0.1.4 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
   &nbsp;|&nbsp; <a href="https://sookmook.org/">sookmook.org</a>
   &nbsp;|&nbsp; <a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
   &nbsp;|&nbsp; ⏱ <span id="uptime"></span>
@@ -97,22 +93,44 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	return sb.String()
 }
 
-func langLabel(lang string) string {
-	m := map[string]string{
-		"ko": "🌏 한국어", "en": "🌍 English", "zh": "🌏 中文",
-		"es": "🌍 Español", "hi": "🌏 हिन्दी", "ar": "🌍 العربية",
-		"pt": "🌍 Português", "fr": "🌍 Français", "de": "🌍 Deutsch", "ja": "🌏 日本語",
+func langLabel(code string) string {
+	label := i18n.LangLabel(code)
+	if label != "" {
+		return label
 	}
-	if v, ok := m[lang]; ok {
-		return v
+	return i18n.LangLabel("ko")
+}
+
+// buildI18NJS: locales/*.json에서 JS I18N 및 LANG_LABELS 동적 생성
+func buildI18NJS() string {
+	var sb strings.Builder
+	sb.WriteString("// ── I18N ──\nconst I18N={\n")
+	allLangs := i18n.AllLangs()
+	for idx, code := range i18n.Supported {
+		m := allLangs[code]
+		data, _ := json.Marshal(m)
+		if idx < len(i18n.Supported)-1 {
+			sb.WriteString(code + ":" + string(data) + ",\n")
+		} else {
+			sb.WriteString(code + ":" + string(data) + "\n")
+		}
 	}
-	return "🌏 한국어"
+	sb.WriteString("};\n")
+	sb.WriteString("const LANG_LABELS={")
+	parts := make([]string, 0, len(i18n.Supported))
+	for _, code := range i18n.Supported {
+		parts = append(parts, fmt.Sprintf("%q:%q", code, i18n.LangLabel(code)))
+	}
+	sb.WriteString(strings.Join(parts, ","))
+	sb.WriteString("};\n")
+	return sb.String()
 }
 
 func themeLabel(name string) string {
 	m := map[string]string{
 		"light": "☀️ light", "dark": "🌑 dark", "gold": "✨ gold",
 		"cherry": "🌸 cherry", "ocean": "🌊 ocean",
+		"autumn": "🍂 autumn", "winter": "❄️ winter",
 	}
 	if v, ok := m[name]; ok {
 		return v
@@ -257,7 +275,16 @@ a{color:var(--accent);text-decoration:none}
 /* ── Gold 반짝임 ── */
 @keyframes gold-twinkle{0%,100%{opacity:0;transform:scale(0) rotate(0deg)}45%{opacity:.25}50%{opacity:1;transform:scale(1) rotate(15deg)}55%{opacity:.25}}
 @keyframes gold-drift{0%,100%{transform:translate(0,0)}25%{transform:translate(14px,-18px)}75%{transform:translate(-12px,14px)}}
-.gold-spark{position:fixed;pointer-events:none;z-index:9999;color:#c89000;text-shadow:0 0 6px #ffd70090,0 0 18px #ffaa0060}`
+.gold-spark{position:fixed;pointer-events:none;z-index:9999;color:#c89000;text-shadow:0 0 6px #ffd70090,0 0 18px #ffaa0060}
+/* ── Autumn 단풍잎 ── */
+.autumn-leaf{position:fixed;top:0;pointer-events:none;z-index:9999;font-size:18px;line-height:1}
+/* ── Winter 뱅글벵글 ── */
+@keyframes winter-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes winter-drift{0%{left:-8vw;opacity:0}5%{opacity:.9}95%{opacity:.9}100%{left:108vw;opacity:0}}
+@keyframes winter-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-28px)}}
+@keyframes snowfall{0%{transform:translateY(-10vh) translateX(0) rotate(0deg);opacity:0}5%{opacity:.8}95%{opacity:.8}100%{transform:translateY(110vh) translateX(40px) rotate(720deg);opacity:0}}
+.winter-char{position:fixed;pointer-events:none;z-index:9999;line-height:1;white-space:nowrap}
+.snowflake{position:fixed;pointer-events:none;z-index:9997;color:rgba(180,220,255,.8);font-size:14px;line-height:1}`
 }
 
 func buildJS(currentTheme, currentLang string, startedAt int64, services []*ServiceConfig) string {
@@ -272,20 +299,7 @@ func buildJS(currentTheme, currentLang string, startedAt int64, services []*Serv
 	}
 	svcJSMap := "{" + strings.Join(svcJSParts, ",") + "}"
 
-	return fmt.Sprintf(`const _SERVICES=%s;`+"\n", svcJSMap) + fmt.Sprintf(`
-// ── I18N ──
-const I18N={
-ko:{title:'AI 프록시 키 금고 대시보드',agents:'🤖 에이전트',keys:'🔑 API 키',services:'⚙️ 서비스',cnt:'개',add:'+ 추가',add_btn:'추가',apply:'적용',save:'저장',cancel:'취소',edit:'편집',no_agents:'등록된 에이전트 없음',no_keys:'등록된 키 없음',lbl_service:'서비스',lbl_model:'모델',sse_conn:'● 연결 중...',sse_run:'● 연결됨',sse_st_ok:'SSE: 연결됨',sse_st_conn:'SSE: 연결 중...',sse_st_retry:'SSE: 재연결 중...',upd:'일',uph:'h',upm:'m',ups:'s',ago_s:'초 전',ago_m:'분 전',del_key:'이 API 키를 삭제하시겠습니까?',del_agent:'이 에이전트를 삭제하시겠습니까?',del_service:'이 서비스를 삭제하시겠습니까?',err_model:'모델명을 입력하세요',err_key:'키를 입력하세요',err_id:'ID를 입력하세요',err_token:'토큰 오류',err:'오류: ',adding:'추가 중...',saving:'저장 중...',tok_info:'에이전트 토큰 (저장하세요):\n\n',admin_prompt:'Admin Token:',m_add_client:'🤖 에이전트 추가',m_edit_client:'✏️ 에이전트 편집',m_add_key:'🔑 API 키 추가',m_add_service:'⚙️ 서비스 추가',lbl_id:'ID (영문·숫자·하이픈)',lbl_name:'이름',lbl_tok:'토큰 (빈칸이면 자동 생성)',lbl_defsvc:'기본 서비스',lbl_defmdl:'기본 모델',lbl_apikey:'API 키',lbl_lbl:'레이블 (선택)',lbl_limit:'일일 한도 (0 = 무제한)',ph_auto:'자동 생성',ph_key:'AIzaSy... 또는 sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'비서 AI 에이전트',lbl_agent_type:'에이전트 종류',lbl_work_dir:'작업 디렉토리',lbl_description:'설명',lbl_ip_whitelist:'허용 IP (쉼표 구분, 빈칸=모두)',lbl_enabled:'활성화',lbl_local_url:'서버 URL',lbl_svc_id:'서비스 ID',lbl_svc_name:'서비스 이름',opt_select:'— 선택 —',detecting:'감지 중...',detected:'감지 완료'},
-en:{title:'AI Proxy Key Vault Dashboard',agents:'🤖 Agents',keys:'🔑 API Keys',services:'⚙️ Services',cnt:'',add:'+ Add',add_btn:'Add',apply:'Apply',save:'Save',cancel:'Cancel',edit:'Edit',no_agents:'No agents registered',no_keys:'No keys registered',lbl_service:'Service',lbl_model:'Model',sse_conn:'● Connecting...',sse_run:'● Connected',sse_st_ok:'SSE: Connected',sse_st_conn:'SSE: Connecting...',sse_st_retry:'SSE: Reconnecting...',upd:'d',uph:'h',upm:'m',ups:'s',ago_s:'s ago',ago_m:'m ago',del_key:'Delete this API key?',del_agent:'Delete this agent?',del_service:'Delete this service?',err_model:'Enter model name',err_key:'Enter API key',err_id:'Enter ID',err_token:'Token error',err:'Error: ',adding:'Adding...',saving:'Saving...',tok_info:'Agent token (save this):\n\n',admin_prompt:'Admin Token:',m_add_client:'🤖 Add Agent',m_edit_client:'✏️ Edit Agent',m_add_key:'🔑 Add API Key',m_add_service:'⚙️ Add Service',lbl_id:'ID (letters, numbers, hyphens)',lbl_name:'Name',lbl_tok:'Token (auto-generated if empty)',lbl_defsvc:'Default Service',lbl_defmdl:'Default Model',lbl_apikey:'API Key',lbl_lbl:'Label (optional)',lbl_limit:'Daily limit (0 = unlimited)',ph_auto:'auto-generated',ph_key:'AIzaSy... or sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'AI assistant agent',lbl_agent_type:'Agent Type',lbl_work_dir:'Working Directory',lbl_description:'Description',lbl_ip_whitelist:'Allowed IPs (comma-separated, empty=all)',lbl_enabled:'Enabled',lbl_local_url:'Server URL',lbl_svc_id:'Service ID',lbl_svc_name:'Service Name',opt_select:'— Select —',detecting:'Detecting...',detected:'Detected'},
-zh:{title:'AI代理密钥保险库仪表板',agents:'🤖 代理',keys:'🔑 API密钥',services:'⚙️ 服务',cnt:'个',add:'+ 添加',add_btn:'添加',apply:'应用',save:'保存',cancel:'取消',edit:'编辑',no_agents:'无已注册代理',no_keys:'无已注册密钥',lbl_service:'服务',lbl_model:'模型',sse_conn:'● 连接中...',sse_run:'● 已连接',sse_st_ok:'SSE: 已连接',sse_st_conn:'SSE: 连接中...',sse_st_retry:'SSE: 重连中...',upd:'天',uph:'时',upm:'分',ups:'秒',ago_s:'秒前',ago_m:'分前',del_key:'删除此API密钥？',del_agent:'删除此代理？',del_service:'删除此服务？',err_model:'请输入模型名',err_key:'请输入密钥',err_id:'请输入ID',err_token:'Token错误',err:'错误: ',adding:'添加中...',saving:'保存中...',tok_info:'代理Token（请保存）:\n\n',admin_prompt:'管理员Token:',m_add_client:'🤖 添加代理',m_edit_client:'✏️ 编辑代理',m_add_key:'🔑 添加API密钥',m_add_service:'⚙️ 添加服务',lbl_id:'ID（字母·数字·连字符）',lbl_name:'名称',lbl_tok:'Token（空则自动生成）',lbl_defsvc:'默认服务',lbl_defmdl:'默认模型',lbl_apikey:'API密钥',lbl_lbl:'标签（可选）',lbl_limit:'每日限制（0=无限）',ph_auto:'自动生成',ph_key:'AIzaSy... 或 sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'AI助手代理',lbl_agent_type:'代理类型',lbl_work_dir:'工作目录',lbl_description:'描述',lbl_ip_whitelist:'允许IP（逗号分隔，空=全部）',lbl_enabled:'启用',lbl_local_url:'服务器URL',lbl_svc_id:'服务ID',lbl_svc_name:'服务名称',opt_select:'— 选择 —',detecting:'检测中...',detected:'检测完成'},
-ja:{title:'AIプロキシ キー金庫ダッシュボード',agents:'🤖 エージェント',keys:'🔑 APIキー',services:'⚙️ サービス',cnt:'件',add:'+ 追加',add_btn:'追加',apply:'適用',save:'保存',cancel:'キャンセル',edit:'編集',no_agents:'登録済みエージェントなし',no_keys:'登録済みキーなし',lbl_service:'サービス',lbl_model:'モデル',sse_conn:'● 接続中...',sse_run:'● 接続済み',sse_st_ok:'SSE: 接続済み',sse_st_conn:'SSE: 接続中...',sse_st_retry:'SSE: 再接続中...',upd:'日',uph:'時',upm:'分',ups:'秒',ago_s:'秒前',ago_m:'分前',del_key:'このAPIキーを削除しますか？',del_agent:'このエージェントを削除しますか？',del_service:'このサービスを削除しますか？',err_model:'モデル名を入力してください',err_key:'キーを入力してください',err_id:'IDを入力してください',err_token:'トークンエラー',err:'エラー: ',adding:'追加中...',saving:'保存中...',tok_info:'エージェントトークン（保存してください）:\n\n',admin_prompt:'管理者トークン:',m_add_client:'🤖 エージェント追加',m_edit_client:'✏️ エージェント編集',m_add_key:'🔑 APIキー追加',m_add_service:'⚙️ サービス追加',lbl_id:'ID（英数字・ハイフン）',lbl_name:'名前',lbl_tok:'トークン（空なら自動生成）',lbl_defsvc:'デフォルトサービス',lbl_defmdl:'デフォルトモデル',lbl_apikey:'APIキー',lbl_lbl:'ラベル（任意）',lbl_limit:'1日の上限（0=無制限）',ph_auto:'自動生成',ph_key:'AIzaSy... または sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'AIアシスタントエージェント',lbl_agent_type:'エージェント種別',lbl_work_dir:'作業ディレクトリ',lbl_description:'説明',lbl_ip_whitelist:'許可IP（カンマ区切り、空=全許可）',lbl_enabled:'有効',lbl_local_url:'サーバーURL',lbl_svc_id:'サービスID',lbl_svc_name:'サービス名',opt_select:'— 選択 —',detecting:'検出中...',detected:'検出完了'},
-es:{title:'Panel del Almacén de Claves del Proxy IA',agents:'🤖 Agentes',keys:'🔑 Claves API',services:'⚙️ Servicios',cnt:'',add:'+ Añadir',add_btn:'Añadir',apply:'Aplicar',save:'Guardar',cancel:'Cancelar',edit:'Editar',no_agents:'Sin agentes registrados',no_keys:'Sin claves registradas',lbl_service:'Servicio',lbl_model:'Modelo',sse_conn:'● Conectando...',sse_run:'● Conectado',sse_st_ok:'SSE: Conectado',sse_st_conn:'SSE: Conectando...',sse_st_retry:'SSE: Reconectando...',upd:'d',uph:'h',upm:'m',ups:'s',ago_s:'s atrás',ago_m:'m atrás',del_key:'¿Eliminar esta clave API?',del_agent:'¿Eliminar este agente?',del_service:'¿Eliminar este servicio?',err_model:'Introduce el nombre del modelo',err_key:'Introduce la clave',err_id:'Introduce el ID',err_token:'Error de token',err:'Error: ',adding:'Añadiendo...',saving:'Guardando...',tok_info:'Token del agente (guárdalo):\n\n',admin_prompt:'Token de administrador:',m_add_client:'🤖 Añadir agente',m_edit_client:'✏️ Editar agente',m_add_key:'🔑 Añadir clave API',m_add_service:'⚙️ Añadir servicio',lbl_id:'ID (letras, números, guiones)',lbl_name:'Nombre',lbl_tok:'Token (auto si vacío)',lbl_defsvc:'Servicio predeterminado',lbl_defmdl:'Modelo predeterminado',lbl_apikey:'Clave API',lbl_lbl:'Etiqueta (opcional)',lbl_limit:'Límite diario (0=sin límite)',ph_auto:'auto',ph_key:'AIzaSy... o sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'Agente asistente IA',lbl_agent_type:'Tipo de agente',lbl_work_dir:'Directorio de trabajo',lbl_description:'Descripción',lbl_ip_whitelist:'IPs permitidas (separadas por coma, vacío=todas)',lbl_enabled:'Habilitado',lbl_local_url:'URL del servidor',lbl_svc_id:'ID de servicio',lbl_svc_name:'Nombre de servicio',opt_select:'— Seleccionar —',detecting:'Detectando...',detected:'Detectado'},
-hi:{title:'AI प्रॉक्सी की वॉल्ट डैशबोर्ड',agents:'🤖 एजेंट',keys:'🔑 API कुंजियाँ',services:'⚙️ सेवाएं',cnt:'',add:'+ जोड़ें',add_btn:'जोड़ें',apply:'लागू',save:'सहेजें',cancel:'रद्द करें',edit:'संपादित',no_agents:'कोई एजेंट नहीं',no_keys:'कोई कुंजी नहीं',lbl_service:'सेवा',lbl_model:'मॉडल',sse_conn:'● जोड़ रहे हैं...',sse_run:'● जुड़ा',sse_st_ok:'SSE: जुड़ा',sse_st_conn:'SSE: जोड़ रहे...',sse_st_retry:'SSE: पुनः जोड़ रहे...',upd:'दिन',uph:'घं',upm:'मि',ups:'से',ago_s:'से पहले',ago_m:'मि पहले',del_key:'इस API कुंजी को हटाएं?',del_agent:'इस एजेंट को हटाएं?',del_service:'इस सेवा को हटाएं?',err_model:'मॉडल नाम दर्ज करें',err_key:'कुंजी दर्ज करें',err_id:'ID दर्ज करें',err_token:'टोकन त्रुटि',err:'त्रुटि: ',adding:'जोड़ रहे...',saving:'सहेज रहे...',tok_info:'एजेंट टोकन (सहेजें):\n\n',admin_prompt:'एडमिन टोकन:',m_add_client:'🤖 एजेंट जोड़ें',m_edit_client:'✏️ एजेंट संपादित करें',m_add_key:'🔑 API कुंजी जोड़ें',m_add_service:'⚙️ सेवा जोड़ें',lbl_id:'ID (अक्षर·अंक·हाइफन)',lbl_name:'नाम',lbl_tok:'टोकन (खाली = स्वतः)',lbl_defsvc:'डिफ़ॉल्ट सेवा',lbl_defmdl:'डिफ़ॉल्ट मॉडल',lbl_apikey:'API कुंजी',lbl_lbl:'लेबल (वैकल्पिक)',lbl_limit:'दैनिक सीमा (0=असीमित)',ph_auto:'स्वतः',ph_key:'AIzaSy... या sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'AI सहायक एजेंट',lbl_agent_type:'एजेंट प्रकार',lbl_work_dir:'कार्य निर्देशिका',lbl_description:'विवरण',lbl_ip_whitelist:'अनुमत IP (कॉमा से अलग, खाली=सभी)',lbl_enabled:'सक्षम',lbl_local_url:'सर्वर URL',lbl_svc_id:'सेवा ID',lbl_svc_name:'सेवा नाम',opt_select:'— चुनें —',detecting:'पता लगा रहे...',detected:'पता चला'},
-ar:{title:'لوحة تحكم خزينة مفاتيح وكيل الذكاء الاصطناعي',agents:'🤖 العملاء',keys:'🔑 مفاتيح API',services:'⚙️ الخدمات',cnt:'',add:'+ إضافة',add_btn:'إضافة',apply:'تطبيق',save:'حفظ',cancel:'إلغاء',edit:'تعديل',no_agents:'لا عملاء مسجلين',no_keys:'لا مفاتيح مسجلة',lbl_service:'الخدمة',lbl_model:'النموذج',sse_conn:'● جارٍ الاتصال...',sse_run:'● متصل',sse_st_ok:'SSE: متصل',sse_st_conn:'SSE: جارٍ الاتصال...',sse_st_retry:'SSE: إعادة الاتصال...',upd:'ي',uph:'س',upm:'د',ups:'ث',ago_s:'ث مضت',ago_m:'د مضت',del_key:'حذف مفتاح API هذا؟',del_agent:'حذف هذا العميل؟',del_service:'حذف هذه الخدمة؟',err_model:'أدخل اسم النموذج',err_key:'أدخل المفتاح',err_id:'أدخل المعرف',err_token:'خطأ في الرمز',err:'خطأ: ',adding:'جارٍ الإضافة...',saving:'جارٍ الحفظ...',tok_info:'رمز العميل (احفظه):\n\n',admin_prompt:'رمز المسؤول:',m_add_client:'🤖 إضافة عميل',m_edit_client:'✏️ تعديل عميل',m_add_key:'🔑 إضافة مفتاح API',m_add_service:'⚙️ إضافة خدمة',lbl_id:'المعرف (حروف·أرقام·شرطة)',lbl_name:'الاسم',lbl_tok:'الرمز (تلقائي إن فارغ)',lbl_defsvc:'الخدمة الافتراضية',lbl_defmdl:'النموذج الافتراضي',lbl_apikey:'مفتاح API',lbl_lbl:'التسمية (اختياري)',lbl_limit:'الحد اليومي (0=غير محدود)',ph_auto:'تلقائي',ph_key:'AIzaSy... أو sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'وكيل مساعد الذكاء الاصطناعي',lbl_agent_type:'نوع الوكيل',lbl_work_dir:'دليل العمل',lbl_description:'الوصف',lbl_ip_whitelist:'IPs المسموح بها (فاصلة، فارغ=الكل)',lbl_enabled:'مفعل',lbl_local_url:'عنوان الخادم',lbl_svc_id:'معرف الخدمة',lbl_svc_name:'اسم الخدمة',opt_select:'— اختر —',detecting:'جارٍ الكشف...',detected:'تم الكشف'},
-pt:{title:'Painel do Cofre de Chaves do Proxy de IA',agents:'🤖 Agentes',keys:'🔑 Chaves API',services:'⚙️ Serviços',cnt:'',add:'+ Adicionar',add_btn:'Adicionar',apply:'Aplicar',save:'Salvar',cancel:'Cancelar',edit:'Editar',no_agents:'Sem agentes registrados',no_keys:'Sem chaves registradas',lbl_service:'Serviço',lbl_model:'Modelo',sse_conn:'● Conectando...',sse_run:'● Conectado',sse_st_ok:'SSE: Conectado',sse_st_conn:'SSE: Conectando...',sse_st_retry:'SSE: Reconectando...',upd:'d',uph:'h',upm:'m',ups:'s',ago_s:'s atrás',ago_m:'m atrás',del_key:'Excluir esta chave API?',del_agent:'Excluir este agente?',del_service:'Excluir este serviço?',err_model:'Insira o nome do modelo',err_key:'Insira a chave',err_id:'Insira o ID',err_token:'Erro de token',err:'Erro: ',adding:'Adicionando...',saving:'Salvando...',tok_info:'Token do agente (salve):\n\n',admin_prompt:'Token de administrador:',m_add_client:'🤖 Adicionar agente',m_edit_client:'✏️ Editar agente',m_add_key:'🔑 Adicionar chave API',m_add_service:'⚙️ Adicionar serviço',lbl_id:'ID (letras, números, hifens)',lbl_name:'Nome',lbl_tok:'Token (auto se vazio)',lbl_defsvc:'Serviço padrão',lbl_defmdl:'Modelo padrão',lbl_apikey:'Chave API',lbl_lbl:'Rótulo (opcional)',lbl_limit:'Limite diário (0=ilimitado)',ph_auto:'automático',ph_key:'AIzaSy... ou sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'Agente assistente de IA',lbl_agent_type:'Tipo de agente',lbl_work_dir:'Diretório de trabalho',lbl_description:'Descrição',lbl_ip_whitelist:'IPs permitidos (vírgula, vazio=todos)',lbl_enabled:'Habilitado',lbl_local_url:'URL do servidor',lbl_svc_id:'ID do serviço',lbl_svc_name:'Nome do serviço',opt_select:'— Selecionar —',detecting:'Detectando...',detected:'Detectado'},
-fr:{title:'Tableau de bord du coffre de clés proxy IA',agents:'🤖 Agents',keys:'🔑 Clés API',services:'⚙️ Services',cnt:'',add:'+ Ajouter',add_btn:'Ajouter',apply:'Appliquer',save:'Enregistrer',cancel:'Annuler',edit:'Modifier',no_agents:'Aucun agent enregistré',no_keys:'Aucune clé enregistrée',lbl_service:'Service',lbl_model:'Modèle',sse_conn:'● Connexion...',sse_run:'● Connecté',sse_st_ok:'SSE: Connecté',sse_st_conn:'SSE: Connexion...',sse_st_retry:'SSE: Reconnexion...',upd:'j',uph:'h',upm:'m',ups:'s',ago_s:'s',ago_m:'min',del_key:'Supprimer cette clé API ?',del_agent:"Supprimer cet agent ?",del_service:'Supprimer ce service ?',err_model:'Entrez le nom du modèle',err_key:'Entrez la clé',err_id:"Entrez l'ID",err_token:'Erreur de token',err:'Erreur : ',adding:'Ajout en cours...',saving:'Enregistrement...',tok_info:'Token agent (sauvegardez):\n\n',admin_prompt:'Token administrateur:',m_add_client:'🤖 Ajouter un agent',m_edit_client:'✏️ Modifier un agent',m_add_key:'🔑 Ajouter une clé API',m_add_service:'⚙️ Ajouter un service',lbl_id:'ID (lettres, chiffres, tirets)',lbl_name:'Nom',lbl_tok:'Token (auto si vide)',lbl_defsvc:'Service par défaut',lbl_defmdl:'Modèle par défaut',lbl_apikey:'Clé API',lbl_lbl:'Libellé (optionnel)',lbl_limit:'Limite quotidienne (0=illimité)',ph_auto:'auto',ph_key:'AIzaSy... ou sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:"Agent assistant IA",lbl_agent_type:"Type d'agent",lbl_work_dir:'Répertoire de travail',lbl_description:'Description',lbl_ip_whitelist:'IPs autorisées (virgule, vide=toutes)',lbl_enabled:'Activé',lbl_local_url:'URL du serveur',lbl_svc_id:'ID du service',lbl_svc_name:'Nom du service',opt_select:'— Sélectionner —',detecting:'Détection...',detected:'Détecté'},
-de:{title:'KI-Proxy-Schlüsseltresor-Dashboard',agents:'🤖 Agenten',keys:'🔑 API-Schlüssel',services:'⚙️ Dienste',cnt:'',add:'+ Hinzufügen',add_btn:'Hinzufügen',apply:'Anwenden',save:'Speichern',cancel:'Abbrechen',edit:'Bearbeiten',no_agents:'Keine Agenten registriert',no_keys:'Keine Schlüssel registriert',lbl_service:'Dienst',lbl_model:'Modell',sse_conn:'● Verbinde...',sse_run:'● Verbunden',sse_st_ok:'SSE: Verbunden',sse_st_conn:'SSE: Verbinde...',sse_st_retry:'SSE: Wiederverbinde...',upd:'T',uph:'h',upm:'m',ups:'s',ago_s:'s her',ago_m:'min her',del_key:'Diesen API-Schlüssel löschen?',del_agent:'Diesen Agenten löschen?',del_service:'Diesen Dienst löschen?',err_model:'Modellname eingeben',err_key:'Schlüssel eingeben',err_id:'ID eingeben',err_token:'Token-Fehler',err:'Fehler: ',adding:'Hinzufügen...',saving:'Speichern...',tok_info:'Agenten-Token (speichern):\n\n',admin_prompt:'Admin-Token:',m_add_client:'🤖 Agenten hinzufügen',m_edit_client:'✏️ Agenten bearbeiten',m_add_key:'🔑 API-Schlüssel hinzufügen',m_add_service:'⚙️ Dienst hinzufügen',lbl_id:'ID (Buchstaben, Zahlen, Bindestriche)',lbl_name:'Name',lbl_tok:'Token (auto wenn leer)',lbl_defsvc:'Standarddienst',lbl_defmdl:'Standardmodell',lbl_apikey:'API-Schlüssel',lbl_lbl:'Bezeichnung (optional)',lbl_limit:'Tageslimit (0=unbegrenzt)',ph_auto:'automatisch',ph_key:'AIzaSy... oder sk-or-...',ph_lbl:'my-key-1',ph_mdl:'gemini-2.5-flash',ph_desc:'KI-Assistent Agent',lbl_agent_type:'Agententyp',lbl_work_dir:'Arbeitsverzeichnis',lbl_description:'Beschreibung',lbl_ip_whitelist:'Erlaubte IPs (Komma, leer=alle)',lbl_enabled:'Aktiviert',lbl_local_url:'Server-URL',lbl_svc_id:'Dienst-ID',lbl_svc_name:'Dienstname',opt_select:'— Auswählen —',detecting:'Erkenne...',detected:'Erkannt'}
-};
+	return fmt.Sprintf(`const _SERVICES=%s;`+"\n", svcJSMap) + buildI18NJS() + fmt.Sprintf(`
 let curLang='ko';
 function T(k){return(I18N[curLang]||I18N.ko)[k]||k;}
 function applyLang(lang){
@@ -374,7 +388,7 @@ function toggleDd(evt, id){
 document.addEventListener('click',()=>document.querySelectorAll('.dd-menu').forEach(m=>m.classList.remove('open')));
 
 // 언어 변경
-const LANG_LABELS={'ko':'🌏 한국어','en':'🌍 English','zh':'🌏 中文','ja':'🌏 日本語','es':'🌍 Español','hi':'🌏 हिन्दी','ar':'🌍 العربية','pt':'🌍 Português','fr':'🌍 Français','de':'🌍 Deutsch'};
+// LANG_LABELS is injected by buildI18NJS()
 function setLang(lang){
   const tok=localStorage.getItem('wv_admin_token')||'';
   fetch('/admin/lang',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({lang:lang})})
@@ -391,7 +405,9 @@ const THEMES = {
   dark:   {'--bg':'#0d0d10','--surface':'#18181f','--border':'#2e2e3a','--text':'#e2e4ea','--text-muted':'#606470','--green':'#3dbf6a','--yellow':'#f5a623','--red':'#f05050','--blue':'#4da6ff','--accent':'#9b8afb','--accent-hover':'#b3a5ff'},
   gold:   {'--bg':'#faf8ee','--surface':'#fffff8','--border':'#e0cc70','--text':'#2a1e00','--text-muted':'#806a14','--green':'#2a8020','--yellow':'#b07000','--red':'#c03020','--blue':'#1850a0','--accent':'#a06800','--accent-hover':'#c07800'},
   cherry: {'--bg':'#fff4f7','--surface':'#fffbfd','--border':'#f0c0d0','--text':'#320820','--text-muted':'#9a5068','--green':'#0e9040','--yellow':'#c86800','--red':'#d81040','--blue':'#0e58b0','--accent':'#d8105e','--accent-hover':'#f0206e'},
-  ocean:  {'--bg':'#e6f4ff','--surface':'#f8fdff','--border':'#70c4e8','--text':'#052038','--text-muted':'#26789a','--green':'#007858','--yellow':'#b06800','--red':'#c82828','--blue':'#0070b8','--accent':'#0086c8','--accent-hover':'#10a0e0'}
+  ocean:  {'--bg':'#e6f4ff','--surface':'#f8fdff','--border':'#70c4e8','--text':'#052038','--text-muted':'#26789a','--green':'#007858','--yellow':'#b06800','--red':'#c82828','--blue':'#0070b8','--accent':'#0086c8','--accent-hover':'#10a0e0'},
+  autumn: {'--bg':'#fff8f0','--surface':'#ffffff','--border':'#e8c8a0','--text':'#3a2010','--text-muted':'#9a6030','--green':'#6a9a20','--yellow':'#c08000','--red':'#c83020','--blue':'#4060a0','--accent':'#d04010','--accent-hover':'#e85820'},
+  winter: {'--bg':'#f4f8ff','--surface':'#ffffff','--border':'#b8d4f0','--text':'#1a2840','--text-muted':'#5878a0','--green':'#087850','--yellow':'#d89800','--red':'#c82020','--blue':'#1868c0','--accent':'#1870d8','--accent-hover':'#3090f8'}
 };
 
 // ── 효과 요소 관리 ──
@@ -503,6 +519,92 @@ function createGoldFx(){
   }
 }
 
+// ── Autumn: 단풍잎 솔솔 ──
+function createAutumnFx(){
+  clearFx();
+  const leaves=['🍂','🍁','🍃','🍂','🍁'];
+  const N=28;
+  const style=document.createElement('style');
+  let css='';
+  for(let i=0;i<N;i++){
+    const amp=40+Math.random()*70;
+    const steps=7;
+    let kf='@keyframes aleaf'+i+'{';
+    for(let s=0;s<=steps;s++){
+      const pct=(s/steps*100).toFixed(0);
+      const y=(s/steps*110).toFixed(1);
+      const x=((s%2===0)?1:-1)*amp*(0.5+Math.random()*0.5);
+      const rz=(s*(540/steps)).toFixed(0);
+      const op=s===0||s===steps?0:0.85;
+      kf+=pct+'%{transform:translate('+x.toFixed(0)+'px,'+y+'vh) rotate('+rz+'deg);opacity:'+op+'}';
+    }
+    kf+='}';
+    css+=kf;
+  }
+  style.textContent=css;
+  document.head.appendChild(style);fxElems.push(style);
+  for(let i=0;i<N;i++){
+    const l=document.createElement('div');
+    l.className='autumn-leaf';
+    const dur=18+Math.random()*14;
+    const startY=Math.random()*100;
+    l.textContent=leaves[Math.floor(Math.random()*leaves.length)];
+    l.style.cssText=
+      'left:'+Math.random()*108+'vw;'+
+      'font-size:'+(14+Math.random()*12)+'px;'+
+      'animation:aleaf'+i+' '+dur+'s linear -'+(dur*startY/100).toFixed(1)+'s infinite;';
+    document.body.appendChild(l);fxElems.push(l);
+  }
+}
+
+// ── Winter: 눈사람+트리 뱅글벵글 + 눈송이 ──
+function createWinterFx(){
+  clearFx();
+  const chars=['☃️','🎄','❄️','⛄','🎄','☃️','❄️'];
+  chars.forEach((ch,i)=>{
+    const c=document.createElement('div');
+    c.className='winter-char';
+    const sz=1.8+Math.random()*2.2;
+    const top=5+i*12;
+    const dd=60+i*18;
+    const bd=4+Math.random()*5;
+    const sd=-(Math.random()*dd).toFixed(1);
+    c.textContent=ch;
+    c.style.cssText=
+      'top:'+top+'vh;'+
+      'font-size:'+sz+'rem;'+
+      'animation:winter-drift '+dd+'s linear '+sd+'s infinite,'+
+               'winter-bob '+bd+'s ease-in-out -'+(Math.random()*bd).toFixed(1)+'s infinite;';
+    document.body.appendChild(c);fxElems.push(c);
+  });
+  // 회전하는 눈결정
+  for(let i=0;i<6;i++){
+    const s=document.createElement('div');
+    s.className='winter-char';
+    s.textContent='❄';
+    const sz=0.9+Math.random()*1.2;
+    const top=10+i*14;
+    const spd=3+Math.random()*4;
+    s.style.cssText=
+      'top:'+top+'vh;left:'+(5+i*16)+'vw;'+
+      'font-size:'+sz+'rem;color:rgba(140,190,255,.7);'+
+      'animation:winter-spin '+spd+'s linear infinite;';
+    document.body.appendChild(s);fxElems.push(s);
+  }
+  // 눈송이 내리기
+  for(let i=0;i<20;i++){
+    const f=document.createElement('div');
+    f.className='snowflake';
+    f.textContent='❅';
+    const dur=8+Math.random()*12;
+    f.style.cssText=
+      'left:'+Math.random()*100+'vw;'+
+      'font-size:'+(10+Math.random()*10)+'px;'+
+      'animation:snowfall '+dur+'s linear -'+(Math.random()*dur).toFixed(1)+'s infinite;';
+    document.body.appendChild(f);fxElems.push(f);
+  }
+}
+
 function applyThemeCss(name){
   const vars=THEMES[name]; if(!vars) return;
   const root=document.documentElement;
@@ -511,9 +613,11 @@ function applyThemeCss(name){
   if(name==='cherry') createCherryFx();
   else if(name==='ocean') createOceanFx();
   else if(name==='gold') createGoldFx();
+  else if(name==='autumn') createAutumnFx();
+  else if(name==='winter') createWinterFx();
   else clearFx();
 }
-const THEME_LABELS={'light':'☀️ light','dark':'🌑 dark','gold':'✨ gold','cherry':'🌸 cherry','ocean':'🌊 ocean'};
+const THEME_LABELS={'light':'☀️ light','dark':'🌑 dark','gold':'✨ gold','cherry':'🌸 cherry','ocean':'🌊 ocean','autumn':'🍂 autumn','winter':'❄️ winter'};
 function setTheme(name){
   const tok=localStorage.getItem('wv_admin_token')||'';
   fetch('/admin/theme',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({theme:name})})

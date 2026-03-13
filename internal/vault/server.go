@@ -167,7 +167,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	clients := s.store.ListClients()
 	jsonOK(w, map[string]interface{}{
 		"status":  "ok",
-		"version": "v0.1.3",
+		"version": "v0.1.4",
 		"keys":    len(keys),
 		"clients": len(clients),
 		"sse":     s.broker.Count(),
@@ -475,9 +475,9 @@ func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	valid := map[string]bool{"light": true, "dark": true, "gold": true, "cherry": true, "ocean": true}
+	valid := map[string]bool{"light": true, "dark": true, "gold": true, "cherry": true, "ocean": true, "autumn": true, "winter": true}
 	if !valid[body.Theme] {
-		jsonError(w, "unknown theme (light|dark|gold|cherry|ocean)", http.StatusBadRequest)
+		jsonError(w, "unknown theme (light|dark|gold|cherry|ocean|autumn|winter)", http.StatusBadRequest)
 		return
 	}
 	s.cfg.Theme = body.Theme

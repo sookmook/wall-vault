@@ -95,6 +95,36 @@ var themes = map[string]*Theme{
 		Accent:      "#0098d8",
 		AccentHover: "#20b8f8",
 	},
+	// 가을 테마 — 밝고 옅은 브라운 계통, 단풍잎 가을
+	"autumn": {
+		Name:        "autumn",
+		Background:  "#fff8f0",
+		Surface:     "#ffffff",
+		Border:      "#e8c8a0",
+		Text:        "#3a2010",
+		TextMuted:   "#9a6030",
+		Green:       "#6a9a20",
+		Yellow:      "#c08000",
+		Red:         "#c83020",
+		Blue:        "#4060a0",
+		Accent:      "#d04010",
+		AccentHover: "#e85820",
+	},
+	// 겨울 테마 — 하얀 배경, 눈사람과 트리 뱅글벵글
+	"winter": {
+		Name:        "winter",
+		Background:  "#f4f8ff",
+		Surface:     "#ffffff",
+		Border:      "#b8d4f0",
+		Text:        "#1a2840",
+		TextMuted:   "#5878a0",
+		Green:       "#087850",
+		Yellow:      "#d89800",
+		Red:         "#c82020",
+		Blue:        "#1868c0",
+		Accent:      "#1870d8",
+		AccentHover: "#3090f8",
+	},
 }
 
 // Get: 테마 반환 (없으면 cherry)
@@ -130,7 +160,7 @@ func (t *Theme) CSSVars() string {
   --accent-hover: ` + t.AccentHover + `;`
 }
 
-// List: 사용 가능한 테마 목록 (순서: light, dark, gold, cherry, ocean)
+// List: 사용 가능한 테마 목록
 func List() []string {
-	return []string{"light", "dark", "gold", "cherry", "ocean"}
+	return []string{"light", "dark", "gold", "cherry", "ocean", "autumn", "winter"}
 }

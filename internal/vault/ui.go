@@ -145,7 +145,7 @@ a{color:var(--accent);text-decoration:none}
 /* ── Topbar ── */
 .topbar{position:sticky;top:0;z-index:500;display:flex;justify-content:space-between;align-items:center;padding:.5rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);gap:.8rem;box-shadow:0 1px 5px rgba(0,0,0,.08)}
 .topbar-brand{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-.topbar-logo{height:26px;width:auto;flex-shrink:0;object-fit:contain;border-radius:4px}
+.topbar-logo{height:104px;width:auto;flex-shrink:0;object-fit:contain;border-radius:6px}
 .topbar-title{color:var(--accent);font-size:.92rem;font-weight:800;letter-spacing:1.2px;white-space:nowrap}
 .topbar-controls{display:flex;align-items:center;gap:.5rem}
 /* ── Dropdown ── */
@@ -159,7 +159,7 @@ a{color:var(--accent);text-decoration:none}
 .dd-item.active{color:var(--accent);font-weight:600}
 /* ── Header (슬림) ── */
 .header{display:flex;align-items:center;justify-content:center;gap:.7rem;padding:.55rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
-.header-logo{height:24px;width:auto;flex-shrink:0;object-fit:contain;border-radius:4px}
+.header-logo{height:96px;width:auto;flex-shrink:0;object-fit:contain;border-radius:6px}
 .header h1{color:var(--text-muted);font-size:.88rem;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 /* ── Badge ── */
 .badge{display:inline-block;background:var(--surface);border:1px solid var(--green);color:var(--green);padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.3px}

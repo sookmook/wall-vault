@@ -104,7 +104,7 @@ Single Go binary. One bot or a dozen — fully covered.
 | **Bidirectional Model Sync** | TUI model change → vault; vault change → TUI. All sources stay in sync. |
 | **Per-type Config Copy** | 🦞 openclaw / 🟠 claude-code / ⌨ cursor / 💻 vscode — one-click config snippet |
 | **Doctor** | Health check, auto-recovery, systemd/launchd/NSSM registration |
-| **[17 Languages](#languages)** | Drop a JSON file in `locales/` — zero code changes needed |
+| **[17 Languages](#languages)** | Korean · English · Chinese · Japanese · Spanish · Hindi · Arabic · Portuguese · French · German · Thai · Mongolian · Swahili · Hausa · Zulu · Nepali · Indonesian — drop a JSON file to add any language, zero code changes |
 | **Themes** | Light ☀️ / Dark 🌑 / Gold ✨ / Cherry 🌸 / Ocean 🌊 / Autumn 🍂 / Winter ❄️ |
 | **Cross-platform** | Linux / macOS / Windows / WSL |
 | **[OpenClaw Integration](#openclaw-integration)** | Unix socket TUI events, agent auto-config |
@@ -148,7 +148,7 @@ Open `http://localhost:56243` to access the dashboard.
 
 ## Languages
 
-The setup wizard, system messages, and dashboard UI support **17 languages**. Add a new language by dropping a `.json` file into `internal/i18n/locales/` — no code changes needed.
+wall-vault speaks **17 languages** out of the box — and you can add any language you want with a single JSON file. No Go code to write. No recompilation. Just drop the file and rebuild.
 
 | Code | Language | Code | Language | Code | Language |
 |------|----------|------|----------|------|----------|
@@ -159,31 +159,52 @@ The setup wizard, system messages, and dashboard UI support **17 languages**. Ad
 | `es` | Español | `id` | Indonesia | `zu` | IsiZulu |
 | `hi` | हिन्दी | `ne` | नेपाली | | |
 
+Language coverage includes:
+- **Setup wizard** — interactive CLI prompts, help text, error messages
+- **Dashboard UI** — all labels, buttons, status messages
+- **System messages** — key events, service status, health reports
+- **Live switching** — change language in the dashboard with no page reload
+
 ```bash
 WV_LANG=en ./wall-vault setup   # English setup
 WV_LANG=ja ./wall-vault setup   # Japanese setup
+WV_LANG=zh ./wall-vault setup   # Chinese setup
 WV_LANG=ko ./wall-vault setup   # Korean setup
 ```
 
-Switch languages live in the dashboard (no page reload).
-
 ### Adding a New Language
 
-Create `internal/i18n/locales/xx.json` (where `xx` is the language code):
+Want Turkish? Vietnamese? Swahili wasn't enough? **It takes about 5 minutes.**
+
+1. Copy an existing locale file as a starting point:
+
+```bash
+cp internal/i18n/locales/en.json internal/i18n/locales/tr.json
+```
+
+2. Translate the values (keys stay in English):
 
 ```json
 {
-  "lang_label": "My Language",
-  "lang_emoji": "🌍",
-  "unknown_command": "Unknown command",
-  "setup_welcome": "Welcome to wall-vault setup wizard",
-  "setup_done": "Setup complete! Run wall-vault start",
-  "title": "AI Proxy Key Vault Dashboard",
+  "lang_label": "Türkçe",
+  "lang_emoji": "🇹🇷",
+  "unknown_command": "Bilinmeyen komut",
+  "setup_welcome": "wall-vault kurulum sihirbazına hoş geldiniz",
+  "setup_done": "Kurulum tamamlandı! wall-vault start komutunu çalıştırın",
+  "title": "AI Proxy Anahtar Kasası",
   ...
 }
 ```
 
-Rebuild and restart — the new language appears automatically everywhere.
+3. Rebuild:
+
+```bash
+make build
+```
+
+That's it. The new language appears automatically in the setup wizard, dashboard language picker, and all UI text. The i18n system uses Go's `embed.FS` — any `.json` file in `internal/i18n/locales/` is picked up at compile time, no registration required.
+
+> **Contributions welcome.** If you add a language, consider opening a PR — every language helps someone run their bots in their native tongue.
 
 ---
 
@@ -639,7 +660,7 @@ Go 바이너리 단 하나. 봇 한 대부터 분산 다중 봇까지 전부 커
 | **에이전트 관리** | 에이전트별 서비스·모델·IP·작업 디렉토리 설정 |
 | **에이전트 상태** | 4단계 🟢실행중 / 🟡지연 / 🔴오프라인 / ⚫미연결 |
 | **주치의(Doctor)** | 헬스체크, 자동복구, systemd/launchd/NSSM 등록 |
-| **[17개 언어](#languages)** | `locales/xx.json` 파일 추가만으로 새 언어 지원 |
+| **[17개 언어](#languages)** | 한국어·영어·중국어·일본어·스페인어·힌디어·아랍어·포르투갈어·프랑스어·독일어·태국어·몽골어·스와힐리어·하우사어·줄루어·네팔어·인도네시아어 기본 탑재. `locales/xx.json` 파일 하나로 어떤 언어든 추가 가능 — 코드 수정 불필요 |
 | **테마** | 라이트 ☀️ / 다크 🌑 / 골드 ✨ / 벚꽃 🌸 / 오션 🌊 / 가을 🍂 / 겨울 ❄️ |
 | **크로스 플랫폼** | Linux / macOS / Windows / WSL |
 
@@ -655,6 +676,39 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 ```
 
 브라우저에서 `http://localhost:56243` 을 열면 키 금고 대시보드가 나타납니다.
+
+---
+
+### 다국어 지원
+
+wall-vault는 **17개 언어**를 기본 탑재하며, JSON 파일 하나만 추가하면 어떤 언어든 지원 가능합니다. Go 코드를 건드릴 필요가 없습니다.
+
+| 코드 | 언어 | 코드 | 언어 | 코드 | 언어 |
+|------|------|------|------|------|------|
+| `ko` | 한국어 | `ar` | العربية | `th` | ภาษาไทย |
+| `en` | English | `pt` | Português | `mn` | Монгол |
+| `zh` | 中文 | `fr` | Français | `sw` | Kiswahili |
+| `ja` | 日本語 | `de` | Deutsch | `ha` | Hausa |
+| `es` | Español | `id` | Indonesia | `zu` | IsiZulu |
+| `hi` | हिन्दी | `ne` | नेपाली | | |
+
+- 설치 마법사, 대시보드 UI, 시스템 메시지 전체에 적용
+- 대시보드에서 언어 즉시 변경 (페이지 새로고침 불필요)
+
+**새 언어 추가 방법 (5분이면 충분)**:
+
+```bash
+# 1. 기존 파일을 복사해 시작
+cp internal/i18n/locales/ko.json internal/i18n/locales/tr.json
+
+# 2. 번역 (키는 그대로, 값만 번역)
+# "lang_label": "Türkçe", "lang_emoji": "🇹🇷", ...
+
+# 3. 빌드
+make build
+```
+
+빌드만 다시 하면 새 언어가 마법사·대시보드·UI 전체에 자동 반영됩니다.
 
 ---
 
@@ -812,4 +866,4 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 
 ---
 
-*Last updated · 최종 업데이트: 2026-03-13*
+*Last updated · 최종 업데이트: 2026-03-14*

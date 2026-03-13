@@ -657,11 +657,11 @@ function connectSSE() {
         // 에이전트 모델 드롭다운만 갱신 (페이지 reload 없음)
         refreshModelDropdowns();
       } else if (d.type === 'service_changed') {
-        // 서비스 목록 변경 → 서비스 select + 모델 드롭다운 갱신
-        refreshServiceSelects().then(() => refreshModelDropdowns());
+        // 서비스 추가/삭제 → 체크 후 에이전트 메뉴 전체 갱신
+        autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
       } else if (d.type === 'key_added' || d.type === 'key_deleted') {
-        // 키 변경 → 모델 드롭다운 갱신 (모델 레지스트리 TTL 무효화 후)
-        refreshModelDropdowns();
+        // 키 변경 → 서비스 활성 상태 재판정 후 에이전트 메뉴 갱신
+        autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
       } else if (d.type === 'usage_reset') {
         // 가벼운 reload (일일 사용량 초기화)
         setTimeout(() => location.reload(), 500);
@@ -776,9 +776,9 @@ function deleteKey(id) {
   });
 }
 
-// ── 서비스 자동 체크 (페이지 로드 시 실행) ──
-// 클라우드: 키 없는 서비스 자동 비활성화
-// 로컬: URL 프로브 후 응답 여부에 따라 활성/비활성
+// ── 서비스 자동 체크 ──
+// 클라우드: 키 없는 서비스 자동 비활성화 / 키 있으면 자동 활성화
+// 로컬: /admin/models 프로브 결과에 따라 활성/비활성
 async function _setSvcEnabled(id, enabled, token) {
   const urlEl = document.getElementById('svc-url-'+id);
   try {
@@ -791,37 +791,47 @@ async function _setSvcEnabled(id, enabled, token) {
     if (cb) cb.checked = enabled;
   } catch {}
 }
-async function _checkLocalSvc(id, token) {
+async function _checkLocalSvc(id, svcEnabled, token) {
   const cb = document.getElementById('svc-en-'+id);
-  if (!cb) return;
   try {
     const resp = await fetch('/admin/models?service='+id, {headers:{'Authorization':'Bearer '+token}});
-    if (resp.ok) {
-      const data = await resp.json();
-      const up = (data.models||[]).length > 0;
-      if (up !== cb.checked) await _setSvcEnabled(id, up, token);
-    } else {
-      if (cb.checked) await _setSvcEnabled(id, false, token);
-    }
-  } catch { if (cb && cb.checked) await _setSvcEnabled(id, false, token); }
+    const up = resp.ok && (((await resp.json()).models)||[]).length > 0;
+    if (up !== svcEnabled) await _setSvcEnabled(id, up, token);
+    else if (cb) cb.checked = up;
+  } catch { if (svcEnabled) await _setSvcEnabled(id, false, token); }
 }
+// 호출할 때마다 최신 키/서비스 현황을 서버에서 조회해 처리
 async function autoCheckServices() {
   const token = localStorage.getItem('wv_admin_token');
   if (!token) return;
-  const checks = [];
-  for (const [id, svc] of Object.entries(_SERVICES)) {
-    if (svc.local) {
-      checks.push(_checkLocalSvc(id, token));
-    } else if (svc.keyCount === 0) {
-      const cb = document.getElementById('svc-en-'+id);
-      if (cb && cb.checked) checks.push(_setSvcEnabled(id, false, token));
+  try {
+    const [kr, sr] = await Promise.all([
+      fetch('/admin/keys',     {headers:{'Authorization':'Bearer '+token}}),
+      fetch('/admin/services', {headers:{'Authorization':'Bearer '+token}})
+    ]);
+    if (!kr.ok || !sr.ok) return;
+    const [keys, svcs] = await Promise.all([kr.json(), sr.json()]);
+    const keyCounts = {};
+    (keys||[]).forEach(k => { keyCounts[k.service] = (keyCounts[k.service]||0)+1; });
+    const checks = [];
+    for (const svc of (svcs||[])) {
+      const meta = _SERVICES[svc.id];
+      const isLocal = meta ? meta.local : false;
+      if (isLocal) {
+        checks.push(_checkLocalSvc(svc.id, svc.enabled, token));
+      } else {
+        const want = (keyCounts[svc.id]||0) > 0;
+        if (svc.enabled !== want) checks.push(_setSvcEnabled(svc.id, want, token));
+      }
     }
-  }
-  await Promise.all(checks);
+    await Promise.all(checks);
+  } catch {}
 }
 
 // ── 에이전트 카드 모델 목록 초기화 (페이지 로드 시) ──
-document.addEventListener('DOMContentLoaded', function() { refreshModelDropdowns(); autoCheckServices(); });
+document.addEventListener('DOMContentLoaded', function() {
+  autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
+});
 
 // ── 모달 공통 유틸 ──
 function closeModal(prefix) {

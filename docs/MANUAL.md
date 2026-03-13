@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 wall-vault를 처음 사용하는 분을 위한 단계별 가이드입니다.
-*(최종 갱신: 2026-03-13 — v0.1.2: OpenClaw provider/model 형식, 실시간 드롭다운 동기화, ✓ 저장 피드백, GLM·DeepSeek 제어 토큰 정리)*
+*(최종 갱신: 2026-03-13 — v0.1.3: 에이전트 카드 리디자인, 타입별 설정 복사 버튼, 연결 상태 상세 표시)*
 
 ---
 
@@ -262,7 +262,7 @@ curl "http://localhost:56244/api/models?service=google"
 curl "http://localhost:56244/api/models?q=claude"
 ```
 
-**지원 모델 요약 (v0.1.2):**
+**지원 모델 요약 (v0.1.3):**
 
 | 서비스 | 주요 모델 |
 |--------|----------|
@@ -300,8 +300,18 @@ curl "http://localhost:56244/api/models?q=claude"
 - **인라인 서비스·모델 변경 폼:**
   - 서비스 드롭다운 변경 시 → 해당 서비스 모델 목록 자동 로드
   - 서비스/키 변경 이벤트 수신 시 → 드롭다운 실시간 갱신 (페이지 새로고침 없음)
-  - `[적용]` 클릭 후 성공 시 → 버튼에 **✓** 표시 + "✓ 저장됨" 인라인 알림 (3초)
-- `[🐾]` — OpenClaw `openclaw.json` 설정 클립보드 복사
+  - `[💾 저장]` 클릭 후 성공 시 → 버튼에 **✓** 표시 + "✓ 저장됨" 인라인 알림 (3초)
+
+**에이전트 종류별 설정 복사 버튼 (v0.1.3):**
+
+| 종류 | 아이콘 | 버튼 레이블 | 복사 내용 |
+|------|--------|------------|----------|
+| openclaw | 🦞 | OpenClaw 설정 복사 | `~/.openclaw/openclaw.json` 스니펫 |
+| claude-code | 🟠 | Claude Code 설정 복사 | `~/.claude/settings.json` 스니펫 |
+| cursor | ⌨ | Cursor 설정 복사 | Cursor AI API Base URL + Key |
+| vscode | 💻 | VSCode 설정 복사 | Continue 확장 `config.json` 스니펫 |
+| 기타 | 📋 | 설정 복사 | OpenClaw 형식 |
+
 - `[✎]` — 편집, `[✕]` — 삭제
 
 ### 에이전트 추가/편집 모달 필드 순서

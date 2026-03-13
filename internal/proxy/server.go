@@ -383,6 +383,11 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 			resp, err = s.callOpenRouter(model, req)
 		case "ollama":
 			resp, err = s.callOllama(model, req)
+		case "openai":
+			resp, err = s.callOpenAI(model, req)
+		case "anthropic":
+			// Anthropic API는 다른 형식 — OpenRouter 경유 (anthropic/model 경로 유지)
+			resp, err = s.callOpenRouter("anthropic/"+model, req)
 		default:
 			continue
 		}
@@ -481,6 +486,48 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 	return OpenAIRespToGemini(&oaiResp), nil
 }
 
+// ─── OpenAI 직접 호출 ─────────────────────────────────────────────────────────
+
+func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, error) {
+	key, plainKey, err := s.getKey("openai")
+	if err != nil {
+		s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openai"})
+		return nil, err
+	}
+
+	oaiReq := GeminiToOpenAI(model, req)
+	data, _ := json.Marshal(oaiReq)
+	headers := map[string]string{
+		"Authorization": "Bearer " + plainKey,
+	}
+	resp, err := s.doRequest("POST", "https://api.openai.com/v1/chat/completions", data, headers)
+	if err != nil {
+		s.keyMgr.RecordError(key, 0)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.keyMgr.RecordError(key, resp.StatusCode)
+		return nil, fmt.Errorf("OpenAI 오류: HTTP %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var oaiResp OpenAIResponse
+	if err := json.Unmarshal(body, &oaiResp); err != nil {
+		return nil, fmt.Errorf("OpenAI 응답 파싱 오류: %w", err)
+	}
+	if oaiResp.Error != nil {
+		return nil, fmt.Errorf("OpenAI: %s", oaiResp.Error.Message)
+	}
+	tokens := 0
+	if oaiResp.Usage != nil {
+		tokens = oaiResp.Usage.TotalTokens
+	}
+	s.keyMgr.RecordSuccess(key, tokens)
+	return OpenAIRespToGemini(&oaiResp), nil
+}
+
 // ─── Ollama (뮤텍스로 단일 동시 요청) ────────────────────────────────────────
 
 func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
@@ -539,57 +586,80 @@ func (s *Server) getKey(service string) (*localKey, string, error) {
 // ─── 유틸 ────────────────────────────────────────────────────────────────────
 
 // parseProviderModel handles OpenClaw's "provider/model-id" format.
-// Known service prefixes are mapped directly; "wall-vault/" prefix is stripped
-// and the service is auto-detected from the model ID.
-// OpenRouter-style paths (e.g. "meta-llama/llama-3.1-8b") are kept intact.
-// Supports OpenClaw 3.11 providers: opencode-go, moonshot, kimi-coding, groq, mistral.
+//
+// Routing rules:
+//   - google/*, ollama/*  → native handlers
+//   - openai/*            → direct OpenAI (callOpenAI)
+//   - anthropic/*         → OpenRouter with "anthropic/model" path (Anthropic API format differs)
+//   - openrouter/*        → OpenRouter, bare model path kept
+//   - opencode*, moonshot, kimi-coding, groq, mistral, minimax, … → OpenRouter
+//   - wall-vault/*        → auto-detect from model ID prefix
+//   - anything else        → OpenRouter (OpenRouter-style "org/model" paths)
+//
+// Ollama :cloud suffix (e.g. "kimi-k2.5:cloud") is stripped and routed to OpenRouter.
 func parseProviderModel(svc, mdl string) (string, string) {
+	// Strip Ollama :cloud suffix — route cloud variants via OpenRouter
+	if strings.HasSuffix(mdl, ":cloud") {
+		bare := strings.TrimSuffix(mdl, ":cloud")
+		return "openrouter", bare
+	}
+
 	if !strings.Contains(mdl, "/") {
 		return svc, mdl
 	}
 	parts := strings.SplitN(mdl, "/", 2)
 	prefix, bare := parts[0], parts[1]
+
 	switch prefix {
+	// ── Native handlers ──────────────────────────────────────────────────────
 	case "google":
 		return "google", bare
-	case "anthropic":
-		return "anthropic", bare
-	case "openai":
-		return "openai", bare
 	case "ollama":
 		return "ollama", bare
+
+	// ── OpenAI direct ────────────────────────────────────────────────────────
+	case "openai":
+		return "openai", bare
+
+	// ── Anthropic via OpenRouter (API format differs) ─────────────────────────
+	case "anthropic":
+		return "openrouter", "anthropic/" + bare
+
+	// ── OpenRouter pass-through (bare already has provider/model) ─────────────
 	case "openrouter":
 		return "openrouter", bare
-	// OpenClaw 3.11: opencode-go, opencode-zen → OpenRouter
-	case "opencode-go", "opencode-zen", "opencode":
+
+	// ── OpenClaw 3.11 providers → OpenRouter ─────────────────────────────────
+	case "opencode", "opencode-go", "opencode-zen":
 		return "openrouter", bare
-	// OpenClaw 3.11: moonshot / kimi-coding → route via OpenRouter
 	case "moonshot", "kimi-coding":
-		return "openrouter", mdl // keep full "moonshot/kimi-k2.5" path for OpenRouter
-	// Common providers available on OpenRouter
-	case "groq", "mistral", "cohere", "perplexity", "minimax", "minimax-text":
-		return "openrouter", bare
+		return "openrouter", mdl // keep full "moonshot/kimi-k2.5" for OpenRouter
+	case "groq", "mistral", "cohere", "perplexity",
+		"minimax", "minimax-text", "together", "together-ai",
+		"huggingface", "novita", "nvidia", "venice",
+		"meta-llama", "qwen", "deepseek", "01-ai":
+		return "openrouter", mdl // keep full org/model path
+
+	// ── wall-vault prefix — auto-detect from model ID ────────────────────────
 	case "wall-vault":
-		// Our own provider prefix — auto-detect service from bare model ID
-		autoSvc := svc
+		bare = strings.TrimSuffix(bare, ":cloud")
 		switch {
 		case strings.HasPrefix(bare, "gemini-"):
-			autoSvc = "google"
+			return "google", bare
 		case strings.HasPrefix(bare, "claude-"):
-			autoSvc = "anthropic"
+			// Route Anthropic models through OpenRouter
+			return "openrouter", "anthropic/" + bare
 		case strings.HasPrefix(bare, "gpt-"),
 			bare == "o1", bare == "o1-mini",
 			strings.HasPrefix(bare, "o3"), strings.HasPrefix(bare, "o4"):
-			autoSvc = "openai"
-		// OpenClaw 3.11 free models via OpenRouter
-		case bare == "hunter-alpha", bare == "healer-alpha",
-			strings.HasPrefix(bare, "kimi-"), strings.HasPrefix(bare, "deepseek-"),
-			strings.HasPrefix(bare, "glm-"), strings.HasPrefix(bare, "qwen"):
-			autoSvc = "openrouter"
+			return "openai", bare
+		default:
+			// kimi-*, glm-*, deepseek-*, qwen*, hunter-alpha, healer-alpha, etc.
+			return "openrouter", bare
 		}
-		return autoSvc, bare
+
+	// ── Default: OpenRouter-style "org/model" ────────────────────────────────
 	default:
-		// OpenRouter-style "org/model" — keep full path for OpenRouter
 		return "openrouter", mdl
 	}
 }

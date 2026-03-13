@@ -680,6 +680,13 @@ func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {
 		w.Write(data) //nolint:errcheck
 		return
 	}
+	// 외부 파일 없으면 바이너리 내장 로고 사용
+	if len(embeddedLogo) > 0 {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "max-age=3600")
+		w.Write(embeddedLogo) //nolint:errcheck
+		return
+	}
 	http.NotFound(w, r)
 }
 

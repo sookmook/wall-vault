@@ -36,7 +36,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 <body>
 <div class="topbar">
   <div class="topbar-brand">
-    <svg class="topbar-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M18 10h-1V7a5 5 0 0 0-10 0v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-6 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-7H9V7a3 3 0 0 1 6 0v3z"/></svg>
+    <img src="/logo" alt="wall-vault" class="topbar-logo">
     <span class="topbar-title">wall-vault</span>
   </div>
   <div class="topbar-controls">
@@ -65,7 +65,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
   </div>
 </div>
 <div class="header">
-  <svg class="header-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M18 10h-1V7a5 5 0 0 0-10 0v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-6 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-7H9V7a3 3 0 0 1 6 0v3z"/></svg>
+  <img src="/logo" alt="wall-vault" class="header-logo">
   <h1 id="page-title" data-i18n="title">AI 프록시 키 금고 대시보드</h1>
 </div>
 <div class="grid">`)
@@ -145,7 +145,7 @@ a{color:var(--accent);text-decoration:none}
 /* ── Topbar ── */
 .topbar{position:sticky;top:0;z-index:500;display:flex;justify-content:space-between;align-items:center;padding:.5rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);gap:.8rem;box-shadow:0 1px 5px rgba(0,0,0,.08)}
 .topbar-brand{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-.topbar-logo{height:22px;width:22px;flex-shrink:0;color:var(--accent)}
+.topbar-logo{height:26px;width:auto;flex-shrink:0;object-fit:contain;border-radius:4px}
 .topbar-title{color:var(--accent);font-size:.92rem;font-weight:800;letter-spacing:1.2px;white-space:nowrap}
 .topbar-controls{display:flex;align-items:center;gap:.5rem}
 /* ── Dropdown ── */
@@ -159,7 +159,7 @@ a{color:var(--accent);text-decoration:none}
 .dd-item.active{color:var(--accent);font-weight:600}
 /* ── Header (슬림) ── */
 .header{display:flex;align-items:center;justify-content:center;gap:.7rem;padding:.55rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
-.header-logo{height:20px;width:20px;flex-shrink:0;display:block;color:var(--accent)}
+.header-logo{height:24px;width:auto;flex-shrink:0;object-fit:contain;border-radius:4px}
 .header h1{color:var(--text-muted);font-size:.88rem;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 /* ── Badge ── */
 .badge{display:inline-block;background:var(--surface);border:1px solid var(--green);color:var(--green);padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.3px}

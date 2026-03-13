@@ -168,7 +168,7 @@ a{color:var(--accent);text-decoration:none}
 .card h2{color:var(--accent);font-size:.88rem;font-weight:700;margin-bottom:.75rem;padding-bottom:.55rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;letter-spacing:.2px}
 .card h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}
 /* ── 에이전트 섹션 (전체 폭) ── */
-.agents-section{grid-column:1/-1;position:relative;z-index:2}
+.agents-section{grid-column:1/-1;position:relative;z-index:2;border-bottom:1px solid var(--border);padding-bottom:1.2rem;margin-bottom:.2rem}
 .section-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
 .section-hdr h2{color:var(--accent);font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:.4rem;letter-spacing:.2px;flex:1}
 .section-hdr h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}

@@ -244,15 +244,49 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	oldSvc, oldMdl := s.service, s.model
 	if body.Service != "" {
 		s.service = body.Service
 	}
 	if body.Model != "" {
 		s.model = body.Model
 	}
+	newSvc, newMdl := s.service, s.model
 	s.mu.Unlock()
-	log.Printf("[config] 모델 변경: %s/%s", body.Service, body.Model)
-	jsonOK(w, map[string]string{"status": "ok", "service": s.service, "model": s.model})
+	log.Printf("[config] 모델 변경: %s/%s", newSvc, newMdl)
+	// vault에 write-through (비동기, best-effort)
+	if newSvc != oldSvc || newMdl != oldMdl {
+		go s.pushConfigToVault(newSvc, newMdl)
+		s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
+			"service": newSvc,
+			"model":   newMdl,
+		})
+	}
+	jsonOK(w, map[string]string{"status": "ok", "service": newSvc, "model": newMdl})
+}
+
+// pushConfigToVault: 프록시 모델 변경을 vault에 write-through (양방향 동기화)
+func (s *Server) pushConfigToVault(service, model string) {
+	if s.cfg.Proxy.VaultURL == "" || s.cfg.Proxy.VaultToken == "" {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{"service": service, "model": model})
+	req, err := http.NewRequest(http.MethodPut, s.cfg.Proxy.VaultURL+"/api/config", bytes.NewReader(payload))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[config] vault 동기화 실패: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[config] vault 동기화 오류: %d", resp.StatusCode)
+	}
 }
 
 func (s *Server) handleThinkMode(w http.ResponseWriter, r *http.Request) {

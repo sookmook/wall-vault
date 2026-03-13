@@ -91,6 +91,7 @@ func (s *Server) Handler() http.Handler {
 	// 프록시 전용 (클라이언트 토큰 인증)
 	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))       // 복호화된 키 목록
 	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))  // Heartbeat 수신
+	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))  // 클라이언트 자기 설정 변경
 
 	// 관리자
 	mux.HandleFunc("/admin/theme", s.adminAuth(s.handleAdminTheme))
@@ -355,6 +356,46 @@ func (s *Server) handleAdminProxies(w http.ResponseWriter, r *http.Request) {
 }
 
 // ─── 프록시 전용 API ──────────────────────────────────────────────────────────
+
+// handleClientConfig: 클라이언트가 자신의 서비스/모델 설정을 변경 (양방향 동기화 지원)
+func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
+		return
+	}
+	// 클라이언트 식별: 토큰으로 찾거나, 관리자 토큰이면 쿼리 파라미터 client_id 사용
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	clientID := ""
+	if c := s.store.GetClientByToken(token); c != nil {
+		clientID = c.ID
+	} else if token == s.cfg.Vault.AdminToken {
+		clientID = r.URL.Query().Get("client_id")
+	}
+	if clientID == "" {
+		jsonError(w, "client not found", http.StatusUnauthorized)
+		return
+	}
+	var inp struct {
+		Service string `json:"service"`
+		Model   string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.UpdateClient(clientID, ClientUpdateInput{
+		DefaultService: inp.Service,
+		DefaultModel:   inp.Model,
+	}); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	s.broker.Broadcast(SSEEvent{
+		Type: "config_change",
+		Data: ConfigChangeEvent{ClientID: clientID, Service: inp.Service, Model: inp.Model},
+	})
+	jsonOK(w, map[string]string{"status": "updated", "client_id": clientID})
+}
 
 // handleProxyKeys: 프록시에게 복호화된 키 목록 제공 (클라이언트 토큰 인증)
 func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {

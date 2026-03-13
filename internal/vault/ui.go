@@ -654,8 +654,10 @@ function connectSSE() {
     try {
       const d = JSON.parse(e.data);
       if (d.type === 'config_change') {
-        // 에이전트 모델 드롭다운만 갱신 (페이지 reload 없음)
-        refreshModelDropdowns();
+        // 에이전트 카드 서비스/모델 필드 즉시 반영 후 드롭다운 갱신
+        const cd = d.data || {};
+        if (cd.client_id) applyAgentConfigChange(cd.client_id, cd.service, cd.model);
+        else refreshModelDropdowns();
       } else if (d.type === 'service_changed') {
         // 서비스 추가/삭제 → 체크 후 에이전트 메뉴 전체 갱신
         autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
@@ -774,6 +776,43 @@ function deleteKey(id) {
       else alert(T('err')+d.error);
     } else { location.reload(); }
   });
+}
+
+// ── 에이전트 카드 실시간 반영 (config_change SSE) ──
+// 에이전트 카드의 서비스 select, 모델 input을 새 값으로 업데이트하고 모델 드롭다운 재조회
+function applyAgentConfigChange(clientId, service, model) {
+  const svcSel = document.getElementById('svc-'+clientId);
+  const mdlInp = document.getElementById('mdl-'+clientId);
+  const mdlSel = document.getElementById('mdl-sel-'+clientId);
+  // 서비스 select 업데이트
+  if (svcSel && service) {
+    svcSel.value = service;
+    if (svcSel.value !== service) {
+      // select에 해당 옵션이 없으면 목록 갱신 후 재적용
+      refreshServiceSelects().then(() => { if (svcSel) svcSel.value = service; });
+    }
+  }
+  // 모델 input 업데이트
+  if (mdlInp && model) {
+    mdlInp.value = model;
+    if (mdlSel) mdlSel.value = '';
+  }
+  // 모델 드롭다운 재조회
+  const curSvc = (svcSel && svcSel.value) || service;
+  if (curSvc) onAgentServiceChange('mdl-'+clientId, 'mdl-sel-'+clientId, curSvc);
+  // 해당 에이전트 카드의 status-live 텍스트 업데이트 (실행 중인 경우)
+  if (svcSel && service && model) {
+    const card = svcSel.closest('.agent-item');
+    if (card) {
+      const live = card.querySelector('.status-live');
+      if (live) {
+        const parts = live.textContent.split('—');
+        if (parts.length >= 2) {
+          live.textContent = parts[0] + '— ' + service + ' / ' + model;
+        }
+      }
+    }
+  }
 }
 
 // ── 서비스 자동 체크 ──

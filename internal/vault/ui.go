@@ -520,8 +520,18 @@ function connectSSE() {
   es.onmessage = (e) => {
     try {
       const d = JSON.parse(e.data);
-      if (d.type === 'config_change' || d.type === 'key_added') {
-        setTimeout(() => location.reload(), 800);
+      if (d.type === 'config_change') {
+        // 에이전트 모델 드롭다운만 갱신 (페이지 reload 없음)
+        refreshModelDropdowns();
+      } else if (d.type === 'service_changed') {
+        // 서비스 목록 변경 → 서비스 select + 모델 드롭다운 갱신
+        refreshServiceSelects().then(() => refreshModelDropdowns());
+      } else if (d.type === 'key_added' || d.type === 'key_deleted') {
+        // 키 변경 → 모델 드롭다운 갱신 (모델 레지스트리 TTL 무효화 후)
+        refreshModelDropdowns();
+      } else if (d.type === 'usage_reset') {
+        // 가벼운 reload (일일 사용량 초기화)
+        setTimeout(() => location.reload(), 500);
       }
     } catch {}
   };
@@ -534,6 +544,41 @@ function connectSSE() {
   };
 }
 connectSSE();
+
+// 서비스 select 갱신: /admin/services에서 현재 목록 받아 모든 svc-* select 업데이트
+function refreshServiceSelects() {
+  const tok = localStorage.getItem('wv_admin_token')||'';
+  return fetch('/admin/services', {headers:{'Authorization':'Bearer '+tok}})
+  .then(r=>r.json()).then(svcs=>{
+    if(!Array.isArray(svcs)) return;
+    // 활성화된 서비스만
+    const enabled = svcs.filter(s=>s.enabled);
+    function _svcOpts(prev) {
+      return enabled.map(s=>'<option value="'+s.id+'"'+(s.id===prev?' selected':'')+'>'+( s.name||s.id)+'</option>').join('');
+    }
+    // 에이전트 카드의 svc-* select 갱신
+    document.querySelectorAll('.agent-svc-sel').forEach(sel=>{
+      const prev = sel.value;
+      sel.innerHTML = _svcOpts(prev);
+      if(!sel.value && enabled.length) sel.value = enabled[0].id;
+    });
+    // 모달의 서비스 select 갱신
+    ['ac-service','ec-service','ak-service'].forEach(id=>{
+      const sel=document.getElementById(id);
+      if(!sel) return;
+      const prev=sel.value;
+      sel.innerHTML = '<option value="">\u2014 \uc120\ud0dd \u2014</option>' + _svcOpts(prev);
+    });
+  }).catch(()=>{});
+}
+
+// 모델 드롭다운 갱신: 각 에이전트 카드의 현재 서비스로 모델 목록 재조회
+function refreshModelDropdowns() {
+  document.querySelectorAll('.agent-svc-sel').forEach(el=>{
+    const id = el.id.replace('svc-','');
+    if(id && el.value) onAgentServiceChange('mdl-'+id,'mdl-sel-'+id, el.value);
+  });
+}
 
 // Admin Token 헬퍼
 function getAdminToken() {
@@ -599,12 +644,7 @@ function deleteKey(id) {
 }
 
 // ── 에이전트 카드 모델 목록 초기화 (페이지 로드 시) ──
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.agent-svc-sel').forEach(function(el) {
-    const id = el.id.replace('svc-', '');
-    if (id && el.value) onAgentServiceChange('mdl-'+id, 'mdl-sel-'+id, el.value);
-  });
-});
+document.addEventListener('DOMContentLoaded', function() { refreshModelDropdowns(); });
 
 // ── 모달 공통 유틸 ──
 function closeModal(prefix) {
@@ -860,17 +900,34 @@ function deleteClient(id) {
   });
 }
 
-// 모델 변경 (에이전트 카드 인라인)
+// 모델 변경 (에이전트 카드 인라인) — reload 없이 인라인 피드백
 function changeModel(clientId) {
   const svc = document.getElementById('svc-'+clientId).value;
   const model = document.getElementById('mdl-'+clientId).value.trim();
   if (!model) return alert(T('err_model'));
   const token = getAdminToken(); if (!token) return;
+  // 버튼 찾기 (onclick="changeModel('...')" 버튼)
+  const btn = document.querySelector('[onclick="changeModel(\''+clientId+'\')"]');
+  if(btn) { btn.disabled=true; btn.textContent='…'; }
   fetch('/admin/clients/'+clientId,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
     body:JSON.stringify({default_service:svc,default_model:model})})
   .then(r=>r.json()).then(d=>{
-    if(d.error){if(d.error==='unauthorized'){clearAdminToken();alert(T('err_token'));}else alert(T('err')+d.error);}
-    else location.reload();
+    if(d.error){
+      if(d.error==='unauthorized'){clearAdminToken();alert(T('err_token'));}
+      else alert(T('err')+d.error);
+      if(btn){btn.disabled=false;btn.setAttribute('data-i18n','apply');btn.textContent=T('apply');}
+    } else {
+      // 저장 성공 — 버튼에 ✓ 표시 후 원래 텍스트로 복귀
+      if(btn){
+        btn.disabled=false;
+        btn.textContent='✓';
+        btn.style.color='var(--green)';
+        setTimeout(()=>{btn.textContent=T('apply');btn.style.color='';},2000);
+      }
+    }
+  }).catch(e=>{
+    alert(T('err')+e);
+    if(btn){btn.disabled=false;btn.setAttribute('data-i18n','apply');btn.textContent=T('apply');}
   });
 }`
 }

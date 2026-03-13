@@ -36,7 +36,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 <body>
 <div class="topbar">
   <div class="topbar-brand">
-    <svg class="topbar-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <svg class="topbar-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M18 10h-1V7a5 5 0 0 0-10 0v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-6 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-7H9V7a3 3 0 0 1 6 0v3z"/></svg>
     <span class="topbar-title">wall-vault</span>
   </div>
   <div class="topbar-controls">
@@ -65,7 +65,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
   </div>
 </div>
 <div class="header">
-  <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></svg>
+  <svg class="header-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M18 10h-1V7a5 5 0 0 0-10 0v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-6 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-7H9V7a3 3 0 0 1 6 0v3z"/></svg>
   <h1 id="page-title" data-i18n="title">AI 프록시 키 금고 대시보드</h1>
 </div>
 <div class="grid">`)
@@ -179,7 +179,7 @@ a{color:var(--accent);text-decoration:none}
 .section-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
 .section-hdr h2{color:var(--accent);font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:.4rem;letter-spacing:.2px;flex:1}
 .section-hdr h2 .count{color:var(--text-muted);font-size:.76rem;font-weight:400}
-.agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.8rem}
+.agents-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.8rem}
 /* ── 에이전트 개별 카드 ── */
 .agent-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.4rem;transition:box-shadow .18s,transform .18s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .agent-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px)}
@@ -189,7 +189,7 @@ a{color:var(--accent);text-decoration:none}
 .agent-card.ac-offline{border-left-color:var(--red)}
 .agent-card.ac-noconn{border-left-color:var(--text-muted)}
 .ac-top{display:flex;align-items:flex-start;gap:.5rem}
-.ac-type-icon{font-size:3.4rem;line-height:1;flex-shrink:0;margin-top:-.1rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.18))}
+.ac-type-icon{font-size:1.75rem;line-height:1;flex-shrink:0;margin-top:-.05rem;filter:drop-shadow(0 1px 3px rgba(0,0,0,.18))}
 .ac-info{flex:1;min-width:0}
 .ac-btns{display:flex;gap:.25rem;flex-shrink:0;margin-top:.05rem}
 /* ── 기본 유틸 ── */

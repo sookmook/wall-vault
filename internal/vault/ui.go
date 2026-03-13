@@ -54,13 +54,11 @@ func buildDashboard(s *Server, t *theme.Theme) string {
       <button class="dd-btn" id="dd-btn-theme" onclick="toggleDd(event,'dd-theme')">`)
 	sb.WriteString(themeLabel(t.Name))
 	sb.WriteString(` ▾</button>
-      <div class="dd-menu" id="dd-theme">
-        <div class="dd-item" data-val="light"  onclick="setTheme('light')">☀️ light</div>
-        <div class="dd-item" data-val="dark"   onclick="setTheme('dark')">🌑 dark</div>
-        <div class="dd-item" data-val="gold"   onclick="setTheme('gold')">✨ gold</div>
-        <div class="dd-item" data-val="cherry" onclick="setTheme('cherry')">🌸 cherry</div>
-        <div class="dd-item" data-val="ocean"  onclick="setTheme('ocean')">🌊 ocean</div>
-      </div>
+      <div class="dd-menu" id="dd-theme">`)
+	for _, name := range theme.List() {
+		sb.WriteString(fmt.Sprintf(`        <div class="dd-item" data-val=%q onclick="setTheme(%q)">%s</div>`+"\n", name, name, themeLabel(name)))
+	}
+	sb.WriteString(`      </div>
     </div>
     <span class="badge" id="sse-badge">● 연결 중...</span>
   </div>
@@ -390,10 +388,10 @@ document.addEventListener('click',()=>document.querySelectorAll('.dd-menu').forE
 // 언어 변경
 // LANG_LABELS is injected by buildI18NJS()
 function setLang(lang){
-  const tok=localStorage.getItem('wv_admin_token')||'';
+  const tok=getAdminToken(); if(!tok) return;
   fetch('/admin/lang',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({lang:lang})})
   .then(r=>r.json()).then(d=>{
-    if(d.error){alert(T('err')+d.error);return;}
+    if(d.error){if(d.error==='unauthorized'){clearAdminToken();alert(T('err_token'));}else alert(T('err')+d.error);return;}
     applyLang(lang);
     document.getElementById('dd-lang').classList.remove('open');
   }).catch(e=>alert(T('err')+e));
@@ -619,10 +617,10 @@ function applyThemeCss(name){
 }
 const THEME_LABELS={'light':'☀️ light','dark':'🌑 dark','gold':'✨ gold','cherry':'🌸 cherry','ocean':'🌊 ocean','autumn':'🍂 autumn','winter':'❄️ winter'};
 function setTheme(name){
-  const tok=localStorage.getItem('wv_admin_token')||'';
+  const tok=getAdminToken(); if(!tok) return;
   fetch('/admin/theme',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({theme:name})})
   .then(r=>r.json()).then(d=>{
-    if(d.error){alert(T('err')+d.error);return;}
+    if(d.error){if(d.error==='unauthorized'){clearAdminToken();alert(T('err_token'));}else alert(T('err')+d.error);return;}
     applyThemeCss(name);
     document.getElementById('dd-btn-theme').textContent=(THEME_LABELS[name]||name)+' ▾';
     document.querySelectorAll('#dd-theme .dd-item').forEach(el=>el.classList.toggle('active',el.dataset.val===name));

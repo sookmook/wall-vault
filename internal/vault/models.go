@@ -114,15 +114,16 @@ func (s *ServiceConfig) IsLocal() bool {
 // ─── Proxy Status (Heartbeat) ────────────────────────────────────────────────
 
 type ProxyStatus struct {
-	ClientID  string    `json:"client_id"`
-	Version   string    `json:"version"`
-	Service   string    `json:"service"`
-	Model     string    `json:"model"`
-	SSE       bool      `json:"sse_connected"`
-	Host      string    `json:"host,omitempty"`
-	StartedAt time.Time `json:"started_at,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Vault     VaultInfo `json:"vault,omitempty"`
+	ClientID   string            `json:"client_id"`
+	Version    string            `json:"version"`
+	Service    string            `json:"service"`
+	Model      string            `json:"model"`
+	SSE        bool              `json:"sse_connected"`
+	Host       string            `json:"host,omitempty"`
+	StartedAt  time.Time         `json:"started_at,omitempty"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	Vault      VaultInfo         `json:"vault,omitempty"`
+	ActiveKeys map[string]string `json:"active_keys,omitempty"` // service → key ID
 }
 
 type VaultInfo struct {

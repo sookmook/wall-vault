@@ -19,7 +19,10 @@ var cooldownDurations = map[int]time.Duration{
 	402: 1 * time.Hour,    // payment required — retry in an hour (was 24h)
 	401: 24 * time.Hour,   // invalid key — retire for a day
 	403: 24 * time.Hour,   // forbidden — retire for a day
-	// 404: model not found — key not at fault, never cooldown
+	// 400: bad request — request format error, not a key error, no cooldown
+	// 404: model not found — key not at fault, no cooldown
+	400: 0,
+	404: 0,
 }
 
 func cooldownFor(errCode int) time.Duration {
@@ -121,11 +124,15 @@ func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.lastUsed[k.service] = k.id
 }
 
-// RecordError: set cooldown
+// RecordError: set cooldown (0 duration = no cooldown, request-side error)
 func (km *KeyManager) RecordError(k *localKey, errCode int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	d := cooldownFor(errCode)
+	if d == 0 {
+		log.Printf("[key] 쿨다운 없음: service=%s, 오류=%d (request error)", k.service, errCode)
+		return
+	}
 	k.cooldownUntil = time.Now().Add(d)
 	log.Printf("[key] 쿨다운 설정: service=%s, 오류=%d, %.0f분", k.service, errCode, d.Minutes())
 }

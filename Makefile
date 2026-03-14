@@ -1,6 +1,6 @@
 BINARY = wall-vault
 MODULE = github.com/sookmook/wall-vault
-VERSION = v0.1.5
+VERSION = v0.1.6
 
 LDFLAGS = -ldflags "-X main.version=$(VERSION) -s -w"
 

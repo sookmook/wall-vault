@@ -1,7 +1,141 @@
+# Contributing to wall-vault
+
+Thank you for contributing to wall-vault!
+*(Last updated: 2026-03-15)*
+
+---
+
+## How to Contribute
+
+### Bug Reports
+
+Open a new issue on [GitHub Issues](https://github.com/sookmook/wall-vault/issues).
+Including the following helps resolve it faster:
+
+- OS and version (e.g. Ubuntu 22.04 / macOS 14 / Windows 11 WSL2)
+- wall-vault version (`wall-vault --version` or `/health` response)
+- Steps to reproduce
+- Expected behavior vs. actual behavior
+- Relevant logs
+
+### Feature Requests
+
+Open an issue with the `enhancement` label.
+
+### Code Contributions
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Make your changes
+4. Add tests and make sure they pass: `make test`
+5. Send a PR
+
+---
+
+## Development Setup
+
+```bash
+# Go 1.22+ required
+go version
+
+# Install dependencies
+make deps
+
+# Build
+make build
+
+# Test
+make test
+make test-verbose
+
+# Local install
+make install
+```
+
+---
+
+## Project Structure
+
+```
+wall-vault/
+├── cmd/              # subcommand entry points
+├── internal/         # core logic (not exported)
+│   ├── config/       # config load / save / plugins
+│   ├── proxy/        # AI API proxy server
+│   ├── vault/        # key vault server
+│   ├── doctor/       # health check / auto-recovery
+│   ├── i18n/         # multi-language support
+│   ├── middleware/   # HTTP middleware
+│   ├── models/       # model registry
+│   ├── hooks/        # event hook system
+│   └── theme/        # UI themes
+├── configs/          # example configs, service plugins
+├── docs/             # documentation
+└── .github/          # GitHub Actions
+```
+
+---
+
+## Coding Style
+
+- **Go standard style** (`gofmt`, `go vet` must pass)
+- Add Go doc comments to new exported functions
+- Wrap errors: `fmt.Errorf("context: %w", err)`
+- Tests in the same package as `_test.go` files
+- Unit tests required for new features
+- **Commit messages in English** — no Korean in commit messages
+- **Source code comments in English**
+
+---
+
+## Writing Tests
+
+```go
+// Function name: Test{Feature}_{Scenario}
+func TestHandleKeys_Unauthorized(t *testing.T) {
+    // Arrange
+    srv := newTestServer(t)
+
+    // Act
+    req := httptest.NewRequest("GET", "/api/keys", nil)
+    w := httptest.NewRecorder()
+    srv.Handler().ServeHTTP(w, req)
+
+    // Assert
+    if w.Code != http.StatusUnauthorized {
+        t.Errorf("status = %d, want 401", w.Code)
+    }
+}
+```
+
+- Mock external services (Google, OpenRouter, Ollama) with `httptest.NewServer`
+- Use `t.TempDir()` for file I/O
+- Synchronize time-dependent tests with short `time.Sleep` or channels
+
+---
+
+## PR Checklist
+
+- [ ] `go vet ./...` passes
+- [ ] `go test ./...` all pass
+- [ ] Tests added for new features
+- [ ] New subcommands / flags: update `docs/API.md` or `docs/MANUAL.md`
+- [ ] Major changes: add entry to `CHANGELOG.md` under `[Unreleased]`
+- [ ] No personal API keys, tokens, or passwords in the commit
+- [ ] `wall-vault.yaml` not accidentally included (it's in `.gitignore`)
+
+---
+
+## License
+
+Contributions are released under the [GPL-3.0 License](LICENSE).
+
+---
+---
+
 # wall-vault 기여 가이드
 
 wall-vault에 기여해 주셔서 감사합니다!
-*(최종 갱신: 2026-03-13)*
 
 ---
 
@@ -83,6 +217,8 @@ wall-vault/
 - 에러는 `fmt.Errorf("컨텍스트: %w", err)` 형식으로 래핑
 - 테스트는 같은 패키지에 `_test.go` 파일로 작성
 - 새 기능에는 단위 테스트 필수
+- **커밋 메시지는 영어** — 한국어 커밋 메시지 금지
+- **소스코드 주석은 영어**
 
 ---
 
@@ -126,4 +262,4 @@ func TestHandleKeys_Unauthorized(t *testing.T) {
 
 ## 라이선스
 
-기여하신 코드는 [MIT License](LICENSE) 하에 배포됩니다.
+기여하신 코드는 [GPL-3.0 License](LICENSE) 하에 배포됩니다.

@@ -523,126 +523,181 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 // ─── Google Gemini ────────────────────────────────────────────────────────────
 
 func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, error) {
-	key, plainKey, err := s.getKey("google")
-	if err != nil {
-		s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "google"})
-		return nil, err
-	}
+	const maxAttempts = 3
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		key, plainKey, err := s.getKey("google")
+		if err != nil {
+			s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "google"})
+			break
+		}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, plainKey)
-	data, _ := json.Marshal(req)
-	resp, err := s.doRequest("POST", url, data, nil)
-	if err != nil {
-		s.keyMgr.RecordError(key, 0)
-		return nil, err
-	}
-	defer resp.Body.Close()
+		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, plainKey)
+		data, _ := json.Marshal(req)
+		resp, err := s.doRequest("POST", url, data, nil)
+		if err != nil {
+			s.keyMgr.RecordError(key, 0)
+			lastErr = err
+			break
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		s.keyMgr.RecordError(key, resp.StatusCode)
-		return nil, fmt.Errorf("Google API 오류: HTTP %d", resp.StatusCode)
-	}
+		if resp.StatusCode == http.StatusNotFound {
+			// Model not found — key is fine, skip service entirely
+			resp.Body.Close()
+			return nil, fmt.Errorf("Google: 모델 없음 (%s)", model)
+		}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusPaymentRequired {
+			// Key-level error — cooldown this key and retry with another
+			resp.Body.Close()
+			s.keyMgr.RecordError(key, resp.StatusCode)
+			lastErr = fmt.Errorf("Google API 오류: HTTP %d", resp.StatusCode)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			s.keyMgr.RecordError(key, resp.StatusCode)
+			resp.Body.Close()
+			return nil, fmt.Errorf("Google API 오류: HTTP %d", resp.StatusCode)
+		}
 
-	body, _ := io.ReadAll(resp.Body)
-	var geminiResp GeminiResponse
-	if err := json.Unmarshal(body, &geminiResp); err != nil {
-		return nil, fmt.Errorf("Google 응답 파싱 오류: %w", err)
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var geminiResp GeminiResponse
+		if err := json.Unmarshal(body, &geminiResp); err != nil {
+			return nil, fmt.Errorf("Google 응답 파싱 오류: %w", err)
+		}
+		if geminiResp.Error != nil {
+			return nil, fmt.Errorf("Google: %s", geminiResp.Error.Message)
+		}
+		tokens := 0
+		if geminiResp.UsageMetadata != nil {
+			tokens = geminiResp.UsageMetadata.TotalTokenCount
+		}
+		s.keyMgr.RecordSuccess(key, tokens)
+		return &geminiResp, nil
 	}
-	if geminiResp.Error != nil {
-		return nil, fmt.Errorf("Google: %s", geminiResp.Error.Message)
-	}
-	tokens := 0
-	if geminiResp.UsageMetadata != nil {
-		tokens = geminiResp.UsageMetadata.TotalTokenCount
-	}
-	s.keyMgr.RecordSuccess(key, tokens)
-	return &geminiResp, nil
+	return nil, lastErr
 }
 
 // ─── OpenRouter ───────────────────────────────────────────────────────────────
 
 func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiResponse, error) {
-	key, plainKey, err := s.getKey("openrouter")
-	if err != nil {
-		s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openrouter"})
-		return nil, err
-	}
-
+	const maxAttempts = 3
+	var lastErr error
 	oaiReq := GeminiToOpenAI(model, req)
 	data, _ := json.Marshal(oaiReq)
-	headers := map[string]string{
-		"Authorization": "Bearer " + plainKey,
-		"HTTP-Referer":  "https://github.com/sookmook/wall-vault",
-		"X-Title":       "wall-vault",
-	}
-	resp, err := s.doRequest("POST", "https://openrouter.ai/api/v1/chat/completions", data, headers)
-	if err != nil {
-		s.keyMgr.RecordError(key, 0)
-		return nil, err
-	}
-	defer resp.Body.Close()
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		key, plainKey, err := s.getKey("openrouter")
+		if err != nil {
+			s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openrouter"})
+			break
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		s.keyMgr.RecordError(key, resp.StatusCode)
-		return nil, fmt.Errorf("OpenRouter 오류: HTTP %d", resp.StatusCode)
-	}
+		headers := map[string]string{
+			"Authorization": "Bearer " + plainKey,
+			"HTTP-Referer":  "https://github.com/sookmook/wall-vault",
+			"X-Title":       "wall-vault",
+		}
+		resp, err := s.doRequest("POST", "https://openrouter.ai/api/v1/chat/completions", data, headers)
+		if err != nil {
+			s.keyMgr.RecordError(key, 0)
+			lastErr = err
+			break
+		}
 
-	body, _ := io.ReadAll(resp.Body)
-	var oaiResp OpenAIResponse
-	if err := json.Unmarshal(body, &oaiResp); err != nil {
-		return nil, fmt.Errorf("OpenRouter 응답 파싱 오류: %w", err)
+		if resp.StatusCode == http.StatusNotFound {
+			// Model not found — key is fine, skip service entirely
+			resp.Body.Close()
+			return nil, fmt.Errorf("OpenRouter: 모델 없음 (%s)", model)
+		}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusPaymentRequired {
+			// Key-level error — cooldown this key and retry with another
+			resp.Body.Close()
+			s.keyMgr.RecordError(key, resp.StatusCode)
+			lastErr = fmt.Errorf("OpenRouter 오류: HTTP %d", resp.StatusCode)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			s.keyMgr.RecordError(key, resp.StatusCode)
+			resp.Body.Close()
+			return nil, fmt.Errorf("OpenRouter 오류: HTTP %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var oaiResp OpenAIResponse
+		if err := json.Unmarshal(body, &oaiResp); err != nil {
+			return nil, fmt.Errorf("OpenRouter 응답 파싱 오류: %w", err)
+		}
+		if oaiResp.Error != nil {
+			return nil, fmt.Errorf("OpenRouter: %s", oaiResp.Error.Message)
+		}
+		tokens := 0
+		if oaiResp.Usage != nil {
+			tokens = oaiResp.Usage.TotalTokens
+		}
+		s.keyMgr.RecordSuccess(key, tokens)
+		return OpenAIRespToGemini(&oaiResp), nil
 	}
-	if oaiResp.Error != nil {
-		return nil, fmt.Errorf("OpenRouter: %s", oaiResp.Error.Message)
-	}
-	tokens := 0
-	if oaiResp.Usage != nil {
-		tokens = oaiResp.Usage.TotalTokens
-	}
-	s.keyMgr.RecordSuccess(key, tokens)
-	return OpenAIRespToGemini(&oaiResp), nil
+	return nil, lastErr
 }
 
 // ─── OpenAI Direct Call ───────────────────────────────────────────────────────
 
 func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, error) {
-	key, plainKey, err := s.getKey("openai")
-	if err != nil {
-		s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openai"})
-		return nil, err
-	}
-
+	const maxAttempts = 3
+	var lastErr error
 	oaiReq := GeminiToOpenAI(model, req)
 	data, _ := json.Marshal(oaiReq)
-	headers := map[string]string{
-		"Authorization": "Bearer " + plainKey,
-	}
-	resp, err := s.doRequest("POST", "https://api.openai.com/v1/chat/completions", data, headers)
-	if err != nil {
-		s.keyMgr.RecordError(key, 0)
-		return nil, err
-	}
-	defer resp.Body.Close()
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		key, plainKey, err := s.getKey("openai")
+		if err != nil {
+			s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openai"})
+			break
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		s.keyMgr.RecordError(key, resp.StatusCode)
-		return nil, fmt.Errorf("OpenAI 오류: HTTP %d", resp.StatusCode)
-	}
+		headers := map[string]string{
+			"Authorization": "Bearer " + plainKey,
+		}
+		resp, err := s.doRequest("POST", "https://api.openai.com/v1/chat/completions", data, headers)
+		if err != nil {
+			s.keyMgr.RecordError(key, 0)
+			lastErr = err
+			break
+		}
 
-	body, _ := io.ReadAll(resp.Body)
-	var oaiResp OpenAIResponse
-	if err := json.Unmarshal(body, &oaiResp); err != nil {
-		return nil, fmt.Errorf("OpenAI 응답 파싱 오류: %w", err)
+		if resp.StatusCode == http.StatusNotFound {
+			resp.Body.Close()
+			return nil, fmt.Errorf("OpenAI: 모델 없음 (%s)", model)
+		}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusPaymentRequired {
+			resp.Body.Close()
+			s.keyMgr.RecordError(key, resp.StatusCode)
+			lastErr = fmt.Errorf("OpenAI 오류: HTTP %d", resp.StatusCode)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			s.keyMgr.RecordError(key, resp.StatusCode)
+			resp.Body.Close()
+			return nil, fmt.Errorf("OpenAI 오류: HTTP %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var oaiResp OpenAIResponse
+		if err := json.Unmarshal(body, &oaiResp); err != nil {
+			return nil, fmt.Errorf("OpenAI 응답 파싱 오류: %w", err)
+		}
+		if oaiResp.Error != nil {
+			return nil, fmt.Errorf("OpenAI: %s", oaiResp.Error.Message)
+		}
+		tokens := 0
+		if oaiResp.Usage != nil {
+			tokens = oaiResp.Usage.TotalTokens
+		}
+		s.keyMgr.RecordSuccess(key, tokens)
+		return OpenAIRespToGemini(&oaiResp), nil
 	}
-	if oaiResp.Error != nil {
-		return nil, fmt.Errorf("OpenAI: %s", oaiResp.Error.Message)
-	}
-	tokens := 0
-	if oaiResp.Usage != nil {
-		tokens = oaiResp.Usage.TotalTokens
-	}
-	s.keyMgr.RecordSuccess(key, tokens)
-	return OpenAIRespToGemini(&oaiResp), nil
+	return nil, lastErr
 }
 
 // ─── Ollama (single concurrent request via mutex) ────────────────────────────

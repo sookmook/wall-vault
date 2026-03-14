@@ -682,6 +682,41 @@ applyThemeCss('` + currentTheme + `');
 applyLang('` + currentLang + `');
 document.querySelectorAll('#dd-theme .dd-item').forEach(el=>el.classList.toggle('active',el.dataset.val==='` + currentTheme + `'));
 
+// 키 상태 캐시 (쿨다운 카운트다운용)
+let _keyCache = [];
+
+// 쿨다운 카운트다운 문자열 생성 (초 단위)
+function _fmtCountdown(until) {
+  const rem = Math.floor((until - Date.now()) / 1000);
+  if(rem <= 0) return null;
+  const m = Math.floor(rem / 60), s = rem % 60;
+  return m > 0 ? m+'분 '+s+'초' : s+'초';
+}
+
+// 1초마다 쿨다운 카운트다운 갱신 (fetch 없이 캐시 사용)
+function _tickCooldowns() {
+  const now = Date.now();
+  _keyCache.forEach(k=>{
+    if(!k._cdMs) return;
+    const el = document.querySelector('[data-key-id="'+k.id+'"]');
+    if(!el) return;
+    const meta = el.querySelector('.key-meta');
+    const bar = el.querySelector('.bar-fill');
+    if(!meta) return;
+    if(k._cdMs > now) {
+      const cd = _fmtCountdown(k._cdMs);
+      meta.textContent = k._baseText + (cd ? ' ('+cd+')' : '');
+      if(bar) bar.className = 'bar-fill bar-yellow';
+    } else {
+      // 쿨다운 만료 — 초록으로 복원
+      meta.textContent = k._baseText;
+      if(bar) bar.className = 'bar-fill bar-green';
+      k._cdMs = 0;
+    }
+  });
+}
+setInterval(_tickCooldowns, 1000);
+
 // 키 사용량 그래프 실시간 갱신 (heartbeat usage_update SSE 이벤트 수신 시)
 function refreshKeyUsage(_data) {
   const tok = localStorage.getItem('wv_admin_token')||'';
@@ -689,13 +724,15 @@ function refreshKeyUsage(_data) {
     .then(r=>r.json()).then(keys=>{
       if(!Array.isArray(keys)) return;
       const now = new Date();
+      _keyCache = [];
       keys.forEach(k=>{
         const el = document.querySelector('[data-key-id="'+k.id+'"]');
         if(!el) return;
         const bar = el.querySelector('.bar-fill');
         const meta = el.querySelector('.key-meta');
         if(!bar) return;
-        const onCooldown = k.cooldown_until && new Date(k.cooldown_until) > now;
+        const cdDate = k.cooldown_until ? new Date(k.cooldown_until) : null;
+        const onCooldown = cdDate && cdDate > now;
         let pct = 0;
         if(k.daily_limit > 0) {
           pct = Math.round(k.today_usage * 100 / k.daily_limit);
@@ -705,14 +742,13 @@ function refreshKeyUsage(_data) {
         bar.style.width = pct + '%';
         const cls = onCooldown ? 'bar-yellow' : (k.usage_pct >= 97 ? 'bar-red' : 'bar-green');
         bar.className = 'bar-fill ' + cls;
+        const baseText = k.daily_limit > 0 ? (k.today_usage+'/'+k.daily_limit) : (k.today_usage+' 요청');
         if(meta) {
-          let txt = k.daily_limit > 0 ? (k.today_usage+'/'+k.daily_limit) : (k.today_usage+' 요청');
-          if(onCooldown) {
-            const rem = Math.round((new Date(k.cooldown_until)-now)/60000);
-            txt += ' ('+rem+'분 후)';
-          }
-          meta.textContent = txt;
+          const cd = onCooldown ? _fmtCountdown(cdDate.getTime()) : null;
+          meta.textContent = baseText + (cd ? ' ('+cd+')' : '');
         }
+        // 캐시 저장 (1초 타이머용)
+        _keyCache.push({id: k.id, _baseText: baseText, _cdMs: onCooldown ? cdDate.getTime() : 0});
       });
     }).catch(()=>{});
 }

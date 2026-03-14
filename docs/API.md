@@ -851,6 +851,7 @@ glm-5:cloud      →  OpenRouter, 모델 ID: glm-5
 | `work_dir` | string | 에이전트 작업 디렉토리 |
 | `description` | string | 설명 |
 | `ip_whitelist` | []string | 허용 IP 목록 (CIDR 지원) |
+| `avatar` | string | Agent avatar — relative path under `~/.openclaw/` (e.g. `workspace/avatar.png`, `workspace/avatars/profile.hpg`) OR base64 data URI (`data:image/png;base64,...`). Supported extensions: `.png`, `.jpg`/`.jpeg`/`.hpg`, `.webp`, `.gif`. |
 | `enabled` | bool | `false`이면 `/api/keys` 접근 시 `403` |
 | `created_at` | time.Time | 등록 시각 |
 
@@ -863,7 +864,7 @@ glm-5:cloud      →  OpenRouter, 모델 ID: glm-5
 | `local_url` | string | 로컬 서버 URL (Ollama/LMStudio/vLLM/커스텀) |
 | `enabled` | bool | 활성화 여부 |
 | `custom` | bool | 사용자 추가 서비스 여부 |
-| `proxy_enabled` | bool | 오픈클로 프록시의 dispatch에 이 서비스 포함 여부 (UI 체크박스) |
+| `proxy_enabled` | bool | Whether this service is included in proxy dispatch and agent model dropdowns. Controlled by the "프록시 사용" checkbox in the Services card. Only `proxy_enabled: true` services appear in agent service/model selectors. |
 
 ### ProxyStatus (Heartbeat)
 
@@ -1063,4 +1064,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*최종 업데이트: 2026-03-14 — v0.1.5: 서비스 카드 UI 정리*
+*Last updated: 2026-03-14 — v0.1.6: avatar path support, proxy-only service filter in dropdowns, SyncFromVault usage fix*

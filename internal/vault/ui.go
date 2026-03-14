@@ -188,7 +188,8 @@ a{color:var(--accent);text-decoration:none}
 .agent-card.ac-offline{border-left-color:var(--red)}
 .agent-card.ac-noconn{border-left-color:var(--text-muted)}
 .ac-top{display:flex;align-items:flex-start;gap:.5rem}
-.ac-type-icon{font-size:1.75rem;line-height:1;flex-shrink:0;margin-top:-.05rem;filter:drop-shadow(0 1px 3px rgba(0,0,0,.18))}
+.ac-type-icon{font-size:5.28rem;line-height:1;flex-shrink:0;margin-top:0;filter:drop-shadow(0 2px 6px rgba(0,0,0,.20))}
+.ac-avatar{width:5.28rem;height:5.28rem;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border)}
 .ac-info{flex:1;min-width:0}
 .ac-btns{display:flex;gap:.25rem;flex-shrink:0;margin-top:.05rem}
 /* ── 기본 유틸 ── */
@@ -913,6 +914,7 @@ function closeModal(prefix) {
 }
 function _readClientForm(prefix) {
   const ipwlRaw = document.getElementById(prefix+'-ipwl').value.trim();
+  const avatarEl = document.getElementById(prefix+'-avatar');
   return {
     id:      document.getElementById(prefix+'-id').value.trim(),
     name:    document.getElementById(prefix+'-name').value.trim(),
@@ -923,6 +925,7 @@ function _readClientForm(prefix) {
     work_dir:    document.getElementById(prefix+'-workdir').value.trim(),
     description: document.getElementById(prefix+'-desc').value.trim(),
     ip_whitelist: ipwlRaw ? ipwlRaw.split(',').map(s=>s.trim()).filter(s=>s) : [],
+    avatar:  avatarEl ? (avatarEl.value||'') : '',
     enabled: document.getElementById(prefix+'-enabled').checked,
   };
 }
@@ -935,6 +938,21 @@ function _clearClientForm(prefix) {
   const msg=document.getElementById(prefix+'-msg');if(msg)msg.textContent='';
   const ms=document.getElementById(prefix+'-mdl-sel');
   if(ms) ms.innerHTML='<option value="">'+T('sel_model_or_enter')+'</option>';
+  const av=document.getElementById(prefix+'-avatar');if(av)av.value='';
+  const avp=document.getElementById(prefix+'-avatar-preview');if(avp){avp.src='';avp.style.display='none';}
+}
+// 아바타 파일 → base64 data URI 변환 후 hidden input에 저장
+function loadAvatarPreview(fileInput, hiddenId, previewId) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = e.target.result;
+    document.getElementById(hiddenId).value = data;
+    const prev = document.getElementById(previewId);
+    if (prev) { prev.src = data; prev.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
 }
 
 // ── OpenClaw 설정 복사 ──
@@ -1077,6 +1095,7 @@ function submitModal(prefix) {
     if (data.description !== (o.description||'')) body.description = data.description;
     const newIps = data.ip_whitelist.join(','), oldIps = (o.ip_whitelist||[]).join(',');
     if (newIps !== oldIps) body.ip_whitelist = data.ip_whitelist;
+    if (data.avatar !== (o.avatar||'')) body.avatar = data.avatar;
     fetch(url2, {method:'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify(body)})
     .then(r=>r.json()).then(d=>{
       if (d.error) {
@@ -1126,6 +1145,11 @@ function openEditClient(id) {
     document.getElementById('ec-ipwl').value = (c.ip_whitelist||[]).join(', ');
     document.getElementById('ec-enabled').checked = c.enabled!==false;
     document.getElementById('ec-msg').textContent = '';
+    // 아바타 미리보기
+    const avHid = document.getElementById('ec-avatar');
+    const avPrev = document.getElementById('ec-avatar-preview');
+    if (avHid) avHid.value = c.avatar||'';
+    if (avPrev) { if(c.avatar){avPrev.src=c.avatar;avPrev.style.display='block';}else{avPrev.src='';avPrev.style.display='none';} }
     // 모델 목록 로드
     onAgentServiceChange('ec-mdl', 'ec-mdl-sel', c.default_service||'google');
     document.getElementById('modal-ec').classList.add('open');
@@ -1531,7 +1555,11 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
 		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
-		item.WriteString(fmt.Sprintf(`<div class="ac-type-icon">%s</div>`, typeIcon))
+		if c.AgentType == "openclaw" && c.Avatar != "" {
+			item.WriteString(fmt.Sprintf(`<img src="%s" class="ac-avatar" alt="%s">`, c.Avatar, displayName))
+		} else {
+			item.WriteString(fmt.Sprintf(`<div class="ac-type-icon">%s</div>`, typeIcon))
+		}
 		item.WriteString(`<div class="ac-info">`)
 		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s <span style="color:var(--text-muted);font-size:.7rem">(%s)</span>%s</div>`,
 			displayName, c.ID, typeBadge))
@@ -1762,6 +1790,12 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
   <input id="%s-desc" type="text" data-i18n-ph="ph_desc">
   <label data-i18n="lbl_ip_whitelist">허용 IP</label>
   <input id="%s-ipwl" type="text" placeholder="192.168.1.1, 10.0.0.0/24">
+  <label data-i18n="lbl_avatar">아바타 이미지 (openclaw)</label>
+  <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem">
+    <img id="%s-avatar-preview" src="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:1px solid var(--border);display:none">
+    <input id="%s-avatar" type="hidden">
+    <input type="file" accept="image/*" style="font-size:.75rem;color:var(--text-muted)" onchange="loadAvatarPreview(this,'%s-avatar','%s-avatar-preview')">
+  </div>
   <label data-i18n="lbl_tok">토큰</label>
   <input id="%s-token" type="text" data-i18n-ph="ph_auto" placeholder="자동 생성" autocomplete="off">
   <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-top:.4rem">
@@ -1781,6 +1815,7 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
 		prefix, prefix, prefix, svcOpts,
 		prefix, prefix, prefix,
 		prefix, prefix,
+		prefix, prefix, prefix, prefix, // avatar: preview, hidden, file-onchange x2
 		prefix, prefix, prefix, prefix,
 		prefix, prefix,
 		prefix,

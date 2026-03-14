@@ -1,7 +1,53 @@
 # Changelog
 
+All notable changes to wall-vault are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
 wall-vault의 모든 주요 변경 사항을 기록합니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.0.0/)를 따릅니다.
+
+---
+
+## [Unreleased]
+
+### i18n
+- Added 20 new i18n keys to all 17 locale files — previously hardcoded Korean strings in dashboard JS/HTML are now fully translated: `proxy_use`, `lbl_avatar`, `st_claude_hint`, `st_editor_hint`, `st_gemini_hint`, `toggle_model`, `cfg_gemini_cli`, `cfg_gemini_cli_title`, `cfg_antigravity`, `cfg_antigravity_title`, `err_name`, `ph_token_edit`, `cfg_ok`, `cfg_manual`, `cfg_openclaw_hint`, `cfg_claude_hint`, `cfg_cursor_hint`, `cfg_vscode_hint`, `cfg_gemini_cli_hint`, `cfg_antigravity_hint`
+- Fixed `ko.json` time unit values: `uph` `"h"` → `"시간"`, `upm` `"m"` → `"분"`, `ups` `"s"` → `"초"` — countdown timer and key usage panel were showing raw English letters in Korean UI
+- `internal/i18n/i18n_test.go` `TestSupported`: updated expected language count from 10 → 17
+
+### Added
+- Agent modal default model selection UI: full service-specific model list via dropdown, with manual text input fallback (`onAgentServiceChange`, `onModelSelect`)
+- Agent status 4 states: 🟢 Online (<3min) / 🟡 Delayed (3–10min) / 🔴 Offline (>10min) / ⚫ Inactive / Disconnected
+- `.dot-yellow` CSS class (+ glow effect)
+- `.dot-red` CSS glow effect
+- `vscode` agent type option in agent modal
+- Work directory auto-hint on agent type change (`onAgentTypeChange` JS function): `openclaw` → `~/.openclaw`, `claude-code` → `~/.claude`, `cursor`/`vscode` → `~/projects`
+- `docs/logo.png` logo image
+- README: origin story + full rewrite (MuJaMae style)
+
+### Changed
+- `Makefile`: `VERSION` assignment changed from recursive (`=`) to immediate (`:=`) — `$(shell date)` is now evaluated once at `make` start, preventing version mismatch between build and verify steps
+- `Makefile.local` + `Makefile.local.example`: deploy targets hardened with kill→wait→verify pattern:
+  - `pkill -x "wall-vault"` after service stop (exact process name, not `-f`)
+  - 10-second wait loop using `pgrep -x "wall-vault"`
+  - Error exit if process still alive after 10 seconds
+  - Binary replacement only proceeds after confirming old process is dead
+
+### Fixed
+- Countdown timer in key status panel was hardcoded Korean (`분`, `초`) — now uses `T('upm')` / `T('ups')`
+- Request count label `'요청'` in key usage was hardcoded — now uses `T('key_reqs')`
+- `copyOpenClawConfig` / `copyAgentConfig` alert/prompt messages were hardcoded Korean — now fully i18n via `T()` keys
+- `pgrep -f "wall-vault"` in deploy scripts self-matched the shell process running `make` — replaced with `pgrep -x "wall-vault"` throughout `Makefile.local` and `Makefile.local.example`
+- Version mismatch during deploy verify: `VERSION =` re-evaluated `$(shell date)` at verify time (seconds after build), producing a different timestamp — fixed with `VERSION :=`
+- Agent modal field order: ID → Name → Agent type → Work dir → Service → Model → Description → IP whitelist → Token → Enabled
+- `buildClientModalBody` `fmt.Sprintf` argument count mismatch (19 verbs / 20 args → 20/20)
+- Offline state (`dot-red`) CSS class was not actually applied
+
+### Security
+- Applied `adminAuth` middleware to `/admin/theme` and `/admin/lang` endpoints (was unauthenticated)
+- `/api/keys` handler now enforces IP whitelist — CIDR notation supported (`net.ParseCIDR`), `X-Forwarded-For` header handled
+- Admin auth failure rate limiting: `429 Too Many Requests` after 10 failures within 15 minutes
+- Added `realIP()`, `ipAllowed()` helper functions
 
 ---
 
@@ -84,18 +130,18 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   - `wall-vault/claude-*` → OpenRouter `anthropic/model` (was incorrectly routing to `anthropic` service)
 - `stripControlTokens()`: removes GLM-5 / DeepSeek / ChatML control tokens from responses (`<|im_start|>`, `[gMASK]`, `[sop]`, etc.)
 - `fetchOpenRouterKnown()`: curated fallback model list — Hunter Alpha (1M ctx, free), Healer Alpha, Kimi K2.5, GLM-5, GLM-4.7 Flash, DeepSeek R1/V3, Qwen 2.5, MiniMax M2.5, Llama 3.3
-- `OllamaRecommended()`: Ollama 서버 미응답 시 추천 모델 폴백 (glm-4.7-flash, qwen3.5:35b, deepseek-r1:7b 등)
+- `OllamaRecommended()`: fallback model list when Ollama server is unreachable (glm-4.7-flash, qwen3.5:35b, deepseek-r1:7b, etc.)
 - Google model list: `gemini-2.5-flash-8b`, `gemini-embedding-2-preview` (OpenClaw 3.11 memorySearch)
-- OpenAI model list: `o3` 추가
+- OpenAI model list: `o3`
 
 ### Changed
-- OpenRouter fetch 실패 시 `fetchOpenRouterKnown()` 폴백 적용
-- Ollama 서버 미응답 시 `OllamaRecommended()` 폴백 적용
+- OpenRouter fetch failure → fall back to `fetchOpenRouterKnown()`
+- Ollama server unreachable → fall back to `OllamaRecommended()`
 - Response text in `/v1/chat/completions` now passes through `stripControlTokens()`
 
 ### Fixed
-- `anthropic` / `openai` 서비스가 `dispatch()`에서 묵묵히 무시되던 버그 수정
-- `wall-vault/claude-*` 모델이 실제로 호출되지 않던 버그 수정
+- `anthropic` / `openai` services were silently ignored in `dispatch()`
+- `wall-vault/claude-*` models were never actually called
 
 ---
 
@@ -121,150 +167,98 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [Unreleased]
-
-### 다국어 (i18n)
-- Added 20 new i18n keys to all 17 locale files — previously hardcoded Korean strings in dashboard JS/HTML are now fully translated: `proxy_use`, `lbl_avatar`, `st_claude_hint`, `st_editor_hint`, `st_gemini_hint`, `toggle_model`, `cfg_gemini_cli`, `cfg_gemini_cli_title`, `cfg_antigravity`, `cfg_antigravity_title`, `err_name`, `ph_token_edit`, `cfg_ok`, `cfg_manual`, `cfg_openclaw_hint`, `cfg_claude_hint`, `cfg_cursor_hint`, `cfg_vscode_hint`, `cfg_gemini_cli_hint`, `cfg_antigravity_hint`
-- Fixed `ko.json` time unit values: `uph` `"h"` → `"시간"`, `upm` `"m"` → `"분"`, `ups` `"s"` → `"초"` — countdown timer and key usage panel were showing raw English letters in Korean UI
-- `internal/i18n/i18n_test.go` `TestSupported`: updated expected language count from 10 → 17
-
-### 변경 (Changed)
-- `Makefile`: `VERSION` assignment changed from recursive (`=`) to immediate (`:=`) — `$(shell date)` is now evaluated once at `make` start, preventing version mismatch between build and verify steps
-- `Makefile.local` + `Makefile.local.example`: deploy targets hardened with kill→wait→verify pattern:
-  - `pkill -x "wall-vault"` after service stop (exact process name, not `-f`)
-  - 10-second wait loop using `pgrep -x "wall-vault"`
-  - Error exit if process still alive after 10 seconds
-  - Binary replacement only proceeds after confirming old process is dead
-
-### 수정 (Fixed)
-- Countdown timer in key status panel was hardcoded Korean (`분`, `초`) — now uses `T('upm')` / `T('ups')`
-- Request count label `'요청'` in key usage was hardcoded — now uses `T('key_reqs')`
-- `copyOpenClawConfig` / `copyAgentConfig` alert/prompt messages were hardcoded Korean — now fully i18n via `T()` keys
-- `pgrep -f "wall-vault"` in deploy scripts self-matched the shell process running `make` — replaced with `pgrep -x "wall-vault"` throughout `Makefile.local` and `Makefile.local.example`
-- Version mismatch during deploy verify: `VERSION =` re-evaluated `$(shell date)` at verify time (seconds after build), producing a different timestamp — fixed with `VERSION :=`
-
-### 보안 (Security)
-- `/admin/theme`, `/admin/lang` 엔드포인트에 `adminAuth` 미들웨어 적용 (기존 무인증 취약점 수정)
-- `/api/keys` 핸들러에 IP 화이트리스트 실제 적용 — CIDR 표기법 지원 (`net.ParseCIDR`), `X-Forwarded-For` 헤더 처리
-- 관리자 인증 실패 rate limiting 추가: 15분 이내 10회 실패 시 `429 Too Many Requests` 반환
-- `realIP()`, `ipAllowed()` 헬퍼 함수 추가
-
-### 추가 (Added)
-- 에이전트 모달 기본 모델 선택 UI 개선: 드롭다운으로 서비스별 전체 모델 목록 제공, 직접 입력 병행 지원 (`onAgentServiceChange`, `onModelSelect`)
-- 에이전트 상태 4단계 표시: 🟢 실행 중 (<3분) / 🟡 지연 (3-10분) / 🔴 오프라인 (>10분) / ⚫ 비활성·미연결
-- `.dot-yellow` CSS 클래스 추가 (+ glow effect)
-- `.dot-red` CSS glow effect 추가
-- 에이전트 모달 `vscode` 에이전트 종류 옵션 추가
-- 에이전트 종류 선택 시 작업 디렉토리 자동 힌트 (`onAgentTypeChange` JS 함수)
-  - `openclaw` → `~/.openclaw`
-  - `claude-code` → `~/.claude`
-  - `cursor` / `vscode` → `~/projects`
-- `docs/logo.png` 로고 파일 추가
-- README.md 탄생 배경 스토리 및 전면 개편 (MuJaMae 스타일)
-
-### 수정 (Fixed)
-- 에이전트 모달 필드 순서 정리: ID → 이름 → 에이전트 종류 → 작업 디렉토리 → 기본 서비스 → 기본 모델 → 설명 → 허용 IP → 토큰 → 활성화
-- `buildClientModalBody` `fmt.Sprintf` 인자 수 불일치 수정 (19개 verbs / 20개 args → 20/20)
-- 오프라인 상태(`dot-red`) CSS 클래스가 실제로 적용되지 않던 버그 수정
-
----
-
 ## [0.1.0] — 2026-03-11
 
-### v0.1.0 이후 추가 (post-release)
-- `cmd/proxy`: `--key-google`, `--key-openrouter`, `--vault`, `--vault-token`, `--filter` 플래그 추가
-- `internal/models`: `Registry.NeedsRefresh()`, `Registry.Search(query)` 추가
-- `internal/proxy/server_test.go`: 프록시 HTTP 핸들러 테스트 12개
-- `internal/vault/server_test.go`: 금고 HTTP 핸들러 테스트 15개
-- `internal/middleware/middleware_test.go`: 미들웨어 체인 테스트 8개
-- `internal/hooks/hooks_test.go`: 훅 시스템 테스트 7개
-- `docs/API.md`: 전체 API 엔드포인트 매뉴얼
-- `docs/MANUAL.md`: 사용자 가이드 (설치→분산모드→문제해결)
-- `CONTRIBUTING.md`: 기여 가이드
-- GitHub Actions CI/Release 워크플로우 (로컬 준비 완료)
+### Post-release additions
+- `cmd/proxy`: `--key-google`, `--key-openrouter`, `--vault`, `--vault-token`, `--filter` flags
+- `internal/models`: `Registry.NeedsRefresh()`, `Registry.Search(query)`
+- `internal/proxy/server_test.go`: 12 proxy HTTP handler tests
+- `internal/vault/server_test.go`: 15 vault HTTP handler tests
+- `internal/middleware/middleware_test.go`: 8 middleware chain tests
+- `internal/hooks/hooks_test.go`: 7 hook system tests
+- `docs/API.md`: full API endpoint reference
+- `docs/MANUAL.md`: user guide (install → distributed mode → troubleshooting)
+- `CONTRIBUTING.md`: contributor guide
+- GitHub Actions CI/Release workflows (ready locally)
 
----
+### Initial release (single Go binary)
 
-## [0.1.0] — 2026-03-11
+#### Architecture
+- **Single binary** `wall-vault` — subcommand pattern (start / proxy / vault / doctor / setup)
+- **standalone / distributed** two operating modes
+- **SSE (Server-Sent Events)** real-time config sync (vault → proxy, within 1–3s)
+- **AES-GCM encryption** — master-password-based API key persistence
 
-### 초기 릴리스 (단일 Go 바이너리)
+#### Subcommands
 
-#### 아키텍처
-- **단일 바이너리** `wall-vault` — 서브커맨드 방식 (start / proxy / vault / doctor / setup)
-- **standalone / distributed** 두 가지 운용 모드
-- **SSE(Server-Sent Events)** 실시간 설정 동기화 (금고 → 프록시, 1–3초 이내 반영)
-- **AES-GCM 암호화** — 마스터 비밀번호 기반 API 키 영속화
+| Command | Description |
+|---------|-------------|
+| `wall-vault start` | Run proxy + vault together (standalone) |
+| `wall-vault proxy` | Run proxy only |
+| `wall-vault vault` | Run vault only |
+| `wall-vault doctor` | Health check and auto-recovery |
+| `wall-vault setup` | Interactive setup wizard |
 
-#### 서브커맨드
+#### Proxy features
+- **Google Gemini / OpenRouter / Ollama** simultaneous support
+- **Round-robin key management** — per-service index tracking with `idx map[string]int`
+- **Cooldown management** — 429: 30min, 400/401/403: 24h, network error: 10min
+- **Tool security filter** — strip_all / whitelist / passthrough
+- **Fallback chain** — Google → OpenRouter → Ollama
+- **Hook system** — shell commands on model change, key exhaustion, service down
+- **OpenClaw socket** event integration
 
-| 커맨드 | 설명 |
-|--------|------|
-| `wall-vault start` | 프록시 + 키 금고 동시 실행 (standalone) |
-| `wall-vault proxy` | 프록시 단독 실행 |
-| `wall-vault vault` | 키 금고 단독 실행 |
-| `wall-vault doctor` | 헬스체크 및 자동복구 |
-| `wall-vault setup` | 대화형 설치 마법사 |
-
-#### 프록시 기능
-- **Google Gemini / OpenRouter / Ollama** 동시 지원
-- **라운드 로빈 키 관리** — `idx map[string]int`로 서비스별 인덱스 추적
-- **쿨다운 관리** — 429: 30분, 400/401/403: 24시간, 네트워크 오류: 10분
-- **도구 보안 필터** — strip_all / whitelist / passthrough
-- **폴백 체인** — Google → OpenRouter → Ollama
-- **훅 시스템** — 모델 변경·키 소진·서비스 다운 시 셸 명령 실행
-- **OpenClaw 소켓** 연동 지원
-
-#### 키 금고 (Vault)
+#### Vault
 - **REST API** — `/api/keys`, `/api/clients`, `/api/status`
-- **SSE 브로드캐스트** — `/api/events` 엔드포인트
-- **웹 대시보드** — 테마(sakura/dark/light/ocean), 키 CRUD, 클라이언트 관리
-- **관리자 토큰** 기반 인증
+- **SSE broadcast** — `/api/events` endpoint
+- **Web dashboard** — themes (sakura/dark/light/ocean), key CRUD, client management
+- **Admin token** authentication
 
-#### Doctor (헬스체크/자동복구)
-- `doctor check` / `fix` / `status` / `all` / `deploy` 서브커맨드
-- 자동복구 우선순위: **systemd → launchd → NSSM(Windows) → 직접 프로세스**
-- `deploy` — systemd / launchd / NSSM 서비스 파일 자동 생성
+#### Doctor
+- `doctor check` / `fix` / `status` / `all` / `deploy` subcommands
+- Auto-recovery priority: **systemd → launchd → NSSM (Windows) → direct process**
+- `deploy` — auto-generates systemd / launchd / NSSM service files
 
-#### Setup 마법사
-- **세계 10대 언어** — ko/en/zh/es/hi/ar/pt/fr/de/ja
-- 테마·모드·포트·서비스·도구 필터·보안 토큰 대화형 구성
-- Ollama 서버 자동 연결 및 모델 목록 조회
-- `crypto/rand` 기반 안전한 관리자 토큰 자동 생성
+#### Setup wizard
+- **Top 10 world languages** — ko/en/zh/es/hi/ar/pt/fr/de/ja
+- Interactive configuration: theme, mode, ports, services, tool filter, security tokens
+- Ollama server auto-connect and model list fetch
+- Secure admin token auto-generation via `crypto/rand`
 
-#### 다국어 (i18n)
-- 세계 10대 언어 지원
-- LANG / WV_LANG 환경변수 자동 감지
-- 로케일 문자열 파싱 (e.g. `ko_KR.UTF-8` → `ko`)
-- 영어 폴백 보장
+#### i18n
+- Top 10 world languages supported
+- Auto-detect from LANG / WV_LANG environment variables
+- Locale string parsing (e.g. `ko_KR.UTF-8` → `ko`)
+- English fallback guaranteed
 
-#### 플랫폼 지원
+#### Platform support
 - **Linux** (amd64 / arm64)
 - **macOS** (amd64 / arm64, Apple Silicon)
-- **Windows** (amd64, NSSM 서비스 지원)
-- **WSL** 완벽 지원
+- **Windows** (amd64, NSSM service support)
+- **WSL** fully supported
 
-#### 모델 레지스트리
-- Google: 6개 고정 모델 (Gemini 1.5/2.0/2.5)
-- OpenRouter: 346개+ 동적 조회
-- Ollama: 로컬 서버 자동 탐지
-- TTL 기반 캐시 (기본 10분)
-- 대소문자 무시 모델 ID/이름 검색
+#### Model registry
+- Google: 6 fixed models (Gemini 1.5/2.0/2.5)
+- OpenRouter: 346+ dynamic fetch
+- Ollama: local server auto-discovery
+- TTL-based cache (default 10min)
+- Case-insensitive model ID/name search
 
-#### 서비스 플러그인
-- `~/.wall-vault/services/*.yaml` 기반 외부 서비스 플러그인 로더
-- `enabled: true/false` 필드로 런타임 활성화 제어
+#### Service plugins
+- External service plugin loader from `~/.wall-vault/services/*.yaml`
+- `enabled: true/false` field for runtime activation control
 
-#### 테스트 (39개, 전부 PASS)
-- `crypto_test.go` — AES-GCM 암호화·복호화·랜덤 nonce (5개)
-- `toolfilter_test.go` — strip_all·whitelist·passthrough (5개)
-- `convert_test.go` — Gemini↔OpenAI↔Ollama 포맷 변환 (6개)
-- `services_test.go` — 플러그인 로더 엣지 케이스 (5개)
-- `keymgr_test.go` — 라운드 로빈·쿨다운·일일한도 (8개)
-- `store_test.go` — 키/클라이언트 CRUD·영속화 (10개)
+#### Tests (39, all PASS)
+- `crypto_test.go` — AES-GCM encrypt/decrypt/random nonce (5)
+- `toolfilter_test.go` — strip_all/whitelist/passthrough (5)
+- `convert_test.go` — Gemini↔OpenAI↔Ollama format conversion (6)
+- `services_test.go` — plugin loader edge cases (5)
+- `keymgr_test.go` — round-robin/cooldown/daily limit (8)
+- `store_test.go` — key/client CRUD/persistence (10)
 
 #### CI/CD
-- GitHub Actions CI — push/PR 시 vet + test + 4플랫폼 크로스컴파일
-- GitHub Actions Release — v* 태그 시 자동 GitHub Release 생성
+- GitHub Actions CI — vet + test + 4-platform cross-compile on push/PR
+- GitHub Actions Release — auto GitHub Release on `v*` tag
 
 ---
 

@@ -12,13 +12,13 @@ WAIT_DEAD = for i in $$(seq 1 10); do pgrep -f "$(1)" > /dev/null 2>&1 || break;
 deploy-mini: build-darwin-arm64
 	@echo "▶ [mini] uploading binary..."
 	scp bin/$(BINARY)-darwin-arm64 $(MINI_HOST):~/.openclaw/$(BINARY).new
-	@echo "▶ [mini] stopping services..."
+	@echo "▶ [mini] killing old process..."
 	ssh $(MINI_HOST) '\
 	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.vault.plist 2>/dev/null || true; \
 	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.proxy.plist 2>/dev/null || true; \
-	  pkill -f "wall-vault" 2>/dev/null || true; \
-	  for i in $$(seq 1 10); do pgrep -f "wall-vault" > /dev/null 2>&1 || break; sleep 1; done; \
-	  pgrep -f "wall-vault" > /dev/null 2>&1 && echo "ERROR: old process still alive" && exit 1 || true'
+	  pkill -x "wall-vault" 2>/dev/null || true; \
+	  for i in $$(seq 1 10); do pgrep -x "wall-vault" > /dev/null 2>&1 || break; sleep 1; done; \
+	  pgrep -x "wall-vault" > /dev/null 2>&1 && echo "ERROR: old process still alive" && exit 1 || true'
 	@echo "▶ [mini] replacing binary..."
 	ssh $(MINI_HOST) '\
 	  cp ~/.openclaw/$(BINARY).new ~/.openclaw/$(BINARY) && \
@@ -43,9 +43,12 @@ deploy-mini: build-darwin-arm64
 deploy-bot-c: build-linux-arm64
 	@echo "▶ [bot-c] uploading binary..."
 	scp bin/$(BINARY)-linux-arm64 $(RASPI_HOST):~/.openclaw/$(BINARY).new
-	@echo "▶ [bot-c] stopping service..."
-	ssh $(RASPI_HOST) 'systemctl --user stop wall-vault-proxy 2>/dev/null || true; \
-	  for i in $$(seq 1 8); do pgrep -f "wall-vault" > /dev/null 2>&1 || break; sleep 1; done'
+	@echo "▶ [bot-c] killing old process..."
+	ssh $(RASPI_HOST) '\
+	  systemctl --user stop wall-vault-proxy 2>/dev/null || true; \
+	  pkill -x "wall-vault" 2>/dev/null || true; \
+	  for i in $$(seq 1 10); do pgrep -x "wall-vault" > /dev/null 2>&1 || break; sleep 1; done; \
+	  pgrep -x "wall-vault" > /dev/null 2>&1 && echo "ERROR: old process still alive" && exit 1 || true'
 	@echo "▶ [bot-c] replacing binary..."
 	ssh $(RASPI_HOST) '\
 	  cp ~/.openclaw/$(BINARY).new ~/.openclaw/$(BINARY) && \
@@ -65,9 +68,11 @@ deploy-bot-c: build-linux-arm64
 
 .PHONY: deploy-local
 deploy-local: build
-	@echo "▶ [local] stopping proxy..."
+	@echo "▶ [local] killing old process..."
 	systemctl --user stop wall-vault-proxy 2>/dev/null || true
-	@for i in $$(seq 1 8); do pgrep -f "wall-vault" > /dev/null 2>&1 || break; sleep 1; done
+	@pkill -x "wall-vault" 2>/dev/null || true
+	@for i in $$(seq 1 10); do pgrep -x "wall-vault" > /dev/null 2>&1 || break; sleep 1; done
+	@pgrep -x "wall-vault" > /dev/null 2>&1 && echo "ERROR: old process still alive" && exit 1 || true
 	@echo "▶ [local] replacing binary..."
 	cp bin/$(BINARY) ~/.openclaw/$(BINARY)
 	@echo "▶ [local] starting proxy..."

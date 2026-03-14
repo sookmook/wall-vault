@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-14 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support)*
+*(Last updated: 2026-03-15 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support, i18n 20 new keys)*
 
 ---
 

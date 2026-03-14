@@ -378,7 +378,7 @@ curl "http://localhost:56244/api/models?q=claude"
 ### 구성 예시 (실제 운용 환경)
 
 ```
-[맥미니 192.168.x.x]
+[키 금고 서버]
   wall-vault vault    (키 금고 :56243, 대시보드)
 
 [WSL 알파]            [라즈베리파이 감마]    [맥미니 로컬]
@@ -389,7 +389,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 금고에서 모델 변경 → 세 머신의 오픈클로 TUI에 1-3초 내 반영.
 
-### 키 금고 서버 시작 (베타)
+### 키 금고 서버 시작
 
 ```bash
 wall-vault vault

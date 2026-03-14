@@ -1,8 +1,11 @@
 package vault
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -1377,11 +1380,28 @@ func trimServicePrefix(service, model string) string {
 }
 
 // buildAgentsCard: agent card (registered clients + live heartbeat integration)
+// workspaceAvatarDataURI reads ~/.openclaw/workspace/avatar.png and returns a data URI.
+// Returns "" if the file doesn't exist or can't be read.
+func workspaceAvatarDataURI() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".openclaw", "workspace", "avatar.png"))
+	if err != nil {
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data)
+}
+
 func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*ServiceConfig) string {
 	pmap := make(map[string]*ProxyStatus, len(proxies))
 	for _, p := range proxies {
 		pmap[p.ClientID] = p
 	}
+
+	// 워크스페이스 아바타: 모든 openclaw 에이전트의 기본 아바타
+	defaultAvatar := workspaceAvatarDataURI()
 
 	typeIcons := map[string]string{
 		"openclaw":    "🦞",
@@ -1555,8 +1575,17 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
 		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
-		if c.AgentType == "openclaw" && c.Avatar != "" {
-			item.WriteString(fmt.Sprintf(`<img src="%s" class="ac-avatar" alt="%s">`, c.Avatar, displayName))
+		// 아바타 우선순위: workspace avatar > 업로드 avatar > 이모지
+		avatarSrc := ""
+		if c.AgentType == "openclaw" {
+			if defaultAvatar != "" {
+				avatarSrc = defaultAvatar
+			} else if c.Avatar != "" {
+				avatarSrc = c.Avatar
+			}
+		}
+		if avatarSrc != "" {
+			item.WriteString(fmt.Sprintf(`<img src="%s" class="ac-avatar" alt="%s">`, avatarSrc, displayName))
 		} else {
 			item.WriteString(fmt.Sprintf(`<div class="ac-type-icon">%s</div>`, typeIcon))
 		}

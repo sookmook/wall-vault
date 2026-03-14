@@ -20,7 +20,7 @@ import (
 	ivault "github.com/sookmook/wall-vault/internal/vault"
 )
 
-var version = "v0.1.6" // overridden at build time via -ldflags "-X main.version=..."
+var version = "dev" // overridden at build time via -ldflags "-X main.version=..."
 
 func main() {
 	// propagate build-injected version to all packages

@@ -9,12 +9,13 @@ import (
 )
 
 type heartbeatPayload struct {
-	ClientID string `json:"client_id"`
-	Version  string `json:"version"`
-	Service  string `json:"service"`
-	Model    string `json:"model"`
-	SSE      bool   `json:"sse_connected"`
-	Host     string `json:"host,omitempty"`
+	ClientID   string            `json:"client_id"`
+	Version    string            `json:"version"`
+	Service    string            `json:"service"`
+	Model      string            `json:"model"`
+	SSE        bool              `json:"sse_connected"`
+	Host       string            `json:"host,omitempty"`
+	ActiveKeys map[string]string `json:"active_keys,omitempty"` // service → key ID
 }
 
 // startHeartbeat: send status to vault every 60 seconds (async)
@@ -43,12 +44,21 @@ func (s *Server) sendHeartbeat() {
 
 	sseConn := s.sse != nil && s.sse.IsConnected()
 
+	// Collect last-used key ID per service
+	activeKeys := make(map[string]string)
+	for _, service := range []string{"google", "openrouter", "anthropic", "ollama"} {
+		if id := s.keyMgr.LastUsedID(service); id != "" {
+			activeKeys[service] = id
+		}
+	}
+
 	payload := heartbeatPayload{
-		ClientID: s.cfg.Proxy.ClientID,
-		Version:  "v0.1.4",
-		Service:  svc,
-		Model:    mdl,
-		SSE:      sseConn,
+		ClientID:   s.cfg.Proxy.ClientID,
+		Version:    "v0.1.4",
+		Service:    svc,
+		Model:      mdl,
+		SSE:        sseConn,
+		ActiveKeys: activeKeys,
 	}
 
 	body, _ := json.Marshal(payload)

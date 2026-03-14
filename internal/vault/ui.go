@@ -21,7 +21,14 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 
 	css := buildCSS(t)
 	agentCard := buildAgentsCard(clients, proxies, services)
-	keyCard := buildKeysCard(keys, services)
+	// Merge active key IDs from all connected proxies
+	activeKeys := make(map[string]string)
+	for _, p := range proxies {
+		for svc, keyID := range p.ActiveKeys {
+			activeKeys[svc] = keyID
+		}
+	}
+	keyCard := buildKeysCard(keys, services, activeKeys)
 	svcCard := buildServicesCard(services)
 	js := buildJS(t.Name, s.cfg.Lang, s.startedAt.Unix(), services, keys, s.cfg.Vault.AdminToken)
 
@@ -210,6 +217,8 @@ a{color:var(--accent);text-decoration:none}
 .bar-yellow{background:var(--yellow)}
 .bar-red{background:var(--red)}
 .bar-gray{background:var(--text-muted)}
+.key-active .key-label{color:var(--accent)}
+.key-active .bar-track{box-shadow:0 0 0 1px var(--accent)40}
 /* ── 상태 점 ── */
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .dot-green{background:var(--green);box-shadow:0 0 5px var(--green)}
@@ -1627,7 +1636,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 	return sb.String()
 }
 
-func buildKeysCard(keys []*APIKey, services []*ServiceConfig) string {
+func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[string]string) string {
 	_ = services // 향후 서비스 그룹 표시 확장 가능
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(
@@ -1685,6 +1694,10 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig) string {
 				barClass = "bar-red"
 				statusIcon = "✗ "
 			}
+			isActive := activeKeys[k.Service] == k.ID
+			if isActive {
+				statusIcon = "▶ "
+			}
 
 			label := k.Label
 			if label == "" {
@@ -1701,9 +1714,13 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig) string {
 				meta += fmt.Sprintf(` (%.0f<span data-i18n="key_in_min">분 후</span>)`, remain.Minutes())
 			}
 
+			activeClass := ""
+			if isActive {
+				activeClass = " key-active"
+			}
 			sb.WriteString(fmt.Sprintf(
-				`<div class="key-item"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
-				statusIcon, label, meta, k.ID, barClass, barPct,
+				`<div class="key-item%s"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
+				activeClass, statusIcon, label, meta, k.ID, barClass, barPct,
 			))
 		}
 		sb.WriteString(`</div>`)

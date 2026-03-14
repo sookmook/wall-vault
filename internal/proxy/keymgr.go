@@ -56,6 +56,7 @@ type KeyManager struct {
 	mu       sync.Mutex
 	keys     map[string][]*localKey
 	idx      map[string]int // round-robin index per service
+	lastUsed map[string]string // service → last successful key ID
 	vaultURL string
 	token    string
 	clientID string
@@ -65,10 +66,18 @@ func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 	return &KeyManager{
 		keys:     make(map[string][]*localKey),
 		idx:      make(map[string]int),
+		lastUsed: make(map[string]string),
 		vaultURL: vaultURL,
 		token:    token,
 		clientID: clientID,
 	}
+}
+
+// LastUsedID: return the ID of the last successfully used key for a service
+func (km *KeyManager) LastUsedID(service string) string {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	return km.lastUsed[service]
 }
 
 // AddKey: directly add a key
@@ -104,11 +113,12 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개, 모두 쿨다운/소진)", service, n)
 }
 
-// RecordSuccess: record usage
+// RecordSuccess: record usage and track last-used key per service
 func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	k.todayUsage += tokens
+	km.lastUsed[k.service] = k.id
 }
 
 // RecordError: set cooldown

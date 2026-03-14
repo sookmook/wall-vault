@@ -15,11 +15,11 @@ import (
 // ─── Cooldown Durations ───────────────────────────────────────────────────────
 
 var cooldownDurations = map[int]time.Duration{
-	429: 30 * time.Minute,
-	400: 24 * time.Hour,
-	401: 24 * time.Hour,
-	402: 24 * time.Hour,
-	403: 24 * time.Hour,
+	429: 30 * time.Minute, // rate limit — retry later
+	402: 1 * time.Hour,    // payment required — retry in an hour (was 24h)
+	401: 24 * time.Hour,   // invalid key — retire for a day
+	403: 24 * time.Hour,   // forbidden — retire for a day
+	// 404: model not found — key not at fault, never cooldown
 }
 
 func cooldownFor(errCode int) time.Duration {

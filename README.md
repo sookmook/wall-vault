@@ -31,7 +31,7 @@ One alert. Something felt wrong.
 
 Logged in — all API keys invalidated. vault.json empty. The bots had gone silent. Of course they had. **Their memories had been completely erased.**
 
-> *Motoko knew my work style inside-out. Mini prepared morning briefings every day. Raz handled everything quietly from a Raspberry Pi in the corner. Two weeks of careful cultivation. Two weeks of patience, tuning, and personality-shaping.*
+> *Alpha knew my work style inside-out. Beta prepared morning briefings every day. Gamma handled everything quietly from a Raspberry Pi in the corner. Two weeks of careful cultivation. Two weeks of patience, tuning, and personality-shaping.*
 >
 > *A single hacker broke into the lab's internal network and torched all of it.*
 >
@@ -486,7 +486,7 @@ vault:
 | `WV_MASTER_PASS` | Encryption master password |
 | `WV_KEY_GOOGLE` | Google API key (comma-separated for multiple) |
 | `WV_KEY_OPENROUTER` | OpenRouter API key |
-| `WV_AVATAR` | Proxy avatar file path (relative to `~/.openclaw/`, e.g. `workspace/avatars/bot-a.png`) |
+| `WV_AVATAR` | Proxy avatar file path (relative to `~/.openclaw/`, e.g. `workspace/avatars/avatar.png`) |
 
 ---
 
@@ -614,7 +614,7 @@ Internal Network (e.g. 10.0.0.x)
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
 │  [Mac Mini :56243]          [WSL / Linux]               │
-│  Key Vault                  Proxy A (bot-a)            │
+│  Key Vault                  Proxy A (bot-a)             │
 │  vault.json                 → VAULT_URL=192.168.x.x     │
 │                                                         │
 │                             [Raspberry Pi]              │
@@ -622,7 +622,7 @@ Internal Network (e.g. 10.0.0.x)
 │                             → VAULT_URL=192.168.x.x     │
 │                                                         │
 │                             [Windows / Mac]             │
-│                             Proxy C (mini)              │
+│                             Proxy C (bot-b)             │
 │                             → VAULT_URL=127.0.0.1       │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -671,9 +671,9 @@ VAULT_CLIENT_ID=bot-c \
 VAULT_TOKEN=your-bot-c-token \
 ./wall-vault proxy
 
-# Proxy on the same machine as vault (mini — use localhost)
+# Proxy on the same machine as vault (bot-b — use localhost)
 VAULT_URL=http://127.0.0.1:56243 \
-VAULT_CLIENT_ID=mini \
+VAULT_CLIENT_ID=bot-b \
 VAULT_TOKEN=your-bot-b-token \
 ./wall-vault proxy
 ```
@@ -718,8 +718,6 @@ sudo ufw deny 56243
 # macOS — block vault from external
 # In System Settings → Firewall, allow wall-vault only on LAN interface
 ```
-
-> **Security note:** Never expose port 56243 to the internet. The vault stores encrypted API keys and admin credentials. Use a VPN or SSH tunnel if remote access is needed.
 
 ### Config file approach (recommended for production)
 
@@ -879,7 +877,7 @@ If you wish to distribute modified versions or use this commercially, please con
 
 로그인해 보니 — API 키 전부 무효. vault.json 공백. 봇들은 아무 말도 없었다. 할 수가 없었다. **기억이 통째로 지워져 있었으니까.**
 
-> *Bravo는 내 작업 스타일을 꿰뚫고 있었다. 미니는 매일 아침 브리핑을 준비했다. Charlie는 라즈베리파이 위에서 묵묵히 모든 걸 처리했다. 2주 넘게 공들여 키운 AI 비서들이었다.*
+> *알파는 내 작업 스타일을 꿰뚫고 있었다. 베타는 매일 아침 브리핑을 준비했다. 감마는 라즈베리파이 위에서 묵묵히 모든 걸 처리했다. 2주 넘게 공들여 키운 AI 비서들이었다.*
 >
 > *해커 한 명이 내부망에 들어와서 그걸 전부 날려버렸다.*
 >
@@ -998,15 +996,15 @@ make build
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
 │  [맥미니 :56243]            [WSL / Linux]               │
-│  키 금고 (vault)            프록시 Bravo                │
+│  키 금고 (vault)            프록시 알파                  │
 │  vault.json 저장            VAULT_URL=192.168.x.x       │
 │                                                         │
 │                             [라즈베리파이]              │
-│                             프록시 Charlie                  │
+│                             프록시 감마                  │
 │                             VAULT_URL=192.168.x.x       │
 │                                                         │
 │                             [맥미니 로컬]               │
-│                             프록시 미니                  │
+│                             프록시 베타                  │
 │                             VAULT_URL=127.0.0.1         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -1038,21 +1036,21 @@ make build
 #### 3단계: 각 머신에서 프록시 실행
 
 ```bash
-# WSL (Bravo)
+# WSL (알파)
 VAULT_URL=http://192.168.x.x:56243 \
 VAULT_CLIENT_ID=bot-a \
 VAULT_TOKEN=your-bot-a-token \
 ./wall-vault proxy
 
-# 라즈베리파이 (Charlie)
+# 라즈베리파이 (감마)
 VAULT_URL=http://192.168.x.x:56243 \
 VAULT_CLIENT_ID=bot-c \
 VAULT_TOKEN=your-bot-c-token \
 ./wall-vault proxy
 
-# 맥미니 로컬 (미니)
+# 맥미니 로컬 (베타)
 VAULT_URL=http://127.0.0.1:56243 \
-VAULT_CLIENT_ID=mini \
+VAULT_CLIENT_ID=bot-b \
 VAULT_TOKEN=your-bot-b-token \
 ./wall-vault proxy
 ```
@@ -1086,8 +1084,6 @@ curl -X PUT http://192.168.x.x:56243/admin/clients/bot-a \
 sudo ufw allow from 10.0.0.0/24 to any port 56243
 sudo ufw deny 56243
 ```
-
-> ⚠️ **보안 주의**: 56243 포트는 절대 인터넷에 노출하지 마세요. 암호화된 API 키와 관리자 자격증명이 저장되어 있습니다. 원격 접근이 필요하면 VPN 또는 SSH 터널을 사용하세요.
 
 #### 동기화 범위
 

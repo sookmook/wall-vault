@@ -267,6 +267,15 @@ func (km *KeyManager) SyncFromVault() error {
 	}
 
 	km.mu.Lock()
+	// preserve locally accumulated usage before replacing vault-sourced keys
+	localUsage := make(map[string]int)
+	for _, svcKeys := range km.keys {
+		for _, k := range svcKeys {
+			if !strings.HasPrefix(k.id, "env-") && k.todayUsage > 0 {
+				localUsage[k.id] = k.todayUsage
+			}
+		}
+	}
 	// replace only vault-sourced keys (env var keys are kept)
 	for svc := range km.keys {
 		var kept []*localKey
@@ -282,12 +291,17 @@ func (km *KeyManager) SyncFromVault() error {
 		if k.PlainKey == "" {
 			continue
 		}
+		// use the higher of vault usage vs. locally accumulated usage
+		usage := k.TodayUsage
+		if local := localUsage[k.ID]; local > usage {
+			usage = local
+		}
 		lk := &localKey{
 			id:         k.ID,
 			service:    k.Service,
 			plaintext:  k.PlainKey,
 			dailyLimit: k.DailyLimit,
-			todayUsage: k.TodayUsage,
+			todayUsage: usage,
 		}
 		// restore cooldown only if still in the future
 		if k.CooldownUntil.After(now) {

@@ -53,7 +53,7 @@ type Client struct {
 	WorkDir     string   `json:"work_dir,omitempty"`     // working directory
 	Description string   `json:"description,omitempty"`  // description
 	IPWhitelist []string `json:"ip_whitelist,omitempty"` // allowed IP list (empty array = allow all)
-	Avatar      string   `json:"avatar,omitempty"`       // base64 data URI (data:image/png;base64,...)
+	Avatar      string   `json:"avatar,omitempty"`       // data URI (data:image/...) OR relative path under ~/.openclaw/ (e.g. "workspace/avatar.png")
 	Enabled     bool     `json:"enabled"`                // enabled status
 	CreatedAt   time.Time `json:"created_at"`
 }

@@ -5,7 +5,7 @@
 #   [키 금고 서버] 192.168.x.x:56243
 #        |── SSE 브로드캐스트
 #        ├── [봇 A] bot-a:56244
-#        ├── [봇 B] mini:56244
+#        ├── [봇 B] bot-b:56244
 #        └── [봇 C] bot-c:56244
 
 mode: distributed
@@ -14,7 +14,7 @@ mode: distributed
 proxy:
   port: 56244
   host: 0.0.0.0
-  client_id: bot-a          # 각 봇마다 고유한 ID
+  client_id: bot-a           # 각 봇마다 고유한 ID
 
   # 키 금고 연결
   vault_url: http://192.168.x.x:56243

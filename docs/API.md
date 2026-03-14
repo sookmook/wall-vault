@@ -422,7 +422,7 @@ data: {"type":"usage_reset","data":{"time":"2026-03-13T00:00:30Z"}}
   "service": "google",
   "model": "gemini-2.5-flash",
   "sse_connected": true,
-  "host": "bot-a-wsl",
+  "host": "bot-a-host",
   "avatar": "data:image/png;base64,...",
   "vault": {
     "today_usage": 42,

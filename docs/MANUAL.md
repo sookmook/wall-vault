@@ -381,7 +381,7 @@ curl "http://localhost:56244/api/models?q=claude"
 [맥미니 192.168.x.x]
   wall-vault vault    (키 금고 :56243, 대시보드)
 
-[WSL 모토코]          [라즈베리파이 라즈]    [맥미니 로컬]
+[WSL 알파]            [라즈베리파이 감마]    [맥미니 로컬]
   wall-vault proxy      wall-vault proxy        wall-vault proxy
   openclaw TUI          openclaw TUI            openclaw TUI
   ↕ SSE 동기화          ↕ SSE 동기화            ↕ SSE 동기화
@@ -389,7 +389,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 금고에서 모델 변경 → 세 머신의 오픈클로 TUI에 1-3초 내 반영.
 
-### 키 금고 서버 시작 (미니)
+### 키 금고 서버 시작 (베타)
 
 ```bash
 wall-vault vault
@@ -560,7 +560,7 @@ wall-vault doctor all
 | `WV_MASTER_PASS` | API 키 암호화 비밀번호 | `my-password` |
 | `WV_PROXY_PORT` | 프록시 포트 오버라이드 | `8080` |
 | `WV_VAULT_PORT` | 금고 포트 오버라이드 | `8081` |
-| `WV_AVATAR` | 프록시 로컬 아바타 파일 경로 (`~/.openclaw/` 기준 상대 경로) — heartbeat마다 base64로 전송, vault가 자동 저장 | `workspace/avatars/bot-a.png` |
+| `WV_AVATAR` | 프록시 로컬 아바타 파일 경로 (`~/.openclaw/` 기준 상대 경로) — heartbeat마다 base64로 전송, vault가 자동 저장 | `workspace/avatars/avatar.png` |
 | `OLLAMA_URL` | Ollama 서버 URL | `http://192.168.x.x:11434` |
 | `VAULT_CLIENT_ID` | 클라이언트 ID (레거시 호환) | `bot-a` |
 

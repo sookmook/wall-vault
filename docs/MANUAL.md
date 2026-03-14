@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
-wall-vault를 처음 사용하는 분을 위한 단계별 가이드입니다.
-*(최종 갱신: 2026-03-13 — v0.1.3: 에이전트 카드 리디자인, 타입별 설정 복사 버튼, 연결 상태 상세 표시)*
+오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
+*(최종 갱신: 2026-03-14 — v0.1.4: 프록시 서비스 선택 체크박스, 키 사용량 실시간 동기화, SSE 카운트다운)*
 
 ---
 
@@ -23,21 +23,26 @@ wall-vault를 처음 사용하는 분을 위한 단계별 가이드입니다.
 
 ## wall-vault란?
 
-**wall-vault = AI 프록시 + API 키 금고**
+**wall-vault = 오픈클로(OpenClaw)를 위한 AI 프록시 + API 키 금고**
 
-- AI 클라이언트(Claude Code, VS Code Copilot 등)에서 보내는 요청을 받아 Google Gemini / OpenRouter / Ollama로 전달합니다.
-- API 키를 암호화해서 보관하고, 여러 키를 자동으로 순환(라운드 로빈)합니다.
-- 한 대의 컴퓨터에서 단독으로 쓸 수도 있고, 여러 AI 봇이 하나의 키 금고를 공유하는 분산 구성도 가능합니다.
+오픈클로와 LLM API 사이에 앉아서, 세션을 방해할 모든 요소를 대신 처리합니다:
+
+- **API 키 자동 순환**: 한도 초과·쿨다운 키는 건너뛰고 다음 키로 자동 전환
+- **서비스 폴백**: Google 실패 → OpenRouter → Ollama 자동 전환. 오픈클로는 계속 됩니다
+- **SSE 실시간 동기화**: 금고 대시보드에서 모델을 바꾸면 1-3초 내 오픈클로 TUI에 반영
+- **Unix 소켓 이벤트**: 키 소진·서비스 다운 알림이 TUI 하단에 실시간 표시
+
+Claude Code, Cursor, VS Code도 연결해서 쓸 수 있지만, 오픈클로가 본래 목적입니다.
 
 ```
-여러분의 AI 클라이언트
+오픈클로 (TUI)
         │
         ▼
-  wall-vault 프록시 (:56244)
+  wall-vault 프록시 (:56244)   ← 키 관리, 라우팅, 폴백, 이벤트
         │
         ├─ Google Gemini API
-        ├─ OpenRouter API
-        └─ Ollama (로컬)
+        ├─ OpenRouter API (340+ 모델)
+        └─ Ollama (로컬, 최종 폴백)
 ```
 
 ---
@@ -169,40 +174,44 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 
 ## 프록시 사용법
 
-### Claude Code / OpenClaw에서 사용
+### OpenClaw에서 사용 (주목적)
 
-`~/.claude/settings.json` 또는 `~/.openclaw/openclaw.json`:
+`~/.openclaw/openclaw.json`에 wall-vault 프로바이더 등록:
 
-```json
+```json5
+// ~/.openclaw/openclaw.json
 {
-  "apiProvider": "openai",
-  "baseUrl": "http://localhost:56244/v1",
-  "apiKey": "not-needed"
+  models: {
+    providers: {
+      "wall-vault": {
+        baseUrl: "http://localhost:56244/v1",
+        apiKey: "your-agent-token",   // vault 에이전트 토큰
+        api: "openai-completions",
+        models: [
+          { id: "wall-vault/gemini-2.5-flash" },
+          { id: "wall-vault/gemini-2.5-pro" },
+          { id: "wall-vault/hunter-alpha" },    // 무료 1M context
+          { id: "wall-vault/claude-opus-4-6" }
+        ]
+      }
+    }
+  }
 }
 ```
 
-OpenClaw 3.11+ `provider/model` 형식으로 모델 지정:
+> 에이전트 카드의 **🦞 OpenClaw 설정 복사** 버튼을 누르면 이 스니펫이 자동 생성됩니다.
 
-```json
-{
-  "model": "google/gemini-2.5-flash",
-  "model": "openai/gpt-4o",
-  "model": "anthropic/claude-opus-4",
-  "model": "openrouter/meta-llama/llama-3.3-70b-instruct",
-  "model": "qwen3.5:35b:cloud"
-}
-```
+**`wall-vault/` 접두어 라우팅:**
 
-**provider/model 라우팅 규칙:**
-
-| 형식 | 라우팅 |
-|------|--------|
-| `google/모델명` | Google Gemini 직접 |
-| `openai/모델명` | OpenAI 직접 |
-| `anthropic/모델명` | OpenRouter → `anthropic/모델명` |
-| `openrouter/경로` | OpenRouter 직접 |
+| 모델 형식 | 라우팅 |
+|----------|--------|
+| `wall-vault/gemini-*` | Google Gemini 직접 |
+| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI 직접 |
+| `wall-vault/claude-*` | OpenRouter (Anthropic 경로) |
+| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (무료 1M ctx) |
+| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
+| `google/모델명`, `openai/모델명`, `anthropic/모델명` 등 | 해당 서비스 직접 |
 | `모델명:cloud` | `:cloud` 제거 후 OpenRouter |
-| 나머지 | 서비스 설정 또는 OpenRouter |
 
 ### Gemini API 형식 (기존 호환)
 
@@ -334,6 +343,7 @@ curl "http://localhost:56244/api/models?q=claude"
 ### 서비스 카드
 
 - 서비스별 활성화·비활성화 토글
+- **프록시 사용** 체크박스 — 체크된 서비스만 오픈클로 프록시의 dispatch에 포함됨. SSE로 실시간 반영.
 - 로컬 AI 서버(Ollama/LMStudio/vLLM) URL 입력 및 모델 자동 감지
 - 커스텀 서비스 추가·삭제
 
@@ -347,18 +357,21 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## 분산 모드 (멀티 봇)
 
-여러 봇이 하나의 키 금고를 공유하는 구성입니다.
+여러 머신에서 오픈클로를 운영할 때, 하나의 키 금고를 공유하는 구성입니다.
 
-### 구성 예시
+### 구성 예시 (실제 운용 환경)
 
 ```
-[미니 서버 192.168.x.x]
-  wall-vault vault    (키 금고 :56243)
+[맥미니 192.168.x.x]
+  wall-vault vault    (키 금고 :56243, 대시보드)
 
-[봇A WSL]             [봇B 라즈베리파이]
-  wall-vault proxy      wall-vault proxy
-  ↕ SSE 동기화          ↕ SSE 동기화
+[WSL 모토코]          [라즈베리파이 라즈]    [맥미니 로컬]
+  wall-vault proxy      wall-vault proxy        wall-vault proxy
+  openclaw TUI          openclaw TUI            openclaw TUI
+  ↕ SSE 동기화          ↕ SSE 동기화            ↕ SSE 동기화
 ```
+
+금고에서 모델 변경 → 세 머신의 오픈클로 TUI에 1-3초 내 반영.
 
 ### 키 금고 서버 시작 (미니)
 
@@ -418,13 +431,14 @@ curl http://봇A주소:56244/status
 
 **SSE 이벤트 종류:**
 
-| 이벤트 | 트리거 | 대시보드 반응 |
-|--------|--------|--------------|
-| `config_change` | 클라이언트 모델/서비스 변경 | 모델 드롭다운 갱신 |
-| `service_changed` | 서비스 추가/수정/삭제 | 서비스 select + 모델 드롭다운 갱신 |
-| `key_added` / `key_deleted` | API 키 추가/삭제 | 모델 드롭다운 갱신 |
+| 이벤트 | 트리거 | 대시보드/프록시 반응 |
+|--------|--------|---------------------|
+| `config_change` | 클라이언트 모델/서비스 변경 | 모델 드롭다운 갱신 + 오픈클로 TUI 즉시 반영 |
+| `service_changed` | 서비스 추가/수정/삭제 | 서비스 select + 모델 드롭다운 갱신 + 프록시 dispatch 서비스 목록 갱신 |
+| `key_added` / `key_deleted` | API 키 추가/삭제 | 모델 드롭다운 갱신 + 프록시 키 재동기화 |
+| `usage_update` | heartbeat에서 키 사용량/쿨다운 보고 | 키 상태 실시간 갱신 + 카운트다운 |
 | `usage_reset` | 일일 사용량 초기화 | 페이지 새로고침 |
-| `heartbeat` | 프록시 60초마다 | 에이전트 상태 업데이트 |
+| `heartbeat` | 프록시 20초마다 | 에이전트 상태 업데이트 |
 
 ---
 

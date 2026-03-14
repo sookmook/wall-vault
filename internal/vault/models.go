@@ -53,6 +53,7 @@ type Client struct {
 	WorkDir     string   `json:"work_dir,omitempty"`     // working directory
 	Description string   `json:"description,omitempty"`  // description
 	IPWhitelist []string `json:"ip_whitelist,omitempty"` // allowed IP list (empty array = allow all)
+	Avatar      string   `json:"avatar,omitempty"`       // base64 data URI (data:image/png;base64,...)
 	Enabled     bool     `json:"enabled"`                // enabled status
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -69,6 +70,7 @@ type ClientInput struct {
 	WorkDir         string   `json:"work_dir"`
 	Description     string   `json:"description"`
 	IPWhitelist     []string `json:"ip_whitelist"`
+	Avatar          string   `json:"avatar,omitempty"`
 	Enabled         *bool    `json:"enabled"` // nil = default true
 }
 
@@ -85,6 +87,7 @@ type ClientUpdateInput struct {
 	WorkDir         *string  `json:"work_dir"`
 	Description     *string  `json:"description"`
 	IPWhitelist     []string `json:"ip_whitelist"`
+	Avatar          *string  `json:"avatar"`
 	Enabled         *bool    `json:"enabled"`
 }
 

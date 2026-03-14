@@ -379,6 +379,9 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 			if inp.IPWhitelist != nil {
 				c.IPWhitelist = inp.IPWhitelist
 			}
+			if inp.Avatar != nil {
+				c.Avatar = *inp.Avatar
+			}
 			if inp.Enabled != nil {
 				c.Enabled = *inp.Enabled
 			}

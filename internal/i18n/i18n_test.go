@@ -59,8 +59,8 @@ func TestSetLang_LocaleString(t *testing.T) {
 }
 
 func TestSupported(t *testing.T) {
-	if len(Supported) != 10 {
-		t.Errorf("Supported 언어 수 = %d, want 10", len(Supported))
+	if len(Supported) != 17 {
+		t.Errorf("Supported 언어 수 = %d, want 17", len(Supported))
 	}
 	// verify setup_welcome key exists in all supported languages
 	for _, code := range Supported {

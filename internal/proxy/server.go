@@ -482,11 +482,25 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	var lastErr error
-	// try the specified service first
+
+	// Build try order: configured service first, then the rest
 	tryOrder := []string{service}
 	for _, svc := range s.cfg.Proxy.Services {
 		if svc != service {
 			tryOrder = append(tryOrder, svc)
+		}
+	}
+	// Append anthropic if not already in the list and keys are available
+	hasAnthropic := false
+	for _, svc := range tryOrder {
+		if svc == "anthropic" {
+			hasAnthropic = true
+			break
+		}
+	}
+	if !hasAnthropic {
+		if k, err := s.keyMgr.Get("anthropic"); err == nil && k != nil {
+			tryOrder = append(tryOrder, "anthropic")
 		}
 	}
 
@@ -503,8 +517,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		case "openai":
 			resp, err = s.callOpenAI(model, req)
 		case "anthropic":
-			// Anthropic API uses a different format — route via OpenRouter (keep anthropic/model path)
-			resp, err = s.callOpenRouter("anthropic/"+model, req)
+			resp, err = s.callAnthropic(model, req)
 		default:
 			continue
 		}
@@ -514,9 +527,11 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		log.Printf("[proxy] %s failed → fallback: %v", svc, err)
 		lastErr = err
 	}
-	s.hooksMgr.Fire(hooks.EventServiceDown, map[string]string{
-		"error": lastErr.Error(),
-	})
+	if lastErr != nil {
+		s.hooksMgr.Fire(hooks.EventServiceDown, map[string]string{
+			"error": lastErr.Error(),
+		})
+	}
 	return nil, fmt.Errorf("모든 서비스 실패: %v", lastErr)
 }
 
@@ -529,6 +544,7 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 		key, plainKey, err := s.getKey("google")
 		if err != nil {
 			s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "google"})
+			lastErr = err
 			break
 		}
 
@@ -581,6 +597,22 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 // ─── OpenRouter ───────────────────────────────────────────────────────────────
 
 func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiResponse, error) {
+	resp, err := s.callOpenRouterModel(model, req)
+	if err == nil {
+		return resp, nil
+	}
+	// If paid model failed with payment errors, retry with free-tier variant
+	if !strings.HasSuffix(model, ":free") {
+		freeModel := model + ":free"
+		log.Printf("[proxy] openrouter paid failed, retrying free tier: %s", freeModel)
+		if resp, err2 := s.callOpenRouterModel(freeModel, req); err2 == nil {
+			return resp, nil
+		}
+	}
+	return nil, err
+}
+
+func (s *Server) callOpenRouterModel(model string, req *GeminiRequest) (*GeminiResponse, error) {
 	const maxAttempts = 3
 	var lastErr error
 	oaiReq := GeminiToOpenAI(model, req)
@@ -589,6 +621,7 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 		key, plainKey, err := s.getKey("openrouter")
 		if err != nil {
 			s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openrouter"})
+			lastErr = err
 			break
 		}
 
@@ -605,12 +638,10 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 		}
 
 		if resp.StatusCode == http.StatusNotFound {
-			// Model not found — key is fine, skip service entirely
 			resp.Body.Close()
 			return nil, fmt.Errorf("OpenRouter: 모델 없음 (%s)", model)
 		}
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusPaymentRequired {
-			// Key-level error — cooldown this key and retry with another
 			resp.Body.Close()
 			s.keyMgr.RecordError(key, resp.StatusCode)
 			lastErr = fmt.Errorf("OpenRouter 오류: HTTP %d", resp.StatusCode)
@@ -652,6 +683,7 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 		key, plainKey, err := s.getKey("openai")
 		if err != nil {
 			s.hooksMgr.Fire(hooks.EventKeyExhausted, map[string]string{"service": "openai"})
+			lastErr = err
 			break
 		}
 

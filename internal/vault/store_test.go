@@ -107,7 +107,7 @@ func TestStore_GetAvailableKey(t *testing.T) {
 func TestStore_AddUpdateDeleteClient(t *testing.T) {
 	s := newTestStore(t)
 
-	c, err := s.AddClient("bot1", "봇1", "token-abc", "google", "gemini-2.5-flash", nil)
+	c, err := s.AddClient(ClientInput{ID: "bot1", Name: "봇1", Token: "token-abc", DefaultService: "google", DefaultModel: "gemini-2.5-flash"})
 	if err != nil {
 		t.Fatalf("AddClient 실패: %v", err)
 	}
@@ -115,7 +115,9 @@ func TestStore_AddUpdateDeleteClient(t *testing.T) {
 		t.Fatalf("ID 불일치: %q", c.ID)
 	}
 
-	if err := s.UpdateClient("bot1", "openrouter", "qwen3.5:35b", nil); err != nil {
+	svc := "openrouter"
+	mdl := "qwen3.5:35b"
+	if err := s.UpdateClient("bot1", ClientUpdateInput{DefaultService: &svc, DefaultModel: &mdl}); err != nil {
 		t.Fatalf("UpdateClient 실패: %v", err)
 	}
 	got := s.GetClient("bot1")
@@ -133,7 +135,7 @@ func TestStore_AddUpdateDeleteClient(t *testing.T) {
 
 func TestStore_GetClientByToken(t *testing.T) {
 	s := newTestStore(t)
-	s.AddClient("bot1", "봇1", "secret-token-xyz", "google", "", nil)
+	s.AddClient(ClientInput{ID: "bot1", Name: "봇1", Token: "secret-token-xyz", DefaultService: "google"})
 
 	c := s.GetClientByToken("secret-token-xyz")
 	if c == nil || c.ID != "bot1" {
@@ -147,7 +149,8 @@ func TestStore_GetClientByToken(t *testing.T) {
 
 func TestStore_UpdateClient_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.UpdateClient("nonexistent", "google", "", nil); err == nil {
+	svc := "google"
+	if err := s.UpdateClient("nonexistent", ClientUpdateInput{DefaultService: &svc}); err == nil {
 		t.Fatal("없는 클라이언트 업데이트 — 오류 기대")
 	}
 }
@@ -160,7 +163,7 @@ func TestStore_Persistence(t *testing.T) {
 	// save
 	s1, _ := NewStore(dir, "password123")
 	s1.AddKey("google", "secret-key", "my-key", 500)
-	s1.AddClient("bot", "봇", "tok", "google", "gemini-2.5-flash", nil)
+	s1.AddClient(ClientInput{ID: "bot", Name: "봇", Token: "tok", DefaultService: "google", DefaultModel: "gemini-2.5-flash"})
 
 	// reload
 	s2, err := NewStore(dir, "password123")

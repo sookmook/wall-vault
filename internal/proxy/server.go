@@ -81,6 +81,10 @@ func NewServer(cfg *config.Config) *Server {
 				})
 				go updateOpenClawJSON(newSvc, newMdl)
 			}
+		}, func() {
+			if err := s.keyMgr.SyncFromVault(); err != nil {
+				log.Printf("[SSE] 키 동기화 실패: %v", err)
+			}
 		})
 		s.sse.Start()
 
@@ -134,14 +138,19 @@ func (s *Server) syncFromVault() {
 	for _, c := range clients {
 		if c.ID == s.cfg.Proxy.ClientID {
 			s.mu.Lock()
+			oldSvc, oldMdl := s.service, s.model
 			if c.DefaultService != "" {
 				s.service = c.DefaultService
 			}
 			if c.DefaultModel != "" {
 				s.model = c.DefaultModel
 			}
+			newSvc, newMdl := s.service, s.model
 			s.mu.Unlock()
 			log.Printf("[sync] 설정 로드: %s/%s", c.DefaultService, c.DefaultModel)
+			if newSvc != oldSvc || newMdl != oldMdl {
+				go updateOpenClawJSON(newSvc, newMdl)
+			}
 			break
 		}
 	}

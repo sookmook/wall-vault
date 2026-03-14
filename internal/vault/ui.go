@@ -1962,7 +1962,7 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
   <input id="%s-ipwl" type="text" placeholder="192.168.0.1, 10.0.0.0/24">
   <label data-i18n="lbl_avatar">아바타 이미지 (openclaw)</label>
   <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem">
-    <img id="%s-avatar-preview" src="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:1px solid var(--border);display:none">
+    <img id="%s-avatar-preview" src="" style="width:48px;height:48px;border-radius:50%%;object-fit:cover;border:1px solid var(--border);display:none">
     <input id="%s-avatar" type="hidden">
     <input type="file" accept="image/*" style="font-size:.75rem;color:var(--text-muted)" onchange="loadAvatarPreview(this,'%s-avatar','%s-avatar-preview')">
   </div>

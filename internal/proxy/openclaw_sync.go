@@ -45,7 +45,10 @@ func notifyOpenClaw(primaryModel string) {
 		"PATH="+filepath.Dir(bin)+":/usr/local/bin:/usr/bin:/bin",
 	)
 
-	// 1. 기본 모델 갱신 (openclaw.json agents.defaults.model.primary)
+	// 1. 실행 중인 TUI tmux 패인에 /model 명령 주입 (즉시 반영 — openclaw 명령보다 먼저)
+	injectModelToTUI(primaryModel)
+
+	// 2. 기본 모델 갱신 (openclaw.json agents.defaults.model.primary)
 	cmd := exec.Command(bin, "models", "set", primaryModel)
 	cmd.Env = baseEnv
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -54,16 +57,13 @@ func notifyOpenClaw(primaryModel string) {
 		log.Printf("[openclaw-sync] 모델 적용됨: %s", primaryModel)
 	}
 
-	// 2. sessions.patch로 세션 스토어 갱신 (다음 TUI 연결 시 반영)
+	// 3. sessions.patch로 세션 스토어 갱신 (다음 TUI 연결 시 반영)
 	params := `{"key":"main","model":"` + primaryModel + `"}`
 	cmd2 := exec.Command(bin, "gateway", "call", "sessions.patch", "--params", params)
 	cmd2.Env = baseEnv
 	if _, err := cmd2.CombinedOutput(); err != nil {
 		log.Printf("[openclaw-sync] sessions.patch 실패: %v", err)
 	}
-
-	// 3. 실행 중인 TUI tmux 패인에 /model 명령 주입 (실시간 반영)
-	injectModelToTUI(primaryModel)
 }
 
 // injectModelToTUI: 실행 중인 tmux 패인에서 openclaw TUI를 찾아 /model 명령 주입

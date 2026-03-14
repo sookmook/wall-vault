@@ -400,12 +400,79 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oaiResp := &OpenAIResponse{}
+	type candidate struct {
+		text         string
+		finishReason string
+		index        int
+	}
+	var cands []candidate
 	for _, c := range geminiResp.Candidates {
+		cands = append(cands, candidate{
+			text:         stripControlTokens(extractText(c.Content.Parts)),
+			finishReason: strings.ToLower(c.FinishReason),
+			index:        c.Index,
+		})
+	}
+
+	if oaiReq.Stream {
+		// SSE streaming response (OpenAI chat.completion.chunk format)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("X-Accel-Buffering", "no")
+		flusher, _ := w.(http.Flusher)
+
+		writeSSE := func(data []byte) {
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+
+		for _, c := range cands {
+			// role delta
+			roleChunk := map[string]interface{}{
+				"id":      "chatcmpl-proxy",
+				"object":  "chat.completion.chunk",
+				"model":   mdl,
+				"choices": []map[string]interface{}{{"index": c.index, "delta": map[string]string{"role": "assistant"}, "finish_reason": nil}},
+			}
+			if b, err := json.Marshal(roleChunk); err == nil {
+				writeSSE(b)
+			}
+			// content delta
+			contentChunk := map[string]interface{}{
+				"id":      "chatcmpl-proxy",
+				"object":  "chat.completion.chunk",
+				"model":   mdl,
+				"choices": []map[string]interface{}{{"index": c.index, "delta": map[string]string{"content": c.text}, "finish_reason": nil}},
+			}
+			if b, err := json.Marshal(contentChunk); err == nil {
+				writeSSE(b)
+			}
+			// finish delta
+			finishChunk := map[string]interface{}{
+				"id":      "chatcmpl-proxy",
+				"object":  "chat.completion.chunk",
+				"model":   mdl,
+				"choices": []map[string]interface{}{{"index": c.index, "delta": map[string]interface{}{}, "finish_reason": c.finishReason}},
+			}
+			if b, err := json.Marshal(finishChunk); err == nil {
+				writeSSE(b)
+			}
+		}
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+		return
+	}
+
+	oaiResp := &OpenAIResponse{}
+	for _, c := range cands {
 		oaiResp.Choices = append(oaiResp.Choices, OpenAIChoice{
-			Message:      OpenAIMessage{Role: "assistant", Content: stripControlTokens(extractText(c.Content.Parts))},
-			FinishReason: strings.ToLower(c.FinishReason),
-			Index:        c.Index,
+			Message:      OpenAIMessage{Role: "assistant", Content: c.text},
+			FinishReason: c.finishReason,
+			Index:        c.index,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")

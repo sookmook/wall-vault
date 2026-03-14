@@ -257,6 +257,42 @@ func (s *Store) RecordKeyUsage(id string, tokens int) {
 	}
 }
 
+// SetKeyUsage: set absolute usage value reported by proxy heartbeat (idempotent sync).
+// Returns true if the value changed.
+func (s *Store) SetKeyUsage(id string, tokens int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, k := range s.keys {
+		if k.ID == id {
+			if k.TodayUsage != tokens {
+				k.TodayUsage = tokens
+				_ = s.save()
+				return true
+			}
+			return false
+		}
+	}
+	return false
+}
+
+// SetKeyCooldownIfLater: set cooldown only if the new time is later than existing (proxy sync).
+// Returns true if changed.
+func (s *Store) SetKeyCooldownIfLater(id string, until time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, k := range s.keys {
+		if k.ID == id {
+			if until.After(k.CooldownUntil) {
+				k.CooldownUntil = until
+				_ = s.save()
+				return true
+			}
+			return false
+		}
+	}
+	return false
+}
+
 func (s *Store) SetKeyCooldown(id string, errCode int, until time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

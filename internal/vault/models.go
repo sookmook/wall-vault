@@ -95,11 +95,12 @@ type ClientUpdateInput struct {
 
 // ServiceConfig: per-service runtime settings (local URL, enabled status)
 type ServiceConfig struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	LocalURL string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
-	Enabled  bool   `json:"enabled"`
-	Custom   bool   `json:"custom,omitempty"` // user-added service
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	LocalURL     string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
+	Enabled      bool   `json:"enabled"`
+	Custom       bool   `json:"custom,omitempty"`       // user-added service
+	ProxyEnabled bool   `json:"proxy_enabled,omitempty"` // 오픈클로 프록시에서 이 서비스 사용
 }
 
 // IsLocal: whether this is a local server service

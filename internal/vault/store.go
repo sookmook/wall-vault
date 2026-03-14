@@ -459,6 +459,7 @@ func (s *Store) UpsertService(inp *ServiceConfig) error {
 			}
 			sv.LocalURL = inp.LocalURL
 			sv.Enabled = inp.Enabled
+			sv.ProxyEnabled = inp.ProxyEnabled
 			return s.save()
 		}
 	}
@@ -467,6 +468,19 @@ func (s *Store) UpsertService(inp *ServiceConfig) error {
 	clone.Custom = true
 	s.services = append(s.services, &clone)
 	return s.save()
+}
+
+// ListProxyEnabledServices: returns service IDs where ProxyEnabled=true
+func (s *Store) ListProxyEnabledServices() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var ids []string
+	for _, sv := range s.services {
+		if sv.ProxyEnabled {
+			ids = append(ids, sv.ID)
+		}
+	}
+	return ids
 }
 
 func (s *Store) DeleteService(id string) error {

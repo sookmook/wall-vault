@@ -14,20 +14,22 @@ import (
 
 // SSEClient: vault SSE stream subscription client
 type SSEClient struct {
-	mu        sync.RWMutex
-	vaultURL  string
-	clientID  string
-	connected bool
-	onConfig   func(service, model string) // config change callback
-	onKeyChange func()                     // key added/deleted/reset callback
+	mu              sync.RWMutex
+	vaultURL        string
+	clientID        string
+	connected       bool
+	onConfig        func(service, model string) // config change callback
+	onKeyChange     func()                      // key added/deleted/reset callback
+	onServiceChange func([]string)              // proxy service list change callback
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onKeyChange func()) *SSEClient {
+func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onKeyChange func(), onServiceChange func([]string)) *SSEClient {
 	return &SSEClient{
-		vaultURL:    vaultURL,
-		clientID:    clientID,
-		onConfig:    onConfig,
-		onKeyChange: onKeyChange,
+		vaultURL:        vaultURL,
+		clientID:        clientID,
+		onConfig:        onConfig,
+		onKeyChange:     onKeyChange,
+		onServiceChange: onServiceChange,
 	}
 }
 
@@ -91,9 +93,10 @@ func (c *SSEClient) handleEvent(data string) {
 	var evt struct {
 		Type string `json:"type"`
 		Data struct {
-			ClientID string `json:"client_id"`
-			Service  string `json:"service"`
-			Model    string `json:"model"`
+			ClientID      string   `json:"client_id"`
+			Service       string   `json:"service"`
+			Model         string   `json:"model"`
+			ProxyServices []string `json:"proxy_services"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(data), &evt); err != nil {
@@ -111,6 +114,11 @@ func (c *SSEClient) handleEvent(data string) {
 		log.Printf("[SSE] 🔑 key event: %s — re-syncing keys", evt.Type)
 		if c.onKeyChange != nil {
 			go c.onKeyChange()
+		}
+	case "service_changed":
+		if evt.Data.ProxyServices != nil && c.onServiceChange != nil {
+			log.Printf("[SSE] 🔧 service changed: proxy_services=%v", evt.Data.ProxyServices)
+			go c.onServiceChange(evt.Data.ProxyServices)
 		}
 	case "connected":
 		log.Printf("[SSE] connection confirmed")

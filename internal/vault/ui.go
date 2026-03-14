@@ -1319,8 +1319,9 @@ function onModelSelect(selId, inputId) {
 function toggleService(id, enabled) {
   const token=getAdminToken();if(!token)return;
   const urlEl=document.getElementById('svc-url-'+id);
+  const proxyEl=document.getElementById('svc-proxy-'+id);
   fetch('/admin/services/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({enabled:enabled,local_url:urlEl?urlEl.value:''})})
+    body:JSON.stringify({enabled:enabled,local_url:urlEl?urlEl.value:'',proxy_enabled:proxyEl?proxyEl.checked:false})})
   .then(r=>r.json()).then(d=>{if(d.error){alert(T('err')+d.error);}})
   .catch(e=>alert(T('err')+e));
 }
@@ -1328,9 +1329,19 @@ function saveServiceURL(id) {
   const token=getAdminToken();if(!token)return;
   const urlEl=document.getElementById('svc-url-'+id);if(!urlEl)return;
   const enEl=document.getElementById('svc-en-'+id);
+  const proxyEl=document.getElementById('svc-proxy-'+id);
   fetch('/admin/services/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({local_url:urlEl.value,enabled:enEl?enEl.checked:true})})
+    body:JSON.stringify({local_url:urlEl.value,enabled:enEl?enEl.checked:true,proxy_enabled:proxyEl?proxyEl.checked:false})})
   .then(r=>r.json()).then(d=>{if(d.error)alert(T('err')+d.error);})
+  .catch(e=>alert(T('err')+e));
+}
+function toggleProxyService(id, enabled) {
+  const token=getAdminToken();if(!token)return;
+  const urlEl=document.getElementById('svc-url-'+id);
+  const enEl=document.getElementById('svc-en-'+id);
+  fetch('/admin/services/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify({enabled:enEl?enEl.checked:true,local_url:urlEl?urlEl.value:'',proxy_enabled:enabled})})
+  .then(r=>r.json()).then(d=>{if(d.error){alert(T('err')+d.error);}})
   .catch(e=>alert(T('err')+e));
 }
 function detectLocalModels(id) {
@@ -1824,6 +1835,17 @@ func buildServicesCard(services []*ServiceConfig) string {
 		if sv.Enabled {
 			enabledChecked = " checked"
 		}
+		proxyChecked := ""
+		if sv.ProxyEnabled {
+			proxyChecked = " checked"
+		}
+		proxyCheckbox := fmt.Sprintf(
+			`<label style="display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:var(--text-muted);cursor:pointer;margin-left:.2rem">
+  <input type="checkbox" id="svc-proxy-%s"%s style="accent-color:var(--accent);cursor:pointer" onchange="toggleProxyService('%s',this.checked)">
+  <span data-i18n="proxy_use">프록시 사용</span>
+</label>`,
+			sv.ID, proxyChecked, sv.ID,
+		)
 		localURLField := ""
 		if sv.IsLocal() {
 			var defaultPort string
@@ -1861,12 +1883,14 @@ func buildServicesCard(services []*ServiceConfig) string {
     <span style="font-size:.68rem;color:var(--text-muted)">%s</span>
   </label>
   %s
+  %s
 </div>
 %s
 </div>`,
 			sv.ID,
 			sv.ID, enabledChecked, sv.ID,
 			sv.Name, sv.ID,
+			proxyCheckbox,
 			deleteBtn,
 			localURLField,
 		))

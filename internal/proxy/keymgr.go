@@ -255,10 +255,12 @@ func (km *KeyManager) SyncFromVault() error {
 
 	body, _ := io.ReadAll(resp.Body)
 	var keys []struct {
-		ID         string `json:"id"`
-		Service    string `json:"service"`
-		PlainKey   string `json:"plain_key"`
-		DailyLimit int    `json:"daily_limit"`
+		ID            string    `json:"id"`
+		Service       string    `json:"service"`
+		PlainKey      string    `json:"plain_key"`
+		DailyLimit    int       `json:"daily_limit"`
+		TodayUsage    int       `json:"today_usage"`
+		CooldownUntil time.Time `json:"cooldown_until"`
 	}
 	if err := json.Unmarshal(body, &keys); err != nil {
 		return fmt.Errorf("금고 키 파싱 오류: %w", err)
@@ -275,16 +277,23 @@ func (km *KeyManager) SyncFromVault() error {
 		}
 		km.keys[svc] = kept
 	}
+	now := time.Now()
 	for _, k := range keys {
 		if k.PlainKey == "" {
 			continue
 		}
-		km.keys[k.Service] = append(km.keys[k.Service], &localKey{
+		lk := &localKey{
 			id:         k.ID,
 			service:    k.Service,
 			plaintext:  k.PlainKey,
 			dailyLimit: k.DailyLimit,
-		})
+			todayUsage: k.TodayUsage,
+		}
+		// restore cooldown only if still in the future
+		if k.CooldownUntil.After(now) {
+			lk.cooldownUntil = k.CooldownUntil
+		}
+		km.keys[k.Service] = append(km.keys[k.Service], lk)
 	}
 	km.mu.Unlock()
 

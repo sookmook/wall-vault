@@ -129,6 +129,37 @@ func (s *Store) load() error {
 	if needsSave {
 		_ = s.save()
 	}
+
+	// migrate legacy SHA-256 encrypted keys to Argon2id
+	if s.masterPass != "" {
+		_ = s.migrateLegacyKeys()
+	}
+
+	return nil
+}
+
+// migrateLegacyKeys re-encrypts any SHA-256 encrypted key with Argon2id.
+// Called once on load. Saves automatically if any key was migrated.
+func (s *Store) migrateLegacyKeys() error {
+	migrated := 0
+	for _, k := range s.keys {
+		if !isLegacyEncrypted(k.EncryptedKey) {
+			continue
+		}
+		plain, err := decryptLegacy(k.EncryptedKey, s.masterPass)
+		if err != nil {
+			continue // skip keys that can't be decrypted (wrong password etc.)
+		}
+		enc, err := encryptKey(plain, s.masterPass)
+		if err != nil {
+			continue
+		}
+		k.EncryptedKey = enc
+		migrated++
+	}
+	if migrated > 0 {
+		return s.save()
+	}
 	return nil
 }
 

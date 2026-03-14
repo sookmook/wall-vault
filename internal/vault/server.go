@@ -98,9 +98,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clients", s.handlePublicClients)
 
 	// proxy-only (client token auth)
-	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))       // decrypted key list
-	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))  // heartbeat receiver
-	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))  // client self-config change
+	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))           // decrypted key list
+	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))      // heartbeat receiver
+	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))      // client self-config change
+	mux.HandleFunc("/api/services", s.clientAuth(s.handleProxyServices))   // proxy-enabled service list
 
 	// admin
 	mux.HandleFunc("/admin/theme", s.adminAuth(s.handleAdminTheme))
@@ -436,6 +437,15 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "updated", "client_id": clientID})
 }
 
+// handleProxyServices: returns list of proxy-enabled service IDs (client token auth)
+func (s *Server) handleProxyServices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "GET required", http.StatusMethodNotAllowed)
+		return
+	}
+	jsonOK(w, s.store.ListProxyEnabledServices())
+}
+
 // handleProxyKeys: provide decrypted key list to proxy (client token auth)
 func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -591,7 +601,10 @@ func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]string{"action": "added", "id": inp.ID}})
+		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
+			"action": "added", "id": inp.ID,
+			"proxy_services": s.store.ListProxyEnabledServices(),
+		}})
 		jsonOK(w, map[string]string{"status": "ok"})
 	default:
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -616,14 +629,20 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]string{"action": "updated", "id": id}})
+		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
+			"action": "updated", "id": id,
+			"proxy_services": s.store.ListProxyEnabledServices(),
+		}})
 		jsonOK(w, map[string]string{"status": "updated"})
 	case http.MethodDelete:
 		if err := s.store.DeleteService(id); err != nil {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]string{"action": "deleted", "id": id}})
+		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
+			"action": "deleted", "id": id,
+			"proxy_services": s.store.ListProxyEnabledServices(),
+		}})
 		jsonOK(w, map[string]string{"status": "deleted"})
 	default:
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)

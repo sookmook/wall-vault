@@ -20,16 +20,17 @@ import (
 
 // Server: proxy HTTP server
 type Server struct {
-	cfg      *config.Config
-	mu       sync.RWMutex
-	service  string
-	model    string
-	keyMgr   *KeyManager
-	filter   *ToolFilter
-	sse      *SSEClient
-	registry *models.Registry
-	hooksMgr *hooks.Manager
-	ollamaMu sync.Mutex // protect single concurrent Ollama request
+	cfg             *config.Config
+	mu              sync.RWMutex
+	service         string
+	model           string
+	allowedServices []string // proxy-enabled services from vault (empty = no restriction)
+	keyMgr          *KeyManager
+	filter          *ToolFilter
+	sse             *SSEClient
+	registry        *models.Registry
+	hooksMgr        *hooks.Manager
+	ollamaMu        sync.Mutex // protect single concurrent Ollama request
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -85,6 +86,11 @@ func NewServer(cfg *config.Config) *Server {
 			if err := s.keyMgr.SyncFromVault(); err != nil {
 				log.Printf("[SSE] 키 동기화 실패: %v", err)
 			}
+		}, func(services []string) {
+			s.mu.Lock()
+			s.allowedServices = services
+			s.mu.Unlock()
+			log.Printf("[SSE] 프록시 서비스 갱신: %v", services)
 		})
 		s.sse.Start()
 
@@ -159,6 +165,41 @@ func (s *Server) syncFromVault() {
 	if err := s.keyMgr.SyncFromVault(); err != nil {
 		log.Printf("[sync] 키 동기화 실패: %v", err)
 	}
+
+	// sync proxy-enabled services
+	if err := s.syncAllowedServices(); err != nil {
+		log.Printf("[sync] 서비스 목록 동기화 실패: %v", err)
+	}
+}
+
+// syncAllowedServices: fetch proxy-enabled service list from vault
+func (s *Server) syncAllowedServices() error {
+	url := s.cfg.Proxy.VaultURL + "/api/services"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	if s.cfg.Proxy.VaultToken != "" {
+		req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("서비스 목록 조회 실패: HTTP %d", resp.StatusCode)
+	}
+	var svcs []string
+	if err := json.NewDecoder(resp.Body).Decode(&svcs); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.allowedServices = svcs
+	s.mu.Unlock()
+	log.Printf("[sync] 프록시 서비스 목록: %v", svcs)
+	return nil
 }
 
 // ollamaURL: return Ollama URL from config or env var
@@ -548,6 +589,10 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 // ─── Request Dispatch ─────────────────────────────────────────────────────────
 
 func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiResponse, error) {
+	s.mu.RLock()
+	allowedServices := s.allowedServices
+	s.mu.RUnlock()
+
 	var lastErr error
 
 	// Build try order: configured service first, then the rest
@@ -555,6 +600,22 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 	for _, svc := range s.cfg.Proxy.Services {
 		if svc != service {
 			tryOrder = append(tryOrder, svc)
+		}
+	}
+	// Filter by proxy-enabled services from vault (when configured)
+	if len(allowedServices) > 0 {
+		allowed := make(map[string]bool, len(allowedServices))
+		for _, svc := range allowedServices {
+			allowed[svc] = true
+		}
+		var filtered []string
+		for _, svc := range tryOrder {
+			if allowed[svc] {
+				filtered = append(filtered, svc)
+			}
+		}
+		if len(filtered) > 0 {
+			tryOrder = filtered
 		}
 	}
 	// Append anthropic if not already in the list and keys are available
@@ -566,8 +627,17 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		}
 	}
 	if !hasAnthropic {
-		if k, err := s.keyMgr.Get("anthropic"); err == nil && k != nil {
-			tryOrder = append(tryOrder, "anthropic")
+		anthropicAllowed := len(allowedServices) == 0
+		for _, svc := range allowedServices {
+			if svc == "anthropic" {
+				anthropicAllowed = true
+				break
+			}
+		}
+		if anthropicAllowed {
+			if k, err := s.keyMgr.Get("anthropic"); err == nil && k != nil {
+				tryOrder = append(tryOrder, "anthropic")
+			}
 		}
 	}
 

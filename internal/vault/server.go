@@ -368,6 +368,29 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.store.UpdateProxyStatus(&ps)
+	// sync proxy key usage + cooldowns into vault store so the UI reflects reality
+	changed := false
+	for keyID, tokens := range ps.KeyUsage {
+		if s.store.SetKeyUsage(keyID, tokens) {
+			changed = true
+		}
+	}
+	for keyID, cooldownStr := range ps.KeyCooldowns {
+		if until, err := time.Parse(time.RFC3339, cooldownStr); err == nil {
+			if s.store.SetKeyCooldownIfLater(keyID, until) {
+				changed = true
+			}
+		}
+	}
+	if changed {
+		s.broker.Broadcast(SSEEvent{
+			Type: "usage_update",
+			Data: map[string]interface{}{
+				"key_usage":     ps.KeyUsage,
+				"key_cooldowns": ps.KeyCooldowns,
+			},
+		})
+	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 

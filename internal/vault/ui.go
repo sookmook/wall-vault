@@ -682,6 +682,41 @@ applyThemeCss('` + currentTheme + `');
 applyLang('` + currentLang + `');
 document.querySelectorAll('#dd-theme .dd-item').forEach(el=>el.classList.toggle('active',el.dataset.val==='` + currentTheme + `'));
 
+// 키 사용량 그래프 실시간 갱신 (heartbeat usage_update SSE 이벤트 수신 시)
+function refreshKeyUsage(_data) {
+  const tok = localStorage.getItem('wv_admin_token')||'';
+  fetch('/admin/keys', {headers:{'Authorization':'Bearer '+tok}})
+    .then(r=>r.json()).then(keys=>{
+      if(!Array.isArray(keys)) return;
+      const now = new Date();
+      keys.forEach(k=>{
+        const el = document.querySelector('[data-key-id="'+k.id+'"]');
+        if(!el) return;
+        const bar = el.querySelector('.bar-fill');
+        const meta = el.querySelector('.key-meta');
+        if(!bar) return;
+        const onCooldown = k.cooldown_until && new Date(k.cooldown_until) > now;
+        let pct = 0;
+        if(k.daily_limit > 0) {
+          pct = Math.round(k.today_usage * 100 / k.daily_limit);
+          if(pct === 0 && k.today_usage > 0) pct = 4;
+          if(pct > 100) pct = 100;
+        }
+        bar.style.width = pct + '%';
+        const cls = onCooldown ? 'bar-yellow' : (k.usage_pct >= 97 ? 'bar-red' : 'bar-green');
+        bar.className = 'bar-fill ' + cls;
+        if(meta) {
+          let txt = k.daily_limit > 0 ? (k.today_usage+'/'+k.daily_limit) : (k.today_usage+' 요청');
+          if(onCooldown) {
+            const rem = Math.round((new Date(k.cooldown_until)-now)/60000);
+            txt += ' ('+rem+'분 후)';
+          }
+          meta.textContent = txt;
+        }
+      });
+    }).catch(()=>{});
+}
+
 // SSE 연결
 let es;
 function connectSSE() {
@@ -711,6 +746,9 @@ function connectSSE() {
       } else if (d.type === 'usage_reset') {
         // 가벼운 reload (일일 사용량 초기화)
         setTimeout(() => location.reload(), 500);
+      } else if (d.type === 'usage_update') {
+        // 키 사용량 실시간 갱신 (하트비트 동기화)
+        refreshKeyUsage(d.data || {});
       }
     } catch {}
   };
@@ -1719,8 +1757,8 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 				activeClass = " key-active"
 			}
 			sb.WriteString(fmt.Sprintf(
-				`<div class="key-item%s"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
-				activeClass, statusIcon, label, meta, k.ID, barClass, barPct,
+				`<div class="key-item%s" data-key-id="%s"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
+				activeClass, k.ID, statusIcon, label, meta, k.ID, barClass, barPct,
 			))
 		}
 		sb.WriteString(`</div>`)

@@ -116,6 +116,37 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개, 모두 쿨다운/소진)", service, n)
 }
 
+// CooldownSnapshot: return cooldownUntil per key ID for keys currently on cooldown
+func (km *KeyManager) CooldownSnapshot() map[string]string {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	snap := make(map[string]string)
+	now := time.Now()
+	for _, keys := range km.keys {
+		for _, k := range keys {
+			if k.cooldownUntil.After(now) {
+				snap[k.id] = k.cooldownUntil.UTC().Format(time.RFC3339)
+			}
+		}
+	}
+	return snap
+}
+
+// UsageSnapshot: return current todayUsage per key ID (for heartbeat reporting)
+func (km *KeyManager) UsageSnapshot() map[string]int {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	snap := make(map[string]int)
+	for _, keys := range km.keys {
+		for _, k := range keys {
+			if k.todayUsage > 0 {
+				snap[k.id] = k.todayUsage
+			}
+		}
+	}
+	return snap
+}
+
 // RecordSuccess: record usage and track last-used key per service
 func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.mu.Lock()

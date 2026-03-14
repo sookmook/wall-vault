@@ -123,7 +123,9 @@ type ProxyStatus struct {
 	StartedAt  time.Time         `json:"started_at,omitempty"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	Vault      VaultInfo         `json:"vault,omitempty"`
-	ActiveKeys map[string]string `json:"active_keys,omitempty"` // service → key ID
+	ActiveKeys   map[string]string `json:"active_keys,omitempty"`   // service → key ID
+	KeyUsage     map[string]int    `json:"key_usage,omitempty"`     // key ID → tokens used today
+	KeyCooldowns map[string]string `json:"key_cooldowns,omitempty"` // key ID → cooldown RFC3339
 }
 
 type VaultInfo struct {

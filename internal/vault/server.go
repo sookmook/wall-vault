@@ -426,14 +426,15 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 
 	// identify requesting client
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	isAdmin := s.cfg.Vault.AdminToken != "" && token == s.cfg.Vault.AdminToken
 	client := s.store.GetClientByToken(token)
 	// deny key access to disabled clients
 	if client != nil && !client.Enabled {
 		jsonError(w, "client disabled", http.StatusForbidden)
 		return
 	}
-	// check IP whitelist
-	if client != nil && len(client.IPWhitelist) > 0 {
+	// check IP whitelist (skip for admin token)
+	if !isAdmin && client != nil && len(client.IPWhitelist) > 0 {
 		if !ipAllowed(realIP(r), client.IPWhitelist) {
 			jsonError(w, "ip not allowed", http.StatusForbidden)
 			return

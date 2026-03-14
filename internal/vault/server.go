@@ -46,6 +46,9 @@ func (al *authLimiter) record(ip string) {
 	al.fails[ip] = append(al.fails[ip], time.Now())
 }
 
+// Version is set from main via ldflags injection.
+var Version = "dev"
+
 // Server: key vault HTTP server
 type Server struct {
 	cfg       *config.Config
@@ -178,7 +181,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	clients := s.store.ListClients()
 	jsonOK(w, map[string]interface{}{
 		"status":  "ok",
-		"version": "v0.1.5",
+		"version": Version,
 		"keys":    len(keys),
 		"clients": len(clients),
 		"sse":     s.broker.Count(),

@@ -18,6 +18,10 @@ import (
 	"github.com/sookmook/wall-vault/internal/models"
 )
 
+// Version is set from main via ldflags injection: -ldflags "-X main.version=..."
+// main.go calls proxy.Version = version before starting the server.
+var Version = "dev"
+
 // Server: proxy HTTP server
 type Server struct {
 	cfg             *config.Config
@@ -252,7 +256,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{
 		"status":  "ok",
-		"version": "v0.1.5",
+		"version": Version,
 		"client":  s.cfg.Proxy.ClientID,
 	})
 }
@@ -267,7 +271,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	jsonOK(w, map[string]interface{}{
 		"status":   "ok",
-		"version":  "v0.1.4",
+		"version":  Version,
 		"client":   s.cfg.Proxy.ClientID,
 		"service":  svc,
 		"model":    mdl,

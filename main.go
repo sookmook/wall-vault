@@ -20,9 +20,13 @@ import (
 	ivault "github.com/sookmook/wall-vault/internal/vault"
 )
 
-const version = "v0.1.5"
+var version = "v0.1.6" // overridden at build time via -ldflags "-X main.version=..."
 
 func main() {
+	// propagate build-injected version to all packages
+	iproxy.Version = version
+	ivault.Version = version
+
 	i18n.Init()
 
 	if len(os.Args) < 2 {

@@ -5,6 +5,24 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.5] — 2026-03-14
+
+### Added
+- Proxy service selection: "프록시 사용" checkbox per service card → only checked services are used by OpenClaw proxy
+- `/api/services` endpoint (client-auth): returns list of proxy-enabled service IDs
+- `service_changed` SSE now includes `proxy_services []string` — proxy updates `allowedServices` in real-time
+- `proxy/sseconn.go`: `onServiceChange` callback for live proxy service filtering
+- `proxy/server.go`: `allowedServices` field + `syncAllowedServices()` on startup
+
+### Changed
+- Service card UI: removed redundant ID label below service name (name already identifies the service)
+- Documentation reframed around OpenClaw as primary use case (README, MANUAL, API)
+
+### Fixed
+- Binary on mini was v0.1.3; redeployed v0.1.4+ darwin/arm64 build
+
+---
+
 ## [0.1.3] — 2026-03-13
 
 ### Added
@@ -210,7 +228,8 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/sookmook/wall-vault/compare/v0.1.3...v0.1.5
 [0.1.3]: https://github.com/sookmook/wall-vault/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/sookmook/wall-vault/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/sookmook/wall-vault/compare/v0.1.0...v0.1.1

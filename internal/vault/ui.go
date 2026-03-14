@@ -85,15 +85,15 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(buildAddKeyModal(services))
 	sb.WriteString(buildEditClientModal(services))
 	sb.WriteString(buildAddServiceModal())
-	sb.WriteString(`</div>
+	sb.WriteString(fmt.Sprintf(`</div>
 <div class="footer">
-  wall-vault v0.1.5 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
+  wall-vault %s — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
   &nbsp;|&nbsp; <a href="https://sookmook.org/">sookmook.org</a>
   &nbsp;|&nbsp; <a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
   &nbsp;|&nbsp; ⏱ <span id="uptime"></span>
 </div>
 <div class="sse-indicator" id="sse-status">SSE: 연결 중...</div>
-<script>`)
+<script>`, Version))
 	sb.WriteString(js)
 	sb.WriteString(`</script>
 </body>

@@ -4,7 +4,7 @@
 
 <h1 align="center">🔐 wall-vault</h1>
 
-<p align="center"><i>AI Proxy + Key Vault — keep your bots alive, no matter what</i></p>
+<p align="center"><i>OpenClaw을 위한 AI 프록시 + API 키 금고 — 어떤 상황에서도 오픈클로가 끊기지 않게</i></p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg" alt="License: GPL v3"></a>
@@ -47,38 +47,38 @@ So I built something. **A vault for the keys. A wall for the bots. A guarantee t
 
 ## ⚔️ What It Actually Is
 
-One line: **"A bodyguard that keeps your AI bots alive no matter what."**
+One line: **"OpenClaw's backbone — routes, rotates, and recovers so your AI never stops."**
+
+wall-vault was built for **OpenClaw**. It sits between OpenClaw and the LLM APIs, handling everything that would otherwise interrupt a session:
 
 ```
-Hacker steals a key?                         → Vault blocks it. Rotates to the next.
-Key hits its daily limit?                    → Automatically switches. No downtime.
-Service goes dark?                           → Falls back: Gemini → OpenRouter → Ollama
-Running 100 bots?                            → Change one setting. All bots updated in 1–3s.
-Claude Code runs out of Anthropic quota?     → Silently routes to Gemini. No restart needed.
-Gemini CLI / Antigravity hit rate limits?    → Key rotation kicks in. (native proxy support coming in CLI v0.26+)
-Cursor needs a model list?                   → /v1/models returns everything. 350+ choices.
+Google key hits rate limit?          → Rotates to next key. OpenClaw keeps going.
+OpenRouter quota runs out?           → Falls back to Ollama. No interruption.
+Key gets stolen?                     → Vault blocks it. Next key takes over.
+Running OpenClaw on 3 machines?      → Change model once. All 3 update in 1–3s via SSE.
+Want to switch from Gemini to Kimi?  → One click in the vault dashboard. Done.
 ```
 
 In more detail:
 
+- 🦞 **OpenClaw Integration**: The main event. Live events over Unix socket to TUI. Auto-updates openclaw.json. SSE model sync in 1–3s.
 - 🔐 **Key Vault**: AES-GCM encrypted storage. Round-robin rotation. Quota, cooldown, and error handling — all automatic.
-- 🔀 **AI Proxy**: Accepts requests from OpenClaw, Claude Code, Gemini CLI, Antigravity, Cursor, VS Code, your scripts — routes them to Gemini / OpenAI / Ollama. One dies, the next one picks up.
-- ⚡ **SSE Real-time Sync**: Change anything in the vault, every connected bot reflects it instantly. No restarts.
+- 🔀 **AI Proxy**: OpenClaw sends requests here, wall-vault routes them to Gemini / OpenRouter / Ollama. One dies, the next one picks up.
+- ⚡ **SSE Real-time Sync**: Change anything in the vault, every connected proxy reflects it instantly. No restarts.
 - 🛡️ **Security Filter**: Full function calling block. Stops external skills from hijacking your AI.
-- 🦞 **OpenClaw Integration**: Live events over Unix socket to TUI. Auto-updates openclaw.json.
 
-Single Go binary. One bot or a dozen — fully covered.
+Single Go binary. Works with Claude Code, Cursor, VS Code too — but OpenClaw is what it's built for.
 
 ---
 
 ## 🔌 Works With Everything
 
-wall-vault speaks **four different API formats** out of the box.
+wall-vault was built for OpenClaw — but since it speaks **four API formats**, other clients connect too.
 Point any AI client at `http://your-host:56244` and it just works.
 
 | Client | Endpoint | Format | Setup |
 |--------|----------|--------|-------|
-| **OpenClaw** | `/google/v1beta/models/...` | Gemini | Built-in — just point to proxy port |
+| **OpenClaw** ⭐ | `/google/v1beta/models/...` | Gemini | Built-in — just point to proxy port |
 | **Gemini CLI** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=http://localhost:56244` |
 | **Antigravity IDE** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=http://localhost:56244` |
 | **Claude Code** | `/v1/messages` | Anthropic | `ANTHROPIC_BASE_URL=http://localhost:56244` |
@@ -181,6 +181,7 @@ Same for VS Code + Continue extension:
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [OpenClaw Integration](#openclaw-integration) ⭐
 - [Languages](#languages)
 - [Architecture](#architecture)
 - [Configuration](#configuration)
@@ -189,7 +190,6 @@ Same for VS Code + Continue extension:
 - [Modes](#modes)
 - [Auto-Start](#auto-start)
 - [Internal Network Setup](#internal-network-setup)
-- [OpenClaw Integration](#openclaw-integration)
 - [Build](#build)
 - [Project Structure](#project-structure)
 - [License](#license)
@@ -200,6 +200,7 @@ Same for VS Code + Continue extension:
 
 | Feature | Description |
 |---------|-------------|
+| **[OpenClaw Integration](#openclaw-integration)** ⭐ | The primary use case — Unix socket TUI events, openclaw.json auto-config, SSE model sync |
 | **AI Proxy** | Google Gemini / OpenAI / Anthropic / OpenRouter / GitHub Copilot / Ollama / LMStudio / vLLM |
 | **Client Support** | OpenClaw / Claude Code / Gemini CLI / Antigravity IDE / Cursor / VS Code / LM Studio / scripts |
 | **Key Vault** | API key management, usage monitoring, round-robin rotation |
@@ -210,16 +211,15 @@ Same for VS Code + Continue extension:
 | **Model Registry** | 340+ OpenRouter models + dynamic local model discovery |
 | **Local AI Support** | Ollama / LM Studio / vLLM auto-detection + manual URL |
 | **Service Management** | Add/edit/delete services from UI, custom service support |
-| **Service Auto-check** | Dashboard load / key change → cloud services auto-enable/disable by key count; local services probed for connectivity |
+| **Service Auto-check** | Dashboard load / key change → cloud services auto-enable/disable by key count |
 | **Agent Management** | Per-agent service / model / IP whitelist / workdir |
 | **Agent Status** | 4-state: 🟢Online / 🟡Delayed / 🔴Offline / ⚫Disconnected |
 | **Bidirectional Model Sync** | TUI model change → vault; vault change → TUI. All sources stay in sync. |
 | **Per-type Config Copy** | 🦞 openclaw / 🟠 claude-code / ⌨ cursor / 💻 vscode — one-click config snippet |
 | **Doctor** | Health check, auto-recovery, systemd/launchd/NSSM registration |
-| **[17 Languages](#languages)** | Korean · English · Chinese · Japanese · Spanish · Hindi · Arabic · Portuguese · French · German · Thai · Mongolian · Swahili · Hausa · Zulu · Nepali · Indonesian — drop a JSON file to add any language, zero code changes |
+| **[17 Languages](#languages)** | Korean · English · Chinese · Japanese · Spanish · Hindi · Arabic · Portuguese · French · German · Thai · Mongolian · Swahili · Hausa · Zulu · Nepali · Indonesian |
 | **Themes** | Light ☀️ / Dark 🌑 / Gold ✨ / Cherry 🌸 / Ocean 🌊 / Autumn 🍂 / Winter ❄️ |
 | **Cross-platform** | Linux / macOS / Windows / WSL |
-| **[OpenClaw Integration](#openclaw-integration)** | Unix socket TUI events, agent auto-config |
 
 ---
 
@@ -255,6 +255,85 @@ Invoke-WebRequest -Uri `
 ```
 
 Open `http://localhost:56243` to access the dashboard.
+
+---
+
+## OpenClaw Integration
+
+**OpenClaw** is a distributed AI agent TUI framework that runs personas with long-term memory across multiple devices. wall-vault was built specifically to serve OpenClaw — the two systems are deeply integrated.
+
+### Step 1: Register an OpenClaw Agent
+
+In the dashboard **Add Agent** modal, set agent type to `openclaw`:
+- Work directory auto-fills as `~/.openclaw`
+- wall-vault becomes the API key supplier and proxy for that agent
+
+```bash
+# Run proxy for OpenClaw (distributed mode)
+VAULT_CLIENT_ID=bot-a \
+VAULT_URL=http://192.168.x.x:56243 \
+VAULT_TOKEN=your-agent-token \
+wall-vault proxy
+```
+
+### Step 2: Point openclaw.json at the proxy
+
+```json5
+// ~/.openclaw/openclaw.json
+{
+  models: {
+    providers: {
+      "wall-vault": {
+        baseUrl: "http://localhost:56244/v1",
+        apiKey: "your-agent-token",
+        api: "openai-completions",
+        models: [
+          { id: "wall-vault/gemini-2.5-flash" },
+          { id: "wall-vault/gemini-2.5-pro" },
+          { id: "wall-vault/hunter-alpha" },     // free 1M context
+          { id: "wall-vault/claude-opus-4-6" }
+        ]
+      }
+    }
+  }
+}
+```
+
+The dashboard's **🦞 OpenClaw 설정 복사** button generates this snippet automatically.
+
+### Model routing with `wall-vault/` prefix
+
+| Model prefix | Routes to |
+|---|---|
+| `wall-vault/gemini-*` | Google Gemini (direct) |
+| `wall-vault/gpt-*` / `wall-vault/o3` / `wall-vault/o4*` | OpenAI (direct) |
+| `wall-vault/claude-*` | Anthropic via OpenRouter |
+| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (free, 1M ctx) |
+| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
+| All `opencode/`, `moonshot/`, `kimi-coding/`, `groq/`, `deepseek/`, `qwen/`, `meta-llama/` | OpenRouter |
+| `model-name:cloud` | `:cloud` stripped → OpenRouter |
+
+### Unix Socket Events (TUI live notifications)
+
+wall-vault sends real-time events to OpenClaw's TUI over a Unix socket:
+
+```yaml
+# wall-vault.yaml
+hooks:
+  openclaw_socket: ~/.openclaw/wall-vault.sock
+```
+
+| Event | Trigger |
+|-------|---------|
+| `model_changed` | Model/service switch |
+| `key_exhausted` | API key daily limit reached |
+| `service_down` | Service failure or all keys on cooldown |
+| `ollama_waiting` | Waiting for local Ollama response |
+| `tui_footer` | Status message pushed to TUI footer |
+
+### SSE Auto-Sync
+
+OpenClaw agents subscribe to the wall-vault SSE stream. Model or service changes in the vault are applied within **1–3 seconds** — no TUI restart needed.
 
 ---
 
@@ -696,74 +775,6 @@ launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
 
 ---
 
-## OpenClaw Integration
-
-**OpenClaw** is a distributed AI agent framework that runs personas with long-term memory across multiple devices. wall-vault was born to serve OpenClaw — the two systems are deeply integrated.
-
-### Register an OpenClaw Agent
-
-In the dashboard **Add Agent** modal, set the agent type to `openclaw`:
-- Work directory auto-fills as `~/.openclaw`
-- wall-vault becomes the API key supplier and proxy for that agent
-
-```bash
-VAULT_CLIENT_ID=bot-a \
-VAULT_URL=http://192.168.x.x:56243 \
-wall-vault proxy
-```
-
-### Unix Socket Events (TUI Live Notifications)
-
-wall-vault sends real-time JSON events over a Unix domain socket to OpenClaw's TUI.
-
-```yaml
-# wall-vault.yaml
-hooks:
-  openclaw_socket: ~/.openclaw/wall-vault.sock
-```
-
-| Event | Trigger |
-|-------|---------|
-| `model_changed` | Model switch |
-| `key_exhausted` | API key daily limit reached |
-| `service_down` | Service failure / cooldown |
-| `ollama_waiting` | Waiting for local Ollama response |
-| `ollama_done` | Ollama response complete |
-| `tui_footer` | Status message to TUI footer |
-
-### openclaw.json Provider Config
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
-        apiKey: "YOUR_AGENT_TOKEN",
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/gemini-2.0-flash" }
-        ]
-      }
-    }
-  }
-}
-```
-
-- Prefix model IDs with `wall-vault/` for automatic routing
-- `wall-vault/gemini-*` → Google Gemini (direct)
-- `wall-vault/gpt-*` / `wall-vault/o3` → OpenAI (direct)
-- `wall-vault/claude-*` → Anthropic via OpenRouter
-- All OpenClaw provider prefixes supported: `opencode/`, `moonshot/`, `kimi-coding/`, `groq/`, `mistral/`, `deepseek/`, `qwen/`, `meta-llama/`, etc.
-
-### SSE Auto-Sync
-
-OpenClaw agents subscribe to the wall-vault SSE stream and apply model/service changes within **1–3 seconds** — no restart needed.
-
----
 
 ## Build
 
@@ -882,24 +893,26 @@ If you wish to distribute modified versions or use this commercially, please con
 
 ## ⚔️ 그래서, 이게 뭐냐면
 
-한 줄 요약: **"AI 봇들이 절대 죽지 않게 만드는 보디가드."**
+한 줄 요약: **"오픈클로가 어떤 상황에서도 LLM 서비스를 끊김 없이 쓸 수 있게 하는 AI 프록시 + API 키 금고."**
+
+오픈클로와 LLM API 사이에 앉아서, 세션을 방해할 모든 요소를 대신 처리한다:
 
 ```
-해커가 키를 털어도  → 금고가 막는다
-키 한도가 차도      → 다음 키로 알아서 넘긴다
-서비스가 다운돼도   → Gemini → OpenAI → Ollama 순서로 폴백
-봇이 100대여도      → 설정 하나 바꾸면 1-3초 내 전원에 반영
+구글 키 한도 초과    → 다음 키로 자동 전환. 오픈클로는 계속된다.
+OpenRouter 크레딧 소진 → Ollama로 폴백. 끊김 없음.
+키가 탈취됨          → 금고가 막는다. 다음 키가 투입된다.
+머신 3대에서 오픈클로 실행 중 → 모델 변경 한 번. 3대 전부 1-3초 내 반영.
 ```
 
 더 풀어쓰면:
 
+- 🦞 **OpenClaw 전용 연동**: 핵심 목적. Unix 소켓으로 TUI에 실시간 이벤트 전달. openclaw.json 자동 갱신. SSE 모델 동기화 1-3초.
 - 🔐 **키 금고(Vault)**: AES-GCM 암호화. 라운드 로빈 자동 순환. 할당량·오류·쿨다운 알아서 관리.
-- 🔀 **AI 프록시(Proxy)**: OpenClaw·Claude Code·VS Code·내 스크립트 — 어디서 오든 Gemini / OpenAI / Ollama로 중계. 하나 죽으면 다음 걸로.
-- ⚡ **SSE 실시간 동기화**: 금고에서 뭔가 바꾸면 연결된 모든 봇에 즉각 반영. 재시작 불필요.
-- 🛡️ **보안 필터**: function calling 완전 차단. 외부 스킬이 내 AI를 멋대로 조종하는 걸 막는다.
-- 🦞 **OpenClaw 전용 연동**: Unix 소켓으로 TUI에 실시간 이벤트 전달. openclaw.json 자동 갱신.
+- 🔀 **AI 프록시(Proxy)**: 오픈클로가 여기로 요청을 보내면, Gemini / OpenRouter / Ollama로 라우팅. 하나 죽으면 다음 걸로.
+- ⚡ **SSE 실시간 동기화**: 금고에서 뭔가 바꾸면 연결된 모든 프록시에 즉각 반영. 재시작 불필요.
+- 🛡️ **보안 필터**: function calling 완전 차단. 외부 스킬이 오픈클로를 멋대로 조종하는 걸 막는다.
 
-Go 바이너리 단 하나. 봇 한 대부터 분산 다중 봇까지 전부 커버.
+Go 바이너리 단 하나. Claude Code·Cursor·VS Code도 연결 가능하지만, 오픈클로가 본래 목적.
 
 ---
 
@@ -907,7 +920,9 @@ Go 바이너리 단 하나. 봇 한 대부터 분산 다중 봇까지 전부 커
 
 | 기능 | 설명 |
 |------|------|
+| **OpenClaw 전용 연동** ⭐ | 핵심 목적 — Unix 소켓 TUI 이벤트, openclaw.json 자동 설정, SSE 모델 동기화 |
 | **AI 프록시** | Google Gemini / OpenAI / Anthropic / OpenRouter / GitHub Copilot / Ollama / LMStudio / vLLM |
+| **클라이언트 지원** | OpenClaw / Claude Code / Gemini CLI / Cursor / VS Code / 스크립트 |
 | **키 금고** | API 키 관리, 사용량 모니터링, 라운드 로빈 자동 순환 |
 | **AES-GCM 암호화** | 마스터 비밀번호로 API 키 암호화 저장 |
 | **SSE 실시간 동기화** | 금고 ↔ 프록시 1–3초 내 자동 반영 |
@@ -915,11 +930,11 @@ Go 바이너리 단 하나. 봇 한 대부터 분산 다중 봇까지 전부 커
 | **폴백 체인** | 서비스 실패 시 자동 전환, 최종 폴백은 Ollama |
 | **모델 레지스트리** | OpenRouter 340개+ + 로컬 모델 동적 감지 |
 | **로컬 AI 지원** | Ollama / LM Studio / vLLM 자동 감지 + 수동 URL |
-| **서비스 관리** | UI에서 서비스 추가·수정·삭제 |
+| **서비스 관리** | UI에서 서비스 추가·수정·삭제, 프록시 사용 서비스 체크박스 선택 |
 | **에이전트 관리** | 에이전트별 서비스·모델·IP·작업 디렉토리 설정 |
 | **에이전트 상태** | 4단계 🟢실행중 / 🟡지연 / 🔴오프라인 / ⚫미연결 |
 | **주치의(Doctor)** | 헬스체크, 자동복구, systemd/launchd/NSSM 등록 |
-| **[17개 언어](#languages)** | 한국어·영어·중국어·일본어·스페인어·힌디어·아랍어·포르투갈어·프랑스어·독일어·태국어·몽골어·스와힐리어·하우사어·줄루어·네팔어·인도네시아어 기본 탑재. `locales/xx.json` 파일 하나로 어떤 언어든 추가 가능 — 코드 수정 불필요 |
+| **[17개 언어](#languages)** | 한국어·영어·중국어·일본어·스페인어·힌디어·아랍어·포르투갈어·프랑스어·독일어·태국어·몽골어·스와힐리어·하우사어·줄루어·네팔어·인도네시아어 기본 탑재 |
 | **테마** | 라이트 ☀️ / 다크 🌑 / 골드 ✨ / 벚꽃 🌸 / 오션 🌊 / 가을 🍂 / 겨울 ❄️ |
 | **크로스 플랫폼** | Linux / macOS / Windows / WSL |
 
@@ -1237,4 +1252,4 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 
 ---
 
-*Last updated · 최종 업데이트: 2026-03-13*
+*Last updated · 최종 업데이트: 2026-03-14*

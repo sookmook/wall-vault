@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(최종 갱신: 2026-03-14 — v0.1.5: 서비스 카드 UI 정리, 서비스 이름 중복 표시 제거)*
+*(Last updated: 2026-03-14 — v0.1.6: proxy-only service filter in agent dropdowns, avatar path support, usage tracking fix)*
 
 ---
 
@@ -311,7 +311,20 @@ curl "http://localhost:56244/api/models?q=claude"
   - 서비스/키 변경 이벤트 수신 시 → 드롭다운 실시간 갱신 (페이지 새로고침 없음)
   - `[💾 저장]` 클릭 후 성공 시 → 버튼에 **✓** 표시 + "✓ 저장됨" 인라인 알림 (3초)
 
-**에이전트 종류별 설정 복사 버튼 (v0.1.3):**
+**에이전트 아바타 (v0.1.6~):**
+
+에이전트 카드에 아바타 이미지가 표시됩니다. 아바타는 다음 두 가지 방식으로 지정합니다:
+
+| 방법 | 형식 | 예시 |
+|------|------|------|
+| 상대 경로 | `~/.openclaw/` 기준 경로 | `workspace/avatar.png`, `workspace/avatars/profile.hpg` |
+| base64 URI | `data:image/...;base64,...` | 직접 임베드 |
+
+지원 확장자: `.png`, `.jpg`/`.jpeg`/`.hpg`, `.webp`, `.gif`
+
+에이전트 종류가 `openclaw`이거나 지정되지 않은 경우 기본값으로 `~/.openclaw/workspace/avatar.png`를 시도합니다.
+
+**에이전트 종류별 설정 복사 버튼 (v0.1.3~):**
 
 | 종류 | 아이콘 | 버튼 레이블 | 복사 내용 |
 |------|--------|------------|----------|
@@ -344,6 +357,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 - 서비스별 활성화·비활성화 토글
 - **프록시 사용** 체크박스 — 체크된 서비스만 오픈클로 프록시의 dispatch에 포함됨. SSE로 실시간 반영.
+  - 체크된 서비스만 에이전트 카드의 **서비스·모델 드롭다운에도 표시됨** (v0.1.6~)
 - 로컬 AI 서버(Ollama/LMStudio/vLLM) URL 입력 및 모델 자동 감지
 - 커스텀 서비스 추가·삭제
 

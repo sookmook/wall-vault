@@ -4,16 +4,61 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
 
-// updateOpenClawJSON updates ~/.openclaw/openclaw.json when the model changes via SSE.
-// This keeps OpenClaw TUI in sync with the vault config without restarting.
+// resolveOpenClawBin: openclaw 바이너리 경로 탐색 (systemd 서비스 환경 대응)
+func resolveOpenClawBin() string {
+	// 1. 현재 PATH에서 탐색
+	if p, err := exec.LookPath("openclaw"); err == nil {
+		return p
+	}
+	// 2. 흔한 설치 위치 직접 확인
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		filepath.Join(home, ".npm-global/bin/openclaw"),
+		filepath.Join(home, ".local/bin/openclaw"),
+		"/usr/local/bin/openclaw",
+		"/usr/bin/openclaw",
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// notifyOpenClaw: openclaw models set으로 실행 중인 게이트웨이에 모델 변경 즉시 적용.
+// TUI가 WebSocket을 통해 즉시 반응한다.
+func notifyOpenClaw(primaryModel string) {
+	bin := resolveOpenClawBin()
+	if bin == "" {
+		log.Printf("[openclaw-sync] openclaw 바이너리를 찾을 수 없음 — TUI 미통보")
+		return
+	}
+	home, _ := os.UserHomeDir()
+	cmd := exec.Command(bin, "models", "set", primaryModel)
+	// systemd 서비스는 최소 환경을 가지므로 HOME과 PATH를 명시적으로 전달
+	cmd.Env = append(os.Environ(),
+		"HOME="+home,
+		"PATH="+filepath.Dir(bin)+":/usr/local/bin:/usr/bin:/bin",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("[openclaw-sync] models set 실패: %v — %s", err, string(out))
+	} else {
+		log.Printf("[openclaw-sync] 모델 적용됨: %s", primaryModel)
+	}
+}
+
+// updateOpenClawJSON: 모델 변경 시 ~/.openclaw/openclaw.json 갱신 후 게이트웨이 통보.
 //
 // Supports openclaw.json v2026.3.12+ format:
-//   models.providers.<name>.api = "openai-completions"
-//   models.providers.<name>.models[].{id, name, reasoning, input, contextWindow, maxTokens}
+//
+//	models.providers.<name>.api = "openai-completions"
+//	models.providers.<name>.models[].{id, name, reasoning, input, contextWindow, maxTokens}
 func updateOpenClawJSON(service, model string) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -28,7 +73,7 @@ func updateOpenClawJSON(service, model string) {
 
 	var cfg map[string]interface{}
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		log.Printf("[openclaw-sync] failed to parse openclaw.json: %v", err)
+		log.Printf("[openclaw-sync] openclaw.json 파싱 실패: %v", err)
 		return
 	}
 
@@ -38,22 +83,27 @@ func updateOpenClawJSON(service, model string) {
 	changed := false
 
 	// ── 1. agents.defaults.model.primary ──────────────────────────────────────
-	if agents, ok := cfg["agents"].(map[string]interface{}); ok {
-		if defaults, ok := agents["defaults"].(map[string]interface{}); ok {
-			mdl, _ := defaults["model"].(map[string]interface{})
-			if mdl == nil {
-				mdl = map[string]interface{}{}
-				defaults["model"] = mdl
-			}
-			if mdl["primary"] != primaryModel {
-				mdl["primary"] = primaryModel
-				changed = true
-			}
-		}
+	agents, _ := cfg["agents"].(map[string]interface{})
+	if agents == nil {
+		agents = map[string]interface{}{}
+		cfg["agents"] = agents
+	}
+	defaults, _ := agents["defaults"].(map[string]interface{})
+	if defaults == nil {
+		defaults = map[string]interface{}{}
+		agents["defaults"] = defaults
+	}
+	mdl, _ := defaults["model"].(map[string]interface{})
+	if mdl == nil {
+		mdl = map[string]interface{}{}
+		defaults["model"] = mdl
+	}
+	if mdl["primary"] != primaryModel {
+		mdl["primary"] = primaryModel
+		changed = true
 	}
 
 	// ── 2. models.providers.custom — v2026.3.12 format ────────────────────────
-	// Path: cfg["models"]["providers"]["custom"]["models"]
 	modelsSection, _ := cfg["models"].(map[string]interface{})
 	if modelsSection == nil {
 		modelsSection = map[string]interface{}{}
@@ -133,14 +183,17 @@ func updateOpenClawJSON(service, model string) {
 
 	out, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		log.Printf("[openclaw-sync] failed to marshal openclaw.json: %v", err)
+		log.Printf("[openclaw-sync] marshal 실패: %v", err)
 		return
 	}
 
 	if err := os.WriteFile(path, out, 0644); err != nil {
-		log.Printf("[openclaw-sync] failed to write openclaw.json: %v", err)
+		log.Printf("[openclaw-sync] openclaw.json 쓰기 실패: %v", err)
 		return
 	}
 
-	log.Printf("[openclaw-sync] openclaw.json updated: primary=%s (v2026.3.12 format)", primaryModel)
+	log.Printf("[openclaw-sync] openclaw.json 갱신: primary=%s", primaryModel)
+
+	// 실행 중인 OpenClaw 게이트웨이에 즉시 적용 (TUI WebSocket 통보 포함)
+	notifyOpenClaw(primaryModel)
 }

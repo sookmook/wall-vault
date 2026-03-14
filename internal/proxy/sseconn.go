@@ -18,14 +18,16 @@ type SSEClient struct {
 	vaultURL  string
 	clientID  string
 	connected bool
-	onConfig  func(service, model string) // config change callback
+	onConfig   func(service, model string) // config change callback
+	onKeyChange func()                     // key added/deleted/reset callback
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string)) *SSEClient {
+func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onKeyChange func()) *SSEClient {
 	return &SSEClient{
-		vaultURL: vaultURL,
-		clientID: clientID,
-		onConfig: onConfig,
+		vaultURL:    vaultURL,
+		clientID:    clientID,
+		onConfig:    onConfig,
+		onKeyChange: onKeyChange,
 	}
 }
 
@@ -104,6 +106,11 @@ func (c *SSEClient) handleEvent(data string) {
 			if c.onConfig != nil {
 				c.onConfig(evt.Data.Service, evt.Data.Model)
 			}
+		}
+	case "key_added", "key_deleted", "usage_reset":
+		log.Printf("[SSE] 🔑 key event: %s — re-syncing keys", evt.Type)
+		if c.onKeyChange != nil {
+			go c.onKeyChange()
 		}
 	case "connected":
 		log.Printf("[SSE] connection confirmed")

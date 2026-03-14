@@ -804,8 +804,8 @@ function refreshServiceSelects() {
   return fetch('/admin/services', {headers:{'Authorization':'Bearer '+tok}})
   .then(r=>r.json()).then(svcs=>{
     if(!Array.isArray(svcs)) return;
-    // 활성화된 서비스만
-    const enabled = svcs.filter(s=>s.enabled);
+    // only proxy-enabled services are shown in agent model dropdowns
+    const enabled = svcs.filter(s=>s.enabled && s.proxy_enabled);
     function _svcOpts(prev) {
       return enabled.map(s=>'<option value="'+s.id+'"'+(s.id===prev?' selected':'')+'>'+( s.name||s.id)+'</option>').join('');
     }
@@ -1449,10 +1449,11 @@ function changeModel(clientId) {
 }
 
 // buildServiceOptions: generate HTML options for service select element
+// only includes services that are both enabled and proxy_enabled
 func buildServiceOptions(services []*ServiceConfig, selected string) string {
 	var sb strings.Builder
 	for _, sv := range services {
-		if !sv.Enabled {
+		if !sv.Enabled || !sv.ProxyEnabled {
 			continue
 		}
 		sel := ""
@@ -1473,19 +1474,45 @@ func trimServicePrefix(service, model string) string {
 	return model
 }
 
-// buildAgentsCard: agent card (registered clients + live heartbeat integration)
-// workspaceAvatarDataURI reads ~/.openclaw/workspace/avatar.png and returns a data URI.
-// Returns "" if the file doesn't exist or can't be read.
-func workspaceAvatarDataURI() string {
+// resolveAvatarDataURI resolves an avatar to a data URI.
+// avatarVal can be:
+//   - a base64 data URI (data:image/...) → returned as-is
+//   - a relative path under ~/.openclaw/ (e.g. "workspace/avatar.png") → read and encoded
+//   - empty string → falls back to the default workspace avatar (workspace/avatar.png)
+func resolveAvatarDataURI(avatarVal string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	data, err := os.ReadFile(filepath.Join(home, ".openclaw", "workspace", "avatar.png"))
+	ocBase := filepath.Join(home, ".openclaw")
+
+	// already a data URI
+	if strings.HasPrefix(avatarVal, "data:") {
+		return avatarVal
+	}
+
+	// resolve path: use provided relative path, or default workspace avatar
+	relPath := avatarVal
+	if relPath == "" {
+		relPath = filepath.Join("workspace", "avatar.png")
+	}
+
+	data, err := os.ReadFile(filepath.Join(ocBase, relPath))
 	if err != nil {
 		return ""
 	}
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data)
+
+	// detect mime type from file extension
+	mime := "image/png"
+	switch strings.ToLower(filepath.Ext(relPath)) {
+	case ".jpg", ".jpeg", ".hpg":
+		mime = "image/jpeg"
+	case ".webp":
+		mime = "image/webp"
+	case ".gif":
+		mime = "image/gif"
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
 func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*ServiceConfig) string {
@@ -1494,8 +1521,8 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		pmap[p.ClientID] = p
 	}
 
-	// 워크스페이스 아바타: 모든 openclaw 에이전트의 기본 아바타
-	defaultAvatar := workspaceAvatarDataURI()
+	// default workspace avatar used when a client has no avatar configured
+	defaultAvatar := resolveAvatarDataURI("")
 
 	typeIcons := map[string]string{
 		"openclaw":    "🦞",
@@ -1669,14 +1696,14 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
 		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
-		// 아바타 우선순위: workspace avatar > 업로드 avatar > 이모지
+		// avatar priority: client avatar path/URI > default workspace avatar > emoji icon
+		// c.Avatar may be a data URI, a relative path under ~/.openclaw/, or empty
 		avatarSrc := ""
-		if c.AgentType == "openclaw" {
-			if defaultAvatar != "" {
-				avatarSrc = defaultAvatar
-			} else if c.Avatar != "" {
-				avatarSrc = c.Avatar
-			}
+		if c.Avatar != "" {
+			avatarSrc = resolveAvatarDataURI(c.Avatar)
+		}
+		if avatarSrc == "" && (c.AgentType == "openclaw" || c.AgentType == "") {
+			avatarSrc = defaultAvatar
 		}
 		if avatarSrc != "" {
 			item.WriteString(fmt.Sprintf(`<img src="%s" class="ac-avatar" alt="%s">`, avatarSrc, displayName))

@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-14 — v0.1.6: proxy-only service filter in agent dropdowns, avatar path support, usage tracking fix)*
+*(Last updated: 2026-03-14 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support)*
 
 ---
 
@@ -80,9 +80,11 @@ $env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault
+make build       # bin/wall-vault (버전: v0.1.6.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
+
+> **빌드 타임스탬프 버전**: `make build` 실행 시 버전이 자동으로 `v{major}.{minor}.{patch}.{YYYYMMDD}.{HHmmss}` 형식으로 생성됩니다 (예: `v0.1.6.20260314.231308`). `go build ./...`로 직접 빌드하면 버전이 `"dev"`로 표시됩니다.
 
 ---
 
@@ -558,6 +560,7 @@ wall-vault doctor all
 | `WV_MASTER_PASS` | API 키 암호화 비밀번호 | `my-password` |
 | `WV_PROXY_PORT` | 프록시 포트 오버라이드 | `8080` |
 | `WV_VAULT_PORT` | 금고 포트 오버라이드 | `8081` |
+| `WV_AVATAR` | 프록시 로컬 아바타 파일 경로 (`~/.openclaw/` 기준 상대 경로) — heartbeat마다 base64로 전송, vault가 자동 저장 | `workspace/avatars/bot-a.png` |
 | `OLLAMA_URL` | Ollama 서버 URL | `http://192.168.x.x:11434` |
 | `VAULT_CLIENT_ID` | 클라이언트 ID (레거시 호환) | `bot-a` |
 

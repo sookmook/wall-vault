@@ -486,6 +486,7 @@ vault:
 | `WV_MASTER_PASS` | Encryption master password |
 | `WV_KEY_GOOGLE` | Google API key (comma-separated for multiple) |
 | `WV_KEY_OPENROUTER` | OpenRouter API key |
+| `WV_AVATAR` | Proxy avatar file path (relative to `~/.openclaw/`, e.g. `workspace/avatars/bot-a.png`) |
 
 ---
 
@@ -1254,4 +1255,4 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 
 ---
 
-*Last updated · 최종 업데이트: 2026-03-14 — v0.1.6*
+*Last updated · 최종 업데이트: 2026-03-14 — v0.1.6.x (build timestamp versioning)*

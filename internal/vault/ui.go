@@ -690,7 +690,7 @@ function _fmtCountdown(until) {
   const rem = Math.floor((until - Date.now()) / 1000);
   if(rem <= 0) return null;
   const m = Math.floor(rem / 60), s = rem % 60;
-  return m > 0 ? m+'분 '+s+'초' : s+'초';
+  return m > 0 ? m+T('upm')+' '+s+T('ups') : s+T('ups');
 }
 
 // 1초마다 쿨다운 카운트다운 갱신 (fetch 없이 캐시 사용)
@@ -742,7 +742,7 @@ function refreshKeyUsage(_data) {
         bar.style.width = pct + '%';
         const cls = onCooldown ? 'bar-yellow' : (k.usage_pct >= 97 ? 'bar-red' : 'bar-green');
         bar.className = 'bar-fill ' + cls;
-        const baseText = k.daily_limit > 0 ? (k.today_usage+'/'+k.daily_limit) : (k.today_usage+' 요청');
+        const baseText = k.daily_limit > 0 ? (k.today_usage+'/'+k.daily_limit) : (k.today_usage+' '+T('key_reqs'));
         if(meta) {
           const cd = onCooldown ? _fmtCountdown(cdDate.getTime()) : null;
           meta.textContent = baseText + (cd ? ' ('+cd+')' : '');
@@ -1067,9 +1067,9 @@ function copyOpenClawConfig(clientId) {
       + '  agents: { defaults: { model: { primary: "wall-vault/' + mdl + '" } } }\n'
       + '}';
     navigator.clipboard.writeText(cfg).then(()=>{
-      alert('OpenClaw 설정이 클립보드에 복사되었습니다.\n~/.openclaw/openclaw.json에 붙여넣으세요.');
+      alert(T('cfg_openclaw')+'\n'+T('cfg_ok')+'\n'+T('cfg_openclaw_hint'));
     }).catch(()=>{
-      prompt('아래 내용을 복사하세요:', cfg);
+      prompt(T('cfg_manual'), cfg);
     });
   }).catch(e=>alert(T('err')+e));
 }
@@ -1085,8 +1085,8 @@ function copyAgentConfig(clientId, agentType) {
     const mdl = c.default_model||'gemini-2.5-flash';
     let cfg='', title='', hint='';
     if(agentType==='claude-code'){
-      title='Claude Code 설정이 복사되었습니다.';
-      hint='~/.claude/settings.json 에 붙여넣으세요.';
+      title=T('cfg_claude')+' '+T('cfg_ok');
+      hint=T('cfg_claude_hint');
       cfg='// ~/.claude/settings.json\n'
         +'{\n'
         +'  "apiProvider": "openai",\n'
@@ -1094,18 +1094,18 @@ function copyAgentConfig(clientId, agentType) {
         +'  "apiKey": "'+tok+'"\n'
         +'}';
     } else if(agentType==='cursor'){
-      title='Cursor 설정이 복사되었습니다.';
-      hint='Cursor > Settings > AI > Override OpenAI Base URL 에 입력하세요.';
+      title=T('cfg_cursor')+' '+T('cfg_ok');
+      hint=T('cfg_cursor_hint');
       cfg='// Cursor: Settings > AI > OpenAI API\n'
         +'Base URL : '+baseUrl+'\n'
         +'API Key  : '+tok+'\n\n'
-        +'// 또는 환경변수:\n'
+        +'// or environment variable:\n'
         +'OPENAI_BASE_URL='+baseUrl+'\n'
         +'OPENAI_API_KEY='+tok;
     } else if(agentType==='vscode'){
-      title='VSCode / Continue 설정이 복사되었습니다.';
-      hint='~/.continue/config.json 에 붙여넣으세요.';
-      cfg='// ~/.continue/config.json  (Continue 확장)\n'
+      title=T('cfg_vscode')+' '+T('cfg_ok');
+      hint=T('cfg_vscode_hint');
+      cfg='// ~/.continue/config.json  (Continue extension)\n'
         +'{\n'
         +'  "models": [{\n'
         +'    "title": "wall-vault proxy",\n'
@@ -1117,24 +1117,24 @@ function copyAgentConfig(clientId, agentType) {
         +'}';
     } else if(agentType==='gemini-cli'){
       const geminiBase = location.protocol+'//'+location.hostname+':56244';
-      title='Gemini CLI 설정이 복사되었습니다.';
-      hint='터미널에서 실행하거나 ~/.gemini/settings.json 에 추가하세요.';
-      cfg='# 환경변수로 설정 (터미널에 붙여넣기):\n'
+      title=T('cfg_gemini_cli')+' '+T('cfg_ok');
+      hint=T('cfg_gemini_cli_hint');
+      cfg='# set via environment variable (paste in terminal):\n'
         +'export GEMINI_API_BASE_URL='+geminiBase+'\n'
         +'export GEMINI_API_KEY='+tok+'\n\n'
-        +'# 또는 ~/.gemini/settings.json 에 추가:\n'
+        +'# or add to ~/.gemini/settings.json:\n'
         +'{\n'
         +'  "apiBaseUrl": "'+geminiBase+'",\n'
         +'  "apiKey": "'+tok+'"\n'
         +'}';
     } else if(agentType==='antigravity'){
       const geminiBase = location.protocol+'//'+location.hostname+':56244';
-      title='Antigravity IDE 설정이 복사되었습니다.';
-      hint='터미널에서 실행하거나 Antigravity 설정에 추가하세요.';
-      cfg='# 환경변수로 설정:\n'
+      title=T('cfg_antigravity')+' '+T('cfg_ok');
+      hint=T('cfg_antigravity_hint');
+      cfg='# set via environment variable:\n'
         +'export GEMINI_API_BASE_URL='+geminiBase+'\n'
         +'export GEMINI_API_KEY='+tok+'\n\n'
-        +'# 또는 ~/.gemini/settings.json 에 추가:\n'
+        +'# or add to ~/.gemini/settings.json:\n'
         +'{\n'
         +'  "apiBaseUrl": "'+geminiBase+'",\n'
         +'  "apiKey": "'+tok+'"\n'
@@ -1144,7 +1144,7 @@ function copyAgentConfig(clientId, agentType) {
     navigator.clipboard.writeText(cfg).then(()=>{
       alert(title+'\n'+hint);
     }).catch(()=>{
-      prompt('\uc544\ub798 \ub0b4\uc6a9\uc744 \ubcf5\uc0ac\ud558\uc138\uc694:', cfg);
+      prompt(T('cfg_manual'), cfg);
     });
   }).catch(e=>alert(T('err')+e));
 }
@@ -1160,7 +1160,7 @@ function submitModal(prefix) {
   const data = _readClientForm(prefix);
   const isEdit = (prefix === 'ec');
   if (!data.id && !isEdit) { document.getElementById(prefix+'-msg').textContent = T('err_id'); return; }
-  if (!data.name.trim()) { document.getElementById(prefix+'-msg').textContent = T('err_name')||'이름을 입력하세요'; return; }
+  if (!data.name.trim()) { document.getElementById(prefix+'-msg').textContent = T('err_name'); return; }
   document.getElementById(prefix+'-msg').textContent = isEdit ? T('saving') : T('adding');
   const url = isEdit ? '/admin/clients/'+data.id : '/admin/clients';
   const method = isEdit ? 'PUT' : 'POST';
@@ -1222,7 +1222,7 @@ function openEditClient(id) {
     // 토큰: 항상 빈칸, 플레이스홀더로 상태 표시
     const tokenEl = document.getElementById('ec-token');
     tokenEl.value = '';
-    tokenEl.placeholder = c.token ? '●●●● (변경하려면 입력, 공백=기존 유지)' : (T('ph_auto')||'자동 생성');
+    tokenEl.placeholder = c.token ? T('ph_token_edit') : T('ph_auto');
     document.getElementById('ec-service').value = c.default_service||'google';
     document.getElementById('ec-mdl').value = c.default_model||'';
     document.getElementById('ec-agent-type').value = c.agent_type||'';
@@ -1300,7 +1300,7 @@ function onAgentServiceChange(inputId, selId, service) {
     }
   }).catch(()=>{
     const inp=document.getElementById(inputId);
-    sel.innerHTML='<option value="">— 선택 또는 직접 입력 —</option>';
+    sel.innerHTML='<option value="">'+T('sel_model_or_enter')+'</option>';
     if(inp&&inp.value){
       const cur=document.createElement('option');
       cur.value=inp.value;cur.textContent='✏ '+inp.value;cur.selected=true;
@@ -1580,7 +1580,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			case "gemini-cli", "antigravity":
 				statusChip = `<div class="agent-status">` +
 					`<span class="status-dc">◎ ` + c.AgentType + `</span>` +
-					`<span class="status-hint">GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
+					`<span class="status-hint" data-i18n="st_gemini_hint">GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
 					`</div>`
 			default:
 				statusChip = `<div class="agent-status">` +
@@ -1672,11 +1672,11 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 				c.ID)
 		case "gemini-cli":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','gemini-cli')" title="Gemini CLI 프록시 설정 복사">💎 Gemini CLI 설정 복사</button>`,
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','gemini-cli')" data-i18n-title="cfg_gemini_cli_title" title="Gemini CLI 프록시 설정 복사" data-i18n="cfg_gemini_cli">💎 Gemini CLI 설정 복사</button>`,
 				c.ID)
 		case "antigravity":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','antigravity')" title="Antigravity IDE 프록시 설정 복사">🚀 Antigravity 설정 복사</button>`,
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','antigravity')" data-i18n-title="cfg_antigravity_title" title="Antigravity IDE 프록시 설정 복사" data-i18n="cfg_antigravity">🚀 Antigravity 설정 복사</button>`,
 				c.ID)
 				default:
 			cfgButton = fmt.Sprintf(
@@ -1725,7 +1725,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		item.WriteString(`</div>`) // ac-top
 		// 하단 액션 버튼 행 (모델 변경 토글 + 설정 복사)
 		item.WriteString(`<div class="ac-actions">`)
-		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide" onclick="toggleModelForm('%s')">⚙ 모델 변경</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide" onclick="toggleModelForm('%s')" data-i18n="toggle_model">⚙ 모델 변경</button>`, c.ID))
 		// 설정 복사 버튼 (btn-action-wide 스타일 적용)
 		cfgWide := strings.ReplaceAll(cfgButton, `class="btn-cfg`, `class="btn-action-wide btn-cfg`)
 		item.WriteString(cfgWide)

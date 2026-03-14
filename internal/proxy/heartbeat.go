@@ -26,11 +26,11 @@ func (s *Server) startHeartbeat() {
 		return
 	}
 	go func() {
-		// first send after 15 seconds (allow service to start up)
-		time.Sleep(15 * time.Second)
+		// first send after 5 seconds (allow service to start up)
+		time.Sleep(5 * time.Second)
 		s.sendHeartbeat()
 
-		ticker := time.NewTicker(60 * time.Second)
+		ticker := time.NewTicker(20 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
 			s.sendHeartbeat()

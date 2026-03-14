@@ -651,8 +651,8 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 		if geminiResp.Error != nil {
 			return nil, fmt.Errorf("Google: %s", geminiResp.Error.Message)
 		}
-		tokens := 0
-		if geminiResp.UsageMetadata != nil {
+		tokens := 1 // minimum 1 per request for usage tracking
+		if geminiResp.UsageMetadata != nil && geminiResp.UsageMetadata.TotalTokenCount > 0 {
 			tokens = geminiResp.UsageMetadata.TotalTokenCount
 		}
 		s.keyMgr.RecordSuccess(key, tokens)
@@ -729,8 +729,8 @@ func (s *Server) callOpenRouterModel(model string, req *GeminiRequest) (*GeminiR
 		if oaiResp.Error != nil {
 			return nil, fmt.Errorf("OpenRouter: %s", oaiResp.Error.Message)
 		}
-		tokens := 0
-		if oaiResp.Usage != nil {
+		tokens := 1 // minimum 1 per request for usage tracking
+		if oaiResp.Usage != nil && oaiResp.Usage.TotalTokens > 0 {
 			tokens = oaiResp.Usage.TotalTokens
 		}
 		s.keyMgr.RecordSuccess(key, tokens)
@@ -789,8 +789,8 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 		if oaiResp.Error != nil {
 			return nil, fmt.Errorf("OpenAI: %s", oaiResp.Error.Message)
 		}
-		tokens := 0
-		if oaiResp.Usage != nil {
+		tokens := 1 // minimum 1 per request for usage tracking
+		if oaiResp.Usage != nil && oaiResp.Usage.TotalTokens > 0 {
 			tokens = oaiResp.Usage.TotalTokens
 		}
 		s.keyMgr.RecordSuccess(key, tokens)

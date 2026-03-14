@@ -369,20 +369,16 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	s.store.UpdateProxyStatus(&ps)
 	// sync proxy key usage + cooldowns into vault store so the UI reflects reality
-	changed := false
 	for keyID, tokens := range ps.KeyUsage {
-		if s.store.SetKeyUsage(keyID, tokens) {
-			changed = true
-		}
+		s.store.SetKeyUsage(keyID, tokens)
 	}
 	for keyID, cooldownStr := range ps.KeyCooldowns {
 		if until, err := time.Parse(time.RFC3339, cooldownStr); err == nil {
-			if s.store.SetKeyCooldownIfLater(keyID, until) {
-				changed = true
-			}
+			s.store.SetKeyCooldownIfLater(keyID, until)
 		}
 	}
-	if changed {
+	// always broadcast so the UI stays in sync (heartbeat is now every 20s)
+	if len(ps.KeyUsage) > 0 || len(ps.KeyCooldowns) > 0 {
 		s.broker.Broadcast(SSEEvent{
 			Type: "usage_update",
 			Data: map[string]interface{}{
@@ -467,10 +463,12 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 
 	keys := s.store.ListKeys()
 	type safeKey struct {
-		ID         string `json:"id"`
-		Service    string `json:"service"`
-		PlainKey   string `json:"plain_key"`
-		DailyLimit int    `json:"daily_limit"`
+		ID            string    `json:"id"`
+		Service       string    `json:"service"`
+		PlainKey      string    `json:"plain_key"`
+		DailyLimit    int       `json:"daily_limit"`
+		TodayUsage    int       `json:"today_usage"`
+		CooldownUntil time.Time `json:"cooldown_until"`
 	}
 
 	result := make([]safeKey, 0, len(keys))
@@ -498,10 +496,12 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		result = append(result, safeKey{
-			ID:         k.ID,
-			Service:    k.Service,
-			PlainKey:   plain,
-			DailyLimit: k.DailyLimit,
+			ID:            k.ID,
+			Service:       k.Service,
+			PlainKey:      plain,
+			DailyLimit:    k.DailyLimit,
+			TodayUsage:    k.TodayUsage,
+			CooldownUntil: k.CooldownUntil,
 		})
 	}
 	jsonOK(w, result)

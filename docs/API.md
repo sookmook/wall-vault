@@ -1077,4 +1077,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*Last updated: 2026-03-14 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support*
+*Last updated: 2026-03-15 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support, i18n 20 new keys*

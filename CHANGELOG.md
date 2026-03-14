@@ -123,6 +123,26 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ## [Unreleased]
 
+### 다국어 (i18n)
+- Added 20 new i18n keys to all 17 locale files — previously hardcoded Korean strings in dashboard JS/HTML are now fully translated: `proxy_use`, `lbl_avatar`, `st_claude_hint`, `st_editor_hint`, `st_gemini_hint`, `toggle_model`, `cfg_gemini_cli`, `cfg_gemini_cli_title`, `cfg_antigravity`, `cfg_antigravity_title`, `err_name`, `ph_token_edit`, `cfg_ok`, `cfg_manual`, `cfg_openclaw_hint`, `cfg_claude_hint`, `cfg_cursor_hint`, `cfg_vscode_hint`, `cfg_gemini_cli_hint`, `cfg_antigravity_hint`
+- Fixed `ko.json` time unit values: `uph` `"h"` → `"시간"`, `upm` `"m"` → `"분"`, `ups` `"s"` → `"초"` — countdown timer and key usage panel were showing raw English letters in Korean UI
+- `internal/i18n/i18n_test.go` `TestSupported`: updated expected language count from 10 → 17
+
+### 변경 (Changed)
+- `Makefile`: `VERSION` assignment changed from recursive (`=`) to immediate (`:=`) — `$(shell date)` is now evaluated once at `make` start, preventing version mismatch between build and verify steps
+- `Makefile.local` + `Makefile.local.example`: deploy targets hardened with kill→wait→verify pattern:
+  - `pkill -x "wall-vault"` after service stop (exact process name, not `-f`)
+  - 10-second wait loop using `pgrep -x "wall-vault"`
+  - Error exit if process still alive after 10 seconds
+  - Binary replacement only proceeds after confirming old process is dead
+
+### 수정 (Fixed)
+- Countdown timer in key status panel was hardcoded Korean (`분`, `초`) — now uses `T('upm')` / `T('ups')`
+- Request count label `'요청'` in key usage was hardcoded — now uses `T('key_reqs')`
+- `copyOpenClawConfig` / `copyAgentConfig` alert/prompt messages were hardcoded Korean — now fully i18n via `T()` keys
+- `pgrep -f "wall-vault"` in deploy scripts self-matched the shell process running `make` — replaced with `pgrep -x "wall-vault"` throughout `Makefile.local` and `Makefile.local.example`
+- Version mismatch during deploy verify: `VERSION =` re-evaluated `$(shell date)` at verify time (seconds after build), producing a different timestamp — fixed with `VERSION :=`
+
 ### 보안 (Security)
 - `/admin/theme`, `/admin/lang` 엔드포인트에 `adminAuth` 미들웨어 적용 (기존 무인증 취약점 수정)
 - `/api/keys` 핸들러에 IP 화이트리스트 실제 적용 — CIDR 표기법 지원 (`net.ParseCIDR`), `X-Forwarded-For` 헤더 처리

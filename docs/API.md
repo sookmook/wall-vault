@@ -1063,4 +1063,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*최종 업데이트: 2026-03-14 — v0.1.4: 프록시 서비스 선택(/api/services), service_changed SSE에 proxy_services 포함, 키 사용량 실시간 동기화*
+*최종 업데이트: 2026-03-14 — v0.1.5: 서비스 카드 UI 정리*

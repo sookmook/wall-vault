@@ -87,7 +87,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 	sb.WriteString(buildAddServiceModal())
 	sb.WriteString(`</div>
 <div class="footer">
-  wall-vault v0.1.4 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
+  wall-vault v0.1.5 — <a href="https://github.com/sookmook/wall-vault">github.com/sookmook/wall-vault</a>
   &nbsp;|&nbsp; <a href="https://sookmook.org/">sookmook.org</a>
   &nbsp;|&nbsp; <a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
   &nbsp;|&nbsp; ⏱ <span id="uptime"></span>
@@ -1880,7 +1880,6 @@ func buildServicesCard(services []*ServiceConfig) string {
   <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;flex:1">
     <input type="checkbox" id="svc-en-%s"%s style="accent-color:var(--accent);cursor:pointer" onchange="toggleService('%s',this.checked)">
     <span style="font-size:.82rem;color:var(--text)">%s</span>
-    <span style="font-size:.68rem;color:var(--text-muted)">%s</span>
   </label>
   %s
   %s
@@ -1889,7 +1888,7 @@ func buildServicesCard(services []*ServiceConfig) string {
 </div>`,
 			sv.ID,
 			sv.ID, enabledChecked, sv.ID,
-			sv.Name, sv.ID,
+			sv.Name,
 			proxyCheckbox,
 			deleteBtn,
 			localURLField,

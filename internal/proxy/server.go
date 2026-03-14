@@ -252,7 +252,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{
 		"status":  "ok",
-		"version": "v0.1.4",
+		"version": "v0.1.5",
 		"client":  s.cfg.Proxy.ClientID,
 	})
 }

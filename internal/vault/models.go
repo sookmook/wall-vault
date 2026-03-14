@@ -121,6 +121,7 @@ type ProxyStatus struct {
 	Model      string            `json:"model"`
 	SSE        bool              `json:"sse_connected"`
 	Host       string            `json:"host,omitempty"`
+	Avatar     string            `json:"avatar,omitempty"`        // base64 data URI sent by proxy
 	StartedAt  time.Time         `json:"started_at,omitempty"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	Vault      VaultInfo         `json:"vault,omitempty"`

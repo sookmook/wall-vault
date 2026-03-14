@@ -37,6 +37,7 @@ type ProxyConfig struct {
 	AllowedTools []string      `yaml:"allowed_tools"` // for whitelist mode
 	Services     []string      `yaml:"services"`      // active service list
 	Timeout      time.Duration `yaml:"timeout"`       // API timeout
+	Avatar       string        `yaml:"avatar"`        // relative path under ~/.openclaw/ (e.g. workspace/avatars/bot-a.png)
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -178,6 +179,9 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("VAULT_CLIENT_ID"); v != "" {
 		cfg.Proxy.ClientID = v
+	}
+	if v := os.Getenv("WV_AVATAR"); v != "" {
+		cfg.Proxy.Avatar = v
 	}
 	// Windows: auto-set data path based on APPDATA
 	if cfg.Vault.DataDir == "" {

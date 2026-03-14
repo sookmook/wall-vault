@@ -2,9 +2,13 @@ package proxy
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -15,9 +19,38 @@ type heartbeatPayload struct {
 	Model         string            `json:"model"`
 	SSE           bool              `json:"sse_connected"`
 	Host          string            `json:"host,omitempty"`
+	Avatar        string            `json:"avatar,omitempty"`         // base64 data URI of local avatar file
 	ActiveKeys    map[string]string `json:"active_keys,omitempty"`    // service → key ID
 	KeyUsage      map[string]int    `json:"key_usage,omitempty"`      // key ID → tokens used today
 	KeyCooldowns  map[string]string `json:"key_cooldowns,omitempty"`  // key ID → cooldown RFC3339
+}
+
+// readLocalAvatar reads the configured avatar file and returns a base64 data URI.
+// avatarPath is relative to ~/.openclaw/ (e.g. "workspace/avatars/bot-a.png").
+// Falls back to workspace/avatar.png if avatarPath is empty.
+func readLocalAvatar(avatarPath string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	relPath := avatarPath
+	if relPath == "" {
+		relPath = filepath.Join("workspace", "avatar.png")
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".openclaw", relPath))
+	if err != nil {
+		return ""
+	}
+	mime := "image/png"
+	switch strings.ToLower(filepath.Ext(relPath)) {
+	case ".jpg", ".jpeg", ".hpg":
+		mime = "image/jpeg"
+	case ".webp":
+		mime = "image/webp"
+	case ".gif":
+		mime = "image/gif"
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
 // startHeartbeat: send status to vault every 60 seconds (async)
@@ -60,6 +93,7 @@ func (s *Server) sendHeartbeat() {
 		Service:      svc,
 		Model:        mdl,
 		SSE:          sseConn,
+		Avatar:       readLocalAvatar(s.cfg.Proxy.Avatar),
 		ActiveKeys:   activeKeys,
 		KeyUsage:     s.keyMgr.UsageSnapshot(),
 		KeyCooldowns: s.keyMgr.CooldownSnapshot(),

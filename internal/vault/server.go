@@ -372,6 +372,10 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.store.UpdateProxyStatus(&ps)
+	// if proxy sent an avatar, persist it to the client record
+	if ps.Avatar != "" {
+		_ = s.store.UpdateClient(ps.ClientID, ClientUpdateInput{Avatar: &ps.Avatar})
+	}
 	// sync proxy key usage + cooldowns into vault store so the UI reflects reality
 	for keyID, tokens := range ps.KeyUsage {
 		s.store.SetKeyUsage(keyID, tokens)

@@ -618,11 +618,11 @@ Internal Network (e.g. 10.0.0.x)
 │  vault.json                 → VAULT_URL=192.168.x.x     │
 │                                                         │
 │                             [Raspberry Pi]              │
-│                             Proxy B (bot-c)             │
+│                             Proxy B (bot-b)             │
 │                             → VAULT_URL=192.168.x.x     │
 │                                                         │
 │                             [Windows / Mac]             │
-│                             Proxy C (bot-b)             │
+│                             Proxy C (bot-c)             │
 │                             → VAULT_URL=127.0.0.1       │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -665,16 +665,16 @@ VAULT_CLIENT_ID=bot-a \
 VAULT_TOKEN=your-bot-a-token \
 ./wall-vault proxy
 
-# Proxy on Raspberry Pi (bot-c)
+# Proxy on Raspberry Pi (bot-b)
 VAULT_URL=http://192.168.x.x:56243 \
-VAULT_CLIENT_ID=bot-c \
-VAULT_TOKEN=your-bot-c-token \
-./wall-vault proxy
-
-# Proxy on the same machine as vault (bot-b — use localhost)
-VAULT_URL=http://127.0.0.1:56243 \
 VAULT_CLIENT_ID=bot-b \
 VAULT_TOKEN=your-bot-b-token \
+./wall-vault proxy
+
+# Proxy on the same machine as vault (bot-c — use localhost)
+VAULT_URL=http://127.0.0.1:56243 \
+VAULT_CLIENT_ID=bot-c \
+VAULT_TOKEN=your-bot-c-token \
 ./wall-vault proxy
 ```
 
@@ -1044,14 +1044,14 @@ VAULT_TOKEN=your-bot-a-token \
 
 # 라즈베리파이 (감마)
 VAULT_URL=http://192.168.x.x:56243 \
-VAULT_CLIENT_ID=bot-c \
-VAULT_TOKEN=your-bot-c-token \
+VAULT_CLIENT_ID=bot-b \
+VAULT_TOKEN=your-bot-b-token \
 ./wall-vault proxy
 
 # 맥미니 로컬 (베타)
 VAULT_URL=http://127.0.0.1:56243 \
-VAULT_CLIENT_ID=bot-b \
-VAULT_TOKEN=your-bot-b-token \
+VAULT_CLIENT_ID=bot-c \
+VAULT_TOKEN=your-bot-c-token \
 ./wall-vault proxy
 ```
 

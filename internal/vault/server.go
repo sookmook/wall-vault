@@ -385,14 +385,26 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 			s.store.SetKeyCooldownIfLater(keyID, until)
 		}
 	}
-	// always broadcast so the UI stays in sync (heartbeat is now every 20s)
-	if len(ps.KeyUsage) > 0 || len(ps.KeyCooldowns) > 0 {
+	// always broadcast full key states so the dashboard reflects reality without a fetch
+	{
+		allKeys := s.store.ListKeys()
+		now := time.Now()
+		keyStates := make([]map[string]interface{}, 0, len(allKeys))
+		for _, k := range allKeys {
+			cdStr := ""
+			if k.CooldownUntil.After(now) {
+				cdStr = k.CooldownUntil.UTC().Format(time.RFC3339)
+			}
+			keyStates = append(keyStates, map[string]interface{}{
+				"id":             k.ID,
+				"today_usage":    k.TodayUsage,
+				"daily_limit":    k.DailyLimit,
+				"cooldown_until": cdStr,
+			})
+		}
 		s.broker.Broadcast(SSEEvent{
 			Type: "usage_update",
-			Data: map[string]interface{}{
-				"key_usage":     ps.KeyUsage,
-				"key_cooldowns": ps.KeyCooldowns,
-			},
+			Data: map[string]interface{}{"keys": keyStates},
 		})
 	}
 	jsonOK(w, map[string]string{"status": "ok"})

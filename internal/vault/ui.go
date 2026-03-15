@@ -167,9 +167,9 @@ a{color:var(--accent);text-decoration:none}
 .dd-item:hover{background:var(--bg);color:var(--text)}
 .dd-item.active{color:var(--accent);font-weight:600}
 /* ── Header (슬림) ── */
-.header{display:flex;align-items:center;justify-content:center;gap:.7rem;padding:.55rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
-.header-logo{height:96px;width:auto;flex-shrink:0;object-fit:contain;border-radius:6px}
-.header h1{color:var(--text-muted);font-size:.88rem;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.header{display:flex;align-items:center;justify-content:center;gap:1rem;padding:.75rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
+.header-logo{height:96px;width:auto;flex-shrink:0;display:block}
+.header h1{color:var(--text);font-size:1.5rem;font-weight:700;letter-spacing:.3px;white-space:nowrap}
 /* ── Badge ── */
 .badge{display:inline-block;background:var(--surface);border:1px solid var(--green);color:var(--green);padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.3px}
 /* ── Grid & Cards ── */

@@ -721,6 +721,15 @@ setInterval(_tickCooldowns, 1000);
 function refreshKeyUsage(data) {
   if (!data || !Array.isArray(data.keys)) return;
   const now = Date.now();
+  // Pre-pass: compute max today_usage per service for relative bar scaling (daily_limit=0 keys)
+  const svcMax = {};
+  data.keys.forEach(k => {
+    if (k.daily_limit === 0 && k.today_usage > 0) {
+      if (!(k.service in svcMax) || k.today_usage > svcMax[k.service]) {
+        svcMax[k.service] = k.today_usage;
+      }
+    }
+  });
   data.keys.forEach(k => {
     const el = document.querySelector('[data-key-id="' + k.id + '"]');
     if (!el) return;
@@ -734,6 +743,10 @@ function refreshKeyUsage(data) {
       let pct = 0;
       if (k.daily_limit > 0) {
         pct = Math.min(100, Math.round(k.today_usage * 100 / k.daily_limit));
+        if (pct === 0 && k.today_usage > 0) pct = 4;
+      } else if (svcMax[k.service] > 0) {
+        // relative scaling: highest usage key in the group gets 100%
+        pct = Math.round(k.today_usage * 100 / svcMax[k.service]);
         if (pct === 0 && k.today_usage > 0) pct = 4;
       }
       bar.style.width = pct + '%';

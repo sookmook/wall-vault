@@ -397,6 +397,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 			}
 			keyStates = append(keyStates, map[string]interface{}{
 				"id":             k.ID,
+				"service":        k.Service,
 				"today_usage":    k.TodayUsage,
 				"daily_limit":    k.DailyLimit,
 				"cooldown_until": cdStr,

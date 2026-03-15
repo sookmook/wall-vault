@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-15 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support, i18n 20 new keys)*
+*(Last updated: 2026-03-15 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support, i18n 20 new keys, key usage section redesign)*
 
 ---
 
@@ -452,7 +452,7 @@ curl http://봇A주소:56244/status
 | `config_change` | 클라이언트 모델/서비스 변경 | 모델 드롭다운 갱신 + 오픈클로 TUI 즉시 반영 |
 | `service_changed` | 서비스 추가/수정/삭제 | 서비스 select + 모델 드롭다운 갱신 + 프록시 dispatch 서비스 목록 갱신 |
 | `key_added` / `key_deleted` | API 키 추가/삭제 | 모델 드롭다운 갱신 + 프록시 키 재동기화 |
-| `usage_update` | heartbeat에서 키 사용량/쿨다운 보고 | 키 상태 실시간 갱신 + 카운트다운 |
+| `usage_update` | 프록시 heartbeat 수신 시 (20초마다) | 전체 키 사용량·쿨다운 즉시 갱신 (추가 fetch 없음, SSE 데이터 직접 반영) |
 | `usage_reset` | 일일 사용량 초기화 | 페이지 새로고침 |
 | `heartbeat` | 프록시 20초마다 | 에이전트 상태 업데이트 |
 
@@ -617,7 +617,7 @@ WV_VAULT_CLIENT_ID=클라이언트ID \
 wall-vault proxy
 ```
 
-연결 성공 시 대시보드에서 🟢 실행 중으로 바뀝니다 (약 60초 이내).
+연결 성공 시 대시보드에서 🟢 실행 중으로 바뀝니다 (약 20초 이내).
 
 > **[적용] 후 ✓ 저장됨이 표시되면** 설정은 정상 저장된 것입니다. "미연결"은 프록시 연결 여부를 뜻할 뿐입니다.
 

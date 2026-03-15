@@ -35,7 +35,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   - Binary replacement only proceeds after confirming old process is dead
 
 ### Fixed
-- Key usage display now separates successful token count (`today_usage`) from total attempt count (`today_attempts`). Rate-limited requests (429, 402, 582) increment `today_attempts` only; `today_usage` tracks successful tokens/requests only. Dashboard label shows `"N req (M att)"` or `"M att"` (all failed) when attempts differ from usage. Bar for unlimited keys scales relative to max `today_attempts` in the service group so rate-limited keys show a non-zero bar.
+- Key usage display now separates successful token count (`today_usage`) from total attempt count (`today_attempts`). Bar for unlimited keys uses **share-of-total** scaling (each key's activity / sum of all keys in service), not max-relative, to avoid the "all-100%% or all-0%%" binary appearance. Server-side initial render (`buildKeysCard`) uses the same formula with `TodayAttempts`. Rate-limited requests (429, 402, 582) increment `today_attempts` only; `today_usage` tracks successful tokens/requests only. Dashboard label shows `"N req (M att)"` or `"M att"` (all failed) when attempts differ from usage. Bar for unlimited keys scales relative to max `today_attempts` in the service group so rate-limited keys show a non-zero bar.
 - HTTP 582 (upstream gateway overload) added to cooldown table with 5-minute backoff; previously fell through to the 10-minute default
 - `today_attempts` field added to `APIKey` (vault.json), heartbeat payload (`key_attempts`), SSE `usage_update`, and `/api/keys` response so vault, proxy, and dashboard all stay in sync
 - Countdown timer in key status panel was hardcoded Korean (`분`, `초`) — now uses `T('upm')` / `T('ups')`

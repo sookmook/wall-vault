@@ -155,10 +155,15 @@ func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.lastUsed[k.service] = k.id
 }
 
-// RecordError: set cooldown (0 duration = no cooldown, request-side error)
+// RecordError: set cooldown (0 duration = no cooldown, request-side error).
+// Rate-limit errors (429, 402) also increment todayUsage by 1 so the dashboard
+// shows that the key was attempted even when no successful tokens were returned.
 func (km *KeyManager) RecordError(k *localKey, errCode int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
+	if errCode == http.StatusTooManyRequests || errCode == http.StatusPaymentRequired {
+		k.todayUsage += 1
+	}
 	d := cooldownFor(errCode)
 	if d == 0 {
 		log.Printf("[key] 쿨다운 없음: service=%s, 오류=%d (request error)", k.service, errCode)

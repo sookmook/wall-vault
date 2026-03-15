@@ -337,11 +337,29 @@ func (s *Store) SetKeyCooldown(id string, errCode int, until time.Time) {
 	}
 }
 
+// SetKeyAttempts: set total attempt count reported by proxy heartbeat (idempotent sync).
+func (s *Store) SetKeyAttempts(id string, attempts int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, k := range s.keys {
+		if k.ID == id {
+			if k.TodayAttempts != attempts {
+				k.TodayAttempts = attempts
+				_ = s.save()
+				return true
+			}
+			return false
+		}
+	}
+	return false
+}
+
 func (s *Store) ResetDailyUsage() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, k := range s.keys {
 		k.TodayUsage = 0
+		k.TodayAttempts = 0
 	}
 	_ = s.save()
 }

@@ -21,7 +21,8 @@ type heartbeatPayload struct {
 	Host          string            `json:"host,omitempty"`
 	Avatar        string            `json:"avatar,omitempty"`         // base64 data URI of local avatar file
 	ActiveKeys    map[string]string `json:"active_keys,omitempty"`    // service → key ID
-	KeyUsage      map[string]int    `json:"key_usage,omitempty"`      // key ID → tokens used today
+	KeyUsage      map[string]int    `json:"key_usage,omitempty"`      // key ID → successful tokens today
+	KeyAttempts   map[string]int    `json:"key_attempts,omitempty"`   // key ID → total requests today (including rate-limited)
 	KeyCooldowns  map[string]string `json:"key_cooldowns,omitempty"`  // key ID → cooldown RFC3339
 }
 
@@ -96,6 +97,7 @@ func (s *Server) sendHeartbeat() {
 		Avatar:       readLocalAvatar(s.cfg.Proxy.Avatar),
 		ActiveKeys:   activeKeys,
 		KeyUsage:     s.keyMgr.UsageSnapshot(),
+		KeyAttempts:  s.keyMgr.AttemptsSnapshot(),
 		KeyCooldowns: s.keyMgr.CooldownSnapshot(),
 	}
 

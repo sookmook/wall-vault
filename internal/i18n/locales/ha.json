@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "Liƙa zuwa ~/.continue/config.json",
   "cfg_gemini_cli_hint": "Gudanar da shi a cikin tashar ko ƙara zuwa ~/.gemini/settings.json",
   "cfg_antigravity_hint": "Gudanar da shi a cikin tashar ko ƙara zuwa saitunan Antigravity",
-  "st_gemini_hint": "Saita GEMINI_API_BASE_URL=http://localhost:56244 sannan sake fara"
+  "st_gemini_hint": "Saita GEMINI_API_BASE_URL=http://localhost:56244 sannan sake fara",
+  "key_att": "ƙoƙ."
 }

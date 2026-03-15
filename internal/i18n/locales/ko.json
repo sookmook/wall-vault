@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "~/.continue/config.json 에 붙여넣으세요.",
   "cfg_gemini_cli_hint": "터미널에서 실행하거나 ~/.gemini/settings.json 에 추가하세요.",
   "cfg_antigravity_hint": "터미널에서 실행하거나 Antigravity 설정에 추가하세요.",
-  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작"
+  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작",
+  "key_att": "시도"
 }

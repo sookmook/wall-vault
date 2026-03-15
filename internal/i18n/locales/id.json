@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "Tempel ke ~/.continue/config.json",
   "cfg_gemini_cli_hint": "Jalankan di terminal atau tambahkan ke ~/.gemini/settings.json",
   "cfg_antigravity_hint": "Jalankan di terminal atau tambahkan ke pengaturan Antigravity",
-  "st_gemini_hint": "Atur GEMINI_API_BASE_URL=http://localhost:56244 dan mulai ulang"
+  "st_gemini_hint": "Atur GEMINI_API_BASE_URL=http://localhost:56244 dan mulai ulang",
+  "key_att": "coba"
 }

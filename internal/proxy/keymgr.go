@@ -16,9 +16,10 @@ import (
 
 var cooldownDurations = map[int]time.Duration{
 	429: 30 * time.Minute, // rate limit — retry later
-	402: 1 * time.Hour,    // payment required — retry in an hour (was 24h)
+	402: 1 * time.Hour,    // payment required — retry in an hour
 	401: 24 * time.Hour,   // invalid key — retire for a day
 	403: 24 * time.Hour,   // forbidden — retire for a day
+	582: 5 * time.Minute,  // upstream overload / custom gateway error — short retry
 	// 400: bad request — request format error, not a key error, no cooldown
 	// 404: model not found — key not at fault, no cooldown
 	400: 0,
@@ -35,12 +36,13 @@ func cooldownFor(errCode int) time.Duration {
 // ─── Local Key ────────────────────────────────────────────────────────────────
 
 type localKey struct {
-	id            string
-	service       string
-	plaintext     string
-	todayUsage    int
-	dailyLimit    int
-	cooldownUntil time.Time
+	id             string
+	service        string
+	plaintext      string
+	todayUsage     int  // successful tokens (or 1 per successful request when token count unavailable)
+	todayAttempts  int  // total requests sent to the API (success + rate-limited)
+	dailyLimit     int
+	cooldownUntil  time.Time
 }
 
 func (k *localKey) isAvailable() bool {
@@ -132,7 +134,7 @@ func (km *KeyManager) CooldownSnapshot() map[string]string {
 	return snap
 }
 
-// UsageSnapshot: return current todayUsage per key ID (for heartbeat reporting)
+// UsageSnapshot: return todayUsage per key ID (successful tokens/requests only)
 func (km *KeyManager) UsageSnapshot() map[string]int {
 	km.mu.Lock()
 	defer km.mu.Unlock()
@@ -147,22 +149,39 @@ func (km *KeyManager) UsageSnapshot() map[string]int {
 	return snap
 }
 
-// RecordSuccess: record usage and track last-used key per service
+// AttemptsSnapshot: return todayAttempts per key ID (all requests including rate-limited)
+func (km *KeyManager) AttemptsSnapshot() map[string]int {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	snap := make(map[string]int)
+	for _, keys := range km.keys {
+		for _, k := range keys {
+			if k.todayAttempts > 0 {
+				snap[k.id] = k.todayAttempts
+			}
+		}
+	}
+	return snap
+}
+
+// RecordSuccess: record successful token usage and count the attempt
 func (km *KeyManager) RecordSuccess(k *localKey, tokens int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	k.todayUsage += tokens
+	k.todayAttempts += 1
 	km.lastUsed[k.service] = k.id
 }
 
 // RecordError: set cooldown (0 duration = no cooldown, request-side error).
-// Rate-limit errors (429, 402) also increment todayUsage by 1 so the dashboard
-// shows that the key was attempted even when no successful tokens were returned.
+// Rate-limit and gateway errors (429, 402, 582) count as an attempt so the
+// dashboard shows activity even when no successful tokens were returned.
 func (km *KeyManager) RecordError(k *localKey, errCode int) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
-	if errCode == http.StatusTooManyRequests || errCode == http.StatusPaymentRequired {
-		k.todayUsage += 1
+	switch errCode {
+	case http.StatusTooManyRequests, http.StatusPaymentRequired, 582:
+		k.todayAttempts += 1
 	}
 	d := cooldownFor(errCode)
 	if d == 0 {
@@ -265,6 +284,7 @@ func (km *KeyManager) SyncFromVault() error {
 		PlainKey      string    `json:"plain_key"`
 		DailyLimit    int       `json:"daily_limit"`
 		TodayUsage    int       `json:"today_usage"`
+		TodayAttempts int       `json:"today_attempts"`
 		CooldownUntil time.Time `json:"cooldown_until"`
 	}
 	if err := json.Unmarshal(body, &keys); err != nil {
@@ -272,12 +292,13 @@ func (km *KeyManager) SyncFromVault() error {
 	}
 
 	km.mu.Lock()
-	// preserve locally accumulated usage before replacing vault-sourced keys
-	localUsage := make(map[string]int)
+	// preserve locally accumulated counters before replacing vault-sourced keys
+	type localCounters struct{ usage, attempts int }
+	localCtrs := make(map[string]localCounters)
 	for _, svcKeys := range km.keys {
 		for _, k := range svcKeys {
-			if !strings.HasPrefix(k.id, "env-") && k.todayUsage > 0 {
-				localUsage[k.id] = k.todayUsage
+			if !strings.HasPrefix(k.id, "env-") {
+				localCtrs[k.id] = localCounters{k.todayUsage, k.todayAttempts}
 			}
 		}
 	}
@@ -296,17 +317,22 @@ func (km *KeyManager) SyncFromVault() error {
 		if k.PlainKey == "" {
 			continue
 		}
-		// use the higher of vault usage vs. locally accumulated usage
+		// use the higher of vault vs. locally accumulated for each counter
 		usage := k.TodayUsage
-		if local := localUsage[k.ID]; local > usage {
-			usage = local
+		attempts := k.TodayAttempts
+		if lc := localCtrs[k.ID]; lc.usage > usage {
+			usage = lc.usage
+		}
+		if lc := localCtrs[k.ID]; lc.attempts > attempts {
+			attempts = lc.attempts
 		}
 		lk := &localKey{
-			id:         k.ID,
-			service:    k.Service,
-			plaintext:  k.PlainKey,
-			dailyLimit: k.DailyLimit,
-			todayUsage: usage,
+			id:            k.ID,
+			service:       k.Service,
+			plaintext:     k.PlainKey,
+			dailyLimit:    k.DailyLimit,
+			todayUsage:    usage,
+			todayAttempts: attempts,
 		}
 		// restore cooldown only if still in the future
 		if k.CooldownUntil.After(now) {

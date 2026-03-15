@@ -35,7 +35,9 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   - Binary replacement only proceeds after confirming old process is dead
 
 ### Fixed
-- OpenRouter (and other services) showing 0 usage even after rate-limited requests: `RecordError` now increments `todayUsage += 1` when the error code is 429 (TooManyRequests) or 402 (PaymentRequired), so each attempted-but-rate-limited request counts as 1 in the usage display
+- Key usage display now separates successful token count (`today_usage`) from total attempt count (`today_attempts`). Rate-limited requests (429, 402, 582) increment `today_attempts` only; `today_usage` tracks successful tokens/requests only. Dashboard label shows `"N req (M att)"` or `"M att"` (all failed) when attempts differ from usage. Bar for unlimited keys scales relative to max `today_attempts` in the service group so rate-limited keys show a non-zero bar.
+- HTTP 582 (upstream gateway overload) added to cooldown table with 5-minute backoff; previously fell through to the 10-minute default
+- `today_attempts` field added to `APIKey` (vault.json), heartbeat payload (`key_attempts`), SSE `usage_update`, and `/api/keys` response so vault, proxy, and dashboard all stay in sync
 - Countdown timer in key status panel was hardcoded Korean (`분`, `초`) — now uses `T('upm')` / `T('ups')`
 - Request count label `'요청'` in key usage was hardcoded — now uses `T('key_reqs')`
 - `copyOpenClawConfig` / `copyAgentConfig` alert/prompt messages were hardcoded Korean — now fully i18n via `T()` keys

@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-15 — v0.1.6: avatar heartbeat sync, build timestamp versioning, agent save button fix, proxy-only service filter, avatar path support, i18n 20 new keys, key usage section redesign)*
+*(Last updated: 2026-03-15 — v0.1.6+: today_attempts tracking, HTTP 582 cooldown, share-of-total bar scaling, custom/ routing fix, Ollama timeout fix, key_att i18n, avatar heartbeat sync, build timestamp versioning, proxy-only service filter)*
 
 ---
 
@@ -213,6 +213,7 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 | `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (무료 1M ctx) |
 | `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
 | `google/모델명`, `openai/모델명`, `anthropic/모델명` 등 | 해당 서비스 직접 |
+| `custom/google/모델명`, `custom/openai/모델명` 등 | `custom/` 제거 후 재라우팅 |
 | `모델명:cloud` | `:cloud` 제거 후 OpenRouter |
 
 ### Gemini API 형식 (기존 호환)
@@ -291,7 +292,11 @@ curl "http://localhost:56244/api/models?q=claude"
 ### API 키 카드
 
 - 등록된 키 목록, 서비스별 구분
-- 각 키의 오늘 사용량·일일 한도·쿨다운 상태 표시
+- 각 키의 오늘 사용량·시도 횟수·일일 한도·쿨다운 상태 표시
+  - **`today_usage`**: 성공한 요청의 토큰 수 (429/402/582 오류 미포함)
+  - **`today_attempts`**: 오늘 총 API 호출 수 (성공 + rate-limited 포함)
+  - 대시보드 표시 예: `"42 req (45 att)"` — 42 성공, 45 총 시도
+  - 무제한 키(`daily_limit=0`) 막대 그래프: 같은 서비스 내 **share-of-total** 스케일 (각 키의 활동 / 서비스 전체 활동 × 100%)
 - `[+ 추가]` — 새 키 등록
 - `✕` — 키 삭제 (관리자 토큰 필요)
 - 사용량 초기화 버튼
@@ -581,7 +586,7 @@ wall-vault proxy --port 8080
 journalctl --user -u wall-vault --since "5 minutes ago"
 ```
 
-### API 키 오류 (429, 401, 403)
+### API 키 오류 (429, 402, 401, 403, 582)
 
 ```bash
 # 현재 키 상태 확인
@@ -641,6 +646,12 @@ curl http://localhost:11434/api/tags
 export OLLAMA_URL=http://192.168.x.x:11434
 wall-vault start
 ```
+
+> **대형 모델 추론 타임아웃**: wall-vault의 Ollama 호출은 타임아웃 없이 실행됩니다. 대형 모델(`qwen3.5:35b`, `deepseek-r1` 등)은 응답 생성까지 수 분이 걸릴 수 있으며, 헤더 전송 전까지 응답이 없어도 정상입니다. `stream:false` 모드에서는 생성 완료 후 한 번에 응답하므로 특히 오래 걸릴 수 있습니다.
+
+**HTTP 582 (Gateway Overload) 오류:**
+
+upstream 게이트웨이 과부하 응답. 수신 시 해당 키에 **5분 쿨다운**이 적용됩니다. `today_attempts`는 증가하지만 `today_usage`는 변경되지 않습니다. 5분 후 자동으로 재시도됩니다.
 
 ### Windows에서 경로 문제
 

@@ -435,7 +435,10 @@ Step 3: Ollama (final fallback — survives internet outages)
 |------------|------|
 | 429 Too Many Requests | 30 minutes |
 | 400 / 401 / 402 / 403 | 24 hours |
+| 582 Gateway Overload | 5 minutes |
 | Network error | 10 minutes |
+
+> 429 / 402 / 582 errors increment `today_attempts` (total call count) but not `today_usage` (successful tokens only).
 
 ---
 
@@ -1251,4 +1254,4 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 
 ---
 
-*Last updated · 최종 업데이트: 2026-03-15 — v0.1.6.x (i18n 20 new keys, deploy hardening, VERSION := fix, key usage section redesign)*
+*Last updated · 최종 업데이트: 2026-03-15 — v0.1.6+ (today_attempts tracking, HTTP 582 cooldown 5min, share-of-total bar scaling, custom/ routing fix, Ollama Timeout:0, key_att i18n, avatar heartbeat sync, deploy hardening)*

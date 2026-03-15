@@ -682,75 +682,74 @@ applyThemeCss('` + currentTheme + `');
 applyLang('` + currentLang + `');
 document.querySelectorAll('#dd-theme .dd-item').forEach(el=>el.classList.toggle('active',el.dataset.val==='` + currentTheme + `'));
 
-// 키 상태 캐시 (쿨다운 카운트다운용)
-let _keyCache = [];
+// Key state cache: id → {baseText, cdMs}  — used by 1-second countdown ticker
+let _keyCache = {};
 
-// 쿨다운 카운트다운 문자열 생성 (초 단위)
-function _fmtCountdown(until) {
-  const rem = Math.floor((until - Date.now()) / 1000);
-  if(rem <= 0) return null;
+// Format cooldown countdown string from timestamp (ms)
+function _fmtCountdown(untilMs) {
+  const rem = Math.floor((untilMs - Date.now()) / 1000);
+  if (rem <= 0) return null;
   const m = Math.floor(rem / 60), s = rem % 60;
-  return m > 0 ? m+T('upm')+' '+s+T('ups') : s+T('ups');
+  return m > 0 ? m + T('upm') + ' ' + s + T('ups') : s + T('ups');
 }
 
-// 1초마다 쿨다운 카운트다운 갱신 (fetch 없이 캐시 사용)
+// 1-second ticker: update cooldown countdowns with no network request
 function _tickCooldowns() {
   const now = Date.now();
-  _keyCache.forEach(k=>{
-    if(!k._cdMs) return;
-    const el = document.querySelector('[data-key-id="'+k.id+'"]');
-    if(!el) return;
+  for (const id in _keyCache) {
+    const c = _keyCache[id];
+    if (!c.cdMs) continue;
+    const el = document.querySelector('[data-key-id="' + id + '"]');
+    if (!el) continue;
     const meta = el.querySelector('.key-meta');
-    const bar = el.querySelector('.bar-fill');
-    if(!meta) return;
-    if(k._cdMs > now) {
-      const cd = _fmtCountdown(k._cdMs);
-      meta.textContent = k._baseText + (cd ? ' ('+cd+')' : '');
-      if(bar) bar.className = 'bar-fill bar-yellow';
+    const bar  = el.querySelector('.bar-fill');
+    if (c.cdMs > now) {
+      const cd = _fmtCountdown(c.cdMs);
+      if (meta) meta.textContent = c.baseText + (cd ? ' (' + cd + ')' : '');
+      if (bar)  bar.className = 'bar-fill bar-yellow';
     } else {
-      // 쿨다운 만료 — 초록으로 복원
-      meta.textContent = k._baseText;
-      if(bar) bar.className = 'bar-fill bar-green';
-      k._cdMs = 0;
+      // cooldown expired — restore to green
+      if (meta) meta.textContent = c.baseText;
+      if (bar)  bar.className = 'bar-fill bar-green';
+      _keyCache[id].cdMs = 0;
     }
-  });
+  }
 }
 setInterval(_tickCooldowns, 1000);
 
-// 키 사용량 그래프 실시간 갱신 (heartbeat usage_update SSE 이벤트 수신 시)
-function refreshKeyUsage(_data) {
-  const tok = localStorage.getItem('wv_admin_token')||'';
-  fetch('/admin/keys', {headers:{'Authorization':'Bearer '+tok}})
-    .then(r=>r.json()).then(keys=>{
-      if(!Array.isArray(keys)) return;
-      const now = new Date();
-      _keyCache = [];
-      keys.forEach(k=>{
-        const el = document.querySelector('[data-key-id="'+k.id+'"]');
-        if(!el) return;
-        const bar = el.querySelector('.bar-fill');
-        const meta = el.querySelector('.key-meta');
-        if(!bar) return;
-        const cdDate = k.cooldown_until ? new Date(k.cooldown_until) : null;
-        const onCooldown = cdDate && cdDate > now;
-        let pct = 0;
-        if(k.daily_limit > 0) {
-          pct = Math.round(k.today_usage * 100 / k.daily_limit);
-          if(pct === 0 && k.today_usage > 0) pct = 4;
-          if(pct > 100) pct = 100;
-        }
-        bar.style.width = pct + '%';
-        const cls = onCooldown ? 'bar-yellow' : (k.usage_pct >= 97 ? 'bar-red' : 'bar-green');
-        bar.className = 'bar-fill ' + cls;
-        const baseText = k.daily_limit > 0 ? (k.today_usage+'/'+k.daily_limit) : (k.today_usage+' '+T('key_reqs'));
-        if(meta) {
-          const cd = onCooldown ? _fmtCountdown(cdDate.getTime()) : null;
-          meta.textContent = baseText + (cd ? ' ('+cd+')' : '');
-        }
-        // 캐시 저장 (1초 타이머용)
-        _keyCache.push({id: k.id, _baseText: baseText, _cdMs: onCooldown ? cdDate.getTime() : 0});
-      });
-    }).catch(()=>{});
+// Refresh key usage directly from SSE usage_update payload — no fetch needed
+function refreshKeyUsage(data) {
+  if (!data || !Array.isArray(data.keys)) return;
+  const now = Date.now();
+  data.keys.forEach(k => {
+    const el = document.querySelector('[data-key-id="' + k.id + '"]');
+    if (!el) return;
+    const bar  = el.querySelector('.bar-fill');
+    const meta = el.querySelector('.key-meta');
+    const cdMs = k.cooldown_until ? new Date(k.cooldown_until).getTime() : 0;
+    const onCooldown = cdMs > now;
+    const exhausted  = k.daily_limit > 0 && k.today_usage >= k.daily_limit;
+    // update progress bar
+    if (bar) {
+      let pct = 0;
+      if (k.daily_limit > 0) {
+        pct = Math.min(100, Math.round(k.today_usage * 100 / k.daily_limit));
+        if (pct === 0 && k.today_usage > 0) pct = 4;
+      }
+      bar.style.width = pct + '%';
+      bar.className = 'bar-fill ' + (onCooldown ? 'bar-yellow' : (exhausted || pct >= 97 ? 'bar-red' : 'bar-green'));
+    }
+    // update meta text
+    const baseText = k.daily_limit > 0
+      ? k.today_usage + '/' + k.daily_limit
+      : k.today_usage + ' ' + T('key_reqs');
+    if (meta) {
+      const cd = onCooldown ? _fmtCountdown(cdMs) : null;
+      meta.textContent = baseText + (cd ? ' (' + cd + ')' : '');
+    }
+    // store in cache for 1-second countdown ticker
+    _keyCache[k.id] = {baseText, cdMs: onCooldown ? cdMs : 0};
+  });
 }
 
 // SSE 연결

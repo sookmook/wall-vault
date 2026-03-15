@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "~/.continue/config.json में पेस्ट करें",
   "cfg_gemini_cli_hint": "टर्मिनल में चलाएं या ~/.gemini/settings.json में जोड़ें",
   "cfg_antigravity_hint": "टर्मिनल में चलाएं या Antigravity सेटिंग्स में जोड़ें",
-  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 सेट करें और पुनः प्रारंभ करें"
+  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 सेट करें और पुनः प्रारंभ करें",
+  "key_att": "प्रयास"
 }

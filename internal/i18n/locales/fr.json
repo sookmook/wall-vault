@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "Coller dans ~/.continue/config.json",
   "cfg_gemini_cli_hint": "Exécuter dans le terminal ou ajouter à ~/.gemini/settings.json",
   "cfg_antigravity_hint": "Exécuter dans le terminal ou ajouter aux paramètres Antigravity",
-  "st_gemini_hint": "Définir GEMINI_API_BASE_URL=http://localhost:56244 et redémarrer"
+  "st_gemini_hint": "Définir GEMINI_API_BASE_URL=http://localhost:56244 et redémarrer",
+  "key_att": "tent."
 }

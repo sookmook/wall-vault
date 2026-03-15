@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "Namathisela ku-~/.continue/config.json",
   "cfg_gemini_cli_hint": "Sebenza ku-terminal noma engeza ku-~/.gemini/settings.json",
   "cfg_antigravity_hint": "Sebenza ku-terminal noma engeza ezilungiselweni ze-Antigravity",
-  "st_gemini_hint": "Setha i-GEMINI_API_BASE_URL=http://localhost:56244 bese uqala kabusha"
+  "st_gemini_hint": "Setha i-GEMINI_API_BASE_URL=http://localhost:56244 bese uqala kabusha",
+  "key_att": "izinz."
 }

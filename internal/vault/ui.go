@@ -721,12 +721,15 @@ setInterval(_tickCooldowns, 1000);
 function refreshKeyUsage(data) {
   if (!data || !Array.isArray(data.keys)) return;
   const now = Date.now();
-  // Pre-pass: compute max today_usage per service for relative bar scaling (daily_limit=0 keys)
+  // Pre-pass: for unlimited keys compute max(today_attempts) per service for relative bar scaling.
+  // today_attempts is used for bar width (reflects all activity including rate-limited requests);
+  // today_usage is used for label (successful tokens/requests only).
   const svcMax = {};
   data.keys.forEach(k => {
-    if (k.daily_limit === 0 && k.today_usage > 0) {
-      if (!(k.service in svcMax) || k.today_usage > svcMax[k.service]) {
-        svcMax[k.service] = k.today_usage;
+    if (k.daily_limit === 0) {
+      const ref = k.today_attempts || k.today_usage || 0;
+      if (ref > 0 && (!(k.service in svcMax) || ref > svcMax[k.service])) {
+        svcMax[k.service] = ref;
       }
     }
   });
@@ -737,25 +740,43 @@ function refreshKeyUsage(data) {
     const meta = el.querySelector('.key-meta');
     const cdMs = k.cooldown_until ? new Date(k.cooldown_until).getTime() : 0;
     const onCooldown = cdMs > now;
-    const exhausted  = k.daily_limit > 0 && k.today_usage >= k.daily_limit;
+    const usage    = k.today_usage    || 0;
+    const attempts = k.today_attempts || 0;
+    const exhausted = k.daily_limit > 0 && usage >= k.daily_limit;
     // update progress bar
     if (bar) {
       let pct = 0;
       if (k.daily_limit > 0) {
-        pct = Math.min(100, Math.round(k.today_usage * 100 / k.daily_limit));
-        if (pct === 0 && k.today_usage > 0) pct = 4;
-      } else if (svcMax[k.service] > 0) {
-        // relative scaling: highest usage key in the group gets 100%
-        pct = Math.round(k.today_usage * 100 / svcMax[k.service]);
-        if (pct === 0 && k.today_usage > 0) pct = 4;
+        // absolute scaling against daily limit
+        pct = Math.min(100, Math.round(usage * 100 / k.daily_limit));
+        if (pct === 0 && usage > 0) pct = 4;
+      } else {
+        // relative scaling: use attempts as the activity indicator so rate-limited
+        // keys (usage=0, attempts>0) still show a non-zero bar
+        const ref = attempts > usage ? attempts : usage;
+        if (svcMax[k.service] > 0 && ref > 0) {
+          pct = Math.round(ref * 100 / svcMax[k.service]);
+          if (pct === 0) pct = 4;
+        }
       }
       bar.style.width = pct + '%';
       bar.className = 'bar-fill ' + (onCooldown ? 'bar-yellow' : (exhausted || pct >= 97 ? 'bar-red' : 'bar-green'));
     }
     // update meta text
-    const baseText = k.daily_limit > 0
-      ? k.today_usage + '/' + k.daily_limit
-      : k.today_usage + ' ' + T('key_reqs');
+    // Format: "N/limit" | "N req" | "N/limit (M att)" | "N req (M att)" | "M att"
+    let baseText;
+    if (k.daily_limit > 0) {
+      baseText = usage + '/' + k.daily_limit;
+      if (attempts > usage) baseText += ' (' + attempts + ' ' + T('key_att') + ')';
+    } else if (usage > 0) {
+      baseText = usage + ' ' + T('key_reqs');
+      if (attempts > usage) baseText += ' (' + attempts + ' ' + T('key_att') + ')';
+    } else if (attempts > 0) {
+      // all requests rate-limited; show attempt count so it's not blank
+      baseText = attempts + ' ' + T('key_att');
+    } else {
+      baseText = '0 ' + T('key_reqs');
+    }
     if (meta) {
       const cd = onCooldown ? _fmtCountdown(cdMs) : null;
       meta.textContent = baseText + (cd ? ' (' + cd + ')' : '');

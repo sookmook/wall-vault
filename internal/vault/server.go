@@ -376,9 +376,12 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if ps.Avatar != "" {
 		_ = s.store.UpdateClient(ps.ClientID, ClientUpdateInput{Avatar: &ps.Avatar})
 	}
-	// sync proxy key usage + cooldowns into vault store so the UI reflects reality
+	// sync proxy key usage, attempts, and cooldowns into vault store
 	for keyID, tokens := range ps.KeyUsage {
 		s.store.SetKeyUsage(keyID, tokens)
+	}
+	for keyID, attempts := range ps.KeyAttempts {
+		s.store.SetKeyAttempts(keyID, attempts)
 	}
 	for keyID, cooldownStr := range ps.KeyCooldowns {
 		if until, err := time.Parse(time.RFC3339, cooldownStr); err == nil {
@@ -399,6 +402,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 				"id":             k.ID,
 				"service":        k.Service,
 				"today_usage":    k.TodayUsage,
+				"today_attempts": k.TodayAttempts,
 				"daily_limit":    k.DailyLimit,
 				"cooldown_until": cdStr,
 			})
@@ -498,6 +502,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 		PlainKey      string    `json:"plain_key"`
 		DailyLimit    int       `json:"daily_limit"`
 		TodayUsage    int       `json:"today_usage"`
+		TodayAttempts int       `json:"today_attempts"`
 		CooldownUntil time.Time `json:"cooldown_until"`
 	}
 
@@ -531,6 +536,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 			PlainKey:      plain,
 			DailyLimit:    k.DailyLimit,
 			TodayUsage:    k.TodayUsage,
+			TodayAttempts: k.TodayAttempts,
 			CooldownUntil: k.CooldownUntil,
 		})
 	}

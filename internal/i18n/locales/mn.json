@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "~/.continue/config.json-д буулгана уу",
   "cfg_gemini_cli_hint": "Терминалд ажиллуул эсвэл ~/.gemini/settings.json-д нэмнэ үү",
   "cfg_antigravity_hint": "Терминалд ажиллуул эсвэл Antigravity тохиргоонд нэмнэ үү",
-  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 тохируулаад дахин эхлүүлнэ үү"
+  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 тохируулаад дахин эхлүүлнэ үү",
+  "key_att": "оролд."
 }

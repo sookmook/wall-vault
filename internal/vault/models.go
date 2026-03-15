@@ -5,15 +5,16 @@ import "time"
 // ─── API Key ──────────────────────────────────────────────────────────────────
 
 type APIKey struct {
-	ID            string    `json:"id"`
-	Service       string    `json:"service"`        // google | openrouter | ollama
-	EncryptedKey  string    `json:"encrypted_key"`
-	Label         string    `json:"label"`
-	TodayUsage    int       `json:"today_usage"`
-	DailyLimit    int       `json:"daily_limit"`    // 0 = unlimited
-	CooldownUntil time.Time `json:"cooldown_until"`
-	LastError     int       `json:"last_error"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	Service        string    `json:"service"`         // google | openrouter | ollama
+	EncryptedKey   string    `json:"encrypted_key"`
+	Label          string    `json:"label"`
+	TodayUsage     int       `json:"today_usage"`     // successful tokens (or 1/request when unavailable)
+	TodayAttempts  int       `json:"today_attempts"`  // total requests including rate-limited
+	DailyLimit     int       `json:"daily_limit"`     // 0 = unlimited
+	CooldownUntil  time.Time `json:"cooldown_until"`
+	LastError      int       `json:"last_error"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func (k *APIKey) IsOnCooldown() bool {
@@ -126,7 +127,8 @@ type ProxyStatus struct {
 	UpdatedAt  time.Time         `json:"updated_at"`
 	Vault      VaultInfo         `json:"vault,omitempty"`
 	ActiveKeys   map[string]string `json:"active_keys,omitempty"`   // service → key ID
-	KeyUsage     map[string]int    `json:"key_usage,omitempty"`     // key ID → tokens used today
+	KeyUsage     map[string]int    `json:"key_usage,omitempty"`     // key ID → successful tokens today
+	KeyAttempts  map[string]int    `json:"key_attempts,omitempty"`  // key ID → total requests today
 	KeyCooldowns map[string]string `json:"key_cooldowns,omitempty"` // key ID → cooldown RFC3339
 }
 

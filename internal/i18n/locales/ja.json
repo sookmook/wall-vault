@@ -128,5 +128,6 @@
   "cfg_vscode_hint": "~/.continue/config.json に貼り付けてください。",
   "cfg_gemini_cli_hint": "ターミナルで実行するか ~/.gemini/settings.json に追加してください。",
   "cfg_antigravity_hint": "ターミナルで実行するか Antigravity の設定に追加してください。",
-  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 を設定して再起動してください"
+  "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 を設定して再起動してください",
+  "key_att": "試行"
 }

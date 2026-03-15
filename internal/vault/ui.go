@@ -721,16 +721,16 @@ setInterval(_tickCooldowns, 1000);
 function refreshKeyUsage(data) {
   if (!data || !Array.isArray(data.keys)) return;
   const now = Date.now();
-  // Pre-pass: for unlimited keys compute max(today_attempts) per service for relative bar scaling.
-  // today_attempts is used for bar width (reflects all activity including rate-limited requests);
-  // today_usage is used for label (successful tokens/requests only).
-  const svcMax = {};
+  // Pre-pass: for unlimited keys compute the SUM of activity per service.
+  // Bar width = key_activity / service_total * 100, so each key shows its
+  // SHARE of today's requests. This avoids the "all-100% or all-0%" problem
+  // that occurs with max-relative scaling when keys have equal usage.
+  // Activity = max(today_attempts, today_usage) so rate-limited-only keys count.
+  const svcSum = {};
   data.keys.forEach(k => {
     if (k.daily_limit === 0) {
-      const ref = k.today_attempts || k.today_usage || 0;
-      if (ref > 0 && (!(k.service in svcMax) || ref > svcMax[k.service])) {
-        svcMax[k.service] = ref;
-      }
+      const ref = Math.max(k.today_attempts || 0, k.today_usage || 0);
+      svcSum[k.service] = (svcSum[k.service] || 0) + ref;
     }
   });
   data.keys.forEach(k => {
@@ -751,11 +751,10 @@ function refreshKeyUsage(data) {
         pct = Math.min(100, Math.round(usage * 100 / k.daily_limit));
         if (pct === 0 && usage > 0) pct = 4;
       } else {
-        // relative scaling: use attempts as the activity indicator so rate-limited
-        // keys (usage=0, attempts>0) still show a non-zero bar
-        const ref = attempts > usage ? attempts : usage;
-        if (svcMax[k.service] > 0 && ref > 0) {
-          pct = Math.round(ref * 100 / svcMax[k.service]);
+        // share-of-total: bar shows this key's fraction of today's service requests
+        const ref = Math.max(attempts, usage);
+        if (svcSum[k.service] > 0 && ref > 0) {
+          pct = Math.min(100, Math.round(ref * 100 / svcSum[k.service]));
           if (pct === 0) pct = 4;
         }
       }
@@ -1805,10 +1804,16 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 
 	for _, svc := range svcOrder {
 		svcKeys := byService[svc]
-		maxU := 0
+		// For unlimited keys: compute sum of activity (max of usage, attempts) so bar
+		// shows each key's share of today's total service requests (not max-relative).
+		sumAct := 0
 		for _, k := range svcKeys {
-			if k.TodayUsage > maxU {
-				maxU = k.TodayUsage
+			if k.DailyLimit == 0 {
+				ref := k.TodayUsage
+				if k.TodayAttempts > ref {
+					ref = k.TodayAttempts
+				}
+				sumAct += ref
 			}
 		}
 		sb.WriteString(fmt.Sprintf(`<div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--accent);margin-bottom:.4rem">▸ %s</div>`, svc))
@@ -1817,15 +1822,21 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 			if k.DailyLimit > 0 {
 				barPct = k.TodayUsage * 100 / k.DailyLimit
 				if barPct == 0 && k.TodayUsage > 0 {
-					barPct = 4 // 사용량 있으면 최소 4%
-				}
-			} else if maxU > 0 {
-				barPct = k.TodayUsage * 100 / maxU
-				if barPct == 0 && k.TodayUsage > 0 {
 					barPct = 4
 				}
+			} else if sumAct > 0 {
+				// share-of-total: this key's fraction of service activity today
+				ref := k.TodayUsage
+				if k.TodayAttempts > ref {
+					ref = k.TodayAttempts
+				}
+				if ref > 0 {
+					barPct = ref * 100 / sumAct
+					if barPct == 0 {
+						barPct = 4
+					}
+				}
 			}
-			// 사용량 0이면 barPct = 0 (빈 바)
 			if barPct > 100 {
 				barPct = 100
 			}
@@ -1851,8 +1862,18 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 			var meta string
 			if k.DailyLimit > 0 {
 				meta = fmt.Sprintf("%d/%d", k.TodayUsage, k.DailyLimit)
-			} else {
+				if k.TodayAttempts > k.TodayUsage {
+					meta += fmt.Sprintf(` (%d <span data-i18n="key_att">시도</span>)`, k.TodayAttempts)
+				}
+			} else if k.TodayUsage > 0 {
 				meta = fmt.Sprintf(`%d <span data-i18n="key_reqs">요청</span>`, k.TodayUsage)
+				if k.TodayAttempts > k.TodayUsage {
+					meta += fmt.Sprintf(` (%d <span data-i18n="key_att">시도</span>)`, k.TodayAttempts)
+				}
+			} else if k.TodayAttempts > 0 {
+				meta = fmt.Sprintf(`%d <span data-i18n="key_att">시도</span>`, k.TodayAttempts)
+			} else {
+				meta = fmt.Sprintf(`0 <span data-i18n="key_reqs">요청</span>`)
 			}
 			if k.IsOnCooldown() {
 				remain := time.Until(k.CooldownUntil)

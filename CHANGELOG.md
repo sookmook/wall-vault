@@ -26,7 +26,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 - README: origin story + full rewrite (MuJaMae style)
 
 ### Changed
-- Key usage section fully redesigned — `handleHeartbeat` in `server.go` now always broadcasts `usage_update` SSE with full key state snapshot `{keys: [{id, today_usage, daily_limit, cooldown_until}]}` after every heartbeat (previously conditional on non-empty usage map). Dashboard JS `refreshKeyUsage` no longer fetches `/admin/keys`; it updates DOM directly from SSE payload. `_keyCache` changed from array to object (id → state) for O(1) lookup.
+- Key usage section fully redesigned — `handleHeartbeat` in `server.go` now always broadcasts `usage_update` SSE with full key state snapshot `{keys: [{id, service, today_usage, daily_limit, cooldown_until}]}` after every heartbeat (previously conditional on non-empty usage map). Dashboard JS `refreshKeyUsage` no longer fetches `/admin/keys`; it updates DOM directly from SSE payload. `_keyCache` changed from array to object (id → state) for O(1) lookup. Keys with `daily_limit=0` now use relative bar scaling within their service group (highest usage = 100%).
 - `Makefile`: `VERSION` assignment changed from recursive (`=`) to immediate (`:=`) — `$(shell date)` is now evaluated once at `make` start, preventing version mismatch between build and verify steps
 - `Makefile.local` + `Makefile.local.example`: deploy targets hardened with kill→wait→verify pattern:
   - `pkill -x "wall-vault"` after service stop (exact process name, not `-f`)

@@ -35,6 +35,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   - Binary replacement only proceeds after confirming old process is dead
 
 ### Fixed
+- OpenRouter (and other services) showing 0 usage even after rate-limited requests: `RecordError` now increments `todayUsage += 1` when the error code is 429 (TooManyRequests) or 402 (PaymentRequired), so each attempted-but-rate-limited request counts as 1 in the usage display
 - Countdown timer in key status panel was hardcoded Korean (`분`, `초`) — now uses `T('upm')` / `T('ups')`
 - Request count label `'요청'` in key usage was hardcoded — now uses `T('key_reqs')`
 - `copyOpenClawConfig` / `copyAgentConfig` alert/prompt messages were hardcoded Korean — now fully i18n via `T()` keys

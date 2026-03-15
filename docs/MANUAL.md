@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-15 — v0.1.6+: today_attempts tracking, HTTP 582 cooldown, share-of-total bar scaling, custom/ routing fix, Ollama timeout fix, key_att i18n, avatar heartbeat sync, build timestamp versioning, proxy-only service filter)*
+*(Last updated: 2026-03-16 — v0.1.7: today_attempts tracking, HTTP 582 cooldown, share-of-total bar scaling, custom/ routing fix, Ollama timeout fix, key_att i18n, logo display fix, avatar heartbeat sync, build timestamp versioning, proxy-only service filter)*
 
 ---
 

@@ -1254,4 +1254,4 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 
 ---
 
-*Last updated · 최종 업데이트: 2026-03-15 — v0.1.6+ (today_attempts tracking, HTTP 582 cooldown 5min, share-of-total bar scaling, custom/ routing fix, Ollama Timeout:0, key_att i18n, avatar heartbeat sync, deploy hardening)*
+*Last updated · 최종 업데이트: 2026-03-16 — v0.1.7 (today_attempts tracking, HTTP 582 cooldown 5min, share-of-total bar scaling, custom/ routing fix, Ollama Timeout:0, key_att i18n, logo display fix, avatar heartbeat sync, deploy hardening)*

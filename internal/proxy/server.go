@@ -892,7 +892,16 @@ func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, erro
 	ollamaReq := GeminiToOllama(model, req)
 	data, _ := json.Marshal(ollamaReq)
 
-	resp, err := s.doRequest("POST", ollamaURL+"/api/chat", data, nil)
+	// Ollama is a local service: inference can take several minutes for large models.
+	// Use a dedicated client with no hard timeout so generation is never cut off.
+	// Connection errors (server not running) still surface immediately.
+	httpReq, err := http.NewRequest("POST", ollamaURL+"/api/chat", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("Ollama 요청 생성 실패: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	ollamaClient := &http.Client{Timeout: 0} // no timeout — inference duration is unbounded
+	resp, err := ollamaClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("Ollama 연결 실패 (%s): %w", ollamaURL, err)
 	}
@@ -989,6 +998,13 @@ func parseProviderModel(svc, mdl string) (string, string) {
 		"huggingface", "novita", "nvidia", "venice",
 		"meta-llama", "qwen", "deepseek", "01-ai":
 		return "openrouter", mdl // keep full org/model path
+
+	// ── custom/ prefix — strip and re-parse the remainder ───────────────────
+	// OpenClaw model picker sends "custom/google/gemini-..." or "custom/openrouter/..."
+	// when the user selects a custom entry. Strip the leading "custom/" and re-parse
+	// so the actual provider is detected correctly.
+	case "custom":
+		return parseProviderModel(svc, bare) // bare = "google/gemini-..." etc.
 
 	// ── wall-vault prefix — auto-detect from model ID ────────────────────────
 	case "wall-vault":

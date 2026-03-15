@@ -25,6 +25,10 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 - `docs/logo.png` logo image
 - README: origin story + full rewrite (MuJaMae style)
 
+### Fixed (proxy routing)
+- `parseProviderModel`: added `custom/` prefix handler — `custom/google/gemini-...` and similar paths sent by the OpenClaw model picker were falling through to the `default` case and routing to OpenRouter instead of the correct provider. Now strips `custom/` and re-parses the remainder recursively.
+- Ollama non-streaming call used `http.Client{Timeout: 60s}` which expired before large-model inference completed, producing a misleading "Ollama connection failed: context deadline exceeded" error even when Ollama was healthy. Changed to `Timeout: 0` (no deadline) since Ollama is a local service and generation time is unbounded.
+
 ### Changed
 - Key usage section fully redesigned — `handleHeartbeat` in `server.go` now always broadcasts `usage_update` SSE with full key state snapshot `{keys: [{id, service, today_usage, daily_limit, cooldown_until}]}` after every heartbeat (previously conditional on non-empty usage map). Dashboard JS `refreshKeyUsage` no longer fetches `/admin/keys`; it updates DOM directly from SSE payload. `_keyCache` changed from array to object (id → state) for O(1) lookup. Keys with `daily_limit=0` now use relative bar scaling within their service group (highest usage = 100%).
 - `Makefile`: `VERSION` assignment changed from recursive (`=`) to immediate (`:=`) — `$(shell date)` is now evaluated once at `make` start, preventing version mismatch between build and verify steps

@@ -303,6 +303,7 @@ func (km *KeyManager) SyncFromVault() error {
 		DailyLimit    int       `json:"daily_limit"`
 		TodayUsage    int       `json:"today_usage"`
 		TodayAttempts int       `json:"today_attempts"`
+		UsageDate     string    `json:"usage_date"`
 		CooldownUntil time.Time `json:"cooldown_until"`
 	}
 	if err := json.Unmarshal(body, &keys); err != nil {
@@ -343,9 +344,17 @@ func (km *KeyManager) SyncFromVault() error {
 		if k.PlainKey == "" {
 			continue
 		}
+		// discard vault usage if it was written on a previous day (stale data protection)
+		vaultUsage := k.TodayUsage
+		vaultAttempts := k.TodayAttempts
+		if k.UsageDate != "" && k.UsageDate != today {
+			vaultUsage = 0
+			vaultAttempts = 0
+			log.Printf("[sync] discarding stale vault usage for key %s (vault date: %s, today: %s)", k.ID, k.UsageDate, today)
+		}
 		// use the higher of vault vs. locally accumulated for each counter
-		usage := k.TodayUsage
-		attempts := k.TodayAttempts
+		usage := vaultUsage
+		attempts := vaultAttempts
 		if lc := localCtrs[k.ID]; lc.usage > usage {
 			usage = lc.usage
 		}

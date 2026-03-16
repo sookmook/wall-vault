@@ -9,56 +9,56 @@ LDFLAGS = -ldflags "-X main.version=$(VERSION) -s -w"
 
 .PHONY: build
 build:
-	go build $(LDFLAGS) -o bin/$(BINARY) .
+	~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY) .
 
 .PHONY: build-all
 build-all: build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64
 
 build-linux-amd64:
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY)-linux-amd64 .
+	GOOS=linux GOARCH=amd64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-linux-amd64 .
 
 build-linux-arm64:
-	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY)-linux-arm64 .
+	GOOS=linux GOARCH=arm64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-linux-arm64 .
 
 build-darwin-amd64:
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY)-darwin-amd64 .
+	GOOS=darwin GOARCH=amd64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-darwin-amd64 .
 
 build-darwin-arm64:
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY)-darwin-arm64 .
+	GOOS=darwin GOARCH=arm64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-darwin-arm64 .
 
 build-windows-amd64:
-	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY)-windows-amd64.exe .
+	GOOS=windows GOARCH=amd64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-windows-amd64.exe .
 
 # ─── 실행 ────────────────────────────────────────────────────────────────────
 
 .PHONY: run
 run:
-	go run . start
+	~/go/bin/go run . start
 
 .PHONY: run-proxy
 run-proxy:
-	go run . proxy
+	~/go/bin/go run . proxy
 
 .PHONY: run-vault
 run-vault:
-	go run . vault
+	~/go/bin/go run . vault
 
 # ─── 테스트 ──────────────────────────────────────────────────────────────────
 
 .PHONY: test
 test:
-	go test ./...
+	~/go/bin/go test ./...
 
 .PHONY: test-verbose
 test-verbose:
-	go test -v ./...
+	~/go/bin/go test -v ./...
 
 # ─── 의존성 ──────────────────────────────────────────────────────────────────
 
 .PHONY: deps
 deps:
-	go mod tidy
-	go mod download
+	~/go/bin/go mod tidy
+	~/go/bin/go mod download
 
 # ─── 정리 ────────────────────────────────────────────────────────────────────
 

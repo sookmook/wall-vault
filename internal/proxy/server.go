@@ -90,6 +90,12 @@ func NewServer(cfg *config.Config) *Server {
 			if err := s.keyMgr.SyncFromVault(); err != nil {
 				log.Printf("[SSE] 키 동기화 실패: %v", err)
 			}
+		}, func() {
+			// usage_reset: immediately clear stale local counters, then re-sync from vault
+			s.keyMgr.ResetDailyCounters()
+			if err := s.keyMgr.SyncFromVault(); err != nil {
+				log.Printf("[SSE] usage_reset 후 키 동기화 실패: %v", err)
+			}
 		}, func(services []string) {
 			s.mu.Lock()
 			s.allowedServices = services

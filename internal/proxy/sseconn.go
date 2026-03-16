@@ -19,16 +19,18 @@ type SSEClient struct {
 	clientID        string
 	connected       bool
 	onConfig        func(service, model string) // config change callback
-	onKeyChange     func()                      // key added/deleted/reset callback
+	onKeyChange     func()                      // key added/deleted callback
+	onUsageReset    func()                      // midnight daily-counter reset callback
 	onServiceChange func([]string)              // proxy service list change callback
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onKeyChange func(), onServiceChange func([]string)) *SSEClient {
+func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onKeyChange func(), onUsageReset func(), onServiceChange func([]string)) *SSEClient {
 	return &SSEClient{
 		vaultURL:        vaultURL,
 		clientID:        clientID,
 		onConfig:        onConfig,
 		onKeyChange:     onKeyChange,
+		onUsageReset:    onUsageReset,
 		onServiceChange: onServiceChange,
 	}
 }
@@ -110,10 +112,15 @@ func (c *SSEClient) handleEvent(data string) {
 				c.onConfig(evt.Data.Service, evt.Data.Model)
 			}
 		}
-	case "key_added", "key_deleted", "usage_reset":
+	case "key_added", "key_deleted":
 		log.Printf("[SSE] 🔑 key event: %s — re-syncing keys", evt.Type)
 		if c.onKeyChange != nil {
 			go c.onKeyChange()
+		}
+	case "usage_reset":
+		log.Printf("[SSE] 🌅 usage_reset — resetting local counters and re-syncing")
+		if c.onUsageReset != nil {
+			go c.onUsageReset()
 		}
 	case "service_changed":
 		if evt.Data.ProxyServices != nil && c.onServiceChange != nil {

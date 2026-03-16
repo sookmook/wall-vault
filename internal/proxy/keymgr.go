@@ -58,24 +58,42 @@ func (k *localKey) isAvailable() bool {
 // ─── KeyManager ───────────────────────────────────────────────────────────────
 
 type KeyManager struct {
-	mu       sync.Mutex
-	keys     map[string][]*localKey
-	idx      map[string]int // round-robin index per service
-	lastUsed map[string]string // service → last successful key ID
-	vaultURL string
-	token    string
-	clientID string
+	mu           sync.Mutex
+	keys         map[string][]*localKey
+	idx          map[string]int            // round-robin index per service
+	lastUsed     map[string]string         // service → last successful key ID
+	vaultURL     string
+	token        string
+	clientID     string
+	lastSyncDate string // "YYYY-MM-DD" — detects midnight rollover to discard stale local counters
 }
 
 func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 	return &KeyManager{
-		keys:     make(map[string][]*localKey),
-		idx:      make(map[string]int),
-		lastUsed: make(map[string]string),
-		vaultURL: vaultURL,
-		token:    token,
-		clientID: clientID,
+		keys:         make(map[string][]*localKey),
+		idx:          make(map[string]int),
+		lastUsed:     make(map[string]string),
+		vaultURL:     vaultURL,
+		token:        token,
+		clientID:     clientID,
+		lastSyncDate: time.Now().Format("2006-01-02"),
 	}
+}
+
+// ResetDailyCounters: zero all local today_usage/today_attempts counters immediately.
+// Called when vault broadcasts a usage_reset SSE event (midnight rollover).
+func (km *KeyManager) ResetDailyCounters() {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	today := time.Now().Format("2006-01-02")
+	for _, keys := range km.keys {
+		for _, k := range keys {
+			k.todayUsage = 0
+			k.todayAttempts = 0
+		}
+	}
+	km.lastSyncDate = today
+	log.Printf("[sync] daily counters reset (date: %s)", today)
 }
 
 // LastUsedID: return the ID of the last successfully used key for a service
@@ -301,6 +319,14 @@ func (km *KeyManager) SyncFromVault() error {
 				localCtrs[k.id] = localCounters{k.todayUsage, k.todayAttempts}
 			}
 		}
+	}
+	// detect midnight rollover: if the date changed since last sync, discard stale local counters
+	// so that max(vault=0, local=yesterday) does not keep yesterday's values
+	today := time.Now().Format("2006-01-02")
+	if km.lastSyncDate != today {
+		km.lastSyncDate = today
+		localCtrs = make(map[string]localCounters) // all zeros — vault values win
+		log.Printf("[sync] date changed to %s — discarding stale local counters", today)
 	}
 	// replace only vault-sourced keys (env var keys are kept)
 	for svc := range km.keys {

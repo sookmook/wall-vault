@@ -21,7 +21,7 @@
   "config_not_found": "कन्फिग फेला परेन — पूर्वनिर्धारित प्रयोग",
   "setup_welcome": "wall-vault सेटअप विजार्डमा स्वागत छ",
   "setup_done": "सेटअप पूर्ण! चलाउनुस्: wall-vault start",
-  "title": "AI प्रोक्सी की भल्ट ड्यासबोर्ड",
+  "title": "wall-vault ड्यासबोर्ड",
   "agents": "🤖 एजेन्टहरू",
   "keys": "🔑 API कीहरू",
   "services": "⚙️ सेवाहरू",

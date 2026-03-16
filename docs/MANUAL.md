@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-16 — v0.1.7: today_attempts tracking, HTTP 582 cooldown, share-of-total bar scaling, custom/ routing fix, Ollama timeout fix, key_att i18n, logo display fix, avatar heartbeat sync, build timestamp versioning, proxy-only service filter)*
+*(Last updated: 2026-03-16 — v0.1.7: 대시보드 제목 "벽금고(wall-vault) 대시보드"로 변경, 로고 topbar 이동, today_attempts 추적, HTTP 582 쿨다운, share-of-total 막대 스케일링, custom/ 라우팅 수정, Ollama 타임아웃 수정, key_att i18n, avatar heartbeat 동기화, 빌드 타임스탬프 버전)*
 
 ---
 
@@ -288,6 +288,11 @@ curl "http://localhost:56244/api/models?q=claude"
 ## 키 금고 대시보드
 
 `http://localhost:56243` 접속.
+
+**페이지 구성:**
+- **상단 고정 바(topbar)**: 로고 이미지 + `wall-vault` 텍스트, 언어·테마 선택기, SSE 연결 상태 표시. 스크롤해도 항상 화면 최상단에 고정.
+- **제목 영역**: "**벽금고(wall-vault) 대시보드**" (언어 설정에 따라 자동 번역)
+- **카드 그리드**: 에이전트·서비스·API 키 카드
 
 ### API 키 카드
 

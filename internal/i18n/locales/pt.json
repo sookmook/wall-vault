@@ -21,7 +21,7 @@
   "config_not_found": "configuração não encontrada — usando padrões",
   "setup_welcome": "Bem-vindo ao assistente de instalação do wall-vault",
   "setup_done": "Configuração concluída! Execute: wall-vault start",
-  "title": "Painel do Cofre de Chaves do Proxy de IA",
+  "title": "Painel wall-vault",
   "agents": "🤖 Agentes",
   "keys": "🔑 Chaves API",
   "services": "⚙️ Serviços",

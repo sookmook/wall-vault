@@ -1090,4 +1090,4 @@ curl -X POST http://localhost:56243/api/heartbeat \
 
 ---
 
-*Last updated: 2026-03-16 — v0.1.7: today_attempts tracking (today_usage/today_attempts separation), HTTP 582 cooldown (5min), share-of-total bar scaling, custom/ routing fix, Ollama Timeout:0, key_att i18n, logo display fix, avatar heartbeat sync, build timestamp versioning, proxy-only service filter*
+*Last updated: 2026-03-16 — v0.1.7: dashboard title renamed to "벽금고(wall-vault) 대시보드", logo moved to sticky topbar, today_attempts tracking, HTTP 582 cooldown (5min), share-of-total bar scaling, custom/ routing fix, Ollama Timeout:0, key_att i18n, avatar heartbeat sync, build timestamp versioning, proxy-only service filter*

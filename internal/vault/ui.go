@@ -38,7 +38,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>wall-vault 키 금고</title>
+<title>벽금고(wall-vault) 대시보드</title>
 <style>`)
 	sb.WriteString(css)
 	sb.WriteString(`</style>
@@ -46,6 +46,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
 <body>
 <div class="topbar">
   <div class="topbar-brand">
+    <img src="/logo" alt="wall-vault" class="topbar-logo">
     <span class="topbar-title">wall-vault</span>
   </div>
   <div class="topbar-controls">
@@ -74,8 +75,7 @@ func buildDashboard(s *Server, t *theme.Theme) string {
   </div>
 </div>
 <div class="header">
-  <img src="/logo" alt="wall-vault" class="header-logo">
-  <h1 id="page-title" data-i18n="title">AI 프록시 키 금고 대시보드</h1>
+  <h1 id="page-title" data-i18n="title">벽금고(wall-vault) 대시보드</h1>
 </div>
 <div class="grid">`)
 	sb.WriteString(agentCard)
@@ -154,7 +154,7 @@ a{color:var(--accent);text-decoration:none}
 /* ── Topbar ── */
 .topbar{position:sticky;top:0;z-index:500;display:flex;justify-content:space-between;align-items:center;padding:.5rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);gap:.8rem;box-shadow:0 1px 5px rgba(0,0,0,.08)}
 .topbar-brand{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-.topbar-logo{height:104px;width:auto;flex-shrink:0;object-fit:contain;border-radius:6px}
+.topbar-logo{height:38px;width:auto;flex-shrink:0;display:block}
 .topbar-title{color:var(--accent);font-size:.92rem;font-weight:800;letter-spacing:1.2px;white-space:nowrap}
 .topbar-controls{display:flex;align-items:center;gap:.5rem}
 /* ── Dropdown ── */
@@ -167,8 +167,7 @@ a{color:var(--accent);text-decoration:none}
 .dd-item:hover{background:var(--bg);color:var(--text)}
 .dd-item.active{color:var(--accent);font-weight:600}
 /* ── Header (슬림) ── */
-.header{display:flex;align-items:center;justify-content:center;gap:1rem;padding:.75rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
-.header-logo{height:96px;width:auto;flex-shrink:0;display:block}
+.header{display:flex;align-items:center;justify-content:center;padding:1rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface)}
 .header h1{color:var(--text);font-size:1.5rem;font-weight:700;letter-spacing:.3px;white-space:nowrap}
 /* ── Badge ── */
 .badge{display:inline-block;background:var(--surface);border:1px solid var(--green);color:var(--green);padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.3px}

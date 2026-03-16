@@ -21,7 +21,7 @@
   "config_not_found": "Тохиргоо олдсонгүй — өгөгдмөл ашиглана",
   "setup_welcome": "wall-vault тохиргооны хөтөч рүү тавтай морил",
   "setup_done": "Тохиргоо дууслаа! Ажиллуулах: wall-vault start",
-  "title": "AI прокси түлхүүр сангийн самбар",
+  "title": "wall-vault самбар",
   "agents": "🤖 Агентууд",
   "keys": "🔑 API түлхүүрүүд",
   "services": "⚙️ Үйлчилгээнүүд",

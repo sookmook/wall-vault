@@ -293,8 +293,15 @@ func (s *Store) RecordKeyUsage(id string, tokens int) {
 func (s *Store) SetKeyUsage(id string, tokens int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	today := time.Now().Format("2006-01-02")
 	for _, k := range s.keys {
 		if k.ID == id {
+			// auto-reset if it's a new day (guards against stale heartbeat values after midnight)
+			if k.UsageDate != today {
+				k.TodayUsage = 0
+				k.TodayAttempts = 0
+				k.UsageDate = today
+			}
 			if k.TodayUsage != tokens {
 				k.TodayUsage = tokens
 				_ = s.save()
@@ -341,8 +348,15 @@ func (s *Store) SetKeyCooldown(id string, errCode int, until time.Time) {
 func (s *Store) SetKeyAttempts(id string, attempts int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	today := time.Now().Format("2006-01-02")
 	for _, k := range s.keys {
 		if k.ID == id {
+			// auto-reset if it's a new day
+			if k.UsageDate != today {
+				k.TodayUsage = 0
+				k.TodayAttempts = 0
+				k.UsageDate = today
+			}
 			if k.TodayAttempts != attempts {
 				k.TodayAttempts = attempts
 				_ = s.save()

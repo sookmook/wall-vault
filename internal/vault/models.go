@@ -11,6 +11,7 @@ type APIKey struct {
 	Label          string    `json:"label"`
 	TodayUsage     int       `json:"today_usage"`     // successful tokens (or 1/request when unavailable)
 	TodayAttempts  int       `json:"today_attempts"`  // total requests including rate-limited
+	UsageDate      string    `json:"usage_date"`      // "YYYY-MM-DD" of when today_usage was last written
 	DailyLimit     int       `json:"daily_limit"`     // 0 = unlimited
 	CooldownUntil  time.Time `json:"cooldown_until"`
 	LastError      int       `json:"last_error"`

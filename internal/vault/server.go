@@ -503,6 +503,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 		DailyLimit    int       `json:"daily_limit"`
 		TodayUsage    int       `json:"today_usage"`
 		TodayAttempts int       `json:"today_attempts"`
+		UsageDate     string    `json:"usage_date"`
 		CooldownUntil time.Time `json:"cooldown_until"`
 	}
 
@@ -537,6 +538,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 			DailyLimit:    k.DailyLimit,
 			TodayUsage:    k.TodayUsage,
 			TodayAttempts: k.TodayAttempts,
+			UsageDate:     k.UsageDate,
 			CooldownUntil: k.CooldownUntil,
 		})
 	}

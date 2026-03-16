@@ -8,6 +8,17 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [Unreleased]
+
+### Changed
+- Dashboard title changed to **"벽금고(wall-vault) 대시보드"** across all 17 locale files (`title` key). Previously "AI 프록시 키 금고 대시보드" (ko), "AI Proxy Key Vault Dashboard" (en), etc.
+- HTML `<title>` tag updated to "벽금고(wall-vault) 대시보드"
+- Logo image moved from `.header` section (non-sticky, scrolled under topbar) to `.topbar-brand` (sticky) — top portion of logo was hidden behind the sticky topbar on scroll. Logo is now always fully visible at height 38px in topbar.
+- `.header` section simplified: logo removed, h1 title only. Title font-size raised to `1.5rem`, weight `700`, color `var(--text)`.
+- `.topbar-logo` CSS updated: `height:38px`, no `border-radius`, no `object-fit`.
+
+---
+
 ## [0.1.7] — 2026-03-16
 
 ### i18n

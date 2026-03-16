@@ -21,7 +21,7 @@
   "config_not_found": "ไม่พบการตั้งค่า — ใช้ค่าเริ่มต้น",
   "setup_welcome": "ยินดีต้อนรับสู่ตัวช่วยติดตั้ง wall-vault",
   "setup_done": "ตั้งค่าเสร็จแล้ว! รัน: wall-vault start",
-  "title": "แดชบอร์ดห้องนิรภัยคีย์พร็อกซี AI",
+  "title": "แดชบอร์ด wall-vault",
   "agents": "🤖 ตัวแทน",
   "keys": "🔑 คีย์ API",
   "services": "⚙️ บริการ",

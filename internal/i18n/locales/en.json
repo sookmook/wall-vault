@@ -21,7 +21,7 @@
   "config_not_found": "config not found — using defaults",
   "setup_welcome": "Welcome to wall-vault setup wizard",
   "setup_done": "Setup complete! Run: wall-vault start",
-  "title": "AI Proxy Key Vault Dashboard",
+  "title": "wall-vault Dashboard",
   "agents": "🤖 Agents",
   "keys": "🔑 API Keys",
   "services": "⚙️ Services",

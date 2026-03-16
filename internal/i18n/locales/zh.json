@@ -21,7 +21,7 @@
   "config_not_found": "未找到配置文件 — 使用默认值",
   "setup_welcome": "欢迎使用 wall-vault 安装向导",
   "setup_done": "设置完成！运行：wall-vault start",
-  "title": "AI代理密钥保险库仪表板",
+  "title": "wall-vault 控制台",
   "agents": "🤖 代理",
   "keys": "🔑 API密钥",
   "services": "⚙️ 服务",

@@ -21,7 +21,7 @@
   "config_not_found": "설정 파일 없음 — 기본값 사용",
   "setup_welcome": "wall-vault 설치 마법사에 오신 것을 환영합니다",
   "setup_done": "설정 완료! wall-vault start 로 시작하세요",
-  "title": "AI 프록시 키 금고 대시보드",
+  "title": "벽금고(wall-vault) 대시보드",
   "agents": "🤖 에이전트",
   "keys": "🔑 API 키",
   "services": "⚙️ 서비스",

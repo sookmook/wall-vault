@@ -21,7 +21,7 @@
   "config_not_found": "Konfigurasi tidak ditemukan — menggunakan default",
   "setup_welcome": "Selamat datang di panduan pengaturan wall-vault",
   "setup_done": "Pengaturan selesai! Jalankan: wall-vault start",
-  "title": "Dasbor Brankas Kunci Proksi AI",
+  "title": "Dasbor wall-vault",
   "agents": "🤖 Agen",
   "keys": "🔑 Kunci API",
   "services": "⚙️ Layanan",

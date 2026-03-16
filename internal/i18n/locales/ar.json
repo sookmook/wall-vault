@@ -21,7 +21,7 @@
   "config_not_found": "الإعدادات غير موجودة — استخدام الافتراضيات",
   "setup_welcome": "مرحبًا بك في معالج إعداد wall-vault",
   "setup_done": "اكتمل الإعداد! شغّل: wall-vault start",
-  "title": "لوحة تحكم خزينة مفاتيح وكيل الذكاء الاصطناعي",
+  "title": "لوحة تحكم wall-vault",
   "agents": "🤖 العملاء",
   "keys": "🔑 مفاتيح API",
   "services": "⚙️ الخدمات",

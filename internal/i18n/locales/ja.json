@@ -21,7 +21,7 @@
   "config_not_found": "設定ファイルなし — デフォルト使用",
   "setup_welcome": "wall-vault セットアップウィザードへようこそ",
   "setup_done": "セットアップ完了！実行: wall-vault start",
-  "title": "AIプロキシ キー金庫ダッシュボード",
+  "title": "wall-vault ダッシュボード",
   "agents": "🤖 エージェント",
   "keys": "🔑 APIキー",
   "services": "⚙️ サービス",

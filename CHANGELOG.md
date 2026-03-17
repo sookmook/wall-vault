@@ -10,12 +10,75 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ## [Unreleased]
 
+---
+
+## [0.1.8] — 2026-03-17
+
+### Fixed
+
+#### Midnight daily reset — stale counter feedback loop
+Previously, after the vault broadcasted `usage_reset` at 00:00:30, a running proxy would
+push its stale yesterday-values back to the vault via the next heartbeat. The vault stored
+them with today's `usage_date`, the next proxy startup loaded them as today's usage, and
+the loop repeated indefinitely.
+
+Four-part fix:
+
+1. **`proxy/keymgr.go` — `ResetDailyCounters()`**: new method that zeroes all
+   `todayUsage` / `todayAttempts` in the local key map immediately. Called on `usage_reset`
+   SSE before the follow-up `SyncFromVault()`.
+
+2. **`proxy/keymgr.go` — `lastSyncDate` rollover detection**: `KeyManager` now tracks
+   `lastSyncDate string` ("YYYY-MM-DD"). In `SyncFromVault()`, if the current date differs
+   from `lastSyncDate`, locally accumulated counters are discarded entirely so that
+   `max(vault=0, local=yesterday)` cannot keep yesterday's values alive.
+
+3. **`proxy/sseconn.go` — `onUsageReset` callback**: separated `usage_reset` event from
+   `key_added`/`key_deleted` in the SSE dispatcher. Proxy registers a dedicated callback
+   that calls `ResetDailyCounters()` then `SyncFromVault()`.
+
+4. **`vault/store.go` — `UsageDate` auto-reset**: `SetKeyUsage` and `SetKeyAttempts` now
+   check `k.UsageDate` against today. When a new day is detected, they reset
+   `TodayUsage`/`TodayAttempts` to zero before applying the new value, preventing
+   cross-day stale accumulation even without the proxy-side fix.
+
+#### `UsageDate` field propagation
+- `vault/models.go` `APIKey`: added `UsageDate string` (`"usage_date"` JSON) — records the
+  YYYY-MM-DD of the last `today_usage` write.
+- `vault/server.go` `safeKey` struct and `/api/keys` response: `UsageDate` now included so
+  proxy can compare against `time.Now().Format("2006-01-02")`.
+- `proxy/keymgr.go` `SyncFromVault()`: if `k.UsageDate != today`, vault's reported
+  `TodayUsage`/`TodayAttempts` are treated as zero (stale — proxy's local counters win).
+
+#### Streaming token count always reported as 1
+OpenRouter's final SSE chunk carries `usage` with total token count but has an empty
+`choices` array and/or empty `delta.content`. `streamOpenRouter` was checking `choices`
+length and `delta.content` with `continue` **before** reading `chunk.Usage`, so the
+token count was always discarded and the fallback value of `1` was used.
+
+Fix in `proxy/stream.go`: moved `chunk.Usage` extraction before all `continue` guards.
+Both `streamOpenRouter` and `streamGoogle` now apply a `min=1` fallback only when the
+API genuinely returns no usage metadata.
+
 ### Changed
-- Dashboard title changed to **"벽금고(wall-vault) 대시보드"** across all 17 locale files (`title` key). Previously "AI 프록시 키 금고 대시보드" (ko), "AI Proxy Key Vault Dashboard" (en), etc.
-- HTML `<title>` tag updated to "벽금고(wall-vault) 대시보드"
-- Logo image moved from `.header` section (non-sticky, scrolled under topbar) to `.topbar-brand` (sticky) — top portion of logo was hidden behind the sticky topbar on scroll. Logo is now always fully visible at height 38px in topbar.
-- `.header` section simplified: logo removed, h1 title only. Title font-size raised to `1.5rem`, weight `700`, color `var(--text)`.
-- `.topbar-logo` CSS updated: `height:38px`, no `border-radius`, no `object-fit`.
+
+#### Key selection: round-robin → drain-first
+`proxy/keymgr.go` `KeyManager.Get()` previously advanced `idx` by `+1` after every
+successful key acquisition (round-robin), distributing load evenly across all keys.
+
+Changed to drain-first: `idx` now stays on the current key after a successful call
+(`(start+i)%n` instead of `(start+i+1)%n`). The next key is only selected when
+`isAvailable()` returns false (cooldown or daily limit reached). This ensures a single
+key absorbs all traffic until it is exhausted before moving to the next.
+
+#### Dashboard UI
+- Dashboard title updated to **"벽금고(wall-vault) 대시보드"** across all 17 locale files
+  (`title` key). Previously service-specific titles per locale.
+- HTML `<title>` tag updated to match.
+- Logo moved from `.header` (non-sticky, scrolled under topbar) to `.topbar-brand`
+  (sticky, always visible). Height fixed at `38px`; `border-radius` and `object-fit`
+  removed.
+- `.header` section simplified to h1 title only (`font-size:1.5rem`, `font-weight:700`).
 
 ---
 
@@ -282,7 +345,9 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/sookmook/wall-vault/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/sookmook/wall-vault/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/sookmook/wall-vault/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/sookmook/wall-vault/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/sookmook/wall-vault/compare/v0.1.3...v0.1.5
 [0.1.3]: https://github.com/sookmook/wall-vault/compare/v0.1.2...v0.1.3

@@ -118,6 +118,9 @@ func (s *Server) streamGoogle(w http.ResponseWriter, f http.Flusher, model strin
 			}
 		}
 	}
+	if tokens == 0 {
+		tokens = 1 // minimum 1 per request when API does not report usage
+	}
 	s.keyMgr.RecordSuccess(key, tokens)
 }
 
@@ -172,6 +175,11 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
 			continue
 		}
+		// capture token usage from any chunk — the final usage chunk often has
+		// empty choices (choices:[]) or empty delta content, so check usage first
+		if chunk.Usage != nil && chunk.Usage.TotalTokens > 0 {
+			totalTokens = chunk.Usage.TotalTokens
+		}
 		if len(chunk.Choices) == 0 {
 			continue
 		}
@@ -192,15 +200,15 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 				},
 			},
 		}
-		if chunk.Usage != nil {
-			totalTokens = chunk.Usage.TotalTokens
-		}
 
 		chunkData, _ := json.Marshal(geminiChunk)
 		fmt.Fprintf(w, "data: %s\n\n", chunkData)
 		if f != nil {
 			f.Flush()
 		}
+	}
+	if totalTokens == 0 {
+		totalTokens = 1 // minimum 1 per request when API does not report usage
 	}
 	s.keyMgr.RecordSuccess(key, totalTokens)
 }

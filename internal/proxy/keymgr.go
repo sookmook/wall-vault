@@ -129,7 +129,7 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	for i := 0; i < n; i++ {
 		k := keys[(start+i)%n]
 		if k.isAvailable() {
-			km.idx[service] = (start + i + 1) % n
+			km.idx[service] = (start + i) % n // stay on this key until exhausted/cooldown
 			return k, nil
 		}
 	}

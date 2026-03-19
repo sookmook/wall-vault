@@ -95,7 +95,14 @@ func Fix(cfg *config.Config) error {
 	}
 
 	// 4th priority: start process directly
-	return fixDirect(cfg)
+	if err := fixDirect(cfg); err != nil {
+		return err
+	}
+
+	// after process recovery, also fix vault service proxy_enabled flags
+	time.Sleep(2 * time.Second) // give the vault a moment to start
+	_ = FixVaultServices(cfg)
+	return nil
 }
 
 // ─── systemd Recovery ─────────────────────────────────────────────────────────
@@ -343,6 +350,153 @@ echo 관리: nssm start/stop/restart %s
 	fmt.Println("[deploy] 관리자 권한으로 실행하세요:")
 	fmt.Printf("  %s\n", path)
 	return nil
+}
+
+// ─── Vault Service Auto-fix ───────────────────────────────────────────────────
+
+// FixVaultServices: for each enabled service that has keys but proxy_enabled=false,
+// automatically enables proxy_enabled via the vault admin API.
+// Only runs if cfg.Vault.AdminToken is set (vault machine).
+func FixVaultServices(cfg *config.Config) error {
+	if cfg.Vault.AdminToken == "" {
+		fmt.Println("[fix-services] 관리자 토큰 없음 — 건너뜀")
+		return nil
+	}
+	vaultBase := fmt.Sprintf("http://localhost:%d", cfg.Vault.Port)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	svcRaw, err := vaultGetJSON(client, vaultBase+"/admin/services", cfg.Vault.AdminToken)
+	if err != nil {
+		return fmt.Errorf("서비스 목록 조회 실패: %w", err)
+	}
+	keyRaw, err := vaultGetJSON(client, vaultBase+"/admin/keys", cfg.Vault.AdminToken)
+	if err != nil {
+		return fmt.Errorf("키 목록 조회 실패: %w", err)
+	}
+
+	// count keys per service
+	keyCounts := map[string]int{}
+	if keyArr, ok := keyRaw.([]interface{}); ok {
+		for _, k := range keyArr {
+			if km, ok := k.(map[string]interface{}); ok {
+				if svc, ok := km["service"].(string); ok {
+					keyCounts[svc]++
+				}
+			}
+		}
+	}
+
+	fixed := 0
+	svcArr, _ := svcRaw.([]interface{})
+	for _, s := range svcArr {
+		sm, ok := s.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, _ := sm["id"].(string)
+		enabled, _ := sm["enabled"].(bool)
+		proxyEnabled, _ := sm["proxy_enabled"].(bool)
+
+		if enabled && keyCounts[id] > 0 && !proxyEnabled {
+			body := strings.NewReader(`{"proxy_enabled":true}`)
+			req, _ := http.NewRequest(http.MethodPut, vaultBase+"/admin/services/"+id, body)
+			req.Header.Set("Authorization", "Bearer "+cfg.Vault.AdminToken)
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := client.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				fmt.Printf("[fix-services] ✗ %s proxy_enabled 활성화 실패\n", id)
+				if resp != nil {
+					resp.Body.Close()
+				}
+				continue
+			}
+			resp.Body.Close()
+			fmt.Printf("[fix-services] ✓ %s proxy_enabled 활성화\n", id)
+			fixed++
+		}
+	}
+	if fixed == 0 {
+		fmt.Println("[fix-services] 수정할 서비스 없음")
+	} else {
+		fmt.Printf("[fix-services] %d개 서비스 proxy_enabled 활성화 완료\n", fixed)
+	}
+	return nil
+}
+
+func vaultGetJSON(client *http.Client, url, token string) (interface{}, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var v interface{}
+	if err := json.Unmarshal(body, &v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+// ─── NanoClaw env check / fix ────────────────────────────────────────────────
+
+// CheckNanoclawEnv: verifies ~/nanoclaw/.env has ANTHROPIC_BASE_URL pointing to
+// the local wall-vault proxy.
+func CheckNanoclawEnv(proxyPort int) (ok bool, detail string) {
+	home, _ := os.UserHomeDir()
+	envFile := filepath.Join(home, "nanoclaw", ".env")
+	data, err := os.ReadFile(envFile)
+	if err != nil {
+		return false, "~/nanoclaw/.env 없음"
+	}
+	expected := fmt.Sprintf("ANTHROPIC_BASE_URL=http://localhost:%d", proxyPort)
+	content := string(data)
+	if strings.Contains(content, expected) {
+		return true, "ANTHROPIC_BASE_URL 정상"
+	}
+	if strings.Contains(content, "ANTHROPIC_BASE_URL=") {
+		return false, fmt.Sprintf("ANTHROPIC_BASE_URL가 localhost:%d 가 아님", proxyPort)
+	}
+	return false, "ANTHROPIC_BASE_URL 없음"
+}
+
+// FixNanoclawEnv: sets ANTHROPIC_BASE_URL=http://localhost:{proxyPort} in
+// ~/nanoclaw/.env, replacing an existing entry if present.
+// Also replaces any expired sk-ant-... CLAUDE_CODE_OAUTH_TOKEN with vaultToken.
+func FixNanoclawEnv(proxyPort int, vaultToken string) error {
+	home, _ := os.UserHomeDir()
+	envFile := filepath.Join(home, "nanoclaw", ".env")
+	data, err := os.ReadFile(envFile)
+	if err != nil {
+		return fmt.Errorf("~/nanoclaw/.env 없음: %w", err)
+	}
+
+	expected := fmt.Sprintf("ANTHROPIC_BASE_URL=http://localhost:%d", proxyPort)
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	foundBase, foundToken := false, false
+	for i, line := range lines {
+		if strings.HasPrefix(line, "ANTHROPIC_BASE_URL=") {
+			lines[i] = expected
+			foundBase = true
+		}
+		// replace expired sk-ant API keys with vault token
+		if strings.HasPrefix(line, "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-") && vaultToken != "" {
+			lines[i] = "CLAUDE_CODE_OAUTH_TOKEN=" + vaultToken
+			foundToken = true
+		}
+	}
+	if !foundBase {
+		lines = append(lines, expected)
+	}
+	if foundToken {
+		fmt.Println("[fix-nanoclaw] CLAUDE_CODE_OAUTH_TOKEN sk-ant key → vault token 교체")
+	}
+
+	return os.WriteFile(envFile, []byte(strings.Join(lines, "\n")+"\n"), 0600)
 }
 
 // ─── Status Report Output ─────────────────────────────────────────────────────

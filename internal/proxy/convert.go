@@ -149,9 +149,9 @@ func GeminiToOllama(model string, req *GeminiRequest) *OllamaRequest {
 func AnthropicToGemini(req *AnthropicRequest) *GeminiRequest {
 	gemini := &GeminiRequest{}
 
-	if req.System != "" {
+	if sys := req.SystemText(); sys != "" {
 		gemini.SystemInstruction = &GeminiContent{
-			Parts: []GeminiPart{{Text: req.System}},
+			Parts: []GeminiPart{{Text: sys}},
 		}
 	}
 

@@ -22,11 +22,13 @@ func Run(args []string) {
   wall-vault doctor [command]
 
 명령:
-  check     상태 확인만 (기본)
-  fix       자동 복구 실행
-  status    상세 보고서
-  all       확인 후 필요시 복구
-  deploy    systemd/launchd 서비스 파일 생성
+  check           상태 확인만 (기본)
+  fix             자동 복구 실행 (프로세스 + proxy_enabled 수정)
+  fix-services    vault 서비스 proxy_enabled 자동 활성화
+  fix-nanoclaw    ~/nanoclaw/.env ANTHROPIC_BASE_URL 수정
+  status          상세 보고서
+  all             확인 후 필요시 복구
+  deploy          systemd/launchd 서비스 파일 생성
 
 플래그:`)
 		fs.PrintDefaults()
@@ -56,12 +58,35 @@ func Run(args []string) {
 			}
 			idoctor.Printline(level, s.Name, fmt.Sprintf(":%d %s", s.Port, s.Detail))
 		}
+		// also check nanoclaw env if present
+		if ok, detail := idoctor.CheckNanoclawEnv(cfg.Proxy.Port); !ok {
+			idoctor.Printline("WARN", "nanoclaw-env", detail)
+		} else {
+			idoctor.Printline("OK", "nanoclaw-env", detail)
+		}
 
 	case "fix", "--fix":
 		if err := idoctor.Fix(cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "[fix] 오류: %v\n", err)
 			os.Exit(1)
 		}
+		// also fix vault services (no-op if no admin token)
+		if err := idoctor.FixVaultServices(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "[fix-services] 오류: %v\n", err)
+		}
+
+	case "fix-services":
+		if err := idoctor.FixVaultServices(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "[fix-services] 오류: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "fix-nanoclaw":
+		if err := idoctor.FixNanoclawEnv(cfg.Proxy.Port, cfg.Proxy.VaultToken); err != nil {
+			fmt.Fprintf(os.Stderr, "[fix-nanoclaw] 오류: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("[fix-nanoclaw] ✓ ANTHROPIC_BASE_URL=http://localhost:%d 설정 완료\n", cfg.Proxy.Port)
 
 	case "status":
 		idoctor.PrintStatus(cfg)
@@ -77,6 +102,13 @@ func Run(args []string) {
 			}
 			idoctor.Printline(level, s.Name, fmt.Sprintf(":%d %s", s.Port, s.Detail))
 		}
+		if ok, detail := idoctor.CheckNanoclawEnv(cfg.Proxy.Port); !ok {
+			idoctor.Printline("WARN", "nanoclaw-env", detail)
+			fmt.Println()
+			_ = idoctor.FixNanoclawEnv(cfg.Proxy.Port, cfg.Proxy.VaultToken)
+		} else {
+			idoctor.Printline("OK", "nanoclaw-env", detail)
+		}
 		if needFix {
 			fmt.Println()
 			if err := idoctor.Fix(cfg); err != nil {
@@ -84,6 +116,8 @@ func Run(args []string) {
 				os.Exit(1)
 			}
 		}
+		// always try to fix services (no-op when all is well)
+		_ = idoctor.FixVaultServices(cfg)
 
 	case "deploy":
 		deployCmd := "systemd"

@@ -130,6 +130,9 @@
   "cfg_vscode_hint": "الصق في ~/.continue/config.json",
   "cfg_gemini_cli_hint": "تشغيل في الطرفية أو إضافة إلى ~/.gemini/settings.json",
   "cfg_antigravity_hint": "تشغيل في الطرفية أو إضافة إلى إعدادات Antigravity",
+  "cfg_deploy": "🚀 نسخ سكريبت النشر",
+  "cfg_deploy_title": "نسخ سكريبت إعداد Linux systemd",
+  "cfg_deploy_hint": "الصق في طرفية الجهاز المستهدف",
   "st_gemini_hint": "اضبط GEMINI_API_BASE_URL=http://localhost:56244 وأعد التشغيل",
   "key_att": "محاولة"
 }

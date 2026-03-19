@@ -130,6 +130,9 @@
   "cfg_vscode_hint": "Bandika kwenye ~/.continue/config.json",
   "cfg_gemini_cli_hint": "Endesha kwenye terminal au ongeza kwenye ~/.gemini/settings.json",
   "cfg_antigravity_hint": "Endesha kwenye terminal au ongeza kwenye mipangilio ya Antigravity",
+  "cfg_deploy": "🚀 Nakili Skripti ya Usanidi",
+  "cfg_deploy_title": "Nakili skripti ya usanidi wa Linux systemd",
+  "cfg_deploy_hint": "Bandika kwenye terminal ya mashine lengwa",
   "st_gemini_hint": "Weka GEMINI_API_BASE_URL=http://localhost:56244 na uanzishe upya",
   "key_att": "jarib."
 }

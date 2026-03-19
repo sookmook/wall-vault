@@ -130,6 +130,9 @@
   "cfg_vscode_hint": "In ~/.continue/config.json einfügen",
   "cfg_gemini_cli_hint": "Im Terminal ausführen oder zu ~/.gemini/settings.json hinzufügen",
   "cfg_antigravity_hint": "Im Terminal ausführen oder zu Antigravity-Einstellungen hinzufügen",
+  "cfg_deploy": "🚀 Deploy-Skript kopieren",
+  "cfg_deploy_title": "Linux systemd-Einrichtungsskript kopieren",
+  "cfg_deploy_hint": "Im Terminal des Zielrechners einfügen",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 setzen und neu starten",
   "key_att": "Vers."
 }

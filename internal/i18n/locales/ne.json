@@ -130,6 +130,9 @@
   "cfg_vscode_hint": "~/.continue/config.json मा पेस्ट गर्नुहोस्",
   "cfg_gemini_cli_hint": "टर्मिनलमा चलाउनुहोस् वा ~/.gemini/settings.json मा थप्नुहोस्",
   "cfg_antigravity_hint": "टर्मिनलमा चलाउनुहोस् वा Antigravity सेटिङमा थप्नुहोस्",
+  "cfg_deploy": "🚀 डिप्लोय स्क्रिप्ट कपी गर्नुहोस्",
+  "cfg_deploy_title": "Linux systemd सेटअप स्क्रिप्ट कपी",
+  "cfg_deploy_hint": "लक्ष्य मेसिनको टर्मिनलमा टाँस्नुहोस्",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 सेट गरेर पुनः सुरु गर्नुहोस्",
   "key_att": "प्रयास"
 }

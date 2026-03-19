@@ -130,6 +130,9 @@
   "cfg_vscode_hint": "วางที่ ~/.continue/config.json",
   "cfg_gemini_cli_hint": "รันในเทอร์มินัลหรือเพิ่มใน ~/.gemini/settings.json",
   "cfg_antigravity_hint": "รันในเทอร์มินัลหรือเพิ่มในการตั้งค่า Antigravity",
+  "cfg_deploy": "🚀 คัดลอกสคริปต์ติดตั้ง",
+  "cfg_deploy_title": "คัดลอกสคริปต์ติดตั้ง Linux systemd",
+  "cfg_deploy_hint": "วางในเทอร์มินัลของเครื่องเป้าหมาย",
   "st_gemini_hint": "ตั้งค่า GEMINI_API_BASE_URL=http://localhost:56244 และรีสตาร์ท",
   "key_att": "พยายาม"
 }

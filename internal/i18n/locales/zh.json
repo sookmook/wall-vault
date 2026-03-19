@@ -130,6 +130,9 @@
   "cfg_vscode_hint": "粘贴到 ~/.continue/config.json",
   "cfg_gemini_cli_hint": "在终端运行或添加到 ~/.gemini/settings.json",
   "cfg_antigravity_hint": "在终端运行或添加到 Antigravity 设置",
+  "cfg_deploy": "🚀 复制部署脚本",
+  "cfg_deploy_title": "复制 Linux systemd 安装脚本",
+  "cfg_deploy_hint": "粘贴到目标机器的终端",
   "st_gemini_hint": "设置 GEMINI_API_BASE_URL=http://localhost:56244 后重启",
   "key_att": "次试"
 }

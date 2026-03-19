@@ -282,6 +282,7 @@ a{color:var(--accent);text-decoration:none}
 .btn-cfg-openclaw:hover{color:#c0392b;border-color:#c0392b}
 .btn-cfg-nanoclaw:hover{color:#16a085;border-color:#16a085}
 .btn-cfg-claude:hover{color:#e07020;border-color:#e07020}
+.btn-cfg-deploy:hover{color:#8e44ad;border-color:#8e44ad}
 /* ── 모델 저장 버튼 ── */
 .btn-save{background:var(--accent);color:#fff;border:none;padding:.26rem .65rem;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:inherit;font-weight:500;transition:all .15s;white-space:nowrap}
 .btn-save:hover{background:var(--accent-hover);transform:translateY(-1px)}
@@ -1182,6 +1183,54 @@ function copyAgentConfig(clientId, agentType) {
   }).catch(e=>alert(T('err')+e));
 }
 
+// ── 배포 명령어 복사 (Linux systemd) ──
+function copyDeployScript(clientId) {
+  const token = getAdminToken(); if(!token) return;
+  fetch('/admin/clients/'+clientId, {headers:{'Authorization':'Bearer '+token}})
+  .then(r=>r.json()).then(c=>{
+    if(c.error){alert(T('err')+c.error);return;}
+    const vaultHost = location.hostname;
+    const vaultUrl  = location.protocol+'//'+vaultHost+':56243';
+    const tok  = c.token||'YOUR_TOKEN';
+    const id   = c.id||clientId;
+    const name = c.name||id;
+    const script =
+      '#!/bin/bash\n'
+      +'# wall-vault proxy setup: '+name+' → '+vaultHost+'\n\n'
+      +'# 1. Install wall-vault (skip if already installed)\n'
+      +'if ! command -v wall-vault &>/dev/null && [ ! -f "$HOME/.local/bin/wall-vault" ]; then\n'
+      +'  curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh\n'
+      +'fi\n'
+      +'grep -q \'.local/bin\' ~/.bashrc 2>/dev/null || echo \'export PATH="$HOME/.local/bin:$PATH"\' >> ~/.bashrc\n'
+      +'export PATH="$HOME/.local/bin:$PATH"\n\n'
+      +'# 2. Register systemd user service\n'
+      +'mkdir -p ~/.config/systemd/user\n'
+      +'cat > ~/.config/systemd/user/wall-vault-proxy.service << \'SVCEOF\'\n'
+      +'[Unit]\n'
+      +'Description=wall-vault proxy ('+name+')\n'
+      +'After=network.target\n\n'
+      +'[Service]\n'
+      +'Environment="VAULT_URL='+vaultUrl+'"\n'
+      +'Environment="VAULT_CLIENT_ID='+id+'"\n'
+      +'Environment="VAULT_TOKEN='+tok+'"\n'
+      +'ExecStart=%h/.local/bin/wall-vault proxy\n'
+      +'Restart=always\n'
+      +'RestartSec=5\n\n'
+      +'[Install]\n'
+      +'WantedBy=default.target\n'
+      +'SVCEOF\n\n'
+      +'# 3. Enable and start\n'
+      +'systemctl --user daemon-reload\n'
+      +'systemctl --user enable --now wall-vault-proxy\n'
+      +'echo "✓ wall-vault proxy connected to '+vaultHost+'"\n';
+    navigator.clipboard.writeText(script).then(()=>{
+      alert(T('cfg_deploy')+'\n'+T('cfg_ok')+'\n'+T('cfg_deploy_hint'));
+    }).catch(()=>{
+      prompt(T('cfg_manual'), script);
+    });
+  }).catch(e=>alert(T('err')+e));
+}
+
 // ── 에이전트 추가 모달 ──
 function openAddClient() {
   _clearClientForm('ac');
@@ -1769,6 +1818,8 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		// 설정 복사 버튼 (btn-action-wide 스타일 적용)
 		cfgWide := strings.ReplaceAll(cfgButton, `class="btn-cfg`, `class="btn-action-wide btn-cfg`)
 		item.WriteString(cfgWide)
+		// 배포 명령어 복사 버튼
+		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide btn-cfg btn-cfg-deploy" onclick="copyDeployScript('%s')" data-i18n-title="cfg_deploy_title" title="Linux 배포 명령어 복사" data-i18n="cfg_deploy">🚀 배포 명령어</button>`, c.ID))
 		item.WriteString(`</div>`) // ac-actions
 		// 모델 폼 (기본 숨김, 토글로 표시)
 		item.WriteString(fmt.Sprintf(`<div class="model-form" data-client="%s">`, c.ID))

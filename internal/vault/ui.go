@@ -260,6 +260,7 @@ a{color:var(--accent);text-decoration:none}
 /* ── 에이전트 종류 뱃지 (타입별 색상) ── */
 .atbadge{display:inline-flex;align-items:center;font-size:.6rem;padding:.05rem .32rem;border-radius:4px;color:#fff;font-weight:600;opacity:.85;margin-left:.3rem;vertical-align:middle}
 .atb-openclaw{background:#c0392b}
+.atb-nanoclaw{background:#16a085}
 .atb-claude{background:#e07020}
 .atb-cursor{background:#2471b0}
 .atb-vscode{background:#2471b0}
@@ -279,6 +280,7 @@ a{color:var(--accent);text-decoration:none}
 .btn-cfg{display:flex;align-items:center;justify-content:center;gap:.28rem;width:100%;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:.28rem .55rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-family:inherit;transition:all .15s;white-space:nowrap}
 .btn-cfg:hover{background:var(--bg);color:var(--accent);border-color:var(--accent)}
 .btn-cfg-openclaw:hover{color:#c0392b;border-color:#c0392b}
+.btn-cfg-nanoclaw:hover{color:#16a085;border-color:#16a085}
 .btn-cfg-claude:hover{color:#e07020;border-color:#e07020}
 /* ── 모델 저장 버튼 ── */
 .btn-save{background:var(--accent);color:#fff;border:none;padding:.26rem .65rem;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:inherit;font-weight:500;transition:all .15s;white-space:nowrap}
@@ -1281,6 +1283,7 @@ function onAgentTypeChange(type, wdId) {
   if (!el) return;
   const defaults = {
     'openclaw':    '~/.openclaw',
+    'nanoclaw':    '~/.openclaw',
     'claude-code': '~/.claude',
     'cursor':      '~/projects',
     'vscode':      '~/projects',
@@ -1557,6 +1560,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 
 	typeIcons := map[string]string{
 		"openclaw":    "🦞",
+		"nanoclaw":    "🦀",
 		"claude-code": "🟠",
 		"cursor":      "⌨",
 		"vscode":      "💻",
@@ -1566,6 +1570,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 	}
 	typeCls := map[string]string{
 		"openclaw":    "atb-openclaw",
+		"nanoclaw":    "atb-nanoclaw",
 		"claude-code": "atb-claude",
 		"cursor":      "atb-cursor",
 		"vscode":      "atb-vscode",
@@ -1688,6 +1693,10 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		case "openclaw":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg btn-cfg-openclaw" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_openclaw_title" title="~/.openclaw/openclaw.json 설정 복사" data-i18n="cfg_openclaw">🦞 OpenClaw 설정 복사</button>`,
+				c.ID)
+		case "nanoclaw":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg btn-cfg-nanoclaw" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_nanoclaw_title" title="~/.openclaw/openclaw.json 설정 복사" data-i18n="cfg_nanoclaw">🦀 NanoClaw 설정 복사</button>`,
 				c.ID)
 		case "claude-code":
 			cfgButton = fmt.Sprintf(
@@ -1993,6 +2002,7 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
   <select id="%s-agent-type" onchange="onAgentTypeChange(this.value,'%s-workdir')">
     <option value="" data-i18n="opt_select">— 선택 —</option>
     <option value="openclaw">openclaw</option>
+    <option value="nanoclaw">nanoclaw</option>
     <option value="claude-code">claude-code</option>
     <option value="gemini-cli">gemini-cli</option>
     <option value="antigravity">antigravity</option>

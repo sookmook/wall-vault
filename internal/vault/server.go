@@ -3,6 +3,7 @@ package vault
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -647,12 +648,36 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPut:
-		var inp ServiceConfig
-		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
 			return
 		}
+		var fields map[string]interface{}
+		if err := json.Unmarshal(body, &fields); err != nil {
+			jsonError(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		existing := s.store.GetService(id)
+		if existing == nil {
+			jsonError(w, "service not found", http.StatusNotFound)
+			return
+		}
+		// partial update: copy existing, then apply only provided fields
+		inp := *existing
 		inp.ID = id
+		if v, ok := fields["name"].(string); ok && v != "" {
+			inp.Name = v
+		}
+		if v, ok := fields["local_url"].(string); ok {
+			inp.LocalURL = v
+		}
+		if v, ok := fields["enabled"].(bool); ok {
+			inp.Enabled = v
+		}
+		if v, ok := fields["proxy_enabled"].(bool); ok {
+			inp.ProxyEnabled = v
+		}
 		if err := s.store.UpsertService(&inp); err != nil {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return

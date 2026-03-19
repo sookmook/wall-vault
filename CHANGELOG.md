@@ -12,7 +12,18 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [0.1.8] — 2026-03-17
+## [0.1.8] — 2026-03-20
+
+### Added
+- `nanoclaw` agent type in dashboard agent modal — lightweight OpenClaw-compatible agent
+  - 🦀 teal badge (`.atb-nanoclaw`, `#16a085`)
+  - Work directory auto-fills as `~/nanoclaw` on type selection
+  - **🦀 NanoClaw 설정 복사** config copy button — reuses OpenClaw `~/.openclaw/openclaw.json` format
+  - `cfg_nanoclaw` / `cfg_nanoclaw_title` i18n keys added to all 17 locale files
+
+---
+
+## [0.1.8-pre] — 2026-03-17
 
 ### Fixed
 

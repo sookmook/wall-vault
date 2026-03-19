@@ -101,6 +101,8 @@
   "key_in_min": " minti",
   "cfg_openclaw": "🦞 Kwafin Saitunan OpenClaw",
   "cfg_openclaw_title": "Kwafin saitunan ~/.openclaw/openclaw.json",
+  "cfg_nanoclaw": "🦀 Kwafi Saitunan NanoClaw",
+  "cfg_nanoclaw_title": "Kwafi saitunan ~/.openclaw/openclaw.json",
   "cfg_claude": "🟠 Kwafin Saitunan Claude Code",
   "cfg_claude_title": "Kwafin saitunan ~/.claude/settings.json",
   "cfg_cursor": "⌨ Kwafin Saitunan Cursor",

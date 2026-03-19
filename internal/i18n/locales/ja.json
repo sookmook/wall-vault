@@ -101,6 +101,8 @@
   "key_in_min": "分後",
   "cfg_openclaw": "🦞 OpenClaw設定をコピー",
   "cfg_openclaw_title": "~/.openclaw/openclaw.jsonの設定をコピー",
+  "cfg_nanoclaw": "🦀 NanoClaw 設定をコピー",
+  "cfg_nanoclaw_title": "~/.openclaw/openclaw.json 設定をコピー",
   "cfg_claude": "🟠 Claude Code設定をコピー",
   "cfg_claude_title": "~/.claude/settings.jsonの設定をコピー",
   "cfg_cursor": "⌨ Cursor設定をコピー",

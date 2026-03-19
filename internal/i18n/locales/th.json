@@ -101,6 +101,8 @@
   "key_in_min": " นาที",
   "cfg_openclaw": "🦞 คัดลอก Config OpenClaw",
   "cfg_openclaw_title": "คัดลอก Config ~/.openclaw/openclaw.json",
+  "cfg_nanoclaw": "🦀 คัดลอกการตั้งค่า NanoClaw",
+  "cfg_nanoclaw_title": "คัดลอกการตั้งค่า ~/.openclaw/openclaw.json",
   "cfg_claude": "🟠 คัดลอก Config Claude Code",
   "cfg_claude_title": "คัดลอก Config ~/.claude/settings.json",
   "cfg_cursor": "⌨ คัดลอก Config Cursor",

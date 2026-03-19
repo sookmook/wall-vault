@@ -101,6 +101,8 @@
   "key_in_min": " मिनेटमा",
   "cfg_openclaw": "🦞 OpenClaw कन्फिग कपी",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json कन्फिग कपी",
+  "cfg_nanoclaw": "🦀 NanoClaw कन्फिग प्रतिलिपि",
+  "cfg_nanoclaw_title": "~/.openclaw/openclaw.json कन्फिग प्रतिलिपि",
   "cfg_claude": "🟠 Claude Code कन्फिग कपी",
   "cfg_claude_title": "~/.claude/settings.json कन्फिग कपी",
   "cfg_cursor": "⌨ Cursor कन्फिग कपी",

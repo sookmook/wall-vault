@@ -101,6 +101,8 @@
   "key_in_min": " د",
   "cfg_openclaw": "🦞 نسخ إعدادات OpenClaw",
   "cfg_openclaw_title": "نسخ إعدادات ~/.openclaw/openclaw.json",
+  "cfg_nanoclaw": "🦀 نسخ إعدادات NanoClaw",
+  "cfg_nanoclaw_title": "نسخ إعدادات ~/.openclaw/openclaw.json",
   "cfg_claude": "🟠 نسخ إعدادات Claude Code",
   "cfg_claude_title": "نسخ إعدادات ~/.claude/settings.json",
   "cfg_cursor": "⌨ نسخ إعدادات Cursor",

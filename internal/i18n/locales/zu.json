@@ -101,6 +101,8 @@
   "key_in_min": " min",
   "cfg_openclaw": "🦞 Kopisha i-Config ye-OpenClaw",
   "cfg_openclaw_title": "Kopisha i-config ye-~/.openclaw/openclaw.json",
+  "cfg_nanoclaw": "🦀 Kopisha Isethingi ye-NanoClaw",
+  "cfg_nanoclaw_title": "Kopisha isethingi ye-~/.openclaw/openclaw.json",
   "cfg_claude": "🟠 Kopisha i-Config ye-Claude Code",
   "cfg_claude_title": "Kopisha i-config ye-~/.claude/settings.json",
   "cfg_cursor": "⌨ Kopisha i-Config ye-Cursor",

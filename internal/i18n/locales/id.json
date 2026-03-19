@@ -101,6 +101,8 @@
   "key_in_min": " mnt",
   "cfg_openclaw": "🦞 Salin Konfigurasi OpenClaw",
   "cfg_openclaw_title": "Salin konfigurasi ~/.openclaw/openclaw.json",
+  "cfg_nanoclaw": "🦀 Salin Konfigurasi NanoClaw",
+  "cfg_nanoclaw_title": "Salin konfigurasi ~/.openclaw/openclaw.json",
   "cfg_claude": "🟠 Salin Konfigurasi Claude Code",
   "cfg_claude_title": "Salin konfigurasi ~/.claude/settings.json",
   "cfg_cursor": "⌨ Salin Konfigurasi Cursor",

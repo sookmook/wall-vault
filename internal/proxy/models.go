@@ -193,13 +193,41 @@ type OllamaResponse struct {
 type AnthropicRequest struct {
 	Model       string             `json:"model"`
 	Messages    []AnthropicMessage `json:"messages"`
-	System      string             `json:"system,omitempty"`
+	System      json.RawMessage    `json:"system,omitempty"` // string or [{type,text}] array (Claude Code ≥2026.3)
 	MaxTokens   int                `json:"max_tokens,omitempty"`
 	Temperature *float64           `json:"temperature,omitempty"`
 	Stream      bool               `json:"stream,omitempty"`
 	Tools       []interface{}      `json:"tools,omitempty"`
 	ServiceTier string             `json:"service_tier,omitempty"` // OpenClaw v2026.3.12 fast mode (strip before forwarding)
 	Thinking    interface{}        `json:"thinking,omitempty"`     // Claude extended thinking (ignore)
+}
+
+// SystemText extracts the system prompt text from either a JSON string or a
+// [{type:"text", text:"..."}] content-block array.
+func (r *AnthropicRequest) SystemText() string {
+	if len(r.System) == 0 {
+		return ""
+	}
+	// try plain string first
+	var s string
+	if json.Unmarshal(r.System, &s) == nil {
+		return s
+	}
+	// try content-block array
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(r.System, &parts) == nil {
+		var sb strings.Builder
+		for _, p := range parts {
+			if p.Type == "text" {
+				sb.WriteString(p.Text)
+			}
+		}
+		return sb.String()
+	}
+	return ""
 }
 
 type AnthropicMessage struct {

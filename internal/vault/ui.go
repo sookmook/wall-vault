@@ -1183,20 +1183,25 @@ function copyAgentConfig(clientId, agentType) {
   }).catch(e=>alert(T('err')+e));
 }
 
-// ── 배포 명령어 복사 (Linux systemd) ──
+// ── 배포 명령어 복사 (agent-type aware, Docker hint) ──
 function copyDeployScript(clientId) {
   const token = getAdminToken(); if(!token) return;
   fetch('/admin/clients/'+clientId, {headers:{'Authorization':'Bearer '+token}})
   .then(r=>r.json()).then(c=>{
     if(c.error){alert(T('err')+c.error);return;}
-    const vaultHost = location.hostname;
-    const vaultUrl  = location.protocol+'//'+vaultHost+':56243';
-    const tok  = c.token||'YOUR_TOKEN';
-    const id   = c.id||clientId;
-    const name = c.name||id;
-    const script =
+    const vaultHost   = location.hostname;
+    const vaultUrl    = location.protocol+'//'+vaultHost+':56243';
+    const proxyUrl    = location.protocol+'//'+vaultHost+':56244';
+    const tok         = c.token||'YOUR_TOKEN';
+    const id          = c.id||clientId;
+    const name        = c.name||id;
+    const agentType   = c.agent_type||'';
+
+    // ── step 1–3: install + systemd service (common to all agent types) ──
+    let script =
       '#!/bin/bash\n'
-      +'# wall-vault proxy setup: '+name+' → '+vaultHost+'\n\n'
+      +'# wall-vault proxy setup: '+name+' → '+vaultHost+'\n'
+      +'# agent_type: '+(agentType||'generic')+'\n\n'
       +'# 1. Install wall-vault (skip if already installed)\n'
       +'if ! command -v wall-vault &>/dev/null && [ ! -f "$HOME/.local/bin/wall-vault" ]; then\n'
       +'  curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh\n'
@@ -1219,10 +1224,62 @@ function copyDeployScript(clientId) {
       +'[Install]\n'
       +'WantedBy=default.target\n'
       +'SVCEOF\n\n'
-      +'# 3. Enable and start\n'
+      +'# 3. Enable and start wall-vault proxy\n'
       +'systemctl --user daemon-reload\n'
-      +'systemctl --user enable --now wall-vault-proxy\n'
-      +'echo "✓ wall-vault proxy connected to '+vaultHost+'"\n';
+      +'systemctl --user enable --now wall-vault-proxy\n';
+
+    if(agentType === 'nanoclaw') {
+      // ── step 4: configure nanoclaw to route through wall-vault proxy ──
+      script +=
+        '\n# 4. Point nanoclaw at the wall-vault proxy\n'
+        +'if [ -d "$HOME/nanoclaw" ]; then\n'
+        +'  ENV_FILE="$HOME/nanoclaw/.env"\n'
+        +'  touch "$ENV_FILE"\n'
+        +'  # update or append ANTHROPIC_BASE_URL\n'
+        +'  if grep -q "ANTHROPIC_BASE_URL=" "$ENV_FILE"; then\n'
+        +'    sed -i "s|ANTHROPIC_BASE_URL=.*|ANTHROPIC_BASE_URL=http://localhost:56244|" "$ENV_FILE"\n'
+        +'  else\n'
+        +'    echo "ANTHROPIC_BASE_URL=http://localhost:56244" >> "$ENV_FILE"\n'
+        +'  fi\n'
+        +'  # replace expired sk-ant API key with vault token\n'
+        +'  if grep -q "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-" "$ENV_FILE"; then\n'
+        +'    sed -i "s|CLAUDE_CODE_OAUTH_TOKEN=sk-ant-.*|CLAUDE_CODE_OAUTH_TOKEN='+tok+'|" "$ENV_FILE"\n'
+        +'    echo "  ↳ replaced expired sk-ant key with vault token"\n'
+        +'  fi\n'
+        +'  systemctl --user restart nanoclaw 2>/dev/null || true\n'
+        +'  echo "  ✓ ~/nanoclaw/.env updated"\n'
+        +'else\n'
+        +'  echo "  nanoclaw not found at ~/nanoclaw — skipping .env setup"\n'
+        +'fi\n'
+        +'\n# 5. Docker containers (run inside Docker that need Claude API)\n'
+        +'#    Use host.docker.internal instead of localhost:\n'
+        +'#      --add-host=host.docker.internal:host-gateway  (add to docker run)\n'
+        +'#      ANTHROPIC_BASE_URL=http://host.docker.internal:56244\n'
+        +'#      ANTHROPIC_API_KEY='+tok+'\n';
+    } else if(agentType === 'openclaw') {
+      // ── step 4: openclaw Docker hint ──
+      script +=
+        '\n# 4. OpenClaw config: set in ~/.openclaw/openclaw.json or environment\n'
+        +'#    ANTHROPIC_BASE_URL=http://localhost:56244\n'
+        +'#    CLAUDE_CODE_OAUTH_TOKEN='+tok+'\n'
+        +'\n# 5. Docker containers started by openclaw:\n'
+        +'#    ANTHROPIC_BASE_URL=http://host.docker.internal:56244\n'
+        +'#    ANTHROPIC_API_KEY='+tok+'\n'
+        +'#    docker run --add-host=host.docker.internal:host-gateway ...\n';
+    } else {
+      // ── generic: OpenAI-compat + Docker hints ──
+      script +=
+        '\n# 4. Use the proxy (OpenAI-compatible endpoint):\n'
+        +'#    OPENAI_BASE_URL=http://localhost:56244/openai/v1\n'
+        +'#    OPENAI_API_KEY='+tok+'\n'
+        +'#    Anthropic endpoint: http://localhost:56244/v1/messages\n'
+        +'\n# 5. Docker containers:\n'
+        +'#    replace "localhost" with "host.docker.internal"\n'
+        +'#    docker run --add-host=host.docker.internal:host-gateway ...\n';
+    }
+
+    script += '\necho "✓ wall-vault proxy connected to '+vaultHost+'"\n';
+
     navigator.clipboard.writeText(script).then(()=>{
       alert(T('cfg_deploy')+'\n'+T('cfg_ok')+'\n'+T('cfg_deploy_hint'));
     }).catch(()=>{

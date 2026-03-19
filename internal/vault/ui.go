@@ -1283,7 +1283,7 @@ function onAgentTypeChange(type, wdId) {
   if (!el) return;
   const defaults = {
     'openclaw':    '~/.openclaw',
-    'nanoclaw':    '~/.openclaw',
+    'nanoclaw':    '~/nanoclaw',
     'claude-code': '~/.claude',
     'cursor':      '~/projects',
     'vscode':      '~/projects',

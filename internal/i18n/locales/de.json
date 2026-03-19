@@ -101,6 +101,8 @@
   "key_in_min": " Min.",
   "cfg_openclaw": "🦞 OpenClaw-Konfig kopieren",
   "cfg_openclaw_title": "Konfig für ~/.openclaw/openclaw.json kopieren",
+  "cfg_nanoclaw": "🦀 NanoClaw-Config kopieren",
+  "cfg_nanoclaw_title": "~/.openclaw/openclaw.json-Config kopieren",
   "cfg_claude": "🟠 Claude Code-Konfig kopieren",
   "cfg_claude_title": "Konfig für ~/.claude/settings.json kopieren",
   "cfg_cursor": "⌨ Cursor-Konfig kopieren",

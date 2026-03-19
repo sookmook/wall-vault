@@ -101,6 +101,8 @@
   "key_in_min": " мин",
   "cfg_openclaw": "🦞 OpenClaw тохиргоо хуулах",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json тохиргоо хуулах",
+  "cfg_nanoclaw": "🦀 NanoClaw тохиргоо хуулах",
+  "cfg_nanoclaw_title": "~/.openclaw/openclaw.json тохиргоо хуулах",
   "cfg_claude": "🟠 Claude Code тохиргоо хуулах",
   "cfg_claude_title": "~/.claude/settings.json тохиргоо хуулах",
   "cfg_cursor": "⌨ Cursor тохиргоо хуулах",

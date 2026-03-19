@@ -101,6 +101,8 @@
   "key_in_min": " 分钟后",
   "cfg_openclaw": "🦞 复制 OpenClaw 配置",
   "cfg_openclaw_title": "复制 ~/.openclaw/openclaw.json 配置",
+  "cfg_nanoclaw": "🦀 复制 NanoClaw 配置",
+  "cfg_nanoclaw_title": "复制 ~/.openclaw/openclaw.json 配置",
   "cfg_claude": "🟠 复制 Claude Code 配置",
   "cfg_claude_title": "复制 ~/.claude/settings.json 配置",
   "cfg_cursor": "⌨ 复制 Cursor 配置",

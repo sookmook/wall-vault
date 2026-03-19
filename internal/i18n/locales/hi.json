@@ -101,6 +101,8 @@
   "key_in_min": " मिनट में",
   "cfg_openclaw": "🦞 OpenClaw कॉन्फ़िग कॉपी करें",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json कॉन्फ़िग कॉपी करें",
+  "cfg_nanoclaw": "🦀 NanoClaw कॉन्फिग कॉपी करें",
+  "cfg_nanoclaw_title": "~/.openclaw/openclaw.json कॉन्फिग कॉपी करें",
   "cfg_claude": "🟠 Claude Code कॉन्फ़िग कॉपी करें",
   "cfg_claude_title": "~/.claude/settings.json कॉन्फ़िग कॉपी करें",
   "cfg_cursor": "⌨ Cursor कॉन्फ़िग कॉपी करें",

@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-func TestKeyManager_RoundRobin(t *testing.T) {
+func TestKeyManager_DrainFirst(t *testing.T) {
 	km := NewKeyManager("", "", "test")
 	km.AddKey("google", "id1", "key-A", 0)
 	km.AddKey("google", "id2", "key-B", 0)
 	km.AddKey("google", "id3", "key-C", 0)
 
-	// 3 consecutive gets → A → B → C → A cycle
+	// Drain-first: consecutive Gets must return the same key until it is exhausted.
 	got := make([]string, 4)
 	for i := range got {
 		k, err := km.Get("google")
@@ -20,11 +20,21 @@ func TestKeyManager_RoundRobin(t *testing.T) {
 		}
 		got[i] = k.plaintext
 	}
-	if got[0] == got[1] || got[1] == got[2] {
-		t.Fatalf("라운드 로빈 미작동: %v", got)
+	for i := 1; i < len(got); i++ {
+		if got[i] != got[0] {
+			t.Fatalf("drain-first 미작동: 0번(%s) != %d번(%s)", got[0], i, got[i])
+		}
 	}
-	if got[0] != got[3] {
-		t.Fatalf("순환 미작동: 첫 번째(%s) != 네 번째(%s)", got[0], got[3])
+
+	// After cooldown, should advance to the next available key.
+	k, _ := km.Get("google")
+	km.RecordError(k, 429)
+	next, err := km.Get("google")
+	if err != nil {
+		t.Fatalf("쿨다운 후 Get 실패: %v", err)
+	}
+	if next.plaintext == k.plaintext {
+		t.Fatalf("쿨다운 키 건너뛰기 실패: 여전히 %s 반환", k.plaintext)
 	}
 }
 

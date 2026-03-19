@@ -547,6 +547,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	svc := s.service
 	mdl := s.model
+	allowedServices := s.allowedServices
 	s.mu.RUnlock()
 	if mdl == "" {
 		mdl = req.Model
@@ -554,6 +555,27 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	// Parse provider/model form (e.g. "anthropic/claude-opus-4-6")
 	svc, mdl = parseProviderModel(svc, mdl)
 
+	// Native Anthropic passthrough: when Anthropic is available, forward the
+	// original request body directly — no GeminiRequest round-trip conversion.
+	// This preserves tool calls, tool_results, and multi-block content.
+	anthropicAllowed := len(allowedServices) == 0
+	for _, sv := range allowedServices {
+		if sv == "anthropic" {
+			anthropicAllowed = true
+			break
+		}
+	}
+	if anthropicAllowed {
+		if body, _, err := s.callAnthropicPassthrough(&req, mdl); err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(body) //nolint:errcheck
+			return
+		} else {
+			log.Printf("[anthropic] passthrough failed → fallback to dispatch: %v", err)
+		}
+	}
+
+	// Fallback: convert to GeminiRequest and dispatch via Google/OpenRouter
 	geminiReq := AnthropicToGemini(&req)
 	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
 	if err != nil {

@@ -20,6 +20,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   - Work directory auto-fills as `~/nanoclaw` on type selection
   - **🦀 NanoClaw 설정 복사** config copy button — reuses OpenClaw `~/.openclaw/openclaw.json` format
   - `cfg_nanoclaw` / `cfg_nanoclaw_title` i18n keys added to all 17 locale files
+- `install.sh`: one-liner installer — auto-detects OS/arch, downloads correct binary, installs to `~/.local/bin`
 
 ---
 

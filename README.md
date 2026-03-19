@@ -228,22 +228,31 @@ Same for VS Code + Continue extension:
 
 ## Quick Start
 
-### Linux / macOS
+### Linux / macOS — one-liner install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
+```
+
+Auto-detects OS and architecture, downloads the correct binary, installs to `~/.local/bin`.
+
+```bash
+wall-vault setup   # interactive setup wizard
+wall-vault start   # launch proxy + vault
+```
+
+> If `wall-vault` is not found after install, run: `export PATH="$HOME/.local/bin:$PATH"`
+
+### Manual download
 
 ```bash
 # Linux (amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o wall-vault && chmod +x wall-vault
+curl -fsSL https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault && ./wall-vault setup
 
 # macOS Apple Silicon
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o wall-vault && chmod +x wall-vault
-
-# Interactive setup wizard
-./wall-vault setup
-
-# Launch (proxy + vault)
-./wall-vault start
+curl -fsSL https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault && ./wall-vault setup
 ```
 
 ### Windows
@@ -949,13 +958,17 @@ Go 바이너리 단 하나. Claude Code·Cursor·VS Code도 연결 가능하지�
 ### 빠른 시작
 
 ```bash
-# Linux (amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o wall-vault && chmod +x wall-vault
-
-./wall-vault setup   # 대화형 설치 마법사
-./wall-vault start   # 프록시 + 키 금고 실행
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
+
+OS와 아키텍처를 자동 감지하여 올바른 바이너리를 다운로드하고 `~/.local/bin`에 설치합니다.
+
+```bash
+wall-vault setup   # 대화형 설치 마법사
+wall-vault start   # 프록시 + 키 금고 실행
+```
+
+> 설치 후 `wall-vault` 명령을 찾지 못하면: `export PATH="$HOME/.local/bin:$PATH"`
 
 브라우저에서 `http://localhost:56243` 을 열면 키 금고 대시보드가 나타납니다.
 

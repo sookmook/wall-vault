@@ -808,8 +808,8 @@ function connectSSE() {
         if (cd.client_id) applyAgentConfigChange(cd.client_id, cd.service, cd.model);
         else refreshModelDropdowns();
       } else if (d.type === 'service_changed') {
-        // 서비스 추가/삭제 → 체크 후 에이전트 메뉴 전체 갱신
-        autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
+        // 서비스 변경 → 에이전트 메뉴 갱신만 (autoCheck 제외: 사용자 수동 토글 덮어쓰기 방지)
+        refreshServiceSelects().then(() => refreshModelDropdowns());
       } else if (d.type === 'key_added' || d.type === 'key_deleted') {
         // 키 변경 → 서비스 활성 상태 재판정 후 에이전트 메뉴 갱신
         autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
@@ -1031,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', function() {
     Object.keys(_SERVICES).forEach(id => { if(_SERVICES[id].local) checkLocalService(id); });
   }
   pingLocalServices();
-  setInterval(() => { pingLocalServices(); autoCheckServices(); }, 15000);
+  setInterval(pingLocalServices, 15000);
 });
 
 // ── 모달 공통 유틸 ──

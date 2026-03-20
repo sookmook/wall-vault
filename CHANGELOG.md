@@ -22,6 +22,14 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   (chicken-and-egg). The ping endpoint connects directly to the configured `local_url`
   (or the default port) regardless of enabled state, so services are correctly
   auto-checked when the local server is reachable.
+- **Service checkbox override loop**: manual checkbox toggles were being immediately
+  reverted by `autoCheckServices`. Two root causes fixed:
+  1. `service_changed` SSE handler no longer calls `autoCheckServices` — it only
+     refreshes the agent service/model selects. Calling `autoCheckServices` on every
+     toggle created a ping→enable→SSE→autoCheck→ping loop that undid user intent.
+  2. `checkLocalService` (15 s dot-ping loop) no longer calls `_setSvcEnabled` — it
+     updates only the status dot (●). Checkbox state is now controlled exclusively by
+     `autoCheckServices` on page load and `key_added`/`key_deleted` SSE events.
 
 ---
 

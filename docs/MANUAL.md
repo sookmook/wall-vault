@@ -1,7 +1,7 @@
 # wall-vault 사용자 매뉴얼
 
 오픈클로(OpenClaw)와 wall-vault를 함께 쓰는 방법을 중심으로 설명합니다.
-*(Last updated: 2026-03-16 — v0.1.7: 대시보드 제목 "벽금고(wall-vault) 대시보드"로 변경, 로고 topbar 이동, today_attempts 추적, HTTP 582 쿨다운, share-of-total 막대 스케일링, custom/ 라우팅 수정, Ollama 타임아웃 수정, key_att i18n, avatar heartbeat 동기화, 빌드 타임스탬프 버전)*
+*(Last updated: 2026-03-20 — v0.1.15: 설정 복사·배포 명령어 복사 버튼 상세 설명 추가, 로컬 서비스 체크박스 자동 동기화 수정 문서화. v0.1.7: 대시보드 제목 "벽금고(wall-vault) 대시보드"로 변경, 로고 topbar 이동, today_attempts 추적, HTTP 582 쿨다운, share-of-total 막대 스케일링, custom/ 라우팅 수정, Ollama 타임아웃 수정, key_att i18n, avatar heartbeat 동기화, 빌드 타임스탬프 버전)*
 
 ---
 
@@ -336,15 +336,106 @@ curl "http://localhost:56244/api/models?q=claude"
 
 에이전트 종류가 `openclaw`이거나 지정되지 않은 경우 기본값으로 `~/.openclaw/workspace/avatar.png`를 시도합니다.
 
-**에이전트 종류별 설정 복사 버튼 (v0.1.3~):**
+**에이전트 종류별 버튼 (카드 하단)**
 
-| 종류 | 아이콘 | 버튼 레이블 | 복사 내용 |
-|------|--------|------------|----------|
-| openclaw | 🦞 | OpenClaw 설정 복사 | `~/.openclaw/openclaw.json` 스니펫 |
-| claude-code | 🟠 | Claude Code 설정 복사 | `~/.claude/settings.json` 스니펫 |
-| cursor | ⌨ | Cursor 설정 복사 | Cursor AI API Base URL + Key |
-| vscode | 💻 | VSCode 설정 복사 | Continue 확장 `config.json` 스니펫 |
-| 기타 | 📋 | 설정 복사 | OpenClaw 형식 |
+각 에이전트 카드 맨 아래에는 **설정 복사** 버튼과 **배포 명령어 복사** 버튼이 있습니다.
+에이전트를 등록할 때 **에이전트 종류**를 지정해 두면, 해당 종류에 맞는 버튼이 자동으로 나타납니다.
+
+---
+
+#### 🔘 설정 복사 버튼
+
+버튼을 클릭하면 해당 에이전트의 **토큰·프록시 주소·모델**이 이미 채워진 설정 스니펫이 클립보드에 복사됩니다. 복사한 내용을 그대로 해당 설정 파일에 붙여넣으면 됩니다.
+
+**에이전트 종류별 복사 내용:**
+
+| 버튼 | 에이전트 종류 | 붙여넣을 위치 | 복사되는 내용 |
+|------|-------------|-------------|-------------|
+| 🦞 OpenClaw 설정 복사 | `openclaw` | `~/.openclaw/openclaw.json` | wall-vault 프로바이더 블록 |
+| 🦀 NanoClaw 설정 복사 | `nanoclaw` | `~/.openclaw/openclaw.json` | wall-vault 프로바이더 블록 |
+| 🟠 Claude Code 설정 복사 | `claude-code` | `~/.claude/settings.json` | apiProvider / baseUrl / apiKey |
+| ⌨ Cursor 설정 복사 | `cursor` | Cursor → Settings → AI → OpenAI API | Base URL + API Key |
+| 💻 VSCode 설정 복사 | `vscode` | `~/.continue/config.json` | Continue 확장 models 블록 |
+
+**예시 — Claude Code 타입이면 이런 내용이 복사됩니다:**
+
+```json
+// ~/.claude/settings.json
+{
+  "apiProvider": "openai",
+  "baseUrl": "http://192.168.0.6:56244/v1",
+  "apiKey": "이-에이전트의-토큰"
+}
+```
+
+**예시 — VSCode (Continue) 타입이면:**
+
+```json
+// ~/.continue/config.json
+{
+  "models": [{
+    "title": "wall-vault proxy",
+    "provider": "openai",
+    "model": "gemini-2.5-flash",
+    "apiBase": "http://192.168.0.6:56244/v1",
+    "apiKey": "이-에이전트의-토큰"
+  }]
+}
+```
+
+**예시 — Cursor 타입이면:**
+
+```
+Base URL : http://192.168.0.6:56244/v1
+API Key  : 이-에이전트의-토큰
+
+// 또는 환경변수:
+OPENAI_BASE_URL=http://192.168.0.6:56244/v1
+OPENAI_API_KEY=이-에이전트의-토큰
+```
+
+> **클립보드가 막힌 경우**: 브라우저가 HTTP 환경에서 클립보드 접근을 차단하면, 버튼 클릭 시 팝업 텍스트박스가 열립니다. 전체 선택(`Ctrl+A`) 후 복사(`Ctrl+C`)하세요.
+
+---
+
+#### 🟣 배포 명령어 복사 버튼
+
+새 머신에 wall-vault 프록시를 처음 설치·등록할 때 사용합니다.
+버튼을 클릭하면 **셸 스크립트 전체**가 클립보드에 복사됩니다.
+
+복사한 내용을 해당 머신 터미널에 붙여넣고 실행하면 다음 과정이 자동으로 진행됩니다:
+
+1. **wall-vault 바이너리 설치** — 이미 설치되어 있으면 건너뜁니다
+2. **systemd 사용자 서비스 등록** — `~/.config/systemd/user/wall-vault-proxy.service` 자동 생성
+3. **서비스 시작** — `systemctl --user enable --now wall-vault-proxy`
+4. **에이전트 종류별 추가 설정** — OpenClaw/NanoClaw라면 `.env` 파일 자동 갱신, Docker 사용 시 힌트 주석 포함
+
+생성되는 스크립트 예시 (openclaw 타입):
+
+```bash
+#!/bin/bash
+# wall-vault proxy setup: 모토코 → 192.168.0.6
+# agent_type: openclaw
+
+# 1. Install wall-vault (skip if already installed)
+if ! command -v wall-vault &>/dev/null && [ ! -f "$HOME/.local/bin/wall-vault" ]; then
+  curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
+fi
+...
+
+# 4. OpenClaw config: set in ~/.openclaw/openclaw.json or environment
+#    ANTHROPIC_BASE_URL=http://localhost:56244
+#    CLAUDE_CODE_OAUTH_TOKEN=이-에이전트의-토큰
+
+# 5. Docker containers started by openclaw:
+#    ANTHROPIC_BASE_URL=http://host.docker.internal:56244
+#    ANTHROPIC_API_KEY=이-에이전트의-토큰
+#    docker run --add-host=host.docker.internal:host-gateway ...
+```
+
+> **토큰 자동 삽입**: 스크립트 안에 이 에이전트의 토큰과 금고 서버 주소가 이미 채워져 있으므로, 붙여넣기 후 별도 수정 없이 바로 실행할 수 있습니다.
+
+---
 
 - `[✎]` — 편집, `[✕]` — 삭제
 

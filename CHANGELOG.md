@@ -12,6 +12,19 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-20
+
+### Fixed
+- **Local service auto-enable (Ollama / LM Studio / vLLM)**: `_checkLocalSvc` now uses
+  `GET /admin/services/{id}/ping` instead of `GET /admin/models?service={id}` to decide
+  whether to enable a local service. The previous approach never enabled the service
+  because `handleAdminModels` only queries models for already-enabled services
+  (chicken-and-egg). The ping endpoint connects directly to the configured `local_url`
+  (or the default port) regardless of enabled state, so services are correctly
+  auto-checked when the local server is reachable.
+
+---
+
 ## [0.1.14] — 2026-03-20
 
 ### Added

@@ -546,6 +546,25 @@ func (s *Store) ListProxyEnabledServices() []string {
 	return ids
 }
 
+// ProxyService: ID + local URL for proxy routing
+type ProxyService struct {
+	ID       string `json:"id"`
+	LocalURL string `json:"local_url,omitempty"`
+}
+
+// ListProxyEnabledServicesInfo: returns proxy-enabled services with their local URLs
+func (s *Store) ListProxyEnabledServicesInfo() []ProxyService {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []ProxyService
+	for _, sv := range s.services {
+		if sv.ProxyEnabled {
+			result = append(result, ProxyService{ID: sv.ID, LocalURL: sv.LocalURL})
+		}
+	}
+	return result
+}
+
 func (s *Store) DeleteService(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

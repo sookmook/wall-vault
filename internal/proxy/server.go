@@ -732,6 +732,8 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 // ─── Google Gemini ────────────────────────────────────────────────────────────
 
 func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, error) {
+	// Strip "google/" prefix if present (passed through from parseProviderModel for fallback compatibility)
+	model = strings.TrimPrefix(model, "google/")
 	const maxAttempts = 3
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -1025,7 +1027,9 @@ func parseProviderModel(svc, mdl string) (string, string) {
 	switch prefix {
 	// ── Native handlers ──────────────────────────────────────────────────────
 	case "google":
-		return "google", bare
+		// Keep full "google/X" form so OpenRouter fallback receives a valid model ID.
+		// callGoogle strips the "google/" prefix itself before building the API URL.
+		return "google", mdl
 	case "ollama":
 		return "ollama", bare
 
@@ -1064,7 +1068,8 @@ func parseProviderModel(svc, mdl string) (string, string) {
 		bare = strings.TrimSuffix(bare, ":cloud")
 		switch {
 		case strings.HasPrefix(bare, "gemini-"):
-			return "google", bare
+			// Keep "google/bare" so OpenRouter fallback receives a valid model ID
+			return "google", "google/" + bare
 		case strings.HasPrefix(bare, "claude-"):
 			// Route Anthropic models through OpenRouter
 			return "openrouter", "anthropic/" + bare

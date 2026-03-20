@@ -1031,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', function() {
     Object.keys(_SERVICES).forEach(id => { if(_SERVICES[id].local) checkLocalService(id); });
   }
   pingLocalServices();
-  setInterval(pingLocalServices, 15000);
+  setInterval(() => { pingLocalServices(); autoCheckServices(); }, 15000);
 });
 
 // ── 모달 공통 유틸 ──

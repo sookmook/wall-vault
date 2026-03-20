@@ -28,7 +28,8 @@ type Server struct {
 	mu              sync.RWMutex
 	service         string
 	model           string
-	allowedServices []string // proxy-enabled services from vault (empty = no restriction)
+	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
+	serviceURLs     map[string]string // service ID → local URL from vault config
 	keyMgr          *KeyManager
 	filter          *ToolFilter
 	sse             *SSEClient
@@ -101,6 +102,12 @@ func NewServer(cfg *config.Config) *Server {
 			s.allowedServices = services
 			s.mu.Unlock()
 			log.Printf("[SSE] 프록시 서비스 갱신: %v", services)
+			// re-sync URLs in background (SSE only carries IDs, not local_url)
+			go func() {
+				if err := s.syncAllowedServices(); err != nil {
+					log.Printf("[SSE] 서비스 URL 재동기화 실패: %v", err)
+				}
+			}()
 		})
 		s.sse.Start()
 
@@ -182,7 +189,7 @@ func (s *Server) syncFromVault() {
 	}
 }
 
-// syncAllowedServices: fetch proxy-enabled service list from vault
+// syncAllowedServices: fetch proxy-enabled service list (with local URLs) from vault
 func (s *Server) syncAllowedServices() error {
 	url := s.cfg.Proxy.VaultURL + "/api/services"
 	req, err := http.NewRequest("GET", url, nil)
@@ -201,24 +208,42 @@ func (s *Server) syncAllowedServices() error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("서비스 목록 조회 실패: HTTP %d", resp.StatusCode)
 	}
-	var svcs []string
+	var svcs []struct {
+		ID       string `json:"id"`
+		LocalURL string `json:"local_url"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&svcs); err != nil {
 		return err
 	}
+	ids := make([]string, 0, len(svcs))
+	urls := make(map[string]string, len(svcs))
+	for _, sv := range svcs {
+		ids = append(ids, sv.ID)
+		if sv.LocalURL != "" {
+			urls[sv.ID] = sv.LocalURL
+		}
+	}
 	s.mu.Lock()
-	s.allowedServices = svcs
+	s.allowedServices = ids
+	s.serviceURLs = urls
 	s.mu.Unlock()
-	log.Printf("[sync] 프록시 서비스 목록: %v", svcs)
+	log.Printf("[sync] 프록시 서비스 목록: %v (urls: %v)", ids, urls)
 	return nil
 }
 
-// ollamaURL: return Ollama URL from config or env var
+// ollamaURL: return Ollama URL — env > vault service config > localhost default
 func (s *Server) ollamaURL() string {
 	if v := os.Getenv("OLLAMA_URL"); v != "" {
 		return v
 	}
 	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
 		return v
+	}
+	s.mu.RLock()
+	u := s.serviceURLs["ollama"]
+	s.mu.RUnlock()
+	if u != "" {
+		return u
 	}
 	return "http://localhost:11434"
 }

@@ -462,13 +462,13 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "updated", "client_id": clientID})
 }
 
-// handleProxyServices: returns list of proxy-enabled service IDs (client token auth)
+// handleProxyServices: returns proxy-enabled services with local URLs (client token auth)
 func (s *Server) handleProxyServices(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		jsonError(w, "GET required", http.StatusMethodNotAllowed)
 		return
 	}
-	jsonOK(w, s.store.ListProxyEnabledServices())
+	jsonOK(w, s.store.ListProxyEnabledServicesInfo())
 }
 
 // handleProxyKeys: provide decrypted key list to proxy (client token auth)

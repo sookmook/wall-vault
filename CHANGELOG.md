@@ -12,6 +12,32 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.14] — 2026-03-20
+
+### Added
+- **Local service status indicator**: green/grey dot (●) next to local service names
+  (Ollama, LM Studio, vLLM) in the Services card — auto-pings on page load and after
+  saving the URL. Endpoint: `GET /admin/services/{id}/ping` (3 s timeout).
+
+### Fixed
+- **Ollama distributed routing**: proxy now receives `local_url` per service from vault
+  (`/api/services` returns `[{id, local_url}]` instead of `[]string`). Ollama URL
+  priority: env var → vault config → `localhost:11434`.
+- **Google model fallback to OpenRouter**: `google/X` model names no longer lose the
+  `google/` prefix when falling back to OpenRouter. `callGoogle` strips the prefix
+  internally; all other services receive the full `google/X` form.
+- **UpsertService partial update**: PUT `/admin/services/{id}` now uses map-based
+  partial update so toggling `proxy_enabled` does not accidentally reset `enabled` to
+  `false` (Go JSON zero-value bug).
+- **AnthropicRequest.System array**: Claude Code ≥ 2026-03 sends `system` as
+  `[{type, text}]` array instead of a plain string. `System` field changed to
+  `json.RawMessage`; new `SystemText()` method handles both formats.
+- **Anthropic native passthrough**: `/v1/messages` handler now forwards the original
+  request body directly to Anthropic (skipping GeminiRequest round-trip) to preserve
+  tool calls, tool_results, and multi-block content.
+
+---
+
 ## [0.1.8] — 2026-03-20
 
 ### Added

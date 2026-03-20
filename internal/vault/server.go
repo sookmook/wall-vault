@@ -641,7 +641,26 @@ func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/admin/services/")
+	path := strings.TrimPrefix(r.URL.Path, "/admin/services/")
+	// ping sub-route: GET /admin/services/{id}/ping
+	if strings.HasSuffix(path, "/ping") {
+		id := strings.TrimSuffix(path, "/ping")
+		sv := s.store.GetService(id)
+		if sv == nil || sv.LocalURL == "" {
+			jsonOK(w, map[string]interface{}{"ok": false, "reason": "no url"})
+			return
+		}
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Get(sv.LocalURL)
+		if err != nil {
+			jsonOK(w, map[string]interface{}{"ok": false, "reason": err.Error()})
+			return
+		}
+		resp.Body.Close()
+		jsonOK(w, map[string]interface{}{"ok": resp.StatusCode < 500})
+		return
+	}
+	id := path
 	if id == "" {
 		jsonError(w, "service id required", http.StatusBadRequest)
 		return

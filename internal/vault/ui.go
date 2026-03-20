@@ -1026,6 +1026,8 @@ async function autoCheckServices() {
 // ── 에이전트 카드 모델 목록 초기화 (페이지 로드 시) ──
 document.addEventListener('DOMContentLoaded', function() {
   autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
+  // ping local services to show status dots
+  Object.keys(SERVICES).forEach(id => { if(SERVICES[id].local) checkLocalService(id); });
 });
 
 // ── 모달 공통 유틸 ──
@@ -1472,7 +1474,7 @@ function saveServiceURL(id) {
   const proxyEl=document.getElementById('svc-proxy-'+id);
   fetch('/admin/services/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
     body:JSON.stringify({local_url:urlEl.value,enabled:enEl?enEl.checked:true,proxy_enabled:proxyEl?proxyEl.checked:false})})
-  .then(r=>r.json()).then(d=>{if(d.error)alert(T('err')+d.error);})
+  .then(r=>r.json()).then(d=>{if(d.error)alert(T('err')+d.error);else checkLocalService(id);})
   .catch(e=>alert(T('err')+e));
 }
 function toggleProxyService(id, enabled) {
@@ -1483,6 +1485,15 @@ function toggleProxyService(id, enabled) {
     body:JSON.stringify({enabled:enEl?enEl.checked:true,local_url:urlEl?urlEl.value:'',proxy_enabled:enabled})})
   .then(r=>r.json()).then(d=>{if(d.error){alert(T('err')+d.error);}})
   .catch(e=>alert(T('err')+e));
+}
+function checkLocalService(id) {
+  const dot=document.getElementById('svc-dot-'+id);if(!dot)return;
+  const token=getAdminToken();
+  fetch('/admin/services/'+id+'/ping',{headers:{'Authorization':'Bearer '+(token||'')}})
+  .then(r=>r.json()).then(d=>{
+    dot.style.color=d.ok?'#4caf50':'var(--text-muted)';
+    dot.title=d.ok?'연결됨':'연결 안 됨'+(d.reason?' ('+d.reason+')':'');
+  }).catch(()=>{dot.style.color='var(--text-muted)';dot.title='확인 실패';});
 }
 function detectLocalModels(id) {
   const urlEl=document.getElementById('svc-url-'+id);if(!urlEl)return;
@@ -2044,6 +2055,7 @@ func buildServicesCard(services []*ServiceConfig) string {
 			sv.ID, proxyChecked, sv.ID,
 		)
 		localURLField := ""
+		localDot := ""
 		if sv.IsLocal() {
 			var defaultPort string
 			switch sv.ID {
@@ -2066,6 +2078,7 @@ func buildServicesCard(services []*ServiceConfig) string {
 </div>`,
 				sv.ID, placeholder, sv.LocalURL, sv.ID, sv.ID,
 			)
+			localDot = fmt.Sprintf(`<span id="svc-dot-%s" style="font-size:.8rem;color:var(--text-muted)" title="연결 확인 중">●</span>`, sv.ID)
 		}
 		deleteBtn := ""
 		if sv.Custom {
@@ -2077,6 +2090,7 @@ func buildServicesCard(services []*ServiceConfig) string {
   <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;flex:1">
     <input type="checkbox" id="svc-en-%s"%s style="accent-color:var(--accent);cursor:pointer" onchange="toggleService('%s',this.checked)">
     <span style="font-size:.82rem;color:var(--text)">%s</span>
+    %s
   </label>
   %s
   %s
@@ -2086,6 +2100,7 @@ func buildServicesCard(services []*ServiceConfig) string {
 			sv.ID,
 			sv.ID, enabledChecked, sv.ID,
 			sv.Name,
+			localDot,
 			proxyCheckbox,
 			deleteBtn,
 			localURLField,

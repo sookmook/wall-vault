@@ -989,8 +989,8 @@ async function _setSvcEnabled(id, enabled, token) {
 async function _checkLocalSvc(id, svcEnabled, token) {
   const cb = document.getElementById('svc-en-'+id);
   try {
-    const resp = await fetch('/admin/models?service='+id, {headers:{'Authorization':'Bearer '+token}});
-    const up = resp.ok && (((await resp.json()).models)||[]).length > 0;
+    const resp = await fetch('/admin/services/'+id+'/ping', {headers:{'Authorization':'Bearer '+token}});
+    const up = resp.ok && (await resp.json()).ok === true;
     if (up !== svcEnabled) await _setSvcEnabled(id, up, token);
     else if (cb) cb.checked = up;
   } catch { if (svcEnabled) await _setSvcEnabled(id, false, token); }
@@ -1027,7 +1027,11 @@ async function autoCheckServices() {
 document.addEventListener('DOMContentLoaded', function() {
   autoCheckServices().then(() => refreshServiceSelects()).then(() => refreshModelDropdowns());
   // ping local services to show status dots
-  Object.keys(SERVICES).forEach(id => { if(SERVICES[id].local) checkLocalService(id); });
+  function pingLocalServices() {
+    Object.keys(_SERVICES).forEach(id => { if(_SERVICES[id].local) checkLocalService(id); });
+  }
+  pingLocalServices();
+  setInterval(pingLocalServices, 15000);
 });
 
 // ── 모달 공통 유틸 ──
@@ -1921,12 +1925,27 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 	}
 
 	byService := make(map[string][]*APIKey)
-	svcOrder := []string{}
 	for _, k := range keys {
-		if _, exists := byService[k.Service]; !exists {
-			svcOrder = append(svcOrder, k.Service)
-		}
 		byService[k.Service] = append(byService[k.Service], k)
+	}
+	// order service groups by services card order (openrouter first), unknowns appended last
+	svcOrder := []string{}
+	for _, sv := range services {
+		if _, ok := byService[sv.ID]; ok {
+			svcOrder = append(svcOrder, sv.ID)
+		}
+	}
+	for svc := range byService {
+		found := false
+		for _, s := range svcOrder {
+			if s == svc {
+				found = true
+				break
+			}
+		}
+		if !found {
+			svcOrder = append(svcOrder, svc)
+		}
 	}
 
 	for _, svc := range svcOrder {

@@ -15,10 +15,10 @@ import (
 // cloud services: enabled based on key presence → all start as false
 // local services: enabled based on connectivity check → all start as false
 var defaultServiceList = []*ServiceConfig{
+	{ID: "openrouter",     Name: "OpenRouter",        Enabled: false},
 	{ID: "google",         Name: "Google Gemini",     Enabled: false},
 	{ID: "openai",         Name: "OpenAI",            Enabled: false},
 	{ID: "anthropic",      Name: "Anthropic",         Enabled: false},
-	{ID: "openrouter",     Name: "OpenRouter",        Enabled: false},
 	{ID: "github-copilot", Name: "GitHub Copilot",    Enabled: false},
 	{ID: "ollama",         Name: "Ollama (Local)",    Enabled: false},
 	{ID: "lmstudio",       Name: "LM Studio (Local)", Enabled: false},
@@ -87,6 +87,27 @@ func (s *Store) load() error {
 				s.services = append(s.services, &clone)
 			}
 		}
+		// reorder: sort non-custom services by defaultServiceList order, custom appended last
+		order := make(map[string]int, len(defaultServiceList))
+		for i, def := range defaultServiceList {
+			order[def.ID] = i
+		}
+		byID := make(map[string]*ServiceConfig, len(s.services))
+		for _, sv := range s.services {
+			byID[sv.ID] = sv
+		}
+		sorted := make([]*ServiceConfig, 0, len(s.services))
+		for _, def := range defaultServiceList {
+			if sv, ok := byID[def.ID]; ok {
+				sorted = append(sorted, sv)
+			}
+		}
+		for _, sv := range s.services {
+			if sv.Custom {
+				sorted = append(sorted, sv)
+			}
+		}
+		s.services = sorted
 	}
 	// migration: default Enabled=true for existing clients
 	needsSave := false

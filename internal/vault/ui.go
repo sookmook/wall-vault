@@ -1167,6 +1167,14 @@ function copyAgentConfig(clientId, agentType) {
         +'      - chat\n'
         +'      - edit\n'
         +'      - apply\n';
+    } else if(agentType==='cline'){
+      title='🔧 Cline '+T('cfg_ok');
+      hint='VS Code → Cline 확장 → ⚙ 설정 → API Provider: OpenAI Compatible → 아래 값 입력';
+      cfg='Provider : OpenAI Compatible\n'
+        +'Base URL : '+baseUrl+'\n'
+        +'API Key  : '+tok+'\n'
+        +'Model    : '+mdl+'\n\n'
+        +'// 모델은 wall-vault 대시보드에서 변경하면 자동 반영됩니다.';
     } else if(agentType==='gemini-cli'){
       const geminiBase = location.protocol+'//'+location.hostname+':56244';
       title=T('cfg_gemini_cli')+' '+T('cfg_ok');
@@ -1689,6 +1697,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		"claude-code": "🟠",
 		"cursor":      "⌨",
 		"vscode":      "💻",
+		"cline":       "🔧",
 		"gemini-cli":  "💎",
 		"antigravity": "🚀",
 		"custom":      "⚙",
@@ -1699,6 +1708,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		"claude-code": "atb-claude",
 		"cursor":      "atb-cursor",
 		"vscode":      "atb-vscode",
+		"cline":       "atb-vscode",
 		"gemini-cli":  "atb-gemini",
 		"antigravity": "atb-gemini",
 		"custom":      "atb-custom",
@@ -1733,7 +1743,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 					`<span class="status-dc">◎ Claude Code</span>` +
 					`<span class="status-hint" data-i18n="st_claude_hint">ANTHROPIC_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
 					`</div>`
-			case "cursor", "vscode":
+			case "cursor", "vscode", "cline":
 				statusChip = `<div class="agent-status">` +
 					`<span class="status-dc">◎ ` + c.AgentType + `</span>` +
 					`<span class="status-hint" data-i18n="st_editor_hint">Base URL을 http://localhost:56244 로 설정하세요</span>` +
@@ -1834,6 +1844,10 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		case "vscode":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyAgentConfig('%s','vscode')" data-i18n-title="cfg_vscode_title" title="VS Code / Continue 프록시 설정 복사" data-i18n="cfg_vscode">💻 VSCode 설정 복사</button>`,
+				c.ID)
+		case "cline":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cline')" title="Cline 확장 설정 복사" data-i18n="cfg_cline">🔧 Cline 설정 복사</button>`,
 				c.ID)
 		case "gemini-cli":
 			cfgButton = fmt.Sprintf(
@@ -2154,6 +2168,7 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
     <option value="antigravity">antigravity</option>
     <option value="cursor">cursor</option>
     <option value="vscode">vscode</option>
+    <option value="cline">cline</option>
     <option value="custom">custom</option>
   </select>
   <label data-i18n="lbl_work_dir">작업 디렉토리</label>

@@ -102,10 +102,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clients", s.handlePublicClients)
 
 	// proxy-only (client token auth)
-	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))           // decrypted key list
-	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))      // heartbeat receiver
-	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))      // client self-config change
-	mux.HandleFunc("/api/services", s.clientAuth(s.handleProxyServices))   // proxy-enabled service list
+	mux.HandleFunc("/api/keys", s.clientAuth(s.handleProxyKeys))               // decrypted key list
+	mux.HandleFunc("/api/heartbeat", s.clientAuth(s.handleHeartbeat))          // heartbeat receiver
+	mux.HandleFunc("/api/config", s.clientAuth(s.handleClientConfig))          // client self-config change
+	mux.HandleFunc("/api/services", s.clientAuth(s.handleProxyServices))       // proxy-enabled service list
+	mux.HandleFunc("/api/token/config", s.handleTokenConfig)                   // token→model lookup (for third-party clients)
 
 	// admin
 	mux.HandleFunc("/admin/theme", s.adminAuth(s.handleAdminTheme))
@@ -147,7 +148,7 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 			jsonError(w, "too many failed attempts", http.StatusTooManyRequests)
 			return
 		}
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		token := bearerToken(r)
 		if token != s.cfg.Vault.AdminToken {
 			s.limiter.record(ip)
 			jsonError(w, "unauthorized", http.StatusUnauthorized)
@@ -157,10 +158,15 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// bearerToken extracts the Bearer token from an Authorization header.
+func bearerToken(r *http.Request) string {
+	return strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+}
+
 // clientAuth: authenticate with a registered client token
 func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		token := bearerToken(r)
 		// admin token also accepted
 		if s.cfg.Vault.AdminToken != "" && token == s.cfg.Vault.AdminToken {
 			next(w, r)
@@ -186,6 +192,27 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"keys":    len(keys),
 		"clients": len(clients),
 		"sse":     s.broker.Count(),
+	})
+}
+
+// handleTokenConfig: resolve a client token → {default_service, default_model}
+// Used by third-party clients (Cline, Cursor, etc.) so the proxy can override
+// the model they send with the dashboard-configured model for that token.
+func (s *Server) handleTokenConfig(w http.ResponseWriter, r *http.Request) {
+	token := bearerToken(r)
+	if token == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	c := s.store.GetClientByToken(token)
+	if c == nil {
+		jsonError(w, "token not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{
+		"id":              c.ID,
+		"default_service": c.DefaultService,
+		"default_model":   c.DefaultModel,
 	})
 }
 
@@ -646,12 +673,26 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(path, "/ping") {
 		id := strings.TrimSuffix(path, "/ping")
 		sv := s.store.GetService(id)
-		if sv == nil || sv.LocalURL == "" {
+		pingURL := ""
+		if sv != nil && sv.LocalURL != "" {
+			pingURL = sv.LocalURL
+		} else {
+			// fallback to default port when local_url is not configured
+			switch id {
+			case "ollama":
+				pingURL = "http://localhost:11434"
+			case "lmstudio":
+				pingURL = "http://localhost:1234"
+			case "vllm":
+				pingURL = "http://localhost:8000"
+			}
+		}
+		if pingURL == "" {
 			jsonOK(w, map[string]interface{}{"ok": false, "reason": "no url"})
 			return
 		}
 		client := &http.Client{Timeout: 3 * time.Second}
-		resp, err := client.Get(sv.LocalURL)
+		resp, err := client.Get(pingURL)
 		if err != nil {
 			jsonOK(w, map[string]interface{}{"ok": false, "reason": err.Error()})
 			return

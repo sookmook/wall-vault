@@ -1106,12 +1106,19 @@ function copyOpenClawConfig(clientId) {
       + '  },\n'
       + '  agents: { defaults: { model: { primary: "wall-vault/' + mdl + '" } } }\n'
       + '}';
-    navigator.clipboard.writeText(cfg).then(()=>{
-      alert(T('cfg_openclaw')+'\n'+T('cfg_ok')+'\n'+T('cfg_openclaw_hint'));
-    }).catch(()=>{
-      prompt(T('cfg_manual'), cfg);
-    });
+    _copyText(cfg, ()=>alert(T('cfg_openclaw')+'\n'+T('cfg_ok')+'\n'+T('cfg_openclaw_hint')), T('cfg_manual'));
   }).catch(e=>alert(T('err')+e));
+}
+
+// ── Clipboard helper: falls back to prompt() when clipboard API is unavailable (HTTP + IP) ──
+function _copyText(text, onSuccess, onFallback) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(function(){
+      prompt(onFallback, text);
+    });
+  } else {
+    prompt(onFallback, text);
+  }
 }
 
 // ── 에이전트 타입별 설정 복사 (claude-code / cursor / vscode) ──
@@ -1181,11 +1188,7 @@ function copyAgentConfig(clientId, agentType) {
         +'}';
     }
     if(!cfg) return;
-    navigator.clipboard.writeText(cfg).then(()=>{
-      alert(title+'\n'+hint);
-    }).catch(()=>{
-      prompt(T('cfg_manual'), cfg);
-    });
+    _copyText(cfg, ()=>alert(title+'\n'+hint), T('cfg_manual'));
   }).catch(e=>alert(T('err')+e));
 }
 
@@ -1286,11 +1289,7 @@ function copyDeployScript(clientId) {
 
     script += '\necho "✓ wall-vault proxy connected to '+vaultHost+'"\n';
 
-    navigator.clipboard.writeText(script).then(()=>{
-      alert(T('cfg_deploy')+'\n'+T('cfg_ok')+'\n'+T('cfg_deploy_hint'));
-    }).catch(()=>{
-      prompt(T('cfg_manual'), script);
-    });
+    _copyText(script, ()=>alert(T('cfg_deploy')+'\n'+T('cfg_ok')+'\n'+T('cfg_deploy_hint')), T('cfg_manual'));
   }).catch(e=>alert(T('err')+e));
 }
 

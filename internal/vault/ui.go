@@ -1121,7 +1121,44 @@ function _copyText(text, onSuccess, onFallback) {
   }
 }
 
-// ── 에이전트 타입별 설정 복사 (claude-code / cursor / vscode) ──
+// ── 에이전트 설정 자동 적용 (로컬 프록시 경유) ──
+// agentType: cline | claude-code | openclaw | nanoclaw
+// Calls the LOCAL proxy's /agent/apply endpoint.
+// Only works when wall-vault proxy is running locally (localhost:56244).
+function applyAgentConfig(clientId, agentType) {
+  const token = getAdminToken(); if(!token) return;
+  fetch('/admin/clients/'+clientId, {headers:{'Authorization':'Bearer '+token}})
+  .then(r=>r.json()).then(c=>{
+    if(c.error){alert('오류: '+c.error);return;}
+    const baseUrl = location.protocol+'//'+location.hostname+':56244/v1';
+    const agentToken = c.token||'';
+    const model = c.default_model||'';
+    return fetch('http://localhost:56244/agent/apply', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+agentToken},
+      body: JSON.stringify({agentType, baseUrl, model}),
+    });
+  }).then(r=>{
+    if(!r) return;
+    return r.json().then(d=>{
+      if(d.ok){
+        const labels = {
+          'cline': 'Cline (VS Code 재시작 필요)',
+          'claude-code': 'Claude Code',
+          'openclaw': 'OpenClaw',
+          'nanoclaw': 'NanoClaw',
+        };
+        const label = labels[agentType] || agentType;
+        alert('✓ '+label+' 설정 적용 완료!\n경로: '+d.path);
+      } else {
+        alert('✗ 적용 실패: '+d.error);
+      }
+    });
+  }).catch(()=>{
+    alert('✗ 로컬 프록시에 연결할 수 없습니다.\n\nlocalhost:56244 에 wall-vault가 실행 중인지 확인하세요.\n(WSL 또는 로컬 머신에서 실행 중이어야 합니다)');
+  });
+}
+
 function copyAgentConfig(clientId, agentType) {
   const token = getAdminToken(); if(!token) return;
   fetch('/admin/clients/'+clientId, {headers:{'Authorization':'Bearer '+token}})
@@ -1169,12 +1206,12 @@ function copyAgentConfig(clientId, agentType) {
         +'      - apply\n';
     } else if(agentType==='cline'){
       title='🔧 Cline '+T('cfg_ok');
-      hint='VS Code → Cline 확장 → ⚙ 설정 → API Provider: OpenAI Compatible → 아래 값 입력';
-      cfg='Provider : OpenAI Compatible\n'
-        +'Base URL : '+baseUrl+'\n'
-        +'API Key  : '+tok+'\n'
-        +'Model    : '+mdl+'\n\n'
-        +'// 모델은 wall-vault 대시보드에서 변경하면 자동 반영됩니다.';
+      hint='Cline ⚙ 설정 → API Provider: OpenAI Compatible → 아래 값을 각 필드에 입력';
+      // Four values in field order: API Provider / Base URL / API Key / Model ID
+      cfg='OpenAI Compatible\n'
+        +baseUrl+'\n'
+        +tok+'\n'
+        +mdl;
     } else if(agentType==='gemini-cli'){
       const geminiBase = location.protocol+'//'+location.hostname+':56244';
       title=T('cfg_gemini_cli')+' '+T('cfg_ok');
@@ -1827,15 +1864,15 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		switch c.AgentType {
 		case "openclaw":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg btn-cfg-openclaw" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_openclaw_title" title="~/.openclaw/openclaw.json 설정 복사" data-i18n="cfg_openclaw">🦞 OpenClaw 설정 복사</button>`,
+				`<button class="btn-cfg btn-cfg-openclaw" onclick="applyAgentConfig('%s','openclaw')" title="~/.openclaw/openclaw.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_openclaw">⚡ OpenClaw 설정 적용</button>`,
 				c.ID)
 		case "nanoclaw":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg btn-cfg-nanoclaw" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_nanoclaw_title" title="~/.openclaw/openclaw.json 설정 복사" data-i18n="cfg_nanoclaw">🦀 NanoClaw 설정 복사</button>`,
+				`<button class="btn-cfg btn-cfg-nanoclaw" onclick="applyAgentConfig('%s','nanoclaw')" title="~/.openclaw/openclaw.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_nanoclaw">⚡ NanoClaw 설정 적용</button>`,
 				c.ID)
 		case "claude-code":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg btn-cfg-claude" onclick="copyAgentConfig('%s','claude-code')" data-i18n-title="cfg_claude_title" title="~/.claude/settings.json 설정 복사" data-i18n="cfg_claude">🟠 Claude Code 설정 복사</button>`,
+				`<button class="btn-cfg btn-cfg-claude" onclick="applyAgentConfig('%s','claude-code')" title="~/.claude/settings.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_claude">⚡ Claude Code 설정 적용</button>`,
 				c.ID)
 		case "cursor":
 			cfgButton = fmt.Sprintf(
@@ -1847,7 +1884,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 				c.ID)
 		case "cline":
 			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cline')" title="Cline 확장 설정 복사" data-i18n="cfg_cline">🔧 Cline 설정 복사</button>`,
+				`<button class="btn-cfg" onclick="applyAgentConfig('%s','cline')" title="로컬 Cline 설정 자동 적용 (localhost:56244 필요)">⚡ Cline 설정 적용</button>`,
 				c.ID)
 		case "gemini-cli":
 			cfgButton = fmt.Sprintf(

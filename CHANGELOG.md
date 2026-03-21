@@ -12,6 +12,19 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-21 (patch)
+
+### Fixed
+- **Clipboard copy buttons on HTTP + IP access**: `navigator.clipboard.writeText` is only
+  available in secure contexts (HTTPS or localhost). Accessing the dashboard via
+  `http://192.168.x.x:56243` caused `TypeError: Cannot read properties of undefined
+  (reading 'writeText')` before any Promise was created, so the existing `.catch()` fallback
+  never fired. Added `_copyText()` helper that checks `navigator.clipboard` availability
+  first; if absent, it falls back to `prompt()` so the user can manually copy with Ctrl+A →
+  Ctrl+C. Applied to all three copy buttons: OpenClaw config, agent config, and deploy script.
+
+---
+
 ## [0.1.15] — 2026-03-20
 
 ### Fixed

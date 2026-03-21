@@ -22,6 +22,13 @@ import (
 // main.go calls proxy.Version = version before starting the server.
 var Version = "dev"
 
+// tokenCacheEntry: cached result of a token→model lookup from the vault
+type tokenCacheEntry struct {
+	service   string
+	model     string
+	expiresAt time.Time
+}
+
 // Server: proxy HTTP server
 type Server struct {
 	cfg             *config.Config
@@ -36,6 +43,8 @@ type Server struct {
 	registry        *models.Registry
 	hooksMgr        *hooks.Manager
 	ollamaMu        sync.Mutex // protect single concurrent Ollama request
+	tokenCacheMu    sync.RWMutex
+	tokenCache      map[string]*tokenCacheEntry // Bearer token → client model config
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -46,10 +55,11 @@ func NewServer(cfg *config.Config) *Server {
 	}
 
 	s := &Server{
-		cfg:      cfg,
-		service:  defaultSvc,
-		model:    "",
-		registry: models.NewRegistry(10 * time.Minute),
+		cfg:        cfg,
+		service:    defaultSvc,
+		model:      "",
+		registry:   models.NewRegistry(10 * time.Minute),
+		tokenCache: make(map[string]*tokenCacheEntry),
 	}
 
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
@@ -137,6 +147,69 @@ func NewServer(cfg *config.Config) *Server {
 	}()
 
 	return s
+}
+
+// lookupTokenConfig: resolve a Bearer token to {service, model} via vault's /api/token/config.
+// Results are cached for 30 seconds to avoid per-request vault calls.
+// Returns nil if vault URL is not configured or the token is not found.
+func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
+	if s.cfg.Proxy.VaultURL == "" || token == "" {
+		return nil
+	}
+	// skip our own proxy token (it is already applied via s.service/s.model)
+	if token == s.cfg.Proxy.VaultToken {
+		return nil
+	}
+
+	s.tokenCacheMu.RLock()
+	if e, ok := s.tokenCache[token]; ok && time.Now().Before(e.expiresAt) {
+		s.tokenCacheMu.RUnlock()
+		return e
+	}
+	s.tokenCacheMu.RUnlock()
+
+	// fetch from vault
+	req, err := http.NewRequest("GET", s.cfg.Proxy.VaultURL+"/api/token/config", nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	var result struct {
+		DefaultService string `json:"default_service"`
+		DefaultModel   string `json:"default_model"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil
+	}
+
+	entry := &tokenCacheEntry{
+		service:   result.DefaultService,
+		model:     result.DefaultModel,
+		expiresAt: time.Now().Add(30 * time.Second),
+	}
+	s.tokenCacheMu.Lock()
+	// evict expired entries when cache grows large
+	if len(s.tokenCache) > 500 {
+		now := time.Now()
+		for k, v := range s.tokenCache {
+			if now.After(v.expiresAt) {
+				delete(s.tokenCache, k)
+			}
+		}
+	}
+	s.tokenCache[token] = entry
+	s.tokenCacheMu.Unlock()
+	return entry
 }
 
 // syncFromVault: sync client config and keys from vault
@@ -463,6 +536,22 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 	if mdl == "" {
 		mdl = oaiReq.Model
+	}
+
+	// Token-based model override: if the request carries a different client token,
+	// look up that client's dashboard-configured model and override the request model.
+	// This allows third-party clients (Cline, Cursor, etc.) to be controlled from
+	// the wall-vault dashboard without changing their local settings.
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
+		if entry := s.lookupTokenConfig(reqToken); entry != nil {
+			if entry.service != "" {
+				svc = entry.service
+			}
+			if entry.model != "" {
+				mdl = entry.model
+			}
+		}
 	}
 
 	// OpenClaw sends models as "provider/model-id" (e.g. "wall-vault/gemini-2.5-flash",

@@ -12,6 +12,31 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-21 (patch 2)
+
+### Added
+- **Token-based model override for third-party clients (Cline, Cursor, etc.)**: proxy now
+  resolves the Bearer token on each `/v1/chat/completions` request via the new vault
+  `GET /api/token/config` endpoint and overrides the requested model with the agent's
+  dashboard-configured `default_service`/`default_model`. This lets any OpenAI-compatible
+  client be controlled from the wall-vault dashboard without changing its local settings.
+  Results are cached for 30 seconds to avoid per-request vault round-trips.
+- **`cline` agent type**: new agent type in the dashboard with 🔧 icon, status hint, and
+  "Cline 설정 복사" button that outputs provider/base URL/API key for Cline's UI settings.
+
+### Fixed
+- **Double close bug in `lookupTokenConfig`**: `resp.Body.Close()` was called both explicitly
+  in the error branch and via `defer`, causing a panic on non-200 vault responses. Moved the
+  defer after the nil check so only one close path is taken.
+- **Unbounded token cache**: added eviction of expired entries when the cache exceeds 500
+  entries to prevent memory growth from unique tokens.
+- **Bearer token extraction duplication**: extracted `bearerToken(r)` helper in vault/server.go
+  to replace four copies of `strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")`.
+- **Missing Cline JS handler**: `copyAgentConfig` had the button but no `cline` branch, so
+  clicking the button silently did nothing. Added the config generation logic.
+
+---
+
 ## [0.1.15] — 2026-03-21 (patch)
 
 ### Fixed

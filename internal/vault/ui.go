@@ -1152,16 +1152,21 @@ function copyAgentConfig(clientId, agentType) {
     } else if(agentType==='vscode'){
       title=T('cfg_vscode')+' '+T('cfg_ok');
       hint=T('cfg_vscode_hint');
-      cfg='// ~/.continue/config.json  (Continue extension)\n'
-        +'{\n'
-        +'  "models": [{\n'
-        +'    "title": "wall-vault proxy",\n'
-        +'    "provider": "openai",\n'
-        +'    "model": "'+mdl+'",\n'
-        +'    "apiBase": "'+baseUrl+'",\n'
-        +'    "apiKey": "'+tok+'"\n'
-        +'  }]\n'
-        +'}';
+      cfg='# ~/.continue/config.yaml\n'
+        +'name: My Config\n'
+        +'version: 0.0.1\n'
+        +'schema: v1\n'
+        +'\n'
+        +'models:\n'
+        +'  - name: wall-vault proxy\n'
+        +'    provider: openai\n'
+        +'    model: '+mdl+'\n'
+        +'    apiBase: '+baseUrl+'\n'
+        +'    apiKey: '+tok+'\n'
+        +'    roles:\n'
+        +'      - chat\n'
+        +'      - edit\n'
+        +'      - apply\n';
     } else if(agentType==='gemini-cli'){
       const geminiBase = location.protocol+'//'+location.hostname+':56244';
       title=T('cfg_gemini_cli')+' '+T('cfg_ok');

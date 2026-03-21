@@ -348,6 +348,9 @@ func (s *Server) Handler() http.Handler {
 	// OpenAI-compatible model list (Cursor, VS Code, LM Studio, etc.)
 	mux.HandleFunc("/v1/models", s.handleOpenAIModels)
 
+	// Agent config writer (local proxy only — writes config files for cline/claude-code/openclaw/nanoclaw)
+	mux.HandleFunc("/agent/apply", s.handleAgentApply)
+
 	return middleware.Chain(mux,
 		middleware.Recovery,
 		middleware.CORS,
@@ -666,6 +669,20 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	if mdl == "" {
 		mdl = req.Model
 	}
+
+	// Token-based model override: same logic as handleOpenAI.
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
+		if entry := s.lookupTokenConfig(reqToken); entry != nil {
+			if entry.service != "" {
+				svc = entry.service
+			}
+			if entry.model != "" {
+				mdl = entry.model
+			}
+		}
+	}
+
 	// Parse provider/model form (e.g. "anthropic/claude-opus-4-6")
 	svc, mdl = parseProviderModel(svc, mdl)
 

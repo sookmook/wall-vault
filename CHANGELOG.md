@@ -12,6 +12,25 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-21 (patch 3)
+
+### Added
+- **One-click config apply for all local agents** (`/agent/apply` proxy endpoint): replaced
+  the Cline-only `/cline/apply` endpoint with a unified `/agent/apply` that dispatches to the
+  correct config writer based on `agentType`. Supported types:
+  - `cline` → `~/.cline/data/globalState.json` + `secrets.json` (WSL-aware path detection)
+  - `claude-code` → `~/.claude/settings.json`
+  - `openclaw` / `nanoclaw` → `~/.openclaw/openclaw.json` (updates `models.providers.custom`
+    with `baseUrl` / `apiKey` and sets `agents.defaults.model.primary`)
+- **`⚡ 설정 적용` buttons for openclaw, nanoclaw, and claude-code** agent types in the
+  dashboard: clicking the button calls `applyAgentConfig(clientId, agentType)` on the local
+  proxy and patches the config file in one step. Previously these types only had a copy button.
+- **Generic `applyAgentConfig(clientId, agentType)` JS function**: replaced the Cline-specific
+  `applyClineConfig` with a single function that handles all agent types and shows a
+  type-appropriate success message.
+
+---
+
 ## [0.1.15] — 2026-03-21 (patch 2)
 
 ### Added

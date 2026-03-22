@@ -900,6 +900,11 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 			continue
 		}
 		if err == nil {
+			// When a fallback service is used, update s.service/s.model so the
+			// next heartbeat, vault UI, and openclaw TUI all reflect the actual model.
+			if svc != service {
+				go s.onFallback(svc, s.resolveActualModel(svc, model))
+			}
 			return resp, nil
 		}
 		log.Printf("[proxy] %s failed → fallback: %v", svc, err)
@@ -1298,6 +1303,37 @@ func stripControlTokens(s string) string {
 		s = strings.ReplaceAll(s, tok, "")
 	}
 	return strings.TrimSpace(s)
+}
+
+// onFallback: called when dispatch succeeds on a service other than the requested one.
+// Updates s.service/s.model so the next heartbeat, vault UI, and openclaw TUI reflect reality.
+func (s *Server) onFallback(actualSvc, actualMdl string) {
+	s.mu.Lock()
+	s.service = actualSvc
+	s.model = actualMdl
+	s.mu.Unlock()
+	log.Printf("[proxy] fallback active: %s/%s", actualSvc, actualMdl)
+	s.pushConfigToVault(actualSvc, actualMdl)
+	go updateOpenClawJSON(actualSvc, actualMdl)
+	s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
+		"service": actualSvc,
+		"model":   actualMdl,
+	})
+}
+
+// resolveActualModel returns the model name that will actually be used for the given service.
+// Ollama ignores the upstream model and uses a local env-configured model instead.
+func (s *Server) resolveActualModel(svc, model string) string {
+	if svc == "ollama" {
+		if m := os.Getenv("OLLAMA_MODEL"); m != "" {
+			return m
+		}
+		if m := os.Getenv("WV_OLLAMA_MODEL"); m != "" {
+			return m
+		}
+		return "qwen3.5:35b"
+	}
+	return model
 }
 
 func extractModelFromPath(path string) string {

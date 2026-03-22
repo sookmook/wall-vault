@@ -12,6 +12,20 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-22 (patch 7)
+
+### Fixed
+- **Fallback model reflected in vault UI and openclaw TUI**: When `dispatch()` succeeded on a
+  fallback service (e.g. Google keys exhausted → OpenRouter), `s.service`/`s.model` was never
+  updated, so the vault UI and openclaw TUI continued showing the original (now-failing) model.
+  Added `onFallback()` which updates `s.service`/`s.model`, calls `pushConfigToVault()` to
+  persist the change, calls `updateOpenClawJSON()` to update the TUI, and fires the
+  `EventModelChanged` hook — same path as a manual model change.
+  Added `resolveActualModel()` to correctly report the Ollama model name (from env vars)
+  instead of the upstream model string when Ollama is the fallback.
+
+---
+
 ## [0.1.15] — 2026-03-22 (patch 5)
 
 ### Fixed

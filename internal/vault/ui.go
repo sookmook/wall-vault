@@ -687,6 +687,23 @@ document.querySelectorAll('#dd-theme .dd-item').forEach(el=>el.classList.toggle(
 // Key state cache: id → {baseText, cdMs}  — used by 1-second countdown ticker
 let _keyCache = {};
 
+// Seed key cache from server-rendered DOM so countdown ticks immediately on page load
+(function _seedKeyCache() {
+  const now = Date.now();
+  document.querySelectorAll('.key-item[data-key-id]').forEach(el => {
+    const id = el.dataset.keyId;
+    const cdMs = parseInt(el.dataset.cdMs || '0', 10);
+    const meta = el.querySelector('.key-meta');
+    if (!meta) return;
+    let baseText = meta.textContent || '';
+    if (cdMs > now) {
+      // Strip trailing " (X후)" cooldown annotation to recover baseText
+      baseText = baseText.replace(/\s*\([^)]+\)\s*$/, '').trim();
+    }
+    _keyCache[id] = {baseText, cdMs: cdMs > now ? cdMs : 0};
+  });
+})();
+
 // Format cooldown countdown string from timestamp (ms)
 function _fmtCountdown(untilMs) {
   const rem = Math.floor((untilMs - Date.now()) / 1000);
@@ -1985,20 +2002,15 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 	}
 	// order service groups by services card order (openrouter first), unknowns appended last
 	svcOrder := []string{}
+	svcInOrder := make(map[string]bool, len(services))
 	for _, sv := range services {
 		if _, ok := byService[sv.ID]; ok {
 			svcOrder = append(svcOrder, sv.ID)
+			svcInOrder[sv.ID] = true
 		}
 	}
 	for svc := range byService {
-		found := false
-		for _, s := range svcOrder {
-			if s == svc {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !svcInOrder[svc] {
 			svcOrder = append(svcOrder, svc)
 		}
 	}
@@ -2078,7 +2090,16 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 			}
 			if k.IsOnCooldown() {
 				remain := time.Until(k.CooldownUntil)
-				meta += fmt.Sprintf(` (%.0f<span data-i18n="key_in_min">분 후</span>)`, remain.Minutes())
+				secs := int(remain.Seconds())
+				if secs < 60 {
+					meta += fmt.Sprintf(` (%d<span data-i18n="key_in_sec">초 후</span>)`, secs)
+				} else {
+					meta += fmt.Sprintf(` (%.0f<span data-i18n="key_in_min">분 후</span>)`, remain.Minutes())
+				}
+			}
+			cdMs := int64(0)
+			if k.IsOnCooldown() {
+				cdMs = k.CooldownUntil.UnixMilli()
 			}
 
 			activeClass := ""
@@ -2086,8 +2107,8 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 				activeClass = " key-active"
 			}
 			sb.WriteString(fmt.Sprintf(
-				`<div class="key-item%s" data-key-id="%s"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
-				activeClass, k.ID, statusIcon, label, meta, k.ID, barClass, barPct,
+				`<div class="key-item%s" data-key-id="%s" data-cd-ms="%d"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
+				activeClass, k.ID, cdMs, statusIcon, label, meta, k.ID, barClass, barPct,
 			))
 		}
 		sb.WriteString(`</div>`)

@@ -99,6 +99,7 @@
   "auto_detect": "自动检测",
   "key_reqs": "请求",
   "key_in_min": " 分钟后",
+  "key_in_sec": " 秒后",
   "cfg_openclaw": "🦞 复制 OpenClaw 配置",
   "cfg_openclaw_title": "复制 ~/.openclaw/openclaw.json 配置",
   "cfg_nanoclaw": "🦀 复制 NanoClaw 配置",

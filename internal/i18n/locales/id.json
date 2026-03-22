@@ -99,6 +99,7 @@
   "auto_detect": "Deteksi otomatis",
   "key_reqs": "permintaan",
   "key_in_min": " mnt",
+  "key_in_sec": " dtk",
   "cfg_openclaw": "🦞 Salin Konfigurasi OpenClaw",
   "cfg_openclaw_title": "Salin konfigurasi ~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 Salin Konfigurasi NanoClaw",

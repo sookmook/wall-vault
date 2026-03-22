@@ -98,6 +98,11 @@ func NewServer(cfg *config.Config) *Server {
 				go updateOpenClawJSON(newSvc, newMdl)
 			}
 		}, func() {
+			// Flush token cache so vault model changes take effect immediately
+			s.tokenCacheMu.Lock()
+			s.tokenCache = make(map[string]*tokenCacheEntry)
+			s.tokenCacheMu.Unlock()
+		}, func() {
 			if err := s.keyMgr.SyncFromVault(); err != nil {
 				log.Printf("[SSE] 키 동기화 실패: %v", err)
 			}

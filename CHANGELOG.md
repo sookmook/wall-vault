@@ -12,6 +12,37 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-22 (patch 4)
+
+### Fixed
+- **`ResetDailyUsage` not resetting `UsageDate`**: daily usage reset cleared `TodayUsage` and
+  `TodayAttempts` but left `UsageDate` stale, causing the auto-reset guard in `SetKeyUsage` /
+  `SetKeyAttempts` to skip the reset on the next heartbeat.
+- **`handleAdminKeys` missing `today_attempts` field**: the safe struct for `GET /admin/keys`
+  was omitting `TodayAttempts`, so the REST response always returned `0` for attempts.
+- **Sub-minute cooldown shown as "0분 후"**: `%.0f` of `remain.Minutes()` rounds sub-60s
+  values to 0. Now shows seconds (e.g. "45초 후") when cooldown is under 60 seconds. Added
+  `key_in_sec` i18n key to all 17 locale files.
+- **`_keyCache` empty on page load**: countdown ticker had no data for the first ~20s after
+  page load. Added `_seedKeyCache()` IIFE that populates `_keyCache` from server-rendered
+  `data-cd-ms` DOM attributes on load so countdowns start ticking immediately.
+- **Model change in vault UI not immediately reflected**: `lookupTokenConfig` cached
+  token→model mappings for 30 seconds; changing a client's model didn't invalidate the cache.
+  Now any `config_change` SSE event immediately flushes the entire token cache via the new
+  `onConfigFlush` callback on `SSEClient`, so the new model takes effect within one request.
+- **heartbeat `activeKeys` missing `openai`, `lmstudio`, `vllm`**: the service list for
+  last-used key tracking only included `google`, `openrouter`, `anthropic`, `ollama`.
+
+### Changed
+- **`BatchUpdateKeyMetrics` replaces 3-loop heartbeat key sync**: vault's `handleHeartbeat`
+  previously called `SetKeyUsage`, `SetKeyAttempts`, and `SetKeyCooldownIfLater` in separate
+  loops (up to 3N `save()` calls per heartbeat). Replaced with a single
+  `BatchUpdateKeyMetrics` that updates all keys in one lock and one `save()`.
+- **O(n²) → O(n) service ordering in `buildKeysCard`**: replaced inner linear scan with a
+  `map[string]bool` set.
+
+---
+
 ## [0.1.15] — 2026-03-21 (patch 3)
 
 ### Added

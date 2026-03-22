@@ -99,6 +99,7 @@
   "auto_detect": "ตรวจจับอัตโนมัติ",
   "key_reqs": "คำขอ",
   "key_in_min": " นาที",
+  "key_in_sec": " วินาที",
   "cfg_openclaw": "🦞 คัดลอก Config OpenClaw",
   "cfg_openclaw_title": "คัดลอก Config ~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 คัดลอกการตั้งค่า NanoClaw",

@@ -99,6 +99,7 @@
   "auto_detect": "Auto-Erkennung",
   "key_reqs": "Anf.",
   "key_in_min": " Min.",
+  "key_in_sec": " Sek.",
   "cfg_openclaw": "🦞 OpenClaw-Konfig kopieren",
   "cfg_openclaw_title": "Konfig für ~/.openclaw/openclaw.json kopieren",
   "cfg_nanoclaw": "🦀 NanoClaw-Config kopieren",

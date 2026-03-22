@@ -99,6 +99,7 @@
   "auto_detect": "Thola ngokuzenzakalela",
   "key_reqs": "izicelo",
   "key_in_min": " min",
+  "key_in_sec": " sec",
   "cfg_openclaw": "🦞 Kopisha i-Config ye-OpenClaw",
   "cfg_openclaw_title": "Kopisha i-config ye-~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 Kopisha Isethingi ye-NanoClaw",

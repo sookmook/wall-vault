@@ -392,11 +392,49 @@ func (s *Store) SetKeyAttempts(id string, attempts int) bool {
 func (s *Store) ResetDailyUsage() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	today := time.Now().Format("2006-01-02")
 	for _, k := range s.keys {
 		k.TodayUsage = 0
 		k.TodayAttempts = 0
+		k.UsageDate = today
 	}
 	_ = s.save()
+}
+
+// BatchUpdateKeyMetrics atomically updates usage, attempts, and cooldowns for all keys
+// in a single lock acquisition + save, replacing up to 3N separate save() calls per heartbeat.
+func (s *Store) BatchUpdateKeyMetrics(usage, attempts map[string]int, cooldowns map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	today := time.Now().Format("2006-01-02")
+	changed := false
+	for _, k := range s.keys {
+		if k.UsageDate != today {
+			k.TodayUsage = 0
+			k.TodayAttempts = 0
+			k.UsageDate = today
+			changed = true
+		}
+		if v, ok := usage[k.ID]; ok && k.TodayUsage != v {
+			k.TodayUsage = v
+			changed = true
+		}
+		if v, ok := attempts[k.ID]; ok && k.TodayAttempts != v {
+			k.TodayAttempts = v
+			changed = true
+		}
+		if cdStr, ok := cooldowns[k.ID]; ok {
+			if until, err := time.Parse(time.RFC3339, cdStr); err == nil {
+				if until.After(k.CooldownUntil) {
+					k.CooldownUntil = until
+					changed = true
+				}
+			}
+		}
+	}
+	if changed {
+		_ = s.save()
+	}
 }
 
 // ─── Client Management ────────────────────────────────────────────────────────

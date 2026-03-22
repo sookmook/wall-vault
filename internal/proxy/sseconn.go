@@ -18,17 +18,19 @@ type SSEClient struct {
 	vaultURL        string
 	clientID        string
 	connected       bool
-	onConfig        func(service, model string) // config change callback
+	onConfig        func(service, model string) // config change callback (own client only)
+	onConfigFlush   func()                      // flush token cache on any config_change event
 	onKeyChange     func()                      // key added/deleted callback
 	onUsageReset    func()                      // midnight daily-counter reset callback
 	onServiceChange func([]string)              // proxy service list change callback
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onKeyChange func(), onUsageReset func(), onServiceChange func([]string)) *SSEClient {
+func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string)) *SSEClient {
 	return &SSEClient{
 		vaultURL:        vaultURL,
 		clientID:        clientID,
 		onConfig:        onConfig,
+		onConfigFlush:   onConfigFlush,
 		onKeyChange:     onKeyChange,
 		onUsageReset:    onUsageReset,
 		onServiceChange: onServiceChange,
@@ -106,6 +108,10 @@ func (c *SSEClient) handleEvent(data string) {
 	}
 	switch evt.Type {
 	case "config_change":
+		// Always flush token cache so model changes take effect within one request
+		if c.onConfigFlush != nil {
+			c.onConfigFlush()
+		}
 		if evt.Data.ClientID == c.clientID || evt.Data.ClientID == "" {
 			log.Printf("[SSE] 🔔 config change received: %s/%s", evt.Data.Service, evt.Data.Model)
 			if c.onConfig != nil {

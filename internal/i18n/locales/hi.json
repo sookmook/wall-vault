@@ -99,6 +99,7 @@
   "auto_detect": "स्वत: पहचान",
   "key_reqs": "अनुरोध",
   "key_in_min": " मिनट में",
+  "key_in_sec": " सेकंड में",
   "cfg_openclaw": "🦞 OpenClaw कॉन्फ़िग कॉपी करें",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json कॉन्फ़िग कॉपी करें",
   "cfg_nanoclaw": "🦀 NanoClaw कॉन्फिग कॉपी करें",

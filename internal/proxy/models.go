@@ -26,6 +26,8 @@ type GeminiRequest struct {
 	Tools             []interface{}      `json:"tools,omitempty"`
 	ToolConfig        interface{}        `json:"toolConfig,omitempty"`
 	SafetySettings    []interface{}      `json:"safetySettings,omitempty"`
+	// RawOAI carries the original OpenAI request for OAI-native backends (not serialized).
+	RawOAI *OpenAIRequest `json:"-"`
 }
 
 type GeminiContent struct {
@@ -60,9 +62,11 @@ type GeminiResponse struct {
 }
 
 type GeminiCandidate struct {
-	Content      GeminiContent `json:"content"`
-	FinishReason string        `json:"finishReason,omitempty"`
-	Index        int           `json:"index,omitempty"`
+	Content      GeminiContent   `json:"content"`
+	FinishReason string          `json:"finishReason,omitempty"`
+	Index        int             `json:"index,omitempty"`
+	// RawToolCalls carries tool_calls from OAI-format backend responses (not serialized).
+	RawToolCalls json.RawMessage `json:"-"`
 }
 
 type GeminiUsage struct {
@@ -91,22 +95,31 @@ type OpenAIRequest struct {
 }
 
 type OpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string          `json:"role"`
+	Content    string          `json:"content,omitempty"`
+	ToolCalls  json.RawMessage `json:"tool_calls,omitempty"`
+	ToolCallID string          `json:"tool_call_id,omitempty"`
+	Name       string          `json:"name,omitempty"`
 }
 
 // UnmarshalJSON handles content as either a string or an array of content parts.
 // OpenAI spec allows both; many clients (including OpenClaw) use the array form.
 func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Role    string          `json:"role"`
-		Content json.RawMessage `json:"content"`
+		Role       string          `json:"role"`
+		Content    json.RawMessage `json:"content"`
+		ToolCalls  json.RawMessage `json:"tool_calls"`
+		ToolCallID string          `json:"tool_call_id"`
+		Name       string          `json:"name"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	m.Role = raw.Role
 	m.Content = rawContentToString(raw.Content)
+	m.ToolCalls = raw.ToolCalls
+	m.ToolCallID = raw.ToolCallID
+	m.Name = raw.Name
 	return nil
 }
 

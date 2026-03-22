@@ -573,6 +573,38 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Convert Gemini functionCall parts to OAI tool_calls (for native Gemini backend).
+	for i := range geminiResp.Candidates {
+		if geminiResp.Candidates[i].RawToolCalls != nil {
+			continue // already set by OpenAIRespToGemini (OpenRouter path)
+		}
+		var toolCalls []map[string]interface{}
+		for _, part := range geminiResp.Candidates[i].Content.Parts {
+			if part.FunctionCall == nil {
+				continue
+			}
+			fc, ok := part.FunctionCall.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			name, _ := fc["name"].(string)
+			argsJSON, _ := json.Marshal(fc["args"])
+			toolCalls = append(toolCalls, map[string]interface{}{
+				"id":   fmt.Sprintf("call_%d", len(toolCalls)),
+				"type": "function",
+				"function": map[string]interface{}{
+					"name":      name,
+					"arguments": string(argsJSON),
+				},
+			})
+		}
+		if len(toolCalls) > 0 {
+			if b, err := json.Marshal(toolCalls); err == nil {
+				geminiResp.Candidates[i].RawToolCalls = b
+			}
+		}
+	}
+
 	type candidate struct {
 		text         string
 		finishReason string
@@ -612,15 +644,39 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			if b, err := json.Marshal(roleChunk); err == nil {
 				writeSSE(b)
 			}
-			// content delta
-			contentChunk := map[string]interface{}{
-				"id":      "chatcmpl-proxy",
-				"object":  "chat.completion.chunk",
-				"model":   mdl,
-				"choices": []map[string]interface{}{{"index": c.index, "delta": map[string]string{"content": c.text}, "finish_reason": nil}},
+			// content or tool_calls delta
+			var rawToolCalls json.RawMessage
+			if c.index < len(geminiResp.Candidates) {
+				rawToolCalls = geminiResp.Candidates[c.index].RawToolCalls
 			}
-			if b, err := json.Marshal(contentChunk); err == nil {
-				writeSSE(b)
+			if len(rawToolCalls) > 0 {
+				// Emit tool_calls delta so the client can execute them.
+				var tcList []interface{}
+				if json.Unmarshal(rawToolCalls, &tcList) == nil {
+					toolChunk := map[string]interface{}{
+						"id":     "chatcmpl-proxy",
+						"object": "chat.completion.chunk",
+						"model":  mdl,
+						"choices": []map[string]interface{}{{
+							"index":         c.index,
+							"delta":         map[string]interface{}{"tool_calls": tcList},
+							"finish_reason": nil,
+						}},
+					}
+					if b, err := json.Marshal(toolChunk); err == nil {
+						writeSSE(b)
+					}
+				}
+			} else {
+				contentChunk := map[string]interface{}{
+					"id":      "chatcmpl-proxy",
+					"object":  "chat.completion.chunk",
+					"model":   mdl,
+					"choices": []map[string]interface{}{{"index": c.index, "delta": map[string]string{"content": c.text}, "finish_reason": nil}},
+				}
+				if b, err := json.Marshal(contentChunk); err == nil {
+					writeSSE(b)
+				}
 			}
 			// finish delta
 			finishChunk := map[string]interface{}{
@@ -642,8 +698,13 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 
 	oaiResp := &OpenAIResponse{}
 	for _, c := range cands {
+		msg := OpenAIMessage{Role: "assistant", Content: c.text}
+		// Include tool_calls if the backend returned them.
+		if c.index < len(geminiResp.Candidates) {
+			msg.ToolCalls = geminiResp.Candidates[c.index].RawToolCalls
+		}
 		oaiResp.Choices = append(oaiResp.Choices, OpenAIChoice{
-			Message:      OpenAIMessage{Role: "assistant", Content: c.text},
+			Message:      msg,
 			FinishReason: c.finishReason,
 			Index:        c.index,
 		})
@@ -878,7 +939,9 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 		}
 		if resp.StatusCode != http.StatusOK {
 			s.keyMgr.RecordError(key, resp.StatusCode)
+			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
+			log.Printf("[google] HTTP %d: %s", resp.StatusCode, string(body))
 			return nil, fmt.Errorf("Google API 오류: HTTP %d", resp.StatusCode)
 		}
 
@@ -1134,6 +1197,13 @@ func parseProviderModel(svc, mdl string) (string, string) {
 	}
 	parts := strings.SplitN(mdl, "/", 2)
 	prefix, bare := parts[0], parts[1]
+
+	// When the caller explicitly chose OpenRouter as the service, honour that
+	// choice for models with provider prefixes (e.g. google/gemini-*) instead
+	// of re-routing them to the native Google/OpenAI handler.
+	if svc == "openrouter" && prefix != "openrouter" && prefix != "ollama" {
+		return "openrouter", mdl
+	}
 
 	switch prefix {
 	// ── Native handlers ──────────────────────────────────────────────────────

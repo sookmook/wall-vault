@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -43,13 +44,22 @@ func GeminiToOpenAI(model string, req *GeminiRequest) *OpenAIRequest {
 		oai.MaxTokens = req.GenerationConfig.MaxOutputTokens
 	}
 
+	// Restore tools from original OAI request (preserved through OpenAI→Gemini round-trip)
+	if req.RawOAI != nil && len(req.RawOAI.Tools) > 0 {
+		oai.Tools = req.RawOAI.Tools
+		oai.ToolChoice = req.RawOAI.ToolChoice
+	}
+
 	return oai
 }
 
 // ─── OpenAI → Gemini ─────────────────────────────────────────────────────────
 
 func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
-	gemini := &GeminiRequest{}
+	gemini := &GeminiRequest{RawOAI: req}
+
+	// Track tool_call_id → function_name for functionResponse name lookup.
+	toolCallNames := make(map[string]string)
 
 	for _, msg := range req.Messages {
 		if msg.Role == "system" {
@@ -61,6 +71,61 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 		role := msg.Role
 		if role == "assistant" {
 			role = "model"
+		}
+
+		// Handle assistant messages with tool_calls (model function calls).
+		if role == "model" && len(msg.ToolCalls) > 0 {
+			var tcList []map[string]interface{}
+			if json.Unmarshal(msg.ToolCalls, &tcList) == nil {
+				var parts []GeminiPart
+				for _, tc := range tcList {
+					fn, _ := tc["function"].(map[string]interface{})
+					if fn == nil {
+						continue
+					}
+					name, _ := fn["name"].(string)
+					// Record tool_call_id → function_name for later tool result lookup.
+					if id, _ := tc["id"].(string); id != "" && name != "" {
+						toolCallNames[id] = name
+					}
+					argsStr, _ := fn["arguments"].(string)
+					var args interface{}
+					if json.Unmarshal([]byte(argsStr), &args) != nil {
+						args = map[string]interface{}{}
+					}
+					parts = append(parts, GeminiPart{
+						FunctionCall: map[string]interface{}{"name": name, "args": args},
+					})
+				}
+				if len(parts) > 0 {
+					gemini.Contents = append(gemini.Contents, GeminiContent{Role: role, Parts: parts})
+					continue
+				}
+			}
+		}
+
+		// Handle tool result messages (role=tool → Gemini functionResponse).
+		if msg.Role == "tool" {
+			// OAI tool results carry tool_call_id (not name); look up the function name.
+			fname := toolCallNames[msg.ToolCallID]
+			if fname == "" {
+				fname = msg.Name // fallback if name was populated directly
+			}
+			gemini.Contents = append(gemini.Contents, GeminiContent{
+				Role: "user",
+				Parts: []GeminiPart{{
+					FunctionResponse: map[string]interface{}{
+						"name":     fname,
+						"response": map[string]interface{}{"content": msg.Content},
+					},
+				}},
+			})
+			continue
+		}
+
+		// Skip empty text parts — Gemini rejects parts with no data.
+		if msg.Content == "" {
+			continue
 		}
 		gemini.Contents = append(gemini.Contents, GeminiContent{
 			Role:  role,
@@ -75,7 +140,67 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 		}
 	}
 
+	// Convert OpenAI tools to Gemini functionDeclarations format.
+	if len(req.Tools) > 0 {
+		var funcDecls []interface{}
+		for _, t := range req.Tools {
+			toolMap, ok := t.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			fn, ok := toolMap["function"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			decl := map[string]interface{}{}
+			if name, ok := fn["name"].(string); ok {
+				decl["name"] = name
+			}
+			if desc, ok := fn["description"].(string); ok && desc != "" {
+				decl["description"] = desc
+			}
+			if params := fn["parameters"]; params != nil {
+				// Strip JSON Schema fields unsupported by Gemini.
+				decl["parameters"] = stripGeminiUnsupported(params)
+			}
+			funcDecls = append(funcDecls, decl)
+		}
+		if len(funcDecls) > 0 {
+			gemini.Tools = []interface{}{
+				map[string]interface{}{"functionDeclarations": funcDecls},
+			}
+		}
+	}
+
 	return gemini
+}
+
+// stripGeminiUnsupported recursively removes JSON Schema fields that Gemini's
+// function declaration API rejects (additionalProperties, patternProperties, etc.).
+func stripGeminiUnsupported(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(val))
+		for k, child := range val {
+			switch k {
+			case "additionalProperties", "patternProperties",
+				"$schema", "$ref", "$defs", "definitions",
+				"unevaluatedProperties", "strict":
+				// drop — Gemini doesn't support these
+			default:
+				out[k] = stripGeminiUnsupported(child)
+			}
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(val))
+		for i, elem := range val {
+			out[i] = stripGeminiUnsupported(elem)
+		}
+		return out
+	default:
+		return v
+	}
 }
 
 // ─── OpenAI Response → Gemini Response ───────────────────────────────────────
@@ -87,14 +212,19 @@ func OpenAIRespToGemini(resp *OpenAIResponse) *GeminiResponse {
 		if reason == "" {
 			reason = "STOP"
 		}
-		gr.Candidates = append(gr.Candidates, GeminiCandidate{
+		cand := GeminiCandidate{
 			Content: GeminiContent{
 				Role:  "model",
 				Parts: []GeminiPart{{Text: c.Message.Content}},
 			},
 			FinishReason: reason,
 			Index:        i,
-		})
+		}
+		// Carry tool_calls through so handleOpenAI can return them to the client.
+		if len(c.Message.ToolCalls) > 0 {
+			cand.RawToolCalls = c.Message.ToolCalls
+		}
+		gr.Candidates = append(gr.Candidates, cand)
 	}
 	if resp.Usage != nil {
 		gr.UsageMetadata = &GeminiUsage{

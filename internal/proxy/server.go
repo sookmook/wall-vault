@@ -1126,13 +1126,19 @@ func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, erro
 	s.ollamaMu.Lock()
 	defer s.ollamaMu.Unlock()
 
-	ollamaReq := GeminiToOllama(model, req)
-	data, _ := json.Marshal(ollamaReq)
+	// Use Ollama's OpenAI-compatible /v1/chat/completions endpoint.
+	// The native /api/chat expects tool_calls.function.arguments as a JSON object,
+	// while OpenAI format (and our internal representation) uses a JSON string —
+	// sending the OpenAI format to /api/chat causes HTTP 400.
+	// /v1/chat/completions accepts the standard OpenAI format including arguments-as-string.
+	oaiReq := GeminiToOpenAI(model, req)
+	oaiReq.Stream = false
+	data, _ := json.Marshal(oaiReq)
 
 	// Ollama is a local service: inference can take several minutes for large models.
 	// Use a dedicated client with no hard timeout so generation is never cut off.
 	// Connection errors (server not running) still surface immediately.
-	httpReq, err := http.NewRequest("POST", ollamaURL+"/api/chat", bytes.NewReader(data))
+	httpReq, err := http.NewRequest("POST", ollamaURL+"/v1/chat/completions", bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("Ollama 요청 생성 실패: %w", err)
 	}
@@ -1145,15 +1151,19 @@ func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, erro
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Ollama 오류: HTTP %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Ollama 오류: HTTP %d: %s", resp.StatusCode, body)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var ollamaResp OllamaResponse
-	if err := json.Unmarshal(body, &ollamaResp); err != nil {
+	var oaiResp OpenAIResponse
+	if err := json.Unmarshal(body, &oaiResp); err != nil {
 		return nil, fmt.Errorf("Ollama 응답 파싱 오류: %w", err)
 	}
-	return OllamaRespToGemini(&ollamaResp), nil
+	if oaiResp.Error != nil {
+		return nil, fmt.Errorf("Ollama: %s", oaiResp.Error.Message)
+	}
+	return OpenAIRespToGemini(&oaiResp), nil
 }
 
 // ─── Common HTTP Request ──────────────────────────────────────────────────────

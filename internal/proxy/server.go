@@ -836,39 +836,23 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 
 	var lastErr error
 
-	// Build try order: configured service first, then the rest
-	tryOrder := []string{service}
-	for _, svc := range s.cfg.Proxy.Services {
-		if svc != service {
-			tryOrder = append(tryOrder, svc)
-		}
-	}
-	// Filter by proxy-enabled services from vault (when configured)
+	// Build try order from the vault UI proxy-enabled service list (allowedServices),
+	// which matches the order shown in the Services section of the dashboard.
+	// The currently configured service is moved to the front so it is always tried first.
+	// Falls back to s.cfg.Proxy.Services when the vault list is not yet available.
+	var tryOrder []string
 	if len(allowedServices) > 0 {
-		allowed := make(map[string]bool, len(allowedServices))
+		tryOrder = append(tryOrder, service)
 		for _, svc := range allowedServices {
-			allowed[svc] = true
-		}
-		var filtered []string
-		for _, svc := range tryOrder {
-			if allowed[svc] {
-				filtered = append(filtered, svc)
+			if svc != service {
+				tryOrder = append(tryOrder, svc)
 			}
 		}
-		if len(filtered) > 0 {
-			tryOrder = filtered
-		}
-		// Append any vault-allowed services not yet in tryOrder (covers the case
-		// where the proxy is started without explicit -services flags and
-		// s.cfg.Proxy.Services is empty).
-		inOrder := make(map[string]bool, len(tryOrder))
-		for _, svc := range tryOrder {
-			inOrder[svc] = true
-		}
-		for _, svc := range allowedServices {
-			if !inOrder[svc] {
+	} else {
+		tryOrder = append(tryOrder, service)
+		for _, svc := range s.cfg.Proxy.Services {
+			if svc != service {
 				tryOrder = append(tryOrder, svc)
-				inOrder[svc] = true
 			}
 		}
 	}

@@ -12,9 +12,14 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [0.1.15] — 2026-03-22 (patch 9)
+## [0.1.15] — 2026-03-22 (patch 10)
 
 ### Fixed
+- **Ollama HTTP 400 on tool-call conversations**: `callOllama` used `/api/chat` which requires
+  `tool_calls.function.arguments` as a JSON object, but our internal format (OpenAI-compatible)
+  stores arguments as a JSON string. Switched to Ollama's `/v1/chat/completions` OpenAI-compat
+  endpoint which accepts the standard OpenAI format including arguments-as-string. Response is
+  now parsed as `OpenAIResponse` via `OpenAIRespToGemini` instead of the native Ollama format.
 - **Fallback chain incomplete when proxy starts without `-services` flag**: `dispatch()` built
   `tryOrder` from `s.cfg.Proxy.Services` (local config) and filtered by `allowedServices`
   (from vault). When no local services are configured (common in distributed mode), only the

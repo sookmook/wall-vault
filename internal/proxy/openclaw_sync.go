@@ -126,8 +126,16 @@ func updateOpenClawJSON(service, model string) {
 		return
 	}
 
-	// Build the provider/model string OpenClaw expects (e.g. "custom/gemini-2.5-flash")
-	primaryModel := "custom/" + model
+	// Build the provider/model string OpenClaw expects.
+	// For Anthropic: use the "anthropic" provider so OpenClaw sends to /v1/messages
+	// (which uses callAnthropicPassthrough — preserves tool calls).
+	// For all others: use the "custom" provider (OpenAI-compat proxy at /v1).
+	var primaryModel string
+	if service == "anthropic" {
+		primaryModel = "anthropic/" + model
+	} else {
+		primaryModel = "custom/" + model
+	}
 
 	changed := false
 
@@ -152,7 +160,7 @@ func updateOpenClawJSON(service, model string) {
 		changed = true
 	}
 
-	// ── 2. models.providers.custom — v2026.3.12 format ────────────────────────
+	// ── 2. models.providers — set up the appropriate provider ─────────────────
 	modelsSection, _ := cfg["models"].(map[string]interface{})
 	if modelsSection == nil {
 		modelsSection = map[string]interface{}{}
@@ -163,57 +171,98 @@ func updateOpenClawJSON(service, model string) {
 		providers = map[string]interface{}{}
 		modelsSection["providers"] = providers
 	}
-	custom, _ := providers["custom"].(map[string]interface{})
-	if custom == nil {
-		custom = map[string]interface{}{
-			"baseUrl":    "http://localhost:56244/v1",
-			"apiKey":     "proxy-managed",
-			"api":        "openai-completions",
-			"authHeader": false,
+
+	if service == "anthropic" {
+		// Point the "anthropic" provider at the local proxy so /v1/messages is handled
+		// by callAnthropicPassthrough (preserves tools and tool_use responses).
+		antProv, _ := providers["anthropic"].(map[string]interface{})
+		if antProv == nil {
+			antProv = map[string]interface{}{
+				"baseUrl": "http://localhost:56244",
+				"apiKey":  "proxy-managed",
+			}
+			providers["anthropic"] = antProv
+			changed = true
 		}
-		providers["custom"] = custom
-		changed = true
-	}
-
-	// Ensure provider-level api field is set (migration from per-model api)
-	if custom["api"] == nil {
-		custom["api"] = "openai-completions"
-		changed = true
-	}
-	// Migrate old baseUrl from Gemini path to OpenAI path
-	if bu, _ := custom["baseUrl"].(string); bu == "http://localhost:56244/google/v1beta" {
-		custom["baseUrl"] = "http://localhost:56244/v1"
-		changed = true
-	}
-
-	// Add model entry if missing
-	models, _ := custom["models"].([]interface{})
-	found := false
-	for _, m := range models {
-		if mm, ok := m.(map[string]interface{}); ok {
-			if mm["id"] == model {
-				found = true
-				// Remove legacy per-model api field if present
-				if _, hasAPI := mm["api"]; hasAPI {
-					delete(mm, "api")
-					changed = true
-				}
+		// Redirect from real Anthropic API to proxy if needed.
+		if bu, _ := antProv["baseUrl"].(string); bu != "http://localhost:56244" {
+			antProv["baseUrl"] = "http://localhost:56244"
+			changed = true
+		}
+		// Add model entry if missing.
+		antModels, _ := antProv["models"].([]interface{})
+		antFound := false
+		for _, m := range antModels {
+			if mm, ok := m.(map[string]interface{}); ok && mm["id"] == model {
+				antFound = true
 				break
 			}
 		}
-	}
-	if !found {
-		entry := map[string]interface{}{
-			"id":            model,
-			"name":          service + " / " + model,
-			"reasoning":     false,
-			"input":         []interface{}{"text"},
-			"contextWindow": 1048576,
-			"maxTokens":     65536,
+		if !antFound {
+			entry := map[string]interface{}{
+				"id":            model,
+				"name":          "proxy / " + model,
+				"contextWindow": 1048576,
+				"maxTokens":     65536,
+			}
+			antModels = append([]interface{}{entry}, antModels...)
+			antProv["models"] = antModels
+			changed = true
 		}
-		models = append([]interface{}{entry}, models...)
-		custom["models"] = models
-		changed = true
+	} else {
+		// Non-Anthropic: use the "custom" provider (OpenAI-compat /v1 proxy).
+		custom, _ := providers["custom"].(map[string]interface{})
+		if custom == nil {
+			custom = map[string]interface{}{
+				"baseUrl":    "http://localhost:56244/v1",
+				"apiKey":     "proxy-managed",
+				"api":        "openai-completions",
+				"authHeader": false,
+			}
+			providers["custom"] = custom
+			changed = true
+		}
+
+		// Ensure provider-level api field is set (migration from per-model api)
+		if custom["api"] == nil {
+			custom["api"] = "openai-completions"
+			changed = true
+		}
+		// Migrate old baseUrl from Gemini path to OpenAI path
+		if bu, _ := custom["baseUrl"].(string); bu == "http://localhost:56244/google/v1beta" {
+			custom["baseUrl"] = "http://localhost:56244/v1"
+			changed = true
+		}
+
+		// Add model entry if missing
+		models, _ := custom["models"].([]interface{})
+		found := false
+		for _, m := range models {
+			if mm, ok := m.(map[string]interface{}); ok {
+				if mm["id"] == model {
+					found = true
+					// Remove legacy per-model api field if present
+					if _, hasAPI := mm["api"]; hasAPI {
+						delete(mm, "api")
+						changed = true
+					}
+					break
+				}
+			}
+		}
+		if !found {
+			entry := map[string]interface{}{
+				"id":            model,
+				"name":          service + " / " + model,
+				"reasoning":     false,
+				"input":         []interface{}{"text"},
+				"contextWindow": 1048576,
+				"maxTokens":     65536,
+			}
+			models = append([]interface{}{entry}, models...)
+			custom["models"] = models
+			changed = true
+		}
 	}
 
 	// ── 3. meta version bump ───────────────────────────────────────────────────

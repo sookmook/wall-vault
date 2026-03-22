@@ -12,6 +12,42 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.15] — 2026-03-22 (patch 5)
+
+### Fixed
+- **Tool calling end-to-end through proxy**: Multiple bugs prevented tool calls from working
+  when OpenClaw/Claude Code routed through the proxy in OpenAI-compat mode (`/v1/chat/completions`):
+  - `OpenAIToGemini` dropped the `tools` array entirely — Gemini and OpenRouter backends
+    never received tool definitions. Fixed by converting OAI `tools` to Gemini
+    `functionDeclarations` format and carrying the original `tools`/`tool_choice` through
+    `RawOAI` for OAI-native backends.
+  - `OpenAIMessage.UnmarshalJSON` only parsed `role` and `content`, silently dropping
+    `tool_calls`, `tool_call_id`, and `name`. Fixed by adding these fields to the raw struct.
+  - `function_response.name` was always empty for tool result messages: OAI tool results
+    use `tool_call_id` (not `name`). Added `toolCallNames` map in `OpenAIToGemini` to track
+    `tool_call_id → function_name` from preceding assistant `tool_calls`, then look up the
+    name when converting role=tool messages to Gemini `functionResponse`.
+  - Empty text `GeminiPart` created for assistant messages with `tool_calls` but no content
+    (`msg.Content == ""`). Gemini rejects parts with no data field. Fixed by skipping empty
+    content parts.
+  - `GeminiCandidate.RawToolCalls` and `GeminiRequest.RawOAI` carry-through fields added to
+    `models.go` so tool_calls survive the Gemini response → OAI response conversion.
+  - `stripGeminiUnsupported` added to remove JSON Schema fields Gemini rejects
+    (`additionalProperties`, `patternProperties`, `$schema`, `$ref`, `$defs`, `definitions`,
+    `unevaluatedProperties`, `strict`) from function declaration parameters.
+- **`parseProviderModel` ignoring configured OpenRouter service**: when `svc=openrouter` and
+  the model had a provider prefix (e.g. `google/gemini-2.5-flash`), the switch matched
+  `"google"` and re-routed to the native Google handler, bypassing OpenRouter. Fixed by
+  returning `("openrouter", mdl)` early when `svc == "openrouter"`.
+- **`callGoogle` swallowed HTTP error body**: non-200 responses discarded the body before
+  logging, making 400 errors undiagnosable. Fixed by reading body before closing.
+- **`openclaw_sync` Anthropic provider routing**: when `service == "anthropic"`, now
+  configures `models.providers.anthropic` with `baseUrl = "http://localhost:56244"` so
+  OpenClaw sends tool-aware `/v1/messages` requests through the proxy passthrough path
+  instead of calling the real Anthropic API directly.
+
+---
+
 ## [0.1.15] — 2026-03-22 (patch 4)
 
 ### Fixed

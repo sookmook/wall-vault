@@ -129,6 +129,12 @@ func (s *Server) callAnthropic(model string, req *GeminiRequest) (*GeminiRespons
 			lastErr = fmt.Errorf("Anthropic 오류: HTTP %d", resp.StatusCode)
 			continue
 		}
+		if resp.StatusCode == http.StatusBadRequest {
+			// 400: request error (wrong model name, unsupported params) —
+			// not a key fault; skip without cooldown so dispatch falls through.
+			resp.Body.Close()
+			return nil, fmt.Errorf("Anthropic 오류: HTTP %d", resp.StatusCode)
+		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			s.keyMgr.RecordError(key, resp.StatusCode)

@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— मॉडल चुनें या दर्ज करें —",
   "btn_del": "हटाएं",
   "auto_detect": "स्वत: पहचान",
-  "key_reqs": "अनुरोध",
+  "key_reqs": "टोकन",
   "key_in_min": " मिनट में",
   "key_in_sec": " सेकंड में",
   "cfg_openclaw": "🦞 OpenClaw कॉन्फ़िग कॉपी करें",

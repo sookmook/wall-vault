@@ -611,10 +611,15 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		index        int
 	}
 	var cands []candidate
-	for _, c := range geminiResp.Candidates {
+	for i, c := range geminiResp.Candidates {
+		reason := strings.ToLower(c.FinishReason)
+		// Map to OAI finish_reason: tool_calls when the candidate carries tool calls.
+		if len(geminiResp.Candidates[i].RawToolCalls) > 0 {
+			reason = "tool_calls"
+		}
 		cands = append(cands, candidate{
 			text:         stripControlTokens(extractText(c.Content.Parts)),
-			finishReason: strings.ToLower(c.FinishReason),
+			finishReason: reason,
 			index:        c.Index,
 		})
 	}
@@ -651,15 +656,22 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			}
 			if len(rawToolCalls) > 0 {
 				// Emit tool_calls delta so the client can execute them.
-				var tcList []interface{}
+				// Each tool call must carry an index field per OAI streaming spec.
+				var tcList []map[string]interface{}
 				if json.Unmarshal(rawToolCalls, &tcList) == nil {
+					for i, tc := range tcList {
+						if _, hasIdx := tc["index"]; !hasIdx {
+							tc["index"] = i
+							tcList[i] = tc
+						}
+					}
 					toolChunk := map[string]interface{}{
 						"id":     "chatcmpl-proxy",
 						"object": "chat.completion.chunk",
 						"model":  mdl,
 						"choices": []map[string]interface{}{{
 							"index":         c.index,
-							"delta":         map[string]interface{}{"tool_calls": tcList},
+							"delta":         map[string]interface{}{"role": "assistant", "tool_calls": tcList},
 							"finish_reason": nil,
 						}},
 					}

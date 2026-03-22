@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— 选择或输入模型 —",
   "btn_del": "删除",
   "auto_detect": "自动检测",
-  "key_reqs": "请求",
+  "key_reqs": "令牌",
   "key_in_min": " 分钟后",
   "key_in_sec": " 秒后",
   "cfg_openclaw": "🦞 复制 OpenClaw 配置",

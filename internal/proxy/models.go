@@ -185,6 +185,7 @@ type OpenAIError struct {
 type OllamaRequest struct {
 	Model    string          `json:"model"`
 	Messages []OpenAIMessage `json:"messages"`
+	Tools    []interface{}   `json:"tools,omitempty"`
 	Stream   bool            `json:"stream"`
 	Options  *OllamaOptions  `json:"options,omitempty"`
 }

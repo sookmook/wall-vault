@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— モデルを選択または入力 —",
   "btn_del": "削除",
   "auto_detect": "自動検出",
-  "key_reqs": "リクエスト",
+  "key_reqs": "トークン",
   "key_in_min": "分後",
   "key_in_sec": "秒後",
   "cfg_openclaw": "🦞 OpenClaw設定をコピー",

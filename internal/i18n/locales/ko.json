@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— 모델 선택 또는 직접 입력 —",
   "btn_del": "삭제",
   "auto_detect": "자동 감지",
-  "key_reqs": "요청",
+  "key_reqs": "토큰",
   "key_in_min": "분 후",
   "key_in_sec": "초 후",
   "cfg_openclaw": "🦞 OpenClaw 설정 복사",

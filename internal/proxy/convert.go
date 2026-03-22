@@ -172,6 +172,36 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 		}
 	}
 
+	// Convert tool_choice to Gemini toolConfig.functionCallingConfig.
+	if req.ToolChoice != nil {
+		mode := "AUTO"
+		switch v := req.ToolChoice.(type) {
+		case string:
+			switch v {
+			case "required":
+				mode = "ANY"
+			case "none":
+				mode = "NONE"
+			}
+		case map[string]interface{}:
+			// {"type": "function", "function": {"name": "..."}} → forced specific function
+			if fn, ok := v["function"].(map[string]interface{}); ok {
+				if name, ok := fn["name"].(string); ok && name != "" {
+					gemini.ToolConfig = map[string]interface{}{
+						"functionCallingConfig": map[string]interface{}{
+							"mode":                 "ANY",
+							"allowedFunctionNames": []string{name},
+						},
+					}
+					return gemini
+				}
+			}
+		}
+		gemini.ToolConfig = map[string]interface{}{
+			"functionCallingConfig": map[string]interface{}{"mode": mode},
+		}
+	}
+
 	return gemini
 }
 
@@ -239,17 +269,18 @@ func OpenAIRespToGemini(resp *OpenAIResponse) *GeminiResponse {
 // ─── Ollama Response → Gemini Response ───────────────────────────────────────
 
 func OllamaRespToGemini(resp *OllamaResponse) *GeminiResponse {
-	return &GeminiResponse{
-		Candidates: []GeminiCandidate{
-			{
-				Content: GeminiContent{
-					Role:  "model",
-					Parts: []GeminiPart{{Text: resp.Message.Content}},
-				},
-				FinishReason: "STOP",
-			},
+	cand := GeminiCandidate{
+		Content: GeminiContent{
+			Role:  "model",
+			Parts: []GeminiPart{{Text: resp.Message.Content}},
 		},
+		FinishReason: "STOP",
 	}
+	// Carry tool_calls through so handleOpenAI can return them to the client.
+	if len(resp.Message.ToolCalls) > 0 {
+		cand.RawToolCalls = resp.Message.ToolCalls
+	}
+	return &GeminiResponse{Candidates: []GeminiCandidate{cand}}
 }
 
 // ─── Gemini → Ollama ─────────────────────────────────────────────────────────
@@ -259,6 +290,7 @@ func GeminiToOllama(model string, req *GeminiRequest) *OllamaRequest {
 	ollama := &OllamaRequest{
 		Model:    model,
 		Messages: oai.Messages,
+		Tools:    oai.Tools,
 		Stream:   false,
 	}
 	if req.GenerationConfig != nil {

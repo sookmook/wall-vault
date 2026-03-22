@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— Seleccionar o ingresar modelo —",
   "btn_del": "Eliminar",
   "auto_detect": "Detección auto",
-  "key_reqs": "sol.",
+  "key_reqs": "tokens",
   "key_in_min": " min",
   "key_in_sec": " seg",
   "cfg_openclaw": "🦞 Copiar config OpenClaw",

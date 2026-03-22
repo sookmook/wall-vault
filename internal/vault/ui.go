@@ -788,7 +788,7 @@ function refreshKeyUsage(data) {
       if (attempts > usage) baseText += ' (' + attempts + ' ' + T('key_att') + ')';
     } else if (usage > 0) {
       baseText = usage + ' ' + T('key_reqs');
-      if (attempts > usage) baseText += ' (' + attempts + ' ' + T('key_att') + ')';
+      if (attempts > 0) baseText += ' (' + attempts + ' ' + T('key_att') + ')';
     } else if (attempts > 0) {
       // all requests rate-limited; show attempt count so it's not blank
       baseText = attempts + ' ' + T('key_att');
@@ -2079,14 +2079,14 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 					meta += fmt.Sprintf(` (%d <span data-i18n="key_att">시도</span>)`, k.TodayAttempts)
 				}
 			} else if k.TodayUsage > 0 {
-				meta = fmt.Sprintf(`%d <span data-i18n="key_reqs">요청</span>`, k.TodayUsage)
-				if k.TodayAttempts > k.TodayUsage {
+				meta = fmt.Sprintf(`%d <span data-i18n="key_reqs">토큰</span>`, k.TodayUsage)
+				if k.TodayAttempts > 0 {
 					meta += fmt.Sprintf(` (%d <span data-i18n="key_att">시도</span>)`, k.TodayAttempts)
 				}
 			} else if k.TodayAttempts > 0 {
 				meta = fmt.Sprintf(`%d <span data-i18n="key_att">시도</span>`, k.TodayAttempts)
 			} else {
-				meta = fmt.Sprintf(`0 <span data-i18n="key_reqs">요청</span>`)
+				meta = fmt.Sprintf(`0 <span data-i18n="key_reqs">토큰</span>`)
 			}
 			if k.IsOnCooldown() {
 				remain := time.Until(k.CooldownUntil)

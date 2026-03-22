@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— Modell wählen oder eingeben —",
   "btn_del": "Löschen",
   "auto_detect": "Auto-Erkennung",
-  "key_reqs": "Anf.",
+  "key_reqs": "Token",
   "key_in_min": " Min.",
   "key_in_sec": " Sek.",
   "cfg_openclaw": "🦞 OpenClaw-Konfig kopieren",

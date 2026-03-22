@@ -97,7 +97,7 @@
   "sel_model_or_enter": "— Select or enter model —",
   "btn_del": "Delete",
   "auto_detect": "Auto detect",
-  "key_reqs": "req",
+  "key_reqs": "tokens",
   "key_in_min": " min",
   "key_in_sec": " sec",
   "cfg_openclaw": "🦞 Copy OpenClaw Config",

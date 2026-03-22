@@ -99,6 +99,7 @@
   "auto_detect": "Gundua kiotomatiki",
   "key_reqs": "ombi",
   "key_in_min": " dak",
+  "key_in_sec": " sek",
   "cfg_openclaw": "🦞 Nakili Config ya OpenClaw",
   "cfg_openclaw_title": "Nakili config ya ~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 Nakili Mipangilio ya NanoClaw",

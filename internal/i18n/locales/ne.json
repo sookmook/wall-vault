@@ -99,6 +99,7 @@
   "auto_detect": "स्वचालित पहिचान",
   "key_reqs": "अनुरोध",
   "key_in_min": " मिनेटमा",
+  "key_in_sec": " सेकेन्डमा",
   "cfg_openclaw": "🦞 OpenClaw कन्फिग कपी",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json कन्फिग कपी",
   "cfg_nanoclaw": "🦀 NanoClaw कन्फिग प्रतिलिपि",

@@ -82,7 +82,7 @@ func (s *Server) sendHeartbeat() {
 
 	// Collect last-used key ID per service
 	activeKeys := make(map[string]string)
-	for _, service := range []string{"google", "openrouter", "anthropic", "ollama"} {
+	for _, service := range []string{"google", "openrouter", "anthropic", "ollama", "openai", "lmstudio", "vllm"} {
 		if id := s.keyMgr.LastUsedID(service); id != "" {
 			activeKeys[service] = id
 		}

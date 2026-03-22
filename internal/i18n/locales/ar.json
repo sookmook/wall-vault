@@ -99,6 +99,7 @@
   "auto_detect": "كشف تلقائي",
   "key_reqs": "طلب",
   "key_in_min": " د",
+  "key_in_sec": " ث",
   "cfg_openclaw": "🦞 نسخ إعدادات OpenClaw",
   "cfg_openclaw_title": "نسخ إعدادات ~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 نسخ إعدادات NanoClaw",

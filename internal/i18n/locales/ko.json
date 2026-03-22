@@ -99,6 +99,7 @@
   "auto_detect": "자동 감지",
   "key_reqs": "요청",
   "key_in_min": "분 후",
+  "key_in_sec": "초 후",
   "cfg_openclaw": "🦞 OpenClaw 설정 복사",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json 설정 복사",
   "cfg_nanoclaw": "🦀 NanoClaw 설정 복사",

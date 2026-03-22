@@ -99,6 +99,7 @@
   "auto_detect": "Gano ta atomatik",
   "key_reqs": "buƙata",
   "key_in_min": " minti",
+  "key_in_sec": " daƙiƙa",
   "cfg_openclaw": "🦞 Kwafin Saitunan OpenClaw",
   "cfg_openclaw_title": "Kwafin saitunan ~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 Kwafi Saitunan NanoClaw",

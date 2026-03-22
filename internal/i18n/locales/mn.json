@@ -99,6 +99,7 @@
   "auto_detect": "Автомат илрүүлэх",
   "key_reqs": "хүсэлт",
   "key_in_min": " мин",
+  "key_in_sec": " сек",
   "cfg_openclaw": "🦞 OpenClaw тохиргоо хуулах",
   "cfg_openclaw_title": "~/.openclaw/openclaw.json тохиргоо хуулах",
   "cfg_nanoclaw": "🦀 NanoClaw тохиргоо хуулах",

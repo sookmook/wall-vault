@@ -317,6 +317,7 @@ func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 			Service       string    `json:"service"`
 			Label         string    `json:"label"`
 			TodayUsage    int       `json:"today_usage"`
+			TodayAttempts int       `json:"today_attempts"`
 			DailyLimit    int       `json:"daily_limit"`
 			CooldownUntil time.Time `json:"cooldown_until"`
 			LastError     int       `json:"last_error"`
@@ -328,7 +329,7 @@ func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 		for _, k := range keys {
 			result = append(result, safe{
 				ID: k.ID, Service: k.Service, Label: k.Label,
-				TodayUsage: k.TodayUsage, DailyLimit: k.DailyLimit,
+				TodayUsage: k.TodayUsage, TodayAttempts: k.TodayAttempts, DailyLimit: k.DailyLimit,
 				CooldownUntil: k.CooldownUntil, LastError: k.LastError,
 				CreatedAt: k.CreatedAt, Available: k.IsAvailable(), UsagePct: k.UsagePct(),
 			})
@@ -404,18 +405,8 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if ps.Avatar != "" {
 		_ = s.store.UpdateClient(ps.ClientID, ClientUpdateInput{Avatar: &ps.Avatar})
 	}
-	// sync proxy key usage, attempts, and cooldowns into vault store
-	for keyID, tokens := range ps.KeyUsage {
-		s.store.SetKeyUsage(keyID, tokens)
-	}
-	for keyID, attempts := range ps.KeyAttempts {
-		s.store.SetKeyAttempts(keyID, attempts)
-	}
-	for keyID, cooldownStr := range ps.KeyCooldowns {
-		if until, err := time.Parse(time.RFC3339, cooldownStr); err == nil {
-			s.store.SetKeyCooldownIfLater(keyID, until)
-		}
-	}
+	// sync proxy key usage, attempts, and cooldowns into vault store (single lock + save)
+	s.store.BatchUpdateKeyMetrics(ps.KeyUsage, ps.KeyAttempts, ps.KeyCooldowns)
 	// always broadcast full key states so the dashboard reflects reality without a fetch
 	{
 		allKeys := s.store.ListKeys()

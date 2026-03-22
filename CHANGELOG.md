@@ -12,7 +12,14 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [0.1.15] — 2026-03-22 (patch 10)
+## [0.1.15] — 2026-03-22 (patch 11)
+
+### Changed
+- **Fallback order follows vault UI service list**: `dispatch()` now builds `tryOrder`
+  directly from `allowedServices` (the proxy-enabled service list from the vault dashboard,
+  in the order they appear). The primary configured service is moved to the front; all
+  remaining proxy-enabled services follow in dashboard order (including vLLM, LM Studio,
+  etc.). Falls back to `s.cfg.Proxy.Services` only when the vault list is not yet available.
 
 ### Fixed
 - **Ollama HTTP 400 on tool-call conversations**: `callOllama` used `/api/chat` which requires

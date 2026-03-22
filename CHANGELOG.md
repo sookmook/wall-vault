@@ -12,9 +12,19 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [0.1.15] — 2026-03-22 (patch 8)
+## [0.1.15] — 2026-03-22 (patch 9)
 
 ### Fixed
+- **Fallback chain incomplete when proxy starts without `-services` flag**: `dispatch()` built
+  `tryOrder` from `s.cfg.Proxy.Services` (local config) and filtered by `allowedServices`
+  (from vault). When no local services are configured (common in distributed mode), only the
+  primary service + Anthropic ended up in `tryOrder` — Ollama and OpenRouter were silently
+  skipped. Fixed by appending any vault-allowed services not already in `tryOrder` after the
+  filter step, so all vault-configured services are tried in order.
+- **Anthropic HTTP 400 incorrectly marked as key failure**: `callAnthropic` called
+  `RecordError(key, 400)` on Bad Request responses, potentially triggering key cooldowns
+  for request-format errors (wrong model name, unsupported parameters). 400 is a request
+  error, not a key error; fixed to skip without cooldown so dispatch falls through normally.
 - **Multi-turn tool calling broken for OpenRouter and Ollama backends**: `GeminiToOpenAI()`
   was reconstructing messages from Gemini `Contents` using `extractText()`, which turned
   `FunctionCall` and `FunctionResponse` parts into empty strings. When a cloud fallback

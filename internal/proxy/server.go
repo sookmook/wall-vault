@@ -858,26 +858,17 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		if len(filtered) > 0 {
 			tryOrder = filtered
 		}
-	}
-	// Append anthropic if not already in the list and keys are available
-	hasAnthropic := false
-	for _, svc := range tryOrder {
-		if svc == "anthropic" {
-			hasAnthropic = true
-			break
+		// Append any vault-allowed services not yet in tryOrder (covers the case
+		// where the proxy is started without explicit -services flags and
+		// s.cfg.Proxy.Services is empty).
+		inOrder := make(map[string]bool, len(tryOrder))
+		for _, svc := range tryOrder {
+			inOrder[svc] = true
 		}
-	}
-	if !hasAnthropic {
-		anthropicAllowed := len(allowedServices) == 0
 		for _, svc := range allowedServices {
-			if svc == "anthropic" {
-				anthropicAllowed = true
-				break
-			}
-		}
-		if anthropicAllowed {
-			if k, err := s.keyMgr.Get("anthropic"); err == nil && k != nil {
-				tryOrder = append(tryOrder, "anthropic")
+			if !inOrder[svc] {
+				tryOrder = append(tryOrder, svc)
+				inOrder[svc] = true
 			}
 		}
 	}

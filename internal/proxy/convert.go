@@ -14,6 +14,24 @@ func GeminiToOpenAI(model string, req *GeminiRequest) *OpenAIRequest {
 		Model: model,
 	}
 
+	// Prefer original OAI messages when available — they faithfully preserve tool_calls,
+	// role=tool, and tool_call_id fields that cannot be reconstructed from Gemini contents.
+	// (The Gemini round-trip converts FunctionCall/FunctionResponse parts; using RawOAI
+	// avoids the lossy re-conversion that strips those parts down to empty text.)
+	if req.RawOAI != nil {
+		oai.Messages = req.RawOAI.Messages
+		oai.Temperature = req.RawOAI.Temperature
+		oai.MaxTokens = req.RawOAI.MaxTokens
+		if len(req.RawOAI.Tools) > 0 {
+			oai.Tools = req.RawOAI.Tools
+			oai.ToolChoice = req.RawOAI.ToolChoice
+		}
+		return oai
+	}
+
+	// RawOAI not available (e.g. request originated from handleGemini or handleAnthropic):
+	// reconstruct from Gemini contents.
+
 	// system prompt
 	if req.SystemInstruction != nil {
 		text := extractText(req.SystemInstruction.Parts)
@@ -42,12 +60,6 @@ func GeminiToOpenAI(model string, req *GeminiRequest) *OpenAIRequest {
 	if req.GenerationConfig != nil {
 		oai.Temperature = req.GenerationConfig.Temperature
 		oai.MaxTokens = req.GenerationConfig.MaxOutputTokens
-	}
-
-	// Restore tools from original OAI request (preserved through OpenAI→Gemini round-trip)
-	if req.RawOAI != nil && len(req.RawOAI.Tools) > 0 {
-		oai.Tools = req.RawOAI.Tools
-		oai.ToolChoice = req.RawOAI.ToolChoice
 	}
 
 	return oai

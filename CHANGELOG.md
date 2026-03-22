@@ -12,9 +12,18 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [0.1.15] — 2026-03-22 (patch 7)
+## [0.1.15] — 2026-03-22 (patch 8)
 
 ### Fixed
+- **Multi-turn tool calling broken for OpenRouter and Ollama backends**: `GeminiToOpenAI()`
+  was reconstructing messages from Gemini `Contents` using `extractText()`, which turned
+  `FunctionCall` and `FunctionResponse` parts into empty strings. When a cloud fallback
+  (OpenRouter/Ollama) handled the second turn (with tool results), the tool call history
+  was entirely lost and the model generated confused "I tried but failed" responses.
+  Fixed by using `req.RawOAI.Messages` directly when available — the original OAI messages
+  faithfully preserve `tool_calls`, `tool_call_id`, and `role=tool` fields without any
+  round-trip conversion loss. Falls back to Gemini-content reconstruction only when
+  `RawOAI` is not set (e.g. `handleGemini`/`handleAnthropic` paths).
 - **Fallback model reflected in vault UI and openclaw TUI**: When `dispatch()` succeeded on a
   fallback service (e.g. Google keys exhausted → OpenRouter), `s.service`/`s.model` was never
   updated, so the vault UI and openclaw TUI continued showing the original (now-failing) model.

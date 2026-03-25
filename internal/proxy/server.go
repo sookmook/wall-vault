@@ -96,6 +96,7 @@ func NewServer(cfg *config.Config) *Server {
 					"model":   newMdl,
 				})
 				go updateOpenClawJSON(newSvc, newMdl)
+				go updateClineModel(fmt.Sprintf("http://localhost:%d", s.cfg.Proxy.Port), newMdl)
 			}
 		}, func() {
 			// Flush token cache so vault model changes take effect immediately
@@ -259,6 +260,7 @@ func (s *Server) syncFromVault() {
 			log.Printf("[sync] 설정 로드: %s/%s", c.DefaultService, c.DefaultModel)
 			if newSvc != oldSvc || newMdl != oldMdl {
 				go updateOpenClawJSON(newSvc, newMdl)
+				go updateClineModel(fmt.Sprintf("http://localhost:%d", s.cfg.Proxy.Port), newMdl)
 			}
 			break
 		}

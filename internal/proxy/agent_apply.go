@@ -292,6 +292,19 @@ func applyOpenClawConfig(baseURL, model, token string) (string, error) {
 	return path, nil
 }
 
+// updateClineModel: update Cline's globalState.json with new model when vault config changes.
+// Best-effort: errors are silently ignored (Cline may not be installed on this machine).
+func updateClineModel(baseURL, model string) {
+	if model == "" {
+		return
+	}
+	dataDir, err := findClineDataDir()
+	if err != nil {
+		return // Cline not found on this machine — skip silently
+	}
+	_ = updateClineGlobalState(dataDir, baseURL, model)
+}
+
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
 // windowsPathToWSL converts a Windows-style path (C:\Users\foo) to a WSL mount path (/mnt/c/Users/foo).

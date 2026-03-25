@@ -414,6 +414,117 @@ OPENAI_API_KEY=token_ɗin_wannan_wakili
 
 ---
 
+#### ⚡ Maɓallin Saita ta Atomatik — Danna Sau Ɗaya, Tsarawa ta Gama
+
+Idan nau'in wakili shine `cline`, `claude-code`, `openclaw`, `nanoclaw`, maɓallin **⚡ Saita Tsarawa** zai bayyana a kan katin wakili. Danna wannan maɓallin yana sabunta fayil ɗin tsarawa na gida na wannan wakili ta atomatik.
+
+| Maɓalli | Nau'in Wakili | Fayil ɗin da Ake Sabuntawa |
+|---------|--------------|---------------------------|
+| ⚡ Saita Tsarawan Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Saita Tsarawan Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Saita Tsarawan OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Saita Tsarawan NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Wannan maɓalli yana aika buƙata zuwa **localhost:56244** (proxy na gida). Proxy dole ne ya kasance yana gudana a wannan kwamfutar kafin ya yi aiki.
+
+---
+
+#### 🔄 Daidaita Ƙira ta Bangarorin Biyu (v0.1.16)
+
+Idan ka canza ƙirar wakili a dashboard ɗin ɓaure, tsarawa na gida na wannan wakili za a sabunta ta atomatik.
+
+**Na Cline:**
+- Canza ƙira a ɓaure → lambar SSE → proxy yana sabunta filin ƙira a `globalState.json`
+- Filolin da ake sabuntawa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- Ba a taɓa `openAiBaseUrl` da maɓallin API ba
+- **Ana buƙatar sake loda VS Code (`Ctrl+Alt+R` ko `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Domin Cline ba ya sake karanta fayil ɗin tsarawa yayin da yake gudana
+
+**Na Claude Code:**
+- Canza ƙira a ɓaure → lambar SSE → proxy yana sabunta filin `model` a `settings.json`
+- Yana bincika hanyoyin WSL da Windows ta atomatik (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Banagaren da ke akasin (wakili → ɓaure):**
+- Idan wakili (Cline, Claude Code, da sauransu) ya aika buƙata ta hanyar proxy, proxy yana ƙara bayanan aiki·ƙira na abokin ciniki a heartbeat
+- Katin wakili a dashboard ɗin ɓaure yana nuna aiki/ƙira da ake amfani da shi a yanzu a lokaci ɗaya
+
+> 💡 **Muhimmi**: Proxy yana gane wakili ta hanyar token ɗin Authorization a buƙatar, kuma yana tura buƙata zuwa aiki/ƙira da aka saita a ɓaure ta atomatik. Ko Cline ko Claude Code ya aika wani sunan ƙira, proxy zai maye gurbinsa da tsarawan ɓaure.
+
+---
+
+### Amfani da Cline a VS Code — Cikakken Jagora
+
+#### Mataki na 1: Shigar da Cline
+
+Shigar da **Cline** (ID: `saoudrizwan.claude-dev`) daga VS Code Extension Marketplace.
+
+#### Mataki na 2: Yi Rajista na Wakili a Ɓaure
+
+1. Buɗe dashboard ɗin ɓaure (`http://IP_ɗin_ɓaure:56243`)
+2. Danna **+ Ƙara** a sashen **wakili**
+3. Shigar da bayanan kamar haka:
+
+| Fili | Ƙima | Bayani |
+|------|------|--------|
+| ID | `cline_na` | Lambar ganewa na musamman (Turanci, ba tazara) |
+| Suna | `Cline Na` | Sunan da za a nuna a dashboard |
+| Nau'in Wakili | `cline` | ← Dole ne a zaɓi `cline` |
+| Aiki | Zaɓi aiki da za a yi amfani da shi (misali: `google`) | |
+| Ƙira | Shigar da ƙirar da za a yi amfani da ita (misali: `gemini-2.5-flash`) | |
+
+4. Danna **Adana** sannan za a samar da token ta atomatik
+
+#### Mataki na 3: Haɗa Cline
+
+**Hanya A — Saita ta Atomatik (An Ba da Shawarar)**
+
+1. Tabbata wall-vault **proxy** yana gudana a wannan kwamfutar (`localhost:56244`)
+2. Danna maɓallin **⚡ Saita Tsarawan Cline** a katin wakili a dashboard
+3. Idan saƙon "An kammala saita!" ya bayyana, an yi nasara
+4. Sake loda VS Code (`Ctrl+Alt+R`)
+
+**Hanya B — Saita da Hannu**
+
+Buɗe tsarawa (⚙️) a gefen Cline:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://adireshi_proxy:56244/v1`
+  - Kwamfuta ɗaya: `http://localhost:56244/v1`
+  - Wata kwamfuta kamar Mac Mini: `http://192.168.1.20:56244/v1`
+- **API Key**: Token daga ɓaure (kwafa daga katin wakili)
+- **Model ID**: Ƙirar da aka saita a ɓaure (misali: `gemini-2.5-flash`)
+
+#### Mataki na 4: Tabbatarwa
+
+Aika kowace saƙo a tattaunawar Cline. Idan komai yana aiki daidai:
+- Katin wakili a dashboard ɗin ɓaure zai nuna **koren ɗigo (● Yana Gudana)**
+- Katin zai nuna aiki/ƙira na yanzu (misali: `google / gemini-2.5-flash`)
+
+#### Canza Ƙira
+
+Idan kana son canza ƙirar Cline, canza a **dashboard ɗin ɓaure**:
+
+1. Canza jerin zaɓin aiki/ƙira a katin wakili
+2. Danna **Amince**
+3. Sake loda VS Code (`Ctrl+Alt+R`) — sunan ƙira a ƙasan Cline zai sabunta
+4. Buƙata na gaba za ta yi amfani da sabuwar ƙira
+
+> 💡 A zahiri, proxy yana gane buƙatar Cline ta hanyar token kuma yana tura ta zuwa ƙirar da aka saita a ɓaure. Ko ba a sake loda VS Code ba, **ƙirar da ake amfani da ita za ta canja nan da nan** — sake loda shine kawai don sabunta sunan ƙira a UI na Cline.
+
+#### Gano Yankewar Haɗi
+
+Idan ka rufe VS Code, katin wakili a dashboard ɗin ɓaure zai canza zuwa rawaya (jinkiri) bayan **minti 2–3**, sannan ja (ba kan layi) bayan **minti 5**.
+
+#### Warware Matsaloli
+
+| Alamar | Dalilin | Hanyar Warwarewa |
+|--------|---------|------------------|
+| Cline yana nuna "haɗi ya gaza" | Proxy ba ya gudana ko adireshi ba daidai ba | Gwada proxy da `curl http://localhost:56244/health` |
+| Koren ɗigo ba ya bayyana a ɓaure | Ba a saita maɓallin API (token) ba | Danna maɓallin **⚡ Saita Tsarawan Cline** sake |
+| Sunan ƙira a ƙasan Cline bai canja ba | Cline yana ajiye tsarawa | Sake loda VS Code (`Ctrl+Alt+R`) |
+| An nuna sunan ƙira marar daidai | Tsohon matsala (an gyara a v0.1.16) | Sabunta proxy zuwa v0.1.16 ko sama |
+
+---
+
 #### 🟣 Maɓallin Kwafi Umarnin Shigarwa — Ana Amfani Da shi Idan Ana Shigar Da Sabuwar Kwamfuta
 
 Ana amfani da wannan wajen shigar da wall-vault proxy a kwamfuta sabuwa kuma haɗa ta da ɓaure. Danna maɓallin yana kwafa rubutun shigarwa cikakke. Manna shi a terminal na sabuwar kwamfuta kuma gudanar, za a kula da abubuwa masu zuwa a lokaci ɗaya:

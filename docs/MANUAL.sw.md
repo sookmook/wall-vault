@@ -414,6 +414,117 @@ OPENAI_API_KEY=tokeni-ya-wakala-huyu
 
 ---
 
+#### ⚡ Kitufe cha Kutumia Mipangilio Kiotomatiki — Bonyeza Mara Moja, Usanidi Uliokamilika
+
+Kama aina ya wakala ni `cline`, `claude-code`, `openclaw`, `nanoclaw`, kitufe cha **⚡ Tumia Mipangilio** kitaonekana kwenye kadi ya wakala. Ukibonyeza kitufe hiki, faili ya mipangilio ya ndani ya wakala husasishwa kiotomatiki.
+
+| Kitufe | Aina ya Wakala | Faili Inayosasishwa |
+|--------|---------------|---------------------|
+| ⚡ Tumia Mipangilio ya Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Tumia Mipangilio ya Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Tumia Mipangilio ya OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Tumia Mipangilio ya NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Kitufe hiki kinatuma ombi kwa **localhost:56244** (proxy ya ndani). Proxy lazima iwe inafanya kazi kwenye kompyuta hiyo ili kitufe kifanye kazi.
+
+---
+
+#### 🔄 Usawazishaji wa Mfano wa Pande Mbili (v0.1.16)
+
+Ukibadilisha mfano wa wakala kwenye dashibodi ya ghala, mipangilio ya ndani ya wakala huyo itasasishwa kiotomatiki.
+
+**Kwa Cline:**
+- Kubadilisha mfano kwenye ghala → tukio la SSE → proxy inasasisha sehemu ya mfano katika `globalState.json`
+- Sehemu zinazosasishwa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` na ufunguo wa API hazibadilishwi
+- **Inahitajika kupakia upya VS Code (`Ctrl+Alt+R` au `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Kwa sababu Cline haisomi upya faili ya mipangilio wakati inafanya kazi
+
+**Kwa Claude Code:**
+- Kubadilisha mfano kwenye ghala → tukio la SSE → proxy inasasisha sehemu ya `model` katika `settings.json`
+- Inatafuta njia kiotomatiki kwa WSL na Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Upande wa pili (wakala → ghala):**
+- Wakala (Cline, Claude Code n.k.) anapotuma ombi kupitia proxy, proxy inajumuisha taarifa za huduma·mfano wa mteja kwenye heartbeat
+- Kadi ya wakala kwenye dashibodi ya ghala inaonyesha huduma/mfano inayotumiwa kwa wakati halisi
+
+> 💡 **Muhimu**: Proxy inatambua wakala kwa tokeni ya Authorization katika ombi, na kuelekeza kiotomatiki kwenye huduma/mfano iliyowekwa kwenye ghala. Hata kama Cline au Claude Code inatuma jina tofauti la mfano, proxy itabadilisha na mipangilio ya ghala.
+
+---
+
+### Kutumia Cline kwenye VS Code — Mwongozo wa Kina
+
+#### Hatua ya 1: Kufunga Cline
+
+Funga **Cline** (ID: `saoudrizwan.claude-dev`) kutoka VS Code Extension Marketplace.
+
+#### Hatua ya 2: Kusajili Wakala kwenye Ghala
+
+1. Fungua dashibodi ya ghala (`http://IP-ya-ghala:56243`)
+2. Bonyeza **+ Ongeza** katika sehemu ya **wakala**
+3. Ingiza taarifa zifuatazo:
+
+| Sehemu | Thamani | Maelezo |
+|--------|---------|---------|
+| ID | `cline_yangu` | Kitambulisho cha kipekee (herufi za Kiingereza, bila nafasi) |
+| Jina | `Cline Yangu` | Jina litakaloonekana kwenye dashibodi |
+| Aina ya Wakala | `cline` | ← Lazima uchague `cline` |
+| Huduma | Chagua huduma ya kutumia (mfano: `google`) | |
+| Mfano | Ingiza mfano wa kutumia (mfano: `gemini-2.5-flash`) | |
+
+4. Bonyeza **Hifadhi** na tokeni itaundwa kiotomatiki
+
+#### Hatua ya 3: Kuunganisha Cline
+
+**Njia A — Kutumia Kiotomatiki (Inapendekezwa)**
+
+1. Hakikisha wall-vault **proxy** inafanya kazi kwenye kompyuta hiyo (`localhost:56244`)
+2. Bonyeza kitufe cha **⚡ Tumia Mipangilio ya Cline** kwenye kadi ya wakala kwenye dashibodi
+3. Ujumbe "Mipangilio imetumika!" ukionekana, umefanikiwa
+4. Pakia upya VS Code (`Ctrl+Alt+R`)
+
+**Njia B — Kuweka kwa Mkono**
+
+Fungua mipangilio (⚙️) kwenye upau wa pembeni wa Cline:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://anwani-ya-proxy:56244/v1`
+  - Kompyuta hiyo hiyo: `http://localhost:56244/v1`
+  - Kompyuta nyingine kama Mac Mini: `http://192.168.1.20:56244/v1`
+- **API Key**: tokeni iliyotolewa kutoka ghala (nakili kutoka kadi ya wakala)
+- **Model ID**: mfano uliowekwa kwenye ghala (mfano: `gemini-2.5-flash`)
+
+#### Hatua ya 4: Kuthibitisha
+
+Tuma ujumbe wowote kwenye mazungumzo ya Cline. Ikiwa inafanya kazi vizuri:
+- Kadi ya wakala kwenye dashibodi ya ghala itaonyesha **nukta ya kijani (● Inafanya kazi)**
+- Kadi itaonyesha huduma/mfano wa sasa (mfano: `google / gemini-2.5-flash`)
+
+#### Kubadilisha Mfano
+
+Unapotaka kubadilisha mfano wa Cline, badilisha kwenye **dashibodi ya ghala**:
+
+1. Badilisha orodha ya huduma/mfano kwenye kadi ya wakala
+2. Bonyeza **Tumia**
+3. Pakia upya VS Code (`Ctrl+Alt+R`) — jina la mfano kwenye sehemu ya chini ya Cline litasasishwa
+4. Ombi linalofuata litatumia mfano mpya
+
+> 💡 Kwa kweli, proxy inatambua ombi la Cline kwa tokeni na kuelekeza kwenye mfano uliowekwa kwenye ghala. Hata bila kupakia upya VS Code, **mfano unaotumika hubadilishwa mara moja** — kupakia upya ni tu kusasisha jina la mfano kwenye UI ya Cline.
+
+#### Kugundua Kukatika kwa Muunganisho
+
+Ukifunga VS Code, kadi ya wakala kwenye dashibodi ya ghala itabadilika kuwa ya njano (imechelewa) baada ya **dakika 2–3**, na nyekundu (nje ya mtandao) baada ya **dakika 5**.
+
+#### Utatuzi wa Matatizo
+
+| Dalili | Sababu | Suluhisho |
+|--------|--------|-----------|
+| Cline inaonyesha "muunganisho umeshindwa" | Proxy haifanyi kazi au anwani si sahihi | Angalia proxy kwa `curl http://localhost:56244/health` |
+| Nukta ya kijani haionekani kwenye ghala | Ufunguo wa API (tokeni) haujawekwa | Bonyeza kitufe cha **⚡ Tumia Mipangilio ya Cline** tena |
+| Jina la mfano kwenye sehemu ya chini ya Cline hailabadiliki | Cline inakasha mipangilio | Pakia upya VS Code (`Ctrl+Alt+R`) |
+| Jina la mfano lisilo sahihi linaonyeshwa | Hitilafu ya zamani (ilirekebishwa katika v0.1.16) | Sasisha proxy hadi v0.1.16 au zaidi |
+
+---
+
 #### 🟣 Kitufe cha Nakili Amri za Usambazaji — Inatumika Wakati wa Kufunga kwenye Mashine Mpya
 
 Inatumika unapofunga proxy ya wall-vault kwa mara ya kwanza kwenye kompyuta mpya na kuiunganisha na ghala. Ukibonyeza kitufe, hati ya ufungaji nzima itanakiliwa. Ibandike kwenye terminal ya kompyuta mpya na uitekeleze. Hatua zifuatazo zitashughulikiwa kwa wakati mmoja:

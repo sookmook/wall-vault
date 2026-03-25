@@ -414,6 +414,117 @@ OPENAI_API_KEY=this-agents-token
 
 ---
 
+#### ⚡ Auto-Apply Button — one click and you're configured
+
+When the agent type is `cline`, `claude-code`, `openclaw`, or `nanoclaw`, an **⚡ Apply Settings** button appears on the agent card. Clicking it automatically updates that agent's local configuration file.
+
+| Button | Agent type | Target file |
+|--------|------------|-------------|
+| ⚡ Apply Cline Settings | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Apply Claude Code Settings | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Apply OpenClaw Settings | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Apply NanoClaw Settings | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ This button sends a request to **localhost:56244** (the local proxy). The proxy must be running on that machine for it to work.
+
+---
+
+#### 🔄 Bidirectional Model Sync (v0.1.16)
+
+When you change an agent's model in the vault dashboard, the agent's local settings are automatically updated.
+
+**For Cline:**
+- Change a model in the vault → SSE event → proxy updates the model fields in `globalState.json`
+- Updated fields: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` and API key are left untouched
+- **A VS Code reload is required (`Ctrl+Alt+R` or `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Cline does not re-read its config files while running
+
+**For Claude Code:**
+- Change a model in the vault → SSE event → proxy updates the `model` field in `settings.json`
+- Both WSL and Windows paths are automatically searched (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Reverse direction (agent → vault):**
+- When an agent (Cline, Claude Code, etc.) sends a request through the proxy, the proxy includes that client's service and model information in its heartbeat
+- The agent card on the vault dashboard shows the currently active service/model in real time
+
+> 💡 **Key point**: The proxy identifies agents by their Authorization token, and automatically routes requests to the service/model configured in the vault. Even if Cline or Claude Code sends a different model name, the proxy overrides it with the vault's settings.
+
+---
+
+### Using Cline in VS Code — Detailed Guide
+
+#### Step 1: Install Cline
+
+Install **Cline** (ID: `saoudrizwan.claude-dev`) from the VS Code extension marketplace.
+
+#### Step 2: Register the agent in the vault
+
+1. Open the vault dashboard (`http://vault-IP:56243`)
+2. In the **Agents** section, click **+ Add**
+3. Fill in the following:
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| ID | `my_cline` | Unique identifier (alphanumeric, no spaces) |
+| Name | `My Cline` | Display name shown on the dashboard |
+| Agent type | `cline` | ← must select `cline` |
+| Service | Select the service to use (e.g. `google`) | |
+| Model | Enter the model to use (e.g. `gemini-2.5-flash`) | |
+
+4. Click **Save** — a token is automatically generated
+
+#### Step 3: Connect Cline
+
+**Method A — Auto-apply (recommended)**
+
+1. Make sure the wall-vault **proxy** is running on that machine (`localhost:56244`)
+2. Click the **⚡ Apply Cline Settings** button on the agent card in the dashboard
+3. If you see a "Settings applied!" notification, it worked
+4. Reload VS Code (`Ctrl+Alt+R`)
+
+**Method B — Manual setup**
+
+Open the settings (⚙️) in the Cline sidebar and enter:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://proxy-address:56244/v1`
+  - Same machine: `http://localhost:56244/v1`
+  - Different machine (e.g. Mac Mini): `http://192.168.1.20:56244/v1`
+- **API Key**: The token issued by the vault (copy from the agent card)
+- **Model ID**: The model configured in the vault (e.g. `gemini-2.5-flash`)
+
+#### Step 4: Verify
+
+Send any message in the Cline chat. If everything is working:
+- The agent card on the vault dashboard shows a **green dot (● Running)**
+- The card displays the current service/model (e.g. `google / gemini-2.5-flash`)
+
+#### Changing the model
+
+When you want to switch Cline's model, change it in the **vault dashboard**:
+
+1. Change the service/model dropdown on the agent card
+2. Click **Apply**
+3. Reload VS Code (`Ctrl+Alt+R`) — the model name in Cline's footer will update
+4. The new model takes effect from the next request
+
+> 💡 The proxy actually identifies Cline's requests by token and routes them to the model configured in the vault. Even without reloading VS Code, **the model actually in use changes immediately** — the reload is just to update Cline's UI display.
+
+#### Detecting disconnection
+
+When you close VS Code, the agent card on the vault dashboard will turn yellow (delayed) after about **2–3 minutes**, and red (offline) after **5 minutes**.
+
+#### Troubleshooting
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| "Connection failed" error in Cline | Proxy not running or wrong address | Check proxy with `curl http://localhost:56244/health` |
+| Green dot doesn't appear in vault | API key (token) not configured | Click the **⚡ Apply Cline Settings** button again |
+| Cline footer model doesn't change | Cline caches settings | Reload VS Code (`Ctrl+Alt+R`) |
+| Wrong model name displayed | Old bug (fixed in v0.1.16) | Update proxy to v0.1.16 or later |
+
+---
+
 #### 🟣 Copy Deploy Command Button — for installing on a new machine
 
 Use this when you're setting up the wall-vault proxy on a new computer and connecting it to the vault for the first time. Click the button and the full installation script is copied. Paste it into a terminal on the new machine and run it — it handles everything at once:

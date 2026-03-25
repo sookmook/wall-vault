@@ -414,6 +414,117 @@ OPENAI_API_KEY=TOKEN-DIESES-AGENTEN
 
 ---
 
+#### ⚡ Automatische Anwendung – ein Klick und die Einrichtung ist erledigt
+
+Wenn der Agenten-Typ `cline`, `claude-code`, `openclaw` oder `nanoclaw` ist, erscheint auf der Agentenkarte die Schaltfläche **⚡ Einstellungen anwenden**. Ein Klick darauf aktualisiert automatisch die lokale Konfigurationsdatei des Agenten.
+
+| Schaltfläche | Agenten-Typ | Zieldatei |
+|-------------|------------|-----------|
+| ⚡ Cline-Einstellungen anwenden | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Claude Code-Einstellungen anwenden | `claude-code` | `~/.claude/settings.json` |
+| ⚡ OpenClaw-Einstellungen anwenden | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ NanoClaw-Einstellungen anwenden | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Diese Schaltfläche sendet eine Anfrage an **localhost:56244** (lokaler Proxy). Der Proxy muss auf diesem Rechner laufen, damit es funktioniert.
+
+---
+
+#### 🔄 Bidirektionale Modellsynchronisierung (v0.1.16)
+
+Wenn du im Tresor-Dashboard das Modell eines Agenten änderst, wird die lokale Konfiguration dieses Agenten automatisch aktualisiert.
+
+**Bei Cline:**
+- Modelländerung im Tresor → SSE-Event → der Proxy aktualisiert das Modellfeld in `globalState.json`
+- Aktualisierte Felder: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` und der API-Schlüssel werden nicht verändert
+- **Ein Neuladen von VS Code ist erforderlich (`Strg+Alt+R` oder `Strg+Umschalt+P` → `Developer: Reload Window`)**
+  - Cline liest die Konfigurationsdatei während der Ausführung nicht erneut ein
+
+**Bei Claude Code:**
+- Modelländerung im Tresor → SSE-Event → der Proxy aktualisiert das Feld `model` in `settings.json`
+- WSL- und Windows-Pfade werden automatisch durchsucht (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Umgekehrte Richtung (Agent → Tresor):**
+- Wenn ein Agent (Cline, Claude Code usw.) eine Anfrage an den Proxy sendet, nimmt der Proxy die Service- und Modellinformationen des Clients in den Heartbeat auf
+- Der aktuell verwendete Dienst und das Modell werden in Echtzeit auf der Agentenkarte im Dashboard angezeigt
+
+> 💡 **Kernpunkt**: Der Proxy identifiziert den Agenten anhand des Authorization-Tokens in der Anfrage und leitet automatisch an den im Tresor konfigurierten Dienst/Modell weiter. Selbst wenn Cline oder Claude Code einen anderen Modellnamen sendet, überschreibt der Proxy ihn mit der Tresor-Konfiguration.
+
+---
+
+### Cline in VS Code verwenden — detaillierte Anleitung
+
+#### Schritt 1: Cline installieren
+
+Installiere **Cline** (ID: `saoudrizwan.claude-dev`) aus dem VS Code Extension Marketplace.
+
+#### Schritt 2: Agenten im Tresor registrieren
+
+1. Öffne das Tresor-Dashboard (`http://Tresor-IP:56243`)
+2. Klicke im Abschnitt **Agenten** auf **+ Hinzufügen**
+3. Fülle die folgenden Felder aus:
+
+| Feld | Wert | Beschreibung |
+|------|------|-------------|
+| ID | `mein_cline` | Eindeutiger Bezeichner (Buchstaben, keine Leerzeichen) |
+| Name | `Mein Cline` | Im Dashboard angezeigter Name |
+| Agenten-Typ | `cline` | ← unbedingt `cline` auswählen |
+| Dienst | Gewünschten Dienst auswählen (z. B. `google`) | |
+| Modell | Gewünschtes Modell eingeben (z. B. `gemini-2.5-flash`) | |
+
+4. Klicke auf **Speichern** — ein Token wird automatisch generiert
+
+#### Schritt 3: Cline verbinden
+
+**Methode A — Automatische Anwendung (empfohlen)**
+
+1. Stelle sicher, dass der wall-vault-**Proxy** auf diesem Rechner läuft (`localhost:56244`)
+2. Klicke auf der Agentenkarte auf **⚡ Cline-Einstellungen anwenden**
+3. Wenn die Meldung „Einstellungen angewendet!" erscheint, war es erfolgreich
+4. Lade VS Code neu (`Strg+Alt+R`)
+
+**Methode B — Manuelle Konfiguration**
+
+Öffne die Einstellungen (⚙️) in der Cline-Seitenleiste und konfiguriere:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://Proxy-Adresse:56244/v1`
+  - Auf demselben Rechner: `http://localhost:56244/v1`
+  - Auf einem anderen Gerät (z. B. Mac Mini): `http://192.168.1.20:56244/v1`
+- **API Key**: Der vom Tresor ausgestellte Token (von der Agentenkarte kopiert)
+- **Model ID**: Das im Tresor eingestellte Modell (z. B. `gemini-2.5-flash`)
+
+#### Schritt 4: Überprüfung
+
+Sende eine beliebige Nachricht im Cline-Chat. Wenn alles funktioniert:
+- Auf der Agentenkarte im Dashboard erscheint ein **grüner Punkt (● Aktiv)**
+- Auf der Karte werden der aktuelle Dienst und das Modell angezeigt (z. B. `google / gemini-2.5-flash`)
+
+#### Modell wechseln
+
+Um das Modell von Cline zu ändern, ändere es im **Tresor-Dashboard**:
+
+1. Ändere Dienst/Modell im Dropdown-Menü der Agentenkarte
+2. Klicke auf **Anwenden**
+3. Lade VS Code neu (`Strg+Alt+R`) — der Modellname in der Cline-Fußzeile wird aktualisiert
+4. Ab der nächsten Anfrage wird das neue Modell verwendet
+
+> 💡 Tatsächlich identifiziert der Proxy Cline-Anfragen anhand des Tokens und leitet sie an das im Tresor konfigurierte Modell weiter. Selbst ohne VS Code neu zu laden, **ändert sich das tatsächlich verwendete Modell sofort** — das Neuladen dient nur dazu, die Modellanzeige in der Cline-Oberfläche zu aktualisieren.
+
+#### Verbindungsabbruch erkennen
+
+Wenn du VS Code schließt, wechselt die Agentenkarte im Dashboard nach etwa **2–3 Minuten** auf Gelb (Verzögert) und nach **5 Minuten** auf Rot (Offline).
+
+#### Problemlösung
+
+| Symptom | Ursache | Lösung |
+|---------|---------|--------|
+| Fehler „Verbindung fehlgeschlagen" in Cline | Proxy nicht gestartet oder Adresse falsch | Proxy prüfen mit `curl http://localhost:56244/health` |
+| Grüner Punkt erscheint nicht im Tresor | API-Schlüssel (Token) nicht konfiguriert | **⚡ Cline-Einstellungen anwenden** erneut klicken |
+| Modellname in der Cline-Fußzeile ändert sich nicht | Cline speichert die Konfiguration im Cache | VS Code neu laden (`Strg+Alt+R`) |
+| Ein falscher Modellname wird angezeigt | Alter Bug (behoben in v0.1.16) | Proxy auf Version v0.1.16 oder höher aktualisieren |
+
+---
+
 #### 🟣 Deployment-Befehl kopieren – für die Installation auf einem neuen Gerät
 
 Diese Schaltfläche ist nützlich, wenn wall-vault zum ersten Mal auf einem neuen Computer installiert und mit dem Tresor verbunden werden soll. Ein Klick kopiert das gesamte Installations-Skript. Einfach im Terminal des neuen Computers einfügen und ausführen – folgendes wird dann automatisch erledigt:

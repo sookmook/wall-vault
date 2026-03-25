@@ -414,6 +414,117 @@ OPENAI_API_KEY=此代理的令牌
 
 ---
 
+#### ⚡ 自动应用按钮 — 一键完成设置
+
+当代理类型为 `cline`、`claude-code`、`openclaw`、`nanoclaw` 时，代理卡片上会显示 **⚡ 应用设置** 按钮。点击该按钮后，对应代理的本地配置文件会自动更新。
+
+| 按钮 | 代理类型 | 应用目标文件 |
+|------|---------|------------|
+| ⚡ 应用 Cline 设置 | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ 应用 Claude Code 设置 | `claude-code` | `~/.claude/settings.json` |
+| ⚡ 应用 OpenClaw 设置 | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ 应用 NanoClaw 设置 | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ 该按钮会向 **localhost:56244**（本地代理）发送请求。只有在该机器上代理正在运行时才有效。
+
+---
+
+#### 🔄 双向模型同步 (v0.1.16)
+
+在金库仪表盘中更改代理的模型后，对应代理的本地设置会自动更新。
+
+**Cline 的情况：**
+- 在金库中更改模型 → SSE 事件 → 代理更新 `globalState.json` 中的模型字段
+- 更新对象：`actModeOpenAiModelId`、`planModeOpenAiModelId`、`openAiModelId`
+- 不会修改 `openAiBaseUrl` 和 API 密钥
+- **需要重新加载 VS Code（`Ctrl+Alt+R` 或 `Ctrl+Shift+P` → `Developer: Reload Window`）**
+  - 因为 Cline 在运行期间不会重新读取配置文件
+
+**Claude Code 的情况：**
+- 在金库中更改模型 → SSE 事件 → 代理更新 `settings.json` 中的 `model` 字段
+- 自动搜索 WSL 和 Windows 两侧的路径（`~/.claude/`、`/mnt/c/Users/*/.claude/`）
+
+**反向同步（代理 → 金库）：**
+- 当代理（Cline、Claude Code 等）向代理服务器发送请求时，代理服务器会在心跳中包含该客户端的服务和模型信息
+- 金库仪表盘中的代理卡片会实时显示当前使用的服务/模型
+
+> 💡 **要点**：代理服务器通过请求中的 Authorization 令牌识别代理，并自动路由到金库中设定的服务/模型。即使 Cline 或 Claude Code 发送了不同的模型名称，代理服务器也会用金库设置进行覆盖。
+
+---
+
+### 在 VS Code 中使用 Cline — 详细指南
+
+#### 第 1 步：安装 Cline
+
+在 VS Code 扩展市场中搜索并安装 **Cline**（ID：`saoudrizwan.claude-dev`）。
+
+#### 第 2 步：在金库中注册代理
+
+1. 打开金库仪表盘（`http://金库IP:56243`）
+2. 在 **代理** 部分点击 **+ 添加**
+3. 按如下内容填写：
+
+| 字段 | 值 | 说明 |
+|------|----|------|
+| ID | `my_cline` | 唯一标识符（英文字母，不含空格） |
+| 名称 | `My Cline` | 显示在仪表盘上的名称 |
+| 代理类型 | `cline` | ← 必须选择 `cline` |
+| 服务 | 选择要使用的服务（例：`google`） | |
+| 模型 | 输入要使用的模型（例：`gemini-2.5-flash`） | |
+
+4. 点击 **保存** 后令牌会自动生成
+
+#### 第 3 步：连接到 Cline
+
+**方式 A — 自动应用（推荐）**
+
+1. 确认该机器上的 wall-vault **代理** 正在运行（`localhost:56244`）
+2. 在仪表盘的代理卡片中点击 **⚡ 应用 Cline 设置** 按钮
+3. 出现"设置应用完成！"提示即为成功
+4. 重新加载 VS Code（`Ctrl+Alt+R`）
+
+**方式 B — 手动配置**
+
+打开 Cline 侧边栏的设置（⚙️）：
+- **API Provider**：`OpenAI Compatible`
+- **Base URL**：`http://代理地址:56244/v1`
+  - 同一台机器：`http://localhost:56244/v1`
+  - Mini 服务器等其他机器：`http://192.168.1.20:56244/v1`
+- **API Key**：金库中颁发的令牌（从代理卡片复制）
+- **Model ID**：金库中设置的模型（例：`gemini-2.5-flash`）
+
+#### 第 4 步：验证
+
+在 Cline 聊天窗口中发送任意消息。如果一切正常：
+- 金库仪表盘中该代理卡片会显示 **绿色圆点（● 运行中）**
+- 卡片上会显示当前服务/模型（例：`google / gemini-2.5-flash`）
+
+#### 更改模型
+
+如果要更改 Cline 的模型，请在 **金库仪表盘** 中操作：
+
+1. 更改代理卡片中的服务/模型下拉菜单
+2. 点击 **应用**
+3. 重新加载 VS Code（`Ctrl+Alt+R`）— Cline 页脚中的模型名称会更新
+4. 之后的请求将使用新模型
+
+> 💡 实际上代理服务器通过令牌识别 Cline 的请求，并路由到金库设置中指定的模型。即使不重新加载 VS Code，**实际使用的模型也会立即切换** — 重新加载只是为了更新 Cline 界面中显示的模型名称。
+
+#### 断线检测
+
+关闭 VS Code 后，金库仪表盘中的代理卡片会在约 **2～3 分钟** 后变为黄色（延迟），**5 分钟** 后变为红色（离线）。
+
+#### 故障排除
+
+| 症状 | 原因 | 解决方法 |
+|------|------|---------|
+| Cline 中出现"连接失败"错误 | 代理未运行或地址有误 | 使用 `curl http://localhost:56244/health` 检查代理 |
+| 金库中未显示绿色圆点 | 未设置 API 密钥（令牌） | 再次点击 **⚡ 应用 Cline 设置** 按钮 |
+| Cline 页脚的模型未更新 | Cline 缓存了设置 | 重新加载 VS Code（`Ctrl+Alt+R`） |
+| 显示了错误的模型名称 | 旧版 Bug（v0.1.16 已修复） | 将代理更新到 v0.1.16 或更高版本 |
+
+---
+
 #### 🟣 部署命令复制按钮 — 在新机器上安装时使用
 
 在新计算机上首次安装 wall-vault 代理并连接到金库时使用。点击按钮后，完整的安装脚本会被复制。在新计算机的终端中粘贴并运行，将一次性完成以下操作：

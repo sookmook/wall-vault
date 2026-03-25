@@ -414,6 +414,117 @@ OPENAI_API_KEY=token-agen-ini
 
 ---
 
+#### ⚡ Tombol Terapkan Otomatis — Satu kali tekan, pengaturan selesai
+
+Jika jenis agen adalah `cline`, `claude-code`, `openclaw`, atau `nanoclaw`, tombol **⚡ Terapkan Pengaturan** akan muncul di kartu agen. Menekan tombol ini akan memperbarui file pengaturan lokal agen tersebut secara otomatis.
+
+| Tombol | Jenis Agen | File yang Diperbarui |
+|--------|-----------|---------------------|
+| ⚡ Terapkan Pengaturan Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Terapkan Pengaturan Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Terapkan Pengaturan OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Terapkan Pengaturan NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Tombol ini mengirim permintaan ke **localhost:56244** (proxy lokal). Proxy harus berjalan di mesin ini agar tombol berfungsi.
+
+---
+
+#### 🔄 Sinkronisasi Model Dua Arah (v0.1.16)
+
+Saat Anda mengubah model agen dari dashboard brankas, pengaturan lokal agen tersebut akan diperbarui secara otomatis.
+
+**Untuk Cline:**
+- Ubah model di brankas → event SSE → proxy memperbarui field model di `globalState.json`
+- Field yang diperbarui: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` dan kunci API tidak diubah
+- **Diperlukan reload VS Code (`Ctrl+Alt+R` atau `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Karena Cline tidak membaca ulang file pengaturan selama berjalan
+
+**Untuk Claude Code:**
+- Ubah model di brankas → event SSE → proxy memperbarui field `model` di `settings.json`
+- Secara otomatis mencari di kedua path WSL dan Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Arah sebaliknya (agen → brankas):**
+- Saat agen (Cline, Claude Code, dll.) mengirim permintaan ke proxy, proxy menyertakan informasi layanan dan model klien tersebut dalam heartbeat
+- Layanan/model yang sedang digunakan ditampilkan secara real-time di kartu agen pada dashboard brankas
+
+> 💡 **Inti**: Proxy mengidentifikasi agen dari token Authorization di permintaan, lalu secara otomatis mengarahkan ke layanan/model yang sudah diatur di brankas. Meskipun Cline atau Claude Code mengirimkan nama model yang berbeda, proxy akan menimpa dengan pengaturan brankas.
+
+---
+
+### Menggunakan Cline di VS Code — Panduan Lengkap
+
+#### Langkah 1: Instal Cline
+
+Instal **Cline** (ID: `saoudrizwan.claude-dev`) dari marketplace ekstensi VS Code.
+
+#### Langkah 2: Daftarkan Agen di Brankas
+
+1. Buka dashboard brankas (`http://IP-brankas:56243`)
+2. Di bagian **Agen**, klik **+ Tambah**
+3. Masukkan informasi berikut:
+
+| Field | Nilai | Keterangan |
+|-------|-------|-----------|
+| ID | `my_cline` | Pengenal unik (huruf Latin, tanpa spasi) |
+| Nama | `My Cline` | Nama yang ditampilkan di dashboard |
+| Jenis Agen | `cline` | ← harus pilih `cline` |
+| Layanan | Pilih layanan yang ingin digunakan (contoh: `google`) | |
+| Model | Masukkan model yang ingin digunakan (contoh: `gemini-2.5-flash`) | |
+
+4. Tekan **Simpan** dan token akan dibuat secara otomatis
+
+#### Langkah 3: Hubungkan ke Cline
+
+**Cara A — Terapkan Otomatis (Direkomendasikan)**
+
+1. Pastikan **proxy** wall-vault berjalan di mesin ini (`localhost:56244`)
+2. Klik tombol **⚡ Terapkan Pengaturan Cline** di kartu agen pada dashboard
+3. Jika muncul notifikasi "Pengaturan berhasil diterapkan!", berarti sukses
+4. Reload VS Code (`Ctrl+Alt+R`)
+
+**Cara B — Pengaturan Manual**
+
+Buka pengaturan (⚙️) Cline dari sidebar, lalu isi:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://alamat-proxy:56244/v1`
+  - Jika di mesin yang sama: `http://localhost:56244/v1`
+  - Jika di mesin lain (misalnya Mac Mini): `http://192.168.1.20:56244/v1`
+- **API Key**: Token yang diterbitkan dari brankas (salin dari kartu agen)
+- **Model ID**: Model yang diatur di brankas (contoh: `gemini-2.5-flash`)
+
+#### Langkah 4: Verifikasi
+
+Kirim pesan apa saja di jendela chat Cline. Jika semuanya normal:
+- **Titik hijau (● Berjalan)** akan muncul di kartu agen pada dashboard brankas
+- Layanan/model yang sedang digunakan akan ditampilkan di kartu (contoh: `google / gemini-2.5-flash`)
+
+#### Mengganti Model
+
+Untuk mengganti model Cline, ubah dari **dashboard brankas**:
+
+1. Ubah dropdown layanan/model di kartu agen
+2. Klik **Terapkan**
+3. Reload VS Code (`Ctrl+Alt+R`) — nama model di footer Cline akan diperbarui
+4. Mulai dari permintaan berikutnya, model baru yang akan digunakan
+
+> 💡 Sebenarnya, proxy mengidentifikasi permintaan Cline berdasarkan token dan mengarahkannya ke model sesuai pengaturan brankas. Meskipun VS Code tidak di-reload, **model yang benar-benar digunakan langsung berubah** — reload hanya untuk memperbarui tampilan nama model di antarmuka Cline.
+
+#### Mendeteksi Pemutusan Koneksi
+
+Saat VS Code ditutup, kartu agen di dashboard brankas akan berubah menjadi kuning (lambat) setelah sekitar **2–3 menit**, dan merah (offline) setelah **5 menit**.
+
+#### Pemecahan Masalah
+
+| Gejala | Penyebab | Solusi |
+|--------|----------|-------|
+| Error "koneksi gagal" di Cline | Proxy tidak berjalan atau alamat salah | Periksa dengan `curl http://localhost:56244/health` |
+| Titik hijau tidak muncul di brankas | Kunci API (token) belum diatur | Klik tombol **⚡ Terapkan Pengaturan Cline** sekali lagi |
+| Nama model di footer Cline tidak berubah | Cline meng-cache pengaturan | Reload VS Code (`Ctrl+Alt+R`) |
+| Nama model yang salah ditampilkan | Bug lama (diperbaiki di v0.1.16) | Perbarui proxy ke v0.1.16 atau lebih baru |
+
+---
+
 #### 🟣 Tombol Salin Perintah Deploy — Digunakan saat menginstal di mesin baru
 
 Digunakan saat pertama kali menginstal proxy wall-vault di komputer baru dan menghubungkannya ke brankas. Klik tombol ini untuk menyalin seluruh skrip instalasi. Tempel dan jalankan di terminal komputer baru, dan hal-hal berikut akan diurus sekaligus:

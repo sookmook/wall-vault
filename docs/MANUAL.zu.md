@@ -414,6 +414,117 @@ OPENAI_API_KEY=this-agent-token
 
 ---
 
+#### ⚡ Inkinobho Yokusebenzisa Ngokuzenzakalela — Chofoza Kanye, Izilungiselelo Ziqediwe
+
+Uma uhlobo lwe-agent lungu-`cline`, `claude-code`, `openclaw`, `nanoclaw`, inkinobho ethi **⚡ Sebenzisa Izilungiselelo** izovela ekhadini le-agent. Uma uchofoza le nkinobho, ifayela lezilungiselelo zendawo ye-agent lishintshelwa ngokuzenzakalela.
+
+| Inkinobho | Uhlobo Lwe-agent | Ifayela Elishintshelwayo |
+|-----------|-----------------|------------------------|
+| ⚡ Sebenzisa Izilungiselelo ze-Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Sebenzisa Izilungiselelo ze-Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Sebenzisa Izilungiselelo ze-OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Sebenzisa Izilungiselelo ze-NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Le nkinobho ithumela isicelo ku-**localhost:56244** (i-proxy yendawo). I-proxy kumele isebenze kuleyo khompyutha ukuze isebenze.
+
+---
+
+#### 🔄 Ukuvumelaniswa Kwemodeli Ngezinhlangothi Ezimbili (v0.1.16)
+
+Uma ushintsha imodeli ye-agent ku-vault dashboard, izilungiselelo zendawo ze-agent zishintshelwa ngokuzenzakalela.
+
+**Nge-Cline:**
+- Shintsha imodeli ku-vault → umcimbi we-SSE → i-proxy ishintshe ingxenye yemodeli ku-`globalState.json`
+- Izingxenye ezishintshelwayo: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` nokhiye we-API akuthintwa
+- **Kudingeka ukuvuselela i-VS Code (`Ctrl+Alt+R` noma `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Ngoba i-Cline ayisifundi kabusha ifayela lezilungiselelo ngenkathi isebenza
+
+**Nge-Claude Code:**
+- Shintsha imodeli ku-vault → umcimbi we-SSE → i-proxy ishintshe ingxenye ethi `model` ku-`settings.json`
+- Ifuna ngokuzenzakalela izindlela ze-WSL ne-Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Uhlangothi oluphambene (i-agent → vault):**
+- Uma i-agent (Cline, Claude Code, njll.) ithumela isicelo nge-proxy, i-proxy ifaka ulwazi lwensizakalo·imodeli yeklayenti ku-heartbeat
+- Ikhadi le-agent ku-vault dashboard libonisa insizakalo/imodeli esetshenziswa njengamanje ngesikhathi sangempela
+
+> 💡 **Okusemqoka**: I-proxy ihlonza i-agent ngezikhiye ze-Authorization esicelweni, bese iqondisa ngokuzenzakalela ensizakalweni/emodeli esethwe ku-vault. Noma i-Cline noma i-Claude Code ithumele igama lemodeli elinomahluko, i-proxy iyokubhala ngaphezulu ngezilungiselelo ze-vault.
+
+---
+
+### Ukusebenzisa i-Cline ku-VS Code — Umhlahlandlela Obanzi
+
+#### Isinyathelo 1: Faka i-Cline
+
+Faka **Cline** (ID: `saoudrizwan.claude-dev`) ku-VS Code Extension Marketplace.
+
+#### Isinyathelo 2: Bhalisa i-agent ku-Vault
+
+1. Vula i-vault dashboard (`http://IP-ye-vault:56243`)
+2. Chofoza **+ Engeza** esigabeni **se-agent**
+3. Gcwalisa loku okulandelayo:
+
+| Ingxenye | Inani | Incazelo |
+|----------|-------|----------|
+| ID | `my_cline` | Isazisi esiyingqayizivele (ngesiNgisi, ngaphandle kwezikhala) |
+| Igama | `My Cline` | Igama elizovela ku-dashboard |
+| Uhlobo Lwe-agent | `cline` | ← Kumele ukhethe `cline` |
+| Insizakalo | Khetha insizakalo ozoyisebenzisa (isib: `google`) | |
+| Imodeli | Faka imodeli ozoyisebenzisa (isib: `gemini-2.5-flash`) | |
+
+4. Chofoza **Gcina** bese izikhiye zikhiqizwa ngokuzenzakalela
+
+#### Isinyathelo 3: Xhuma i-Cline
+
+**Indlela A — Ukusebenzisa Ngokuzenzakalela (Inconywa)**
+
+1. Qiniseka ukuthi i-wall-vault **proxy** isebenza kuleyo khompyutha (`localhost:56244`)
+2. Chofoza inkinobho ethi **⚡ Sebenzisa Izilungiselelo ze-Cline** ekhadini le-agent ku-dashboard
+3. Uma ubona umyalezo othi "Izilungiselelo zisebenziswe!" usuphumelele
+4. Vuselela i-VS Code (`Ctrl+Alt+R`)
+
+**Indlela B — Ukusetha Ngesandla**
+
+Vula izilungiselelo (⚙️) ku-sidebar ye-Cline:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://ikheli-le-proxy:56244/v1`
+  - Ikhompyutha efanayo: `http://localhost:56244/v1`
+  - Elinye ikhompyutha njenge-Mac Mini: `http://192.168.0.6:56244/v1`
+- **API Key**: izikhiye ezitholakale ku-vault (khopisha ekhadini le-agent)
+- **Model ID**: imodeli esethwe ku-vault (isib: `gemini-2.5-flash`)
+
+#### Isinyathelo 4: Qinisekisa
+
+Thumela noma yimuphi umyalezo engxoxweni ye-Cline. Uma isebenza kahle:
+- Ikhadi le-agent ku-vault dashboard lizobonisa **indilinga eluhlaza (● Iyasebenza)**
+- Ikhadi lizobonisa insizakalo/imodeli yamanje (isib: `google / gemini-2.5-flash`)
+
+#### Ukushintsha Imodeli
+
+Uma ufuna ukushintsha imodeli ye-Cline, shintsha ku-**vault dashboard**:
+
+1. Shintsha orodha yensizakalo/yemodeli ekhadini le-agent
+2. Chofoza **Sebenzisa**
+3. Vuselela i-VS Code (`Ctrl+Alt+R`) — igama lemodeli ku-footer ye-Cline lizoshintshelwa
+4. Isicelo esilandelayo sizosebenzisa imodeli entsha
+
+> 💡 Empeleni i-proxy ihlonza isicelo se-Cline ngezikhiye bese iqondisa kwimodeli esethwe ku-vault. Noma ungavuseleli i-VS Code, **imodeli esetshenziswayo iguquka ngokuphazima** — ukuvuselela kungokokushintshelwa kwegama lemodeli ku-UI ye-Cline kuphela.
+
+#### Ukubona Ukukhishwa Kokuqhagamshelana
+
+Uma uvala i-VS Code, ikhadi le-agent ku-vault dashboard liguqukela kuphuzi (ilindile) ngemuva **kwemizuzu engu-2–3**, bese liba bomvu (aye ikho ku-inthanethi) ngemuva **kwemizuzu engu-5**.
+
+#### Ukuxazulula Izinkinga
+
+| Isimpawu | Imbangela | Isixazululo |
+|----------|-----------|-------------|
+| I-Cline ibonisa "ukuxhuma kuhlulekile" | I-proxy ayisebenzi noma ikheli alikho kahle | Hlola i-proxy ngo-`curl http://localhost:56244/health` |
+| Indilinga eluhlaza ayibonakali ku-vault | Ukhiye we-API (izikhiye) awukasetshwa | Chofoza inkinobho ethi **⚡ Sebenzisa Izilungiselelo ze-Cline** futhi |
+| Igama lemodeli ku-footer ye-Cline aliguquki | I-Cline igcina izilungiselelo ku-cache | Vuselela i-VS Code (`Ctrl+Alt+R`) |
+| Igama lemodeli elingalungile libonakala | Iphutha elidala (lilungiswe ku-v0.1.16) | Shintshelela i-proxy ku-v0.1.16 noma ngaphezulu |
+
+---
+
 #### 🟣 Inkinobho Yokukhopiya Umyalo Wokusabalalisa — Ukufakela Ekhompyutheni Entsha
 
 Isetshenziswa ekufakeleni i-wall-vault proxy ekhompyutheni entsha nokuyixhuma ne-vault. Chofoza inkinobho ukukhopisha isikripti sifakelo esiphelele. Namathisela itheminalini yekhompyutha entsha bese uqalisa — okulandelayo kuphathwa ngesikhathi sinye:

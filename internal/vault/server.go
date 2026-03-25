@@ -112,6 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/theme", s.adminAuth(s.handleAdminTheme))
 	mux.HandleFunc("/admin/lang", s.adminAuth(s.handleAdminLang))
 	mux.HandleFunc("/admin/clients", s.adminAuth(s.handleAdminClients))
+	mux.HandleFunc("/admin/clients/reorder", s.adminAuth(s.handleAdminClientsReorder))
 	mux.HandleFunc("/admin/clients/", s.adminAuth(s.handleAdminClientsID))
 	mux.HandleFunc("/admin/keys", s.adminAuth(s.handleAdminKeys))
 	mux.HandleFunc("/admin/keys/", s.adminAuth(s.handleAdminKeysID))
@@ -255,6 +256,29 @@ func (s *Server) handleAdminClients(w http.ResponseWriter, r *http.Request) {
 	default:
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleAdminClientsReorder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Order []string `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if len(body.Order) == 0 {
+		jsonError(w, "order list required", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.ReorderClients(body.Order); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {

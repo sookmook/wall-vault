@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -67,6 +68,20 @@ func (s *Store) load() error {
 	}
 	s.keys = snap.Keys
 	s.clients = snap.Clients
+	// migrate: assign SortOrder to existing clients that don't have one
+	needsSave := false
+	for i, c := range s.clients {
+		if c.SortOrder == 0 {
+			c.SortOrder = i + 1
+			needsSave = true
+		}
+	}
+	sort.Slice(s.clients, func(i, j int) bool {
+		return s.clients[i].SortOrder < s.clients[j].SortOrder
+	})
+	if needsSave {
+		defer s.save()
+	}
 	if snap.Settings != nil {
 		s.settings = *snap.Settings
 	}
@@ -110,7 +125,7 @@ func (s *Store) load() error {
 		s.services = sorted
 	}
 	// migration: default Enabled=true for existing clients
-	needsSave := false
+	needsSave = false
 	for _, c := range s.clients {
 		if !c.Enabled && c.CreatedAt.Before(time.Now().Add(-time.Second)) {
 			// among saved records where Enabled=false, perform migration
@@ -476,6 +491,13 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 	if inp.Enabled != nil {
 		enabled = *inp.Enabled
 	}
+	// assign SortOrder: new client goes to the end
+	maxOrder := 0
+	for _, existing := range s.clients {
+		if existing.SortOrder > maxOrder {
+			maxOrder = existing.SortOrder
+		}
+	}
 	c := &Client{
 		ID:              inp.ID,
 		Name:            inp.Name,
@@ -488,6 +510,7 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 		Description:     inp.Description,
 		IPWhitelist:     inp.IPWhitelist,
 		Enabled:         enabled,
+		SortOrder:       maxOrder + 1,
 		CreatedAt:       time.Now(),
 	}
 	s.clients = append(s.clients, c)
@@ -662,6 +685,35 @@ func (s *Store) DeleteClient(id string) error {
 		}
 	}
 	return fmt.Errorf("클라이언트 없음: %s", id)
+}
+
+// ReorderClients reorders clients by the given ID list.
+// IDs not in the list keep their relative order at the end.
+func (s *Store) ReorderClients(order []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	byID := make(map[string]*Client, len(s.clients))
+	for _, c := range s.clients {
+		byID[c.ID] = c
+	}
+	seen := make(map[string]bool, len(order))
+	reordered := make([]*Client, 0, len(s.clients))
+	for i, id := range order {
+		if c, ok := byID[id]; ok && !seen[id] {
+			c.SortOrder = i + 1
+			reordered = append(reordered, c)
+			seen[id] = true
+		}
+	}
+	// append any clients not in the order list
+	for _, c := range s.clients {
+		if !seen[c.ID] {
+			c.SortOrder = len(reordered) + 1
+			reordered = append(reordered, c)
+		}
+	}
+	s.clients = reordered
+	return s.save()
 }
 
 // ─── Proxy Status ─────────────────────────────────────────────────────────────

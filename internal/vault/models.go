@@ -57,6 +57,7 @@ type Client struct {
 	IPWhitelist []string `json:"ip_whitelist,omitempty"` // allowed IP list (empty array = allow all)
 	Avatar      string   `json:"avatar,omitempty"`       // data URI (data:image/...) OR relative path under ~/.openclaw/ (e.g. "workspace/avatar.png")
 	Enabled     bool     `json:"enabled"`                // enabled status
+	SortOrder   int      `json:"sort_order"`             // dashboard card order (lower = first)
 	CreatedAt   time.Time `json:"created_at"`
 }
 

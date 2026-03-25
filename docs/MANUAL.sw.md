@@ -429,6 +429,18 @@ Kama aina ya wakala ni `cline`, `claude-code`, `openclaw`, `nanoclaw`, kitufe ch
 
 ---
 
+#### 🔀 Buruta na Udondoshe ili Kupanga Kadi (v0.1.17)
+
+Unaweza **kuburuta** kadi za wakala kwenye dashibodi ili kuzipanga upya kwa mpangilio unaotaka.
+
+1. Bonyeza na ushikilie kadi ya wakala kisha uiburuze
+2. Idondoshe kwenye kadi katika nafasi unayotaka — mpangilio utabadilika mara moja
+3. Mpangilio mpya **utahifadhiwa kwenye seva mara moja** na utabaki hata ukisasisha ukurasa
+
+> 💡 Vifaa vya kugusa (simu/kompyuta kibao) bado havitumiki kwa sasa. Tafadhali tumia kivinjari cha kompyuta ya mezani.
+
+---
+
 #### 🔄 Usawazishaji wa Mfano wa Pande Mbili (v0.1.16)
 
 Ukibadilisha mfano wa wakala kwenye dashibodi ya ghala, mipangilio ya ndani ya wakala huyo itasasishwa kiotomatiki.

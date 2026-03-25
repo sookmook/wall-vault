@@ -429,6 +429,18 @@ Cuando el tipo de agente es `cline`, `claude-code`, `openclaw` o `nanoclaw`, apa
 
 ---
 
+#### 🔀 Ordenar tarjetas con arrastrar y soltar (v0.1.17)
+
+Puedes **arrastrar** las tarjetas de agentes en el panel para reorganizarlas en el orden que desees.
+
+1. Toma una tarjeta de agente con el ratón y arrástrala
+2. Suéltala sobre otra tarjeta para intercambiar sus posiciones
+3. El nuevo orden se **guarda inmediatamente en el servidor** y se mantiene después de actualizar la página
+
+> 💡 Los dispositivos táctiles (móvil/tableta) aún no son compatibles. Por favor, usa un navegador de escritorio.
+
+---
+
 #### 🔄 Sincronización bidireccional de modelos (v0.1.16)
 
 Cuando cambias el modelo de un agente en el panel de la bóveda, la configuración local de ese agente se actualiza automáticamente.

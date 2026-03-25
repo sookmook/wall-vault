@@ -429,6 +429,18 @@ Wenn der Agenten-Typ `cline`, `claude-code`, `openclaw` oder `nanoclaw` ist, ers
 
 ---
 
+#### 🔀 Kartensortierung per Drag & Drop (v0.1.17)
+
+Sie können die Agentenkarten im Dashboard per **Drag & Drop** in die gewünschte Reihenfolge bringen.
+
+1. Greifen Sie eine Agentenkarte mit der Maus und ziehen Sie sie
+2. Legen Sie sie auf der Karte an der gewünschten Position ab, um die Reihenfolge zu ändern
+3. Die geänderte Reihenfolge wird **sofort auf dem Server gespeichert** und bleibt auch nach dem Neuladen der Seite erhalten
+
+> 💡 Touchgeräte (Mobilgeräte/Tablets) werden noch nicht unterstützt. Bitte verwenden Sie einen Desktop-Browser.
+
+---
+
 #### 🔄 Bidirektionale Modellsynchronisierung (v0.1.16)
 
 Wenn du im Tresor-Dashboard das Modell eines Agenten änderst, wird die lokale Konfiguration dieses Agenten automatisch aktualisiert.

@@ -429,6 +429,18 @@ Idan nau'in wakili shine `cline`, `claude-code`, `openclaw`, `nanoclaw`, maɓall
 
 ---
 
+#### 🔀 Ja da Sauka don Tsara Katunan (v0.1.17)
+
+Kana iya **jan** katunan wakili a dashboard don sake tsara su yadda kake so.
+
+1. Danna ka riƙe katun na wakili sannan ka ja shi
+2. Saka shi a kan katun a wurin da kake so — tsarin zai canja nan take
+3. Sabon tsarin **za a adana shi a uwar garke nan take** kuma zai kasance ko bayan sabunta shafin
+
+> 💡 Na'urorin taɓawa (wayar hannu/kwamfutar hannu) ba su aiki a yanzu ba. Da fatan za a yi amfani da browser na tebur.
+
+---
+
 #### 🔄 Daidaita Ƙira ta Bangarorin Biyu (v0.1.16)
 
 Idan ka canza ƙirar wakili a dashboard ɗin ɓaure, tsarawa na gida na wannan wakili za a sabunta ta atomatik.

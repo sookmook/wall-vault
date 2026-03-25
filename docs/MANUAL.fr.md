@@ -429,6 +429,18 @@ Lorsque le type d'agent est `cline`, `claude-code`, `openclaw` ou `nanoclaw`, un
 
 ---
 
+#### 🔀 Tri des cartes par glisser-déposer (v0.1.17)
+
+Vous pouvez **glisser** les cartes d'agents du tableau de bord pour les réorganiser dans l'ordre souhaité.
+
+1. Saisissez une carte d'agent avec la souris et faites-la glisser
+2. Déposez-la sur la carte à la position souhaitée pour changer l'ordre
+3. L'ordre modifié est **immédiatement enregistré sur le serveur** et conservé même après actualisation de la page
+
+> 💡 Les appareils tactiles (mobile/tablette) ne sont pas encore pris en charge. Veuillez utiliser un navigateur de bureau.
+
+---
+
 #### 🔄 Synchronisation bidirectionnelle des modèles (v0.1.16)
 
 Lorsque vous modifiez le modèle d'un agent dans le tableau de bord du coffre-fort, la configuration locale de cet agent est automatiquement mise à jour.

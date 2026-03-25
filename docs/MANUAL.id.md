@@ -429,6 +429,18 @@ Jika jenis agen adalah `cline`, `claude-code`, `openclaw`, atau `nanoclaw`, tomb
 
 ---
 
+#### 🔀 Pengurutan Kartu dengan Seret dan Lepas (v0.1.17)
+
+Anda dapat **menyeret** kartu agen di dashboard untuk menyusun ulang sesuai urutan yang diinginkan.
+
+1. Klik dan seret kartu agen dengan mouse
+2. Lepaskan di atas kartu pada posisi yang diinginkan untuk menukar urutan
+3. Urutan baru **langsung disimpan ke server** dan tetap bertahan meskipun halaman di-refresh
+
+> 💡 Perangkat sentuh (ponsel/tablet) belum didukung. Silakan gunakan browser desktop.
+
+---
+
 #### 🔄 Sinkronisasi Model Dua Arah (v0.1.16)
 
 Saat Anda mengubah model agen dari dashboard brankas, pengaturan lokal agen tersebut akan diperbarui secara otomatis.

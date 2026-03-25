@@ -429,6 +429,18 @@ Quando o tipo de agente é `cline`, `claude-code`, `openclaw` ou `nanoclaw`, o b
 
 ---
 
+#### 🔀 Ordenação de cartões por arrastar e soltar (v0.1.17)
+
+Você pode **arrastar** os cartões de agentes no painel para reorganizá-los na ordem desejada.
+
+1. Segure um cartão de agente com o mouse e arraste-o
+2. Solte-o sobre o cartão na posição desejada para alterar a ordem
+3. A ordem alterada é **salva imediatamente no servidor** e mantida mesmo após atualizar a página
+
+> 💡 Dispositivos com tela sensível ao toque (celular/tablet) ainda não são suportados. Use um navegador de desktop.
+
+---
+
 #### 🔄 Sincronização bidirecional de modelos (v0.1.16)
 
 Quando você altera o modelo de um agente no painel do cofre, a configuração local desse agente é atualizada automaticamente.

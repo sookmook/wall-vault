@@ -429,6 +429,18 @@ Uma uhlobo lwe-agent lungu-`cline`, `claude-code`, `openclaw`, `nanoclaw`, inkin
 
 ---
 
+#### 🔀 Hudula Bese Uyeka Ukuhlela Amakhadi (v0.1.17)
+
+Ungahudula **amakhadi** e-agent ku-dashboard ukuze uwahlele ngokulandelana okufunayo.
+
+1. Chofoza ubambe ikhadi le-agent bese uyahudula
+2. Liyeke phezu kwekhadi endaweni oyifunayo — ukulandelana kuzoshintsha ngokushesha
+3. Ukulandelana okusha **kugcinwa ku-server ngokushesha** futhi kuzohlala noma ususa ikhasi kabusha
+
+> 💡 Amadivayisi okuthinta (iselula/ithebhulethi) awakasekelwa okwamanje. Sicela usebenzise isiphequluli sekhompyutha.
+
+---
+
 #### 🔄 Ukuvumelaniswa Kwemodeli Ngezinhlangothi Ezimbili (v0.1.16)
 
 Uma ushintsha imodeli ye-agent ku-vault dashboard, izilungiselelo zendawo ze-agent zishintshelwa ngokuzenzakalela.

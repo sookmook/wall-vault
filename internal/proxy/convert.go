@@ -355,6 +355,130 @@ func AnthropicToGemini(req *AnthropicRequest) *GeminiRequest {
 	return gemini
 }
 
+// ─── Anthropic → OpenAI ──────────────────────────────────────────────────────
+// anthropicToOpenAIReq converts an Anthropic /v1/messages request to an OpenAI
+// chat-completions request, preserving tool_use / tool_result content blocks.
+// This is used by handleAnthropic's dispatch path (via RawOAI) so that
+// OpenRouter-based backends receive tools and function calls correctly.
+
+func anthropicToOpenAIReq(req *AnthropicRequest, model string) *OpenAIRequest {
+	oai := &OpenAIRequest{
+		Model:       model,
+		Stream:      req.Stream,
+		Temperature: req.Temperature,
+	}
+	if req.MaxTokens > 0 {
+		mt := req.MaxTokens
+		oai.MaxTokens = &mt
+	}
+
+	// System instruction
+	if sys := req.SystemText(); sys != "" {
+		oai.Messages = append(oai.Messages, OpenAIMessage{Role: "system", Content: sys})
+	}
+
+	// Convert Anthropic messages to OpenAI messages
+	for _, msg := range req.Messages {
+		// Try to parse as content blocks array
+		var blocks []struct {
+			Type      string          `json:"type"`
+			Text      string          `json:"text"`
+			ID        string          `json:"id"`
+			Name      string          `json:"name"`
+			Input     json.RawMessage `json:"input"`
+			ToolUseID string          `json:"tool_use_id"`
+			Content   json.RawMessage `json:"content"`
+		}
+		if json.Unmarshal(msg.Content, &blocks) == nil && len(blocks) > 0 {
+			if msg.Role == "assistant" {
+				// Extract text and tool_use blocks
+				text := ""
+				var toolCalls []map[string]interface{}
+				for _, b := range blocks {
+					switch b.Type {
+					case "text":
+						text += b.Text
+					case "tool_use":
+						argsJSON, _ := json.Marshal(b.Input)
+						toolCalls = append(toolCalls, map[string]interface{}{
+							"id":   b.ID,
+							"type": "function",
+							"function": map[string]interface{}{
+								"name":      b.Name,
+								"arguments": string(argsJSON),
+							},
+						})
+					}
+				}
+				oaiMsg := OpenAIMessage{Role: "assistant", Content: text}
+				if len(toolCalls) > 0 {
+					tc, _ := json.Marshal(toolCalls)
+					oaiMsg.ToolCalls = tc
+				}
+				oai.Messages = append(oai.Messages, oaiMsg)
+			} else {
+				// User messages: handle tool_result blocks
+				for _, b := range blocks {
+					switch b.Type {
+					case "text":
+						oai.Messages = append(oai.Messages, OpenAIMessage{Role: "user", Content: b.Text})
+					case "tool_result":
+						content := ""
+						// tool_result content can be string or content blocks
+						if json.Unmarshal(b.Content, &content) != nil {
+							// Try as content blocks
+							var parts []struct {
+								Type string `json:"type"`
+								Text string `json:"text"`
+							}
+							if json.Unmarshal(b.Content, &parts) == nil {
+								for _, p := range parts {
+									if p.Type == "text" {
+										content += p.Text
+									}
+								}
+							} else {
+								content = string(b.Content)
+							}
+						}
+						oai.Messages = append(oai.Messages, OpenAIMessage{
+							Role:       "tool",
+							ToolCallID: b.ToolUseID,
+							Content:    content,
+						})
+					}
+				}
+			}
+			continue
+		}
+
+		// Simple string content
+		oai.Messages = append(oai.Messages, OpenAIMessage{
+			Role:    msg.Role,
+			Content: msg.ContentText(),
+		})
+	}
+
+	// Convert Anthropic tools to OpenAI tool format
+	for _, t := range req.Tools {
+		toolMap, ok := t.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		oaiTool := map[string]interface{}{
+			"type": "function",
+			"function": map[string]interface{}{
+				"name":        toolMap["name"],
+				"description": toolMap["description"],
+				"parameters":  toolMap["input_schema"],
+			},
+		}
+		oai.Tools = append(oai.Tools, oaiTool)
+	}
+
+	return oai
+}
+
 // ─── Gemini → Anthropic ───────────────────────────────────────────────────────
 
 func GeminiRespToAnthropic(model string, resp *GeminiResponse) *AnthropicResponse {

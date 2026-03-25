@@ -524,7 +524,7 @@ When you want to switch Cline's model, change it in the **vault dashboard**:
 
 #### Detecting disconnection
 
-When you close VS Code, the agent card on the vault dashboard will turn yellow (delayed) after about **2–3 minutes**, and red (offline) after **5 minutes**.
+When you close VS Code, the agent card on the vault dashboard will turn yellow (delayed) after about **90 seconds**, and red (offline) after **3 minutes**. (Since v0.1.18, the 15-second status check interval enables faster offline detection.)
 
 #### Troubleshooting
 

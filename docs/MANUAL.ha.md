@@ -524,7 +524,7 @@ Idan kana son canza ƙirar Cline, canza a **dashboard ɗin ɓaure**:
 
 #### Gano Yankewar Haɗi
 
-Idan ka rufe VS Code, katin wakili a dashboard ɗin ɓaure zai canza zuwa rawaya (jinkiri) bayan **minti 2–3**, sannan ja (ba kan layi) bayan **minti 5**.
+Idan ka rufe VS Code, katin wakili a dashboard ɗin ɓaure zai canza zuwa rawaya (jinkiri) bayan **daƙiƙa 90**, sannan ja (ba kan layi) bayan **minti 3**. (Tun daga v0.1.18, binciken yanayi kowane daƙiƙa 15 yana sa gano rashin haɗi ya yi sauri.)
 
 #### Warware Matsaloli
 

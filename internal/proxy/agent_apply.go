@@ -58,7 +58,7 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 	case "cline":
 		path, err = applyClineConfig(body.BaseURL, body.Model, token)
 	case "claude-code":
-		path, err = applyClaudeCodeConfig(body.BaseURL, token)
+		path, err = applyClaudeCodeConfig(body.BaseURL, body.Model, token)
 	case "openclaw", "nanoclaw":
 		path, err = applyOpenClawConfig(body.BaseURL, body.Model, token)
 	default:
@@ -68,6 +68,18 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Record applied client so heartbeat keeps reporting it to vault (signal light)
+	if entry := s.lookupTokenConfig(token); entry != nil && entry.clientID != "" {
+		s.clientActMu.Lock()
+		s.clientActs[entry.clientID] = &clientAct{
+			service:  entry.service,
+			model:    entry.model,
+			lastSeen: time.Now(),
+			applied:  true,
+		}
+		s.clientActMu.Unlock()
 	}
 
 	jsonOK(w, map[string]interface{}{
@@ -174,7 +186,7 @@ func updateClineSecrets(dataDir, apiKey string) error {
 
 // applyClaudeCodeConfig writes wall-vault proxy settings into ~/.claude/settings.json.
 // Returns the resolved settings.json path on success.
-func applyClaudeCodeConfig(baseURL, token string) (string, error) {
+func applyClaudeCodeConfig(baseURL, model, token string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("cannot determine home directory: %w", err)
@@ -189,6 +201,9 @@ func applyClaudeCodeConfig(baseURL, token string) (string, error) {
 	settings["apiProvider"] = "openai"
 	settings["baseUrl"] = baseURL
 	settings["apiKey"] = token
+	if model != "" {
+		settings["model"] = model
+	}
 
 	if err := writeJSON(path, settings); err != nil {
 		return "", fmt.Errorf("failed to write settings.json: %w", err)
@@ -198,9 +213,19 @@ func applyClaudeCodeConfig(baseURL, token string) (string, error) {
 
 // updateClaudeCodeModel: update Claude Code's model in settings.json when vault config changes.
 // Checks both WSL (~/.claude/) and Windows (/mnt/c/Users/.../.claude/) locations.
+// Only writes Claude-compatible model names; non-Claude models (e.g. google/gemini-*)
+// are handled by the proxy's token-based routing and must NOT be written to settings.json
+// because Claude Code validates model names against its internal registry.
 // Best-effort: errors are silently ignored.
 func updateClaudeCodeModel(model string) {
 	if model == "" {
+		return
+	}
+	// Only write Claude-compatible model names to settings.json.
+	// Claude Code rejects non-Claude models (shows "There's an issue with the selected model").
+	// The proxy routes non-Claude models via token-based lookup in handleOpenAI — no settings
+	// change needed.
+	if !isClaudeModel(model) {
 		return
 	}
 	for _, path := range findClaudeSettingsPaths() {
@@ -213,6 +238,25 @@ func updateClaudeCodeModel(model string) {
 		settings["model"] = model
 		_ = writeJSON(path, settings)
 	}
+}
+
+// isClaudeModel returns true if the model name is a Claude-compatible identifier
+// that Claude Code's internal model registry accepts.
+func isClaudeModel(model string) bool {
+	// Strip provider prefix if present (e.g. "anthropic/claude-opus-4-6")
+	if i := strings.LastIndex(model, "/"); i >= 0 {
+		model = model[i+1:]
+	}
+	// Full model IDs: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5-20251001, etc.
+	if strings.HasPrefix(model, "claude-") {
+		return true
+	}
+	// Short aliases used by Claude Code: opus, sonnet, haiku
+	switch model {
+	case "opus", "sonnet", "haiku":
+		return true
+	}
+	return false
 }
 
 // findClaudeSettingsPaths returns all candidate paths for Claude Code's settings.json.

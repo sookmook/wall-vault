@@ -96,12 +96,21 @@ func (s *Server) sendHeartbeat() {
 		}
 	}
 
-	// Collect recently-active non-proxy clients (last 5 minutes)
+	// Collect recently-active non-proxy clients.
+	// Applied entries get a longer grace period (3 min) so newly-applied
+	// agents stay visible on the dashboard even before the user starts using them.
+	// Regular (request-based) entries time out after 90s of inactivity.
 	var activeClients []activeClientItem
-	cutoff := time.Now().Add(-90 * time.Second)
+	now := time.Now()
+	cutoff := now.Add(-90 * time.Second)
+	appliedCutoff := now.Add(-3 * time.Minute)
 	s.clientActMu.Lock()
 	for cid, act := range s.clientActs {
-		if act.lastSeen.After(cutoff) {
+		alive := act.lastSeen.After(cutoff)
+		if !alive && act.applied {
+			alive = act.lastSeen.After(appliedCutoff)
+		}
+		if alive {
 			activeClients = append(activeClients, activeClientItem{
 				ClientID: cid,
 				Service:  act.service,

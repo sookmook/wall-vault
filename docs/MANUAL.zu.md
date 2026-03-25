@@ -524,7 +524,7 @@ Uma ufuna ukushintsha imodeli ye-Cline, shintsha ku-**vault dashboard**:
 
 #### Ukubona Ukukhishwa Kokuqhagamshelana
 
-Uma uvala i-VS Code, ikhadi le-agent ku-vault dashboard liguqukela kuphuzi (ilindile) ngemuva **kwemizuzu engu-2–3**, bese liba bomvu (aye ikho ku-inthanethi) ngemuva **kwemizuzu engu-5**.
+Uma uvala i-VS Code, ikhadi le-agent ku-vault dashboard liguqukela kuphuzi (ilindile) ngemuva **kwamasekhondi angu-90**, bese liba bomvu (aye ikho ku-inthanethi) ngemuva **kwemizuzu engu-3**. (Kusukela ku-v0.1.18, ukuhlola isimo njalo ngamasekhondi angu-15 kwenza ukutholwa kokungaxhunyiwe kube ngokushesha.)
 
 #### Ukuxazulula Izinkinga
 

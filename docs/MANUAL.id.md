@@ -524,7 +524,7 @@ Untuk mengganti model Cline, ubah dari **dashboard brankas**:
 
 #### Mendeteksi Pemutusan Koneksi
 
-Saat VS Code ditutup, kartu agen di dashboard brankas akan berubah menjadi kuning (lambat) setelah sekitar **2–3 menit**, dan merah (offline) setelah **5 menit**.
+Saat VS Code ditutup, kartu agen di dashboard brankas akan berubah menjadi kuning (lambat) setelah sekitar **90 detik**, dan merah (offline) setelah **3 menit**. (Sejak v0.1.18, interval pemeriksaan status 15 detik memungkinkan deteksi offline yang lebih cepat.)
 
 #### Pemecahan Masalah
 

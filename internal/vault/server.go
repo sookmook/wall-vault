@@ -88,8 +88,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		startedAt: time.Now(),
 		limiter:   newAuthLimiter(),
 	}
+	// send full state to every new SSE client (handles reconnect sync)
+	srv.broker.OnConnect = func() { srv.broadcastAgentsSync() }
 	// start midnight daily usage reset
 	go srv.startDailyReset()
+	// start periodic status broadcaster so the dashboard detects
+	// offline transitions even when no heartbeats arrive
+	go srv.startStatusTicker()
 	return srv, nil
 }
 
@@ -434,42 +439,22 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	// sync proxy key usage, attempts, and cooldowns into vault store (single lock + save)
 	s.store.BatchUpdateKeyMetrics(ps.KeyUsage, ps.KeyAttempts, ps.KeyCooldowns)
-	// broadcast proxy status so the dashboard updates the agent card in real-time
-	s.broker.Broadcast(SSEEvent{
-		Type: "proxy_update",
-		Data: map[string]interface{}{
-			"client_id": ps.ClientID,
-			"service":   ps.Service,
-			"model":     ps.Model,
-			"version":   ps.Version,
-			"sse":       ps.SSE,
-		},
-	})
-	// broadcast proxy_update for each recently-active client served by this proxy
-	// so their agent cards also show green with the correct model
+	// update ProxyStatus for each recently-active sub-client served by this proxy
 	for _, ac := range ps.ActiveClients {
 		if ac.ClientID == "" || ac.ClientID == ps.ClientID {
-			continue // skip self
+			continue
 		}
-		sub := ProxyStatus{
-			ClientID:  ac.ClientID,
-			Service:   ac.Service,
-			Model:     ac.Model,
-			Version:   ps.Version,
-			SSE:       false, // client itself is not SSE-connected
-		}
-		s.store.UpdateProxyStatus(&sub)
-		s.broker.Broadcast(SSEEvent{
-			Type: "proxy_update",
-			Data: map[string]interface{}{
-				"client_id": ac.ClientID,
-				"service":   ac.Service,
-				"model":     ac.Model,
-				"version":   ps.Version,
-				"sse":       false,
-			},
+		s.store.UpdateProxyStatus(&ProxyStatus{
+			ClientID: ac.ClientID,
+			Service:  ac.Service,
+			Model:    ac.Model,
+			Version:  ps.Version,
+			SSE:      false,
 		})
 	}
+
+	// single unified broadcast: status + details for every client card
+	s.broadcastAgentsSync()
 
 	// always broadcast full key states so the dashboard reflects reality without a fetch
 	{
@@ -510,13 +495,17 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
 		return
 	}
-	// identify client: find by token, or use query param client_id if admin token
+	// identify client: explicit client_id query param takes priority (avoids
+	// ambiguity when multiple proxies share the same token), then fall back
+	// to token-based lookup.
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	clientID := ""
-	if c := s.store.GetClientByToken(token); c != nil {
-		clientID = c.ID
-	} else if token == s.cfg.Vault.AdminToken {
-		clientID = r.URL.Query().Get("client_id")
+	clientID := r.URL.Query().Get("client_id")
+	if clientID == "" {
+		if c := s.store.GetClientByToken(token); c != nil {
+			clientID = c.ID
+		} else if token == s.cfg.Vault.AdminToken {
+			// admin token without client_id — cannot resolve
+		}
 	}
 	if clientID == "" {
 		jsonError(w, "client not found", http.StatusUnauthorized)
@@ -850,6 +839,62 @@ func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 
 	result := s.registry.All(svcFilter)
 	jsonOK(w, map[string]interface{}{"models": result, "count": len(result)})
+}
+
+// ─── Periodic Status Broadcast ────────────────────────────────────────────────
+
+// broadcastAgentsSync computes the current status for every client and
+// broadcasts a single "agents_sync" SSE event containing status + details.
+// This is the ONE event the dashboard uses for all card state updates.
+func (s *Server) broadcastAgentsSync() {
+	clients := s.store.ListClients()
+	proxies := s.store.ListProxies()
+	proxyMap := map[string]*ProxyStatus{}
+	for _, p := range proxies {
+		proxyMap[p.ClientID] = p
+	}
+	now := time.Now()
+	items := make([]map[string]interface{}, 0, len(clients))
+	for _, c := range clients {
+		entry := map[string]interface{}{"id": c.ID}
+		if p, ok := proxyMap[c.ID]; ok {
+			age := now.Sub(p.UpdatedAt)
+			switch {
+			case age < 90*time.Second:
+				entry["st"] = "live"
+			case age < 3*time.Minute:
+				entry["st"] = "delay"
+			default:
+				entry["st"] = "offline"
+			}
+			// include service/model/version for live and delay cards
+			if age < 3*time.Minute {
+				entry["svc"] = p.Service
+				entry["mdl"] = p.Model
+				entry["ver"] = p.Version
+			}
+			if !p.StartedAt.IsZero() {
+				entry["sec"] = p.StartedAt.Unix()
+			}
+		} else {
+			entry["st"] = "noconn"
+		}
+		items = append(items, entry)
+	}
+	s.broker.Broadcast(SSEEvent{
+		Type: "agents_sync",
+		Data: map[string]interface{}{"clients": items},
+	})
+}
+
+// startStatusTicker periodically broadcasts agents_sync so the dashboard
+// detects offline transitions even when no proxy heartbeats are arriving.
+func (s *Server) startStatusTicker() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.broadcastAgentsSync()
+	}
 }
 
 // ─── Daily Midnight Reset ─────────────────────────────────────────────────────

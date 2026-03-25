@@ -524,7 +524,7 @@ Unapotaka kubadilisha mfano wa Cline, badilisha kwenye **dashibodi ya ghala**:
 
 #### Kugundua Kukatika kwa Muunganisho
 
-Ukifunga VS Code, kadi ya wakala kwenye dashibodi ya ghala itabadilika kuwa ya njano (imechelewa) baada ya **dakika 2–3**, na nyekundu (nje ya mtandao) baada ya **dakika 5**.
+Ukifunga VS Code, kadi ya wakala kwenye dashibodi ya ghala itabadilika kuwa ya njano (imechelewa) baada ya **sekunde 90**, na nyekundu (nje ya mtandao) baada ya **dakika 3**. (Tangu v0.1.18, ukaguzi wa hali kila sekunde 15 unawezesha kugundua hali ya nje ya mtandao haraka zaidi.)
 
 #### Utatuzi wa Matatizo
 

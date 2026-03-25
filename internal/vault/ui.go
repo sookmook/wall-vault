@@ -421,7 +421,12 @@ function updateAgentUptimes() {
   document.querySelectorAll('.agent-card[data-started-sec]').forEach(el => {
     const started = parseInt(el.dataset.startedSec);
     if (!started) return;
+    const isAlive = el.classList.contains('ac-live') || el.classList.contains('ac-delay');
     let up = el.querySelector('.agent-uptime');
+    if (!isAlive) {
+      if (up) up.style.display = 'none';
+      return;
+    }
     if (!up) {
       up = document.createElement('div');
       up.className = 'agent-uptime';
@@ -431,6 +436,7 @@ function updateAgentUptimes() {
         if (name) name.after(up);
       }
     }
+    up.style.display = '';
     up.textContent = '⏱ ' + fmtAgentUptime(now - started);
   });
 }
@@ -815,6 +821,8 @@ function refreshKeyUsage(data) {
 
 // SSE 연결
 let es;
+const cardAlive = {};        // clientId → epoch sec (last proof-of-life)
+let lastSSETime = Date.now(); // ms — last ANY SSE event received
 function connectSSE() {
   es = new EventSource('/api/events');
   es.onopen = () => {
@@ -826,6 +834,7 @@ function connectSSE() {
     badge.style.borderColor='var(--green)'; badge.style.color='var(--green)';
   };
   es.onmessage = (e) => {
+    lastSSETime = Date.now();
     try {
       const d = JSON.parse(e.data);
       if (d.type === 'config_change') {
@@ -842,9 +851,8 @@ function connectSSE() {
       } else if (d.type === 'usage_reset') {
         // 가벼운 reload (일일 사용량 초기화)
         setTimeout(() => location.reload(), 500);
-      } else if (d.type === 'proxy_update') {
-        // 프록시 하트비트 수신 → 에이전트 카드 연결 상태 즉시 반영
-        applyProxyUpdate(d.data || {});
+      } else if (d.type === 'agents_sync') {
+        applyAgentsSync(d.data || {});
       } else if (d.type === 'usage_update') {
         // 키 사용량 실시간 갱신 (하트비트 동기화)
         refreshKeyUsage(d.data || {});
@@ -860,6 +868,27 @@ function connectSSE() {
   };
 }
 connectSSE();
+
+// ── Client-side watchdog (SSE health only) ──
+// Server is the single authority for card status via agents_sync events.
+// The watchdog only monitors SSE connection health as a safety net.
+function watchdog() {
+  if (Date.now() - lastSSETime > 120000) {
+    const t = I18N[curLang] || I18N.ko;
+    document.querySelectorAll('.agent-card.ac-live').forEach(c => {
+      c.classList.remove('ac-live'); c.classList.add('ac-delay');
+      const d = c.querySelector('.dot'); if (d) d.className = 'dot dot-yellow';
+      const s = c.querySelector('.agent-status');
+      if (s) s.innerHTML = '<span class="status-delay">' + (t.st_delayed||'◑ 지연') + '</span>';
+    });
+  }
+}
+setInterval(watchdog, 5000);
+
+// Tab reactivation: immediately run watchdog when user returns to the tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { watchdog(); updateAgentUptimes(); }
+});
 
 // 서비스 select 갱신: /admin/services에서 현재 목록 받아 모든 svc-* select 업데이트
 function refreshServiceSelects() {
@@ -965,32 +994,56 @@ function deleteKey(id) {
 
 // ── 에이전트 카드 실시간 반영 (config_change SSE) ──
 // 에이전트 카드의 서비스 select, 모델 input을 새 값으로 업데이트하고 모델 드롭다운 재조회
-// applyProxyUpdate: 하트비트 수신 시 에이전트 카드 연결 상태·모델명 즉시 업데이트
-function applyProxyUpdate(pd) {
-  const clientId = pd.client_id;
-  if (!clientId) return;
-  // 카드 찾기: data-client 속성으로 직접 검색 (model-form select 방식보다 안정적)
-  const card = document.querySelector('.agent-card[data-client="' + clientId + '"]');
-  if (!card) return;
-  // 카드 테두리 색상 갱신
-  card.classList.remove('ac-live','ac-delay','ac-offline','ac-noconn');
-  card.classList.add('ac-live');
-  // 상태 점 색상 갱신
-  const dot = card.querySelector('.dot');
-  if (dot) { dot.className = 'dot dot-green'; }
-  // 상태 칩 갱신 (서비스 / 모델명)
-  const statusDiv = card.querySelector('.agent-status');
-  if (statusDiv) {
-    const svc = pd.service || '';
-    let mdl = pd.model || '';
-    // 서비스 prefix 제거 (trimServicePrefix 동등 처리)
-    if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
-    const ver = pd.version ? '<span class="status-version">' + pd.version + '</span>' : '';
-    const t = I18N[curLang] || I18N.ko;
-    statusDiv.innerHTML =
-      '<span class="status-live"><span>' + (t.st_running||'● 실행 중') + '</span> — ' + svc + ' / ' + mdl + '</span> ' +
-      '<span class="status-hint"><span class="bot-ago">방금</span></span> ' + ver;
-  }
+
+// applyAgentsSync: unified handler for ALL card state updates.
+// Server computes status; dashboard just displays. ONE event, ONE handler, no races.
+function applyAgentsSync(data) {
+  const list = data.clients || [];
+  const t = I18N[curLang] || I18N.ko;
+  const infoMap = {};
+  list.forEach(c => { infoMap[c.id] = c; });
+  document.querySelectorAll('.agent-card[data-client]').forEach(card => {
+    const cid = card.dataset.client;
+    const info = infoMap[cid];
+    if (!info) return;
+    const st = info.st || 'noconn';
+    if (st === 'live') cardAlive[cid] = Date.now() / 1000;
+    // CSS class + dot
+    const clsMap = {live:'ac-live', delay:'ac-delay', offline:'ac-offline', noconn:'ac-noconn'};
+    const dotMap = {live:'dot-green', delay:'dot-yellow', offline:'dot-red', noconn:'dot-red'};
+    const wasLive = card.classList.contains('ac-live') || card.classList.contains('ac-delay');
+    const isAlive = (st === 'live' || st === 'delay');
+    card.classList.remove('ac-live','ac-delay','ac-offline','ac-noconn');
+    card.classList.add(clsMap[st] || 'ac-offline');
+    const dot = card.querySelector('.dot');
+    if (dot) dot.className = 'dot ' + (dotMap[st] || 'dot-red');
+    // Uptime sync
+    if (info.sec && isAlive) {
+      card.dataset.startedSec = String(info.sec);
+    } else if (isAlive && !wasLive) {
+      card.dataset.startedSec = Math.floor(Date.now() / 1000);
+    }
+    // Status text — every state handled in one place
+    const statusDiv = card.querySelector('.agent-status');
+    if (!statusDiv) return;
+    if (st === 'live') {
+      const svc = info.svc || '';
+      let mdl = info.mdl || '';
+      if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
+      const ver = info.ver ? '<span class="status-version">' + info.ver + '</span>' : '';
+      statusDiv.innerHTML =
+        '<span class="status-live"><span>' + (t.st_running||'● 실행 중') + '</span> — ' + svc + ' / ' + mdl + '</span> ' +
+        '<span class="status-hint"><span class="bot-ago">' + (t.st_just||'방금') + '</span></span> ' + ver;
+    } else if (st === 'delay') {
+      const svc = info.svc || '';
+      let mdl = info.mdl || '';
+      if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
+      statusDiv.innerHTML = '<span class="status-delay">' + (t.st_delayed||'◑ 지연') + ' — ' + svc + ' / ' + mdl + '</span>';
+    } else if (st === 'offline') {
+      statusDiv.innerHTML = '<span class="status-offline">' + (t.st_offline||'✕ 오프라인') + '</span>';
+    }
+    // noconn: leave initial server-rendered text (agent-type specific instructions)
+  });
 }
 
 function applyAgentConfigChange(clientId, service, model) {
@@ -1903,14 +1956,10 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		} else {
 			age := time.Since(p.UpdatedAt)
 			ageSec := int(age.Seconds())
-			// Foreign clients (SSE=false, reported via proxy heartbeat ActiveClients) use tighter
-			// thresholds: their 90s clientActs TTL means they disappear ~90s after last activity.
-			liveThresh := 3 * time.Minute
-			delayThresh := 10 * time.Minute
-			if !p.SSE {
-				liveThresh = 2 * time.Minute
-				delayThresh = 5 * time.Minute
-			}
+			// Heartbeat arrives every 20s; allow ~90s before showing delay
+			// and 3min before showing offline.
+			liveThresh := 90 * time.Second
+			delayThresh := 3 * time.Minute
 			switch {
 			case age < liveThresh:
 				dotClass = "dot-green"

@@ -12,6 +12,33 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.17] — 2026-03-25
+
+### Added
+- **Drag-and-drop agent card reordering**: Agent cards on the vault dashboard can
+  now be reordered by dragging. Order is persisted in `Client.SortOrder` and saved
+  to `vault.json` via `PUT /admin/clients/reorder`. Existing clients auto-migrate
+  with sequential SortOrder on first load.
+- **Inline apply buttons for disconnected agents**: When an agent (claude-code,
+  cline, openclaw, nanoclaw) is not connected, the status area now shows a
+  clickable [⚡ 설정 적용] button instead of a cryptic env-var instruction.
+  Clicking it auto-writes the agent's local config via the proxy's `/agent/apply`.
+- **`cokacdir` agent type**: New agent type for cokacdir (AI terminal file manager).
+  Badge: 📂, color: #2d8659. Config copy provides `ANTHROPIC_BASE_URL` and
+  `OPENAI_BASE_URL` environment variable templates.
+
+### Removed
+- **`vscode` agent type**: VS Code Continue extension — config format has diverged
+  and the generated YAML no longer matches current Continue versions.
+- **`antigravity` agent type**: Low adoption. Gemini CLI covers the same use case.
+
+### Changed
+- **Claude Code apply success message**: Now says "(새 대화 시작 시 적용)" to
+  clarify that Claude Code picks up the new settings on the next conversation.
+- **Version bump**: `BASE_VERSION` → `v0.1.17`.
+
+---
+
 ## [0.1.16] — 2026-03-25
 
 ### Added

@@ -196,6 +196,10 @@ a{color:var(--accent);text-decoration:none}
 .agent-card.ac-delay{border-left-color:var(--yellow)}
 .agent-card.ac-offline{border-left-color:var(--red)}
 .agent-card.ac-noconn{border-left-color:var(--text-muted)}
+/* ── 드래그 앤 드롭 ── */
+.agent-card[draggable=true]{cursor:grab}
+.agent-card.dragging{opacity:.35;transform:scale(.96)}
+.agent-card.drag-over{border-top:3px solid var(--accent);margin-top:-2px}
 .ac-top{display:flex;align-items:flex-start;gap:.5rem}
 .ac-type-icon{font-size:5.28rem;line-height:1;flex-shrink:0;margin-top:0;filter:drop-shadow(0 2px 6px rgba(0,0,0,.20))}
 .ac-avatar{width:5.28rem;height:5.28rem;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border)}
@@ -262,6 +266,7 @@ a{color:var(--accent);text-decoration:none}
 .atb-openclaw{background:#c0392b}
 .atb-nanoclaw{background:#16a085}
 .atb-claude{background:#e07020}
+.atb-cokacdir{background:#2d8659}
 .atb-cursor{background:#2471b0}
 .atb-vscode{background:#2471b0}
 .atb-gemini{background:#1a73e8}
@@ -282,7 +287,11 @@ a{color:var(--accent);text-decoration:none}
 .btn-cfg-openclaw:hover{color:#c0392b;border-color:#c0392b}
 .btn-cfg-nanoclaw:hover{color:#16a085;border-color:#16a085}
 .btn-cfg-claude:hover{color:#e07020;border-color:#e07020}
+.btn-cfg-cokacdir:hover{color:#2d8659;border-color:#2d8659}
 .btn-cfg-deploy:hover{color:#8e44ad;border-color:#8e44ad}
+/* ── 상태 영역 인라인 설정 적용 버튼 ── */
+.btn-apply-hint{background:transparent;border:1px dashed var(--border);color:var(--accent);padding:.15rem .5rem;border-radius:5px;cursor:pointer;font-size:.67rem;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-apply-hint:hover{background:var(--accent);color:#fff;border-style:solid}
 /* ── 모델 저장 버튼 ── */
 .btn-save{background:var(--accent);color:#fff;border:none;padding:.26rem .65rem;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:inherit;font-weight:500;transition:all .15s;white-space:nowrap}
 .btn-save:hover{background:var(--accent-hover);transform:translateY(-1px)}
@@ -1082,6 +1091,56 @@ document.addEventListener('DOMContentLoaded', function() {
   setInterval(pingLocalServices, 15000);
 });
 
+// ── 드래그 앤 드롭 에이전트 카드 재정렬 ──
+let _dragSrc = null;
+function initDragSort() {
+  document.querySelectorAll('.agent-card[data-client]').forEach(card => {
+    card.setAttribute('draggable', 'true');
+    card.addEventListener('dragstart', e => {
+      _dragSrc = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.dataset.client);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      _dragSrc = null;
+    });
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (card !== _dragSrc) card.classList.add('drag-over');
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      if (!_dragSrc || _dragSrc === card) return;
+      const grid = card.parentNode;
+      const cards = [...grid.querySelectorAll('.agent-card[data-client]')];
+      const fromIdx = cards.indexOf(_dragSrc);
+      const toIdx = cards.indexOf(card);
+      if (fromIdx < toIdx) {
+        grid.insertBefore(_dragSrc, card.nextSibling);
+      } else {
+        grid.insertBefore(_dragSrc, card);
+      }
+      // save new order to server
+      const order = [...grid.querySelectorAll('.agent-card[data-client]')].map(c => c.dataset.client);
+      const token = getAdminToken();
+      if (!token) return;
+      fetch('/admin/clients/reorder', {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({order})
+      }).catch(() => {});
+    });
+  });
+}
+// Initialize after DOM is fully loaded
+setTimeout(initDragSort, 100);
+
 // ── 모달 공통 유틸 ──
 function closeModal(prefix) {
   document.getElementById('modal-'+prefix).classList.remove('open');
@@ -1192,7 +1251,7 @@ function applyAgentConfig(clientId, agentType) {
       if(d.ok){
         const labels = {
           'cline': 'Cline (VS Code 재시작 필요)',
-          'claude-code': 'Claude Code',
+          'claude-code': 'Claude Code (새 대화 시작 시 적용)',
           'openclaw': 'OpenClaw',
           'nanoclaw': 'NanoClaw',
         };
@@ -1234,24 +1293,6 @@ function copyAgentConfig(clientId, agentType) {
         +'// or environment variable:\n'
         +'OPENAI_BASE_URL='+baseUrl+'\n'
         +'OPENAI_API_KEY='+tok;
-    } else if(agentType==='vscode'){
-      title=T('cfg_vscode')+' '+T('cfg_ok');
-      hint=T('cfg_vscode_hint');
-      cfg='# ~/.continue/config.yaml\n'
-        +'name: My Config\n'
-        +'version: 0.0.1\n'
-        +'schema: v1\n'
-        +'\n'
-        +'models:\n'
-        +'  - name: wall-vault proxy\n'
-        +'    provider: openai\n'
-        +'    model: '+mdl+'\n'
-        +'    apiBase: '+baseUrl+'\n'
-        +'    apiKey: '+tok+'\n'
-        +'    roles:\n'
-        +'      - chat\n'
-        +'      - edit\n'
-        +'      - apply\n';
     } else if(agentType==='cline'){
       title='🔧 Cline '+T('cfg_ok');
       hint='Cline ⚙ 설정 → API Provider: OpenAI Compatible → 아래 값을 각 필드에 입력';
@@ -1260,23 +1301,20 @@ function copyAgentConfig(clientId, agentType) {
         +baseUrl+'\n'
         +tok+'\n'
         +mdl;
+    } else if(agentType==='cokacdir'){
+      title='📂 cokacdir '+T('cfg_ok');
+      hint='터미널에서 아래 환경변수를 설정하거나 ~/.bashrc에 추가하세요';
+      cfg='# set via environment variable (paste in terminal):\n'
+        +'export ANTHROPIC_BASE_URL=http://localhost:56244\n'
+        +'export ANTHROPIC_API_KEY='+tok+'\n\n'
+        +'# or for OpenAI-compatible mode:\n'
+        +'export OPENAI_BASE_URL='+baseUrl+'\n'
+        +'export OPENAI_API_KEY='+tok;
     } else if(agentType==='gemini-cli'){
       const geminiBase = location.protocol+'//'+location.hostname+':56244';
       title=T('cfg_gemini_cli')+' '+T('cfg_ok');
       hint=T('cfg_gemini_cli_hint');
       cfg='# set via environment variable (paste in terminal):\n'
-        +'export GEMINI_API_BASE_URL='+geminiBase+'\n'
-        +'export GEMINI_API_KEY='+tok+'\n\n'
-        +'# or add to ~/.gemini/settings.json:\n'
-        +'{\n'
-        +'  "apiBaseUrl": "'+geminiBase+'",\n'
-        +'  "apiKey": "'+tok+'"\n'
-        +'}';
-    } else if(agentType==='antigravity'){
-      const geminiBase = location.protocol+'//'+location.hostname+':56244';
-      title=T('cfg_antigravity')+' '+T('cfg_ok');
-      hint=T('cfg_antigravity_hint');
-      cfg='# set via environment variable:\n'
         +'export GEMINI_API_BASE_URL='+geminiBase+'\n'
         +'export GEMINI_API_KEY='+tok+'\n\n'
         +'# or add to ~/.gemini/settings.json:\n'
@@ -1494,8 +1532,8 @@ function onAgentTypeChange(type, wdId) {
     'openclaw':    '~/.openclaw',
     'nanoclaw':    '~/nanoclaw',
     'claude-code': '~/.claude',
+    'cokacdir':    '~/',
     'cursor':      '~/projects',
-    'vscode':      '~/projects',
   };
   const d = defaults[type] || '';
   el.placeholder = d || '/path/to/workdir';
@@ -1780,22 +1818,20 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		"openclaw":    "🦞",
 		"nanoclaw":    "🦀",
 		"claude-code": "🟠",
+		"cokacdir":    "📂",
 		"cursor":      "⌨",
-		"vscode":      "💻",
 		"cline":       "🔧",
 		"gemini-cli":  "💎",
-		"antigravity": "🚀",
 		"custom":      "⚙",
 	}
 	typeCls := map[string]string{
 		"openclaw":    "atb-openclaw",
 		"nanoclaw":    "atb-nanoclaw",
 		"claude-code": "atb-claude",
+		"cokacdir":    "atb-cokacdir",
 		"cursor":      "atb-cursor",
-		"vscode":      "atb-vscode",
 		"cline":       "atb-vscode",
 		"gemini-cli":  "atb-gemini",
-		"antigravity": "atb-gemini",
 		"custom":      "atb-custom",
 	}
 
@@ -1824,18 +1860,38 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		} else if p == nil {
 			switch c.AgentType {
 			case "claude-code":
+				statusChip = fmt.Sprintf(`<div class="agent-status">`+
+					`<span class="status-dc">◎ Claude Code</span>`+
+					`<button class="btn-apply-hint btn-cfg-claude" onclick="applyAgentConfig('%s','claude-code')" data-i18n="cfg_claude_apply">⚡ 설정 적용</button>`+
+					`</div>`, c.ID)
+			case "cline":
+				statusChip = fmt.Sprintf(`<div class="agent-status">`+
+					`<span class="status-dc">◎ Cline</span>`+
+					`<button class="btn-apply-hint" onclick="applyAgentConfig('%s','cline')">⚡ 설정 적용</button>`+
+					`</div>`, c.ID)
+			case "openclaw":
+				statusChip = fmt.Sprintf(`<div class="agent-status">`+
+					`<span class="status-dc">◎ OpenClaw</span>`+
+					`<button class="btn-apply-hint btn-cfg-openclaw" onclick="applyAgentConfig('%s','openclaw')">⚡ 설정 적용</button>`+
+					`</div>`, c.ID)
+			case "nanoclaw":
+				statusChip = fmt.Sprintf(`<div class="agent-status">`+
+					`<span class="status-dc">◎ NanoClaw</span>`+
+					`<button class="btn-apply-hint btn-cfg-nanoclaw" onclick="applyAgentConfig('%s','nanoclaw')">⚡ 설정 적용</button>`+
+					`</div>`, c.ID)
+			case "cokacdir":
 				statusChip = `<div class="agent-status">` +
-					`<span class="status-dc">◎ Claude Code</span>` +
-					`<span class="status-hint" data-i18n="st_claude_hint">ANTHROPIC_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
+					`<span class="status-dc">◎ cokacdir</span>` +
+					`<span class="status-hint" data-i18n="st_cokacdir_hint">ANTHROPIC_BASE_URL=http://localhost:56244 설정 후 실행</span>` +
 					`</div>`
-			case "cursor", "vscode", "cline":
+			case "cursor":
 				statusChip = `<div class="agent-status">` +
-					`<span class="status-dc">◎ ` + c.AgentType + `</span>` +
+					`<span class="status-dc">◎ Cursor</span>` +
 					`<span class="status-hint" data-i18n="st_editor_hint">Base URL을 http://localhost:56244 로 설정하세요</span>` +
 					`</div>`
-			case "gemini-cli", "antigravity":
+			case "gemini-cli":
 				statusChip = `<div class="agent-status">` +
-					`<span class="status-dc">◎ ` + c.AgentType + `</span>` +
+					`<span class="status-dc">◎ Gemini CLI</span>` +
 					`<span class="status-hint" data-i18n="st_gemini_hint">GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작</span>` +
 					`</div>`
 			default:
@@ -1930,13 +1986,13 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg btn-cfg-claude" onclick="applyAgentConfig('%s','claude-code')" title="~/.claude/settings.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_claude">⚡ Claude Code 설정 적용</button>`,
 				c.ID)
+		case "cokacdir":
+			cfgButton = fmt.Sprintf(
+				`<button class="btn-cfg btn-cfg-cokacdir" onclick="copyAgentConfig('%s','cokacdir')" title="cokacdir 환경변수 설정 복사" data-i18n="cfg_cokacdir">📂 cokacdir 설정 복사</button>`,
+				c.ID)
 		case "cursor":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cursor')" data-i18n-title="cfg_cursor_title" title="Cursor AI 프록시 설정 복사" data-i18n="cfg_cursor">⌨ Cursor 설정 복사</button>`,
-				c.ID)
-		case "vscode":
-			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','vscode')" data-i18n-title="cfg_vscode_title" title="VS Code / Continue 프록시 설정 복사" data-i18n="cfg_vscode">💻 VSCode 설정 복사</button>`,
 				c.ID)
 		case "cline":
 			cfgButton = fmt.Sprintf(
@@ -1946,11 +2002,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyAgentConfig('%s','gemini-cli')" data-i18n-title="cfg_gemini_cli_title" title="Gemini CLI 프록시 설정 복사" data-i18n="cfg_gemini_cli">💎 Gemini CLI 설정 복사</button>`,
 				c.ID)
-		case "antigravity":
-			cfgButton = fmt.Sprintf(
-				`<button class="btn-cfg" onclick="copyAgentConfig('%s','antigravity')" data-i18n-title="cfg_antigravity_title" title="Antigravity IDE 프록시 설정 복사" data-i18n="cfg_antigravity">🚀 Antigravity 설정 복사</button>`,
-				c.ID)
-				default:
+		default:
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_copy_title" title="프록시 설정 복사" data-i18n="cfg_copy">📋 설정 복사</button>`,
 				c.ID)
@@ -2260,11 +2312,10 @@ func buildClientModalBody(prefix, titleKey string, services []*ServiceConfig) st
     <option value="" data-i18n="opt_select">— 선택 —</option>
     <option value="openclaw">openclaw</option>
     <option value="nanoclaw">nanoclaw</option>
+    <option value="cokacdir">cokacdir</option>
     <option value="claude-code">claude-code</option>
     <option value="gemini-cli">gemini-cli</option>
-    <option value="antigravity">antigravity</option>
     <option value="cursor">cursor</option>
-    <option value="vscode">vscode</option>
     <option value="cline">cline</option>
     <option value="custom">custom</option>
   </select>

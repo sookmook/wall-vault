@@ -407,6 +407,18 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	// sync proxy key usage, attempts, and cooldowns into vault store (single lock + save)
 	s.store.BatchUpdateKeyMetrics(ps.KeyUsage, ps.KeyAttempts, ps.KeyCooldowns)
+	// broadcast proxy status so the dashboard updates the agent card in real-time
+	s.broker.Broadcast(SSEEvent{
+		Type: "proxy_update",
+		Data: map[string]interface{}{
+			"client_id": ps.ClientID,
+			"service":   ps.Service,
+			"model":     ps.Model,
+			"version":   ps.Version,
+			"sse":       ps.SSE,
+		},
+	})
+
 	// always broadcast full key states so the dashboard reflects reality without a fetch
 	{
 		allKeys := s.store.ListKeys()

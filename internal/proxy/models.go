@@ -156,6 +156,9 @@ func rawContentToString(raw json.RawMessage) string {
 }
 
 type OpenAIResponse struct {
+	ID      string         `json:"id,omitempty"`
+	Object  string         `json:"object,omitempty"`
+	Model   string         `json:"model,omitempty"`
 	Choices []OpenAIChoice `json:"choices,omitempty"`
 	Usage   *OpenAIUsage   `json:"usage,omitempty"`
 	Error   *OpenAIError   `json:"error,omitempty"`

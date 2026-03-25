@@ -281,17 +281,20 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		// SSE broadcast
-		svc, mdl := "", ""
+		// SSE broadcast (include agent_type so proxies can decide which local agent to update)
+		svc, mdl, agentType := "", "", ""
 		if inp.DefaultService != nil {
 			svc = *inp.DefaultService
 		}
 		if inp.DefaultModel != nil {
 			mdl = *inp.DefaultModel
 		}
+		if c := s.store.GetClient(id); c != nil {
+			agentType = c.AgentType
+		}
 		s.broker.Broadcast(SSEEvent{
 			Type: "config_change",
-			Data: ConfigChangeEvent{ClientID: id, Service: svc, Model: mdl},
+			Data: ConfigChangeEvent{ClientID: id, Service: svc, Model: mdl, AgentType: agentType},
 		})
 		jsonOK(w, map[string]string{"status": "updated"})
 	case http.MethodDelete:
@@ -510,10 +513,11 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	s.broker.Broadcast(SSEEvent{
-		Type: "config_change",
-		Data: ConfigChangeEvent{ClientID: clientID, Service: inp.Service, Model: inp.Model},
-	})
+	cfgEvt := ConfigChangeEvent{ClientID: clientID, Service: inp.Service, Model: inp.Model}
+	if c := s.store.GetClient(clientID); c != nil {
+		cfgEvt.AgentType = c.AgentType
+	}
+	s.broker.Broadcast(SSEEvent{Type: "config_change", Data: cfgEvt})
 	jsonOK(w, map[string]string{"status": "updated", "client_id": clientID})
 }
 

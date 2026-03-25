@@ -98,7 +98,7 @@ func (s *Server) sendHeartbeat() {
 
 	// Collect recently-active non-proxy clients (last 5 minutes)
 	var activeClients []activeClientItem
-	cutoff := time.Now().Add(-5 * time.Minute)
+	cutoff := time.Now().Add(-90 * time.Second)
 	s.clientActMu.Lock()
 	for cid, act := range s.clientActs {
 		if act.lastSeen.After(cutoff) {

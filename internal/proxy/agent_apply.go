@@ -149,6 +149,8 @@ func updateClineGlobalState(dataDir, baseURL, model string) error {
 	state["openAiBaseUrl"] = baseURL
 	state["actModeApiModelId"] = model
 	state["planModeApiModelId"] = model
+	state["actModeOpenAiModelId"] = model
+	state["planModeOpenAiModelId"] = model
 	state["openAiModelId"] = model
 
 	return writeJSON(path, state)
@@ -192,6 +194,47 @@ func applyClaudeCodeConfig(baseURL, token string) (string, error) {
 		return "", fmt.Errorf("failed to write settings.json: %w", err)
 	}
 	return path, nil
+}
+
+// updateClaudeCodeModel: update Claude Code's model in settings.json when vault config changes.
+// Checks both WSL (~/.claude/) and Windows (/mnt/c/Users/.../.claude/) locations.
+// Best-effort: errors are silently ignored.
+func updateClaudeCodeModel(model string) {
+	if model == "" {
+		return
+	}
+	for _, path := range findClaudeSettingsPaths() {
+		settings := map[string]interface{}{}
+		if data, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(data, &settings)
+		} else {
+			continue // file doesn't exist at this location
+		}
+		settings["model"] = model
+		_ = writeJSON(path, settings)
+	}
+}
+
+// findClaudeSettingsPaths returns all candidate paths for Claude Code's settings.json.
+func findClaudeSettingsPaths() []string {
+	var paths []string
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".claude", "settings.json"))
+	}
+	if up := os.Getenv("USERPROFILE"); up != "" {
+		if wsl := windowsPathToWSL(up); wsl != "" {
+			paths = append(paths, filepath.Join(wsl, ".claude", "settings.json"))
+		}
+	}
+	if entries, err := os.ReadDir("/mnt/c/Users"); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() || e.Name() == "Public" || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			paths = append(paths, filepath.Join("/mnt/c/Users", e.Name(), ".claude", "settings.json"))
+		}
+	}
+	return paths
 }
 
 // ── OpenClaw / NanoClaw ───────────────────────────────────────────────────────
@@ -292,9 +335,10 @@ func applyOpenClawConfig(baseURL, model, token string) (string, error) {
 	return path, nil
 }
 
-// updateClineModel: update Cline's globalState.json with new model when vault config changes.
+// updateClineModel: update only model fields in Cline's globalState.json when vault config changes.
+// Preserves the existing openAiBaseUrl — does NOT overwrite it.
 // Best-effort: errors are silently ignored (Cline may not be installed on this machine).
-func updateClineModel(baseURL, model string) {
+func updateClineModel(model string) {
 	if model == "" {
 		return
 	}
@@ -302,7 +346,17 @@ func updateClineModel(baseURL, model string) {
 	if err != nil {
 		return // Cline not found on this machine — skip silently
 	}
-	_ = updateClineGlobalState(dataDir, baseURL, model)
+	path := filepath.Join(dataDir, "globalState.json")
+	state := map[string]interface{}{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &state)
+	}
+	state["actModeApiModelId"] = model
+	state["planModeApiModelId"] = model
+	state["actModeOpenAiModelId"] = model
+	state["planModeOpenAiModelId"] = model
+	state["openAiModelId"] = model
+	_ = writeJSON(path, state)
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────

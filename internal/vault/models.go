@@ -156,9 +156,10 @@ type SSEEvent struct {
 }
 
 type ConfigChangeEvent struct {
-	ClientID string `json:"client_id"`
-	Service  string `json:"service"`
-	Model    string `json:"model"`
+	ClientID  string `json:"client_id"`
+	Service   string `json:"service"`
+	Model     string `json:"model"`
+	AgentType string `json:"agent_type,omitempty"`
 }
 
 // ─── Store Snapshot ───────────────────────────────────────────────────────────

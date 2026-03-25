@@ -107,7 +107,17 @@ func NewServer(cfg *config.Config) *Server {
 					"model":   newMdl,
 				})
 				go updateOpenClawJSON(newSvc, newMdl)
-				go updateClineModel(fmt.Sprintf("http://localhost:%d", s.cfg.Proxy.Port), newMdl)
+			}
+		}, func(clientID, agentType, svc, mdl string) {
+			// Foreign client model changed in vault — update local agent config if applicable
+			if mdl == "" {
+				return
+			}
+			switch agentType {
+			case "cline":
+				go updateClineModel(mdl)
+			case "claude-code":
+				go updateClaudeCodeModel(mdl)
 			}
 		}, func() {
 			// Flush token cache so vault model changes take effect immediately
@@ -283,7 +293,6 @@ func (s *Server) syncFromVault() {
 			log.Printf("[sync] 설정 로드: %s/%s", c.DefaultService, c.DefaultModel)
 			if newSvc != oldSvc || newMdl != oldMdl {
 				go updateOpenClawJSON(newSvc, newMdl)
-				go updateClineModel(fmt.Sprintf("http://localhost:%d", s.cfg.Proxy.Port), newMdl)
 			}
 			break
 		}

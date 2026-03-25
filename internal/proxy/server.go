@@ -123,6 +123,14 @@ func NewServer(cfg *config.Config) *Server {
 					log.Printf("[SSE] 서비스 URL 재동기화 실패: %v", err)
 				}
 			}()
+		}, func() {
+			// SSE reconnect: flush token cache and re-sync model/config from vault
+			// to pick up any changes that occurred while the connection was down.
+			s.tokenCacheMu.Lock()
+			s.tokenCache = make(map[string]*tokenCacheEntry)
+			s.tokenCacheMu.Unlock()
+			log.Printf("[SSE] reconnect — re-syncing from vault")
+			go s.syncFromVault()
 		})
 		s.sse.Start()
 
@@ -200,7 +208,7 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	entry := &tokenCacheEntry{
 		service:   result.DefaultService,
 		model:     result.DefaultModel,
-		expiresAt: time.Now().Add(30 * time.Second),
+		expiresAt: time.Now().Add(5 * time.Second),
 	}
 	s.tokenCacheMu.Lock()
 	// evict expired entries when cache grows large
@@ -708,7 +716,11 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oaiResp := &OpenAIResponse{}
+	oaiResp := &OpenAIResponse{
+		ID:     "chatcmpl-proxy",
+		Object: "chat.completion",
+		Model:  mdl,
+	}
 	for _, c := range cands {
 		msg := OpenAIMessage{Role: "assistant", Content: c.text}
 		// Include tool_calls if the backend returned them.
@@ -806,19 +818,35 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 // ─── OpenAI-compatible model list (/v1/models) ────────────────────────────────
 
 func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
-	all := s.registry.All("")
 	type oaiModel struct {
 		ID      string `json:"id"`
 		Object  string `json:"object"`
 		OwnedBy string `json:"owned_by"`
 	}
 	var data []oaiModel
-	for _, m := range all {
-		data = append(data, oaiModel{
-			ID:      m.ID,
+
+	s.mu.RLock()
+	curModel := s.model
+	curService := s.service
+	s.mu.RUnlock()
+
+	if curModel != "" {
+		// Return only the currently configured model so Cline's model list
+		// always reflects the model set in the wall-vault dashboard.
+		data = []oaiModel{{
+			ID:      curModel,
 			Object:  "model",
-			OwnedBy: m.Service,
-		})
+			OwnedBy: curService,
+		}}
+	} else {
+		// Standalone mode (no vault): return full registry list.
+		for _, m := range s.registry.All("") {
+			data = append(data, oaiModel{
+				ID:      m.ID,
+				Object:  "model",
+				OwnedBy: m.Service,
+			})
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

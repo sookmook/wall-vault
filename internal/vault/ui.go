@@ -833,6 +833,9 @@ function connectSSE() {
       } else if (d.type === 'usage_reset') {
         // 가벼운 reload (일일 사용량 초기화)
         setTimeout(() => location.reload(), 500);
+      } else if (d.type === 'proxy_update') {
+        // 프록시 하트비트 수신 → 에이전트 카드 연결 상태 즉시 반영
+        applyProxyUpdate(d.data || {});
       } else if (d.type === 'usage_update') {
         // 키 사용량 실시간 갱신 (하트비트 동기화)
         refreshKeyUsage(d.data || {});
@@ -953,6 +956,36 @@ function deleteKey(id) {
 
 // ── 에이전트 카드 실시간 반영 (config_change SSE) ──
 // 에이전트 카드의 서비스 select, 모델 input을 새 값으로 업데이트하고 모델 드롭다운 재조회
+// applyProxyUpdate: 하트비트 수신 시 에이전트 카드 연결 상태·모델명 즉시 업데이트
+function applyProxyUpdate(pd) {
+  const clientId = pd.client_id;
+  if (!clientId) return;
+  // 카드 찾기: svc-{id} select의 부모 .agent-card
+  const svcSel = document.getElementById('svc-' + clientId);
+  if (!svcSel) return;
+  const card = svcSel.closest('.agent-card');
+  if (!card) return;
+  // 카드 테두리 색상 갱신
+  card.classList.remove('ac-live','ac-delay','ac-offline','ac-noconn');
+  card.classList.add('ac-live');
+  // 상태 점 색상 갱신
+  const dot = card.querySelector('.dot');
+  if (dot) { dot.className = 'dot dot-green'; }
+  // 상태 칩 갱신 (서비스 / 모델명)
+  const statusDiv = card.querySelector('.agent-status');
+  if (statusDiv) {
+    const svc = pd.service || '';
+    let mdl = pd.model || '';
+    // 서비스 prefix 제거 (trimServicePrefix 동등 처리)
+    if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
+    const ver = pd.version ? '<span class="status-version">' + pd.version + '</span>' : '';
+    const t = I18N[curLang] || I18N.ko;
+    statusDiv.innerHTML =
+      '<span class="status-live"><span>' + (t.st_running||'● 실행 중') + '</span> — ' + svc + ' / ' + mdl + '</span> ' +
+      '<span class="status-hint"><span class="bot-ago">방금</span></span> ' + ver;
+  }
+}
+
 function applyAgentConfigChange(clientId, service, model) {
   const svcSel = document.getElementById('svc-'+clientId);
   const mdlInp = document.getElementById('mdl-'+clientId);

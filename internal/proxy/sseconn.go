@@ -23,9 +23,10 @@ type SSEClient struct {
 	onKeyChange     func()                      // key added/deleted callback
 	onUsageReset    func()                      // midnight daily-counter reset callback
 	onServiceChange func([]string)              // proxy service list change callback
+	onReconnect     func()                      // called after SSE reconnect to re-sync state
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string)) *SSEClient {
+func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string), onReconnect func()) *SSEClient {
 	return &SSEClient{
 		vaultURL:        vaultURL,
 		clientID:        clientID,
@@ -34,6 +35,7 @@ func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string
 		onKeyChange:     onKeyChange,
 		onUsageReset:    onUsageReset,
 		onServiceChange: onServiceChange,
+		onReconnect:     onReconnect,
 	}
 }
 
@@ -50,6 +52,7 @@ func (c *SSEClient) IsConnected() bool {
 
 func (c *SSEClient) loop() {
 	backoff := time.Second
+	first := true
 	for {
 		err := c.connect()
 		c.mu.Lock()
@@ -62,6 +65,12 @@ func (c *SSEClient) loop() {
 		if backoff < 30*time.Second {
 			backoff *= 2
 		}
+		// On reconnect (not first connect): immediately re-sync model/config from vault
+		// to pick up any changes that occurred while the SSE connection was down.
+		if !first && c.onReconnect != nil {
+			go c.onReconnect()
+		}
+		first = false
 	}
 }
 

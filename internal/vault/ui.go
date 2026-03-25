@@ -960,10 +960,8 @@ function deleteKey(id) {
 function applyProxyUpdate(pd) {
   const clientId = pd.client_id;
   if (!clientId) return;
-  // 카드 찾기: svc-{id} select의 부모 .agent-card
-  const svcSel = document.getElementById('svc-' + clientId);
-  if (!svcSel) return;
-  const card = svcSel.closest('.agent-card');
+  // 카드 찾기: data-client 속성으로 직접 검색 (model-form select 방식보다 안정적)
+  const card = document.querySelector('.agent-card[data-client="' + clientId + '"]');
   if (!card) return;
   // 카드 테두리 색상 갱신
   card.classList.remove('ac-live','ac-delay','ac-offline','ac-noconn');
@@ -1007,8 +1005,8 @@ function applyAgentConfigChange(clientId, service, model) {
   const curSvc = (svcSel && svcSel.value) || service;
   if (curSvc) onAgentServiceChange('mdl-'+clientId, 'mdl-sel-'+clientId, curSvc);
   // 해당 에이전트 카드의 status-live 텍스트 업데이트 (실행 중인 경우)
-  if (svcSel && service && model) {
-    const card = svcSel.closest('.agent-card');
+  if (service && model) {
+    const card = document.querySelector('.agent-card[data-client="' + clientId + '"]');
     if (card) {
       const live = card.querySelector('.status-live');
       if (live) {
@@ -1958,7 +1956,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 
 		// ── 개별 에이전트 카드 조립 ──
 		var item strings.Builder
-		item.WriteString(fmt.Sprintf(`<div class="agent-card %s%s"%s>`, cardStatusCls, disabledClass, uptimeAttr))
+		item.WriteString(fmt.Sprintf(`<div class="agent-card %s%s"%s data-client="%s">`, cardStatusCls, disabledClass, uptimeAttr, c.ID))
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
 		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))

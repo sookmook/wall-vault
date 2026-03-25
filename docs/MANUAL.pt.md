@@ -414,6 +414,117 @@ OPENAI_API_KEY=token-deste-agente
 
 ---
 
+#### ⚡ Botão de aplicação automática — um clique e a configuração está pronta
+
+Quando o tipo de agente é `cline`, `claude-code`, `openclaw` ou `nanoclaw`, o botão **⚡ Aplicar configuração** aparece no cartão do agente. Ao clicar, o arquivo de configuração local do agente é atualizado automaticamente.
+
+| Botão | Tipo de agente | Arquivo alvo |
+|-------|---------------|--------------|
+| ⚡ Aplicar configuração do Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Aplicar configuração do Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Aplicar configuração do OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Aplicar configuração do NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Este botão envia uma requisição para **localhost:56244** (proxy local). O proxy precisa estar em execução nesta máquina para que funcione.
+
+---
+
+#### 🔄 Sincronização bidirecional de modelos (v0.1.16)
+
+Quando você altera o modelo de um agente no painel do cofre, a configuração local desse agente é atualizada automaticamente.
+
+**Para o Cline:**
+- Alteração do modelo no cofre → evento SSE → o proxy atualiza o campo de modelo em `globalState.json`
+- Campos atualizados: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` e a chave de API não são alterados
+- **É necessário recarregar o VS Code (`Ctrl+Alt+R` ou `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - O Cline não relê o arquivo de configuração durante a execução
+
+**Para o Claude Code:**
+- Alteração do modelo no cofre → evento SSE → o proxy atualiza o campo `model` em `settings.json`
+- Os caminhos WSL e Windows são verificados automaticamente (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Direção inversa (agente → cofre):**
+- Quando um agente (Cline, Claude Code etc.) envia uma requisição ao proxy, o proxy inclui as informações de serviço e modelo do cliente no heartbeat
+- O serviço e modelo atualmente em uso são exibidos em tempo real no cartão do agente no painel
+
+> 💡 **Ponto-chave**: o proxy identifica o agente pelo token de autorização da requisição e roteia automaticamente para o serviço/modelo configurado no cofre. Mesmo que o Cline ou Claude Code envie um nome de modelo diferente, o proxy substitui pela configuração do cofre.
+
+---
+
+### Usando o Cline no VS Code — guia detalhado
+
+#### Passo 1: Instalar o Cline
+
+Instale o **Cline** (ID: `saoudrizwan.claude-dev`) pelo marketplace de extensões do VS Code.
+
+#### Passo 2: Registrar o agente no cofre
+
+1. Abra o painel do cofre (`http://IP-do-cofre:56243`)
+2. Na seção **Agentes**, clique em **+ Adicionar**
+3. Preencha os seguintes campos:
+
+| Campo | Valor | Descrição |
+|-------|-------|-----------|
+| ID | `meu_cline` | Identificador único (letras, sem espaços) |
+| Nome | `Meu Cline` | Nome exibido no painel |
+| Tipo de agente | `cline` | ← selecione obrigatoriamente `cline` |
+| Serviço | Selecione o serviço desejado (ex.: `google`) | |
+| Modelo | Insira o modelo desejado (ex.: `gemini-2.5-flash`) | |
+
+4. Clique em **Salvar** — um token será gerado automaticamente
+
+#### Passo 3: Conectar o Cline
+
+**Método A — Aplicação automática (recomendado)**
+
+1. Verifique se o **proxy** do wall-vault está em execução nesta máquina (`localhost:56244`)
+2. Clique no botão **⚡ Aplicar configuração do Cline** no cartão do agente
+3. Se a mensagem "Configuração aplicada!" aparecer, foi bem-sucedido
+4. Recarregue o VS Code (`Ctrl+Alt+R`)
+
+**Método B — Configuração manual**
+
+Abra as configurações (⚙️) na barra lateral do Cline e configure:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://endereco-do-proxy:56244/v1`
+  - Na mesma máquina: `http://localhost:56244/v1`
+  - Em outro dispositivo (ex.: Mac Mini): `http://192.168.0.6:56244/v1`
+- **API Key**: o token emitido pelo cofre (copiado do cartão do agente)
+- **Model ID**: o modelo configurado no cofre (ex.: `gemini-2.5-flash`)
+
+#### Passo 4: Verificação
+
+Envie qualquer mensagem no chat do Cline. Se estiver funcionando:
+- Um **ponto verde (● Em execução)** aparecerá no cartão do agente no painel
+- O serviço e modelo atuais serão exibidos no cartão (ex.: `google / gemini-2.5-flash`)
+
+#### Trocar o modelo
+
+Para trocar o modelo do Cline, altere-o no **painel do cofre**:
+
+1. Altere o serviço/modelo no menu suspenso do cartão do agente
+2. Clique em **Aplicar**
+3. Recarregue o VS Code (`Ctrl+Alt+R`) — o nome do modelo no rodapé do Cline será atualizado
+4. A partir da próxima requisição, o novo modelo será utilizado
+
+> 💡 Na prática, o proxy identifica as requisições do Cline pelo token e as roteia para o modelo configurado no cofre. Mesmo sem recarregar o VS Code, **o modelo realmente utilizado muda imediatamente** — o recarregamento serve apenas para atualizar a exibição na interface do Cline.
+
+#### Detecção de desconexão
+
+Ao fechar o VS Code, o cartão do agente no painel muda para amarelo (com atraso) após aproximadamente **2–3 minutos** e para vermelho (offline) após **5 minutos**.
+
+#### Solução de problemas
+
+| Sintoma | Causa | Solução |
+|---------|-------|---------|
+| Erro "falha na conexão" no Cline | Proxy não iniciado ou endereço incorreto | Verifique o proxy com `curl http://localhost:56244/health` |
+| Ponto verde não aparece no cofre | Chave de API (token) não configurada | Clique novamente em **⚡ Aplicar configuração do Cline** |
+| Nome do modelo no rodapé do Cline não muda | O Cline mantém a configuração em cache | Recarregue o VS Code (`Ctrl+Alt+R`) |
+| Um nome de modelo incorreto é exibido | Bug antigo (corrigido na v0.1.16) | Atualize o proxy para a versão v0.1.16 ou superior |
+
+---
+
 #### 🟣 Botão Copiar comando de implantação — para instalar em uma nova máquina
 
 Use este botão ao instalar o proxy do wall-vault em um novo computador e conectá-lo ao cofre pela primeira vez. Ao clicar, o script de instalação completo é copiado para a área de transferência. Cole-o no terminal do novo computador e execute — as seguintes etapas serão realizadas de uma só vez:

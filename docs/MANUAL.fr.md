@@ -414,6 +414,117 @@ OPENAI_API_KEY=le-token-de-cet-agent
 
 ---
 
+#### ⚡ Bouton d'application automatique — un seul clic et tout est configuré
+
+Lorsque le type d'agent est `cline`, `claude-code`, `openclaw` ou `nanoclaw`, un bouton **⚡ Appliquer la configuration** apparaît sur la carte de l'agent. En cliquant dessus, le fichier de configuration local de l'agent est automatiquement mis à jour.
+
+| Bouton | Type d'agent | Fichier cible |
+|--------|-------------|---------------|
+| ⚡ Appliquer la configuration Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Appliquer la configuration Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Appliquer la configuration OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Appliquer la configuration NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Ce bouton envoie une requête à **localhost:56244** (proxy local). Le proxy doit être en cours d'exécution sur cette machine pour que cela fonctionne.
+
+---
+
+#### 🔄 Synchronisation bidirectionnelle des modèles (v0.1.16)
+
+Lorsque vous modifiez le modèle d'un agent dans le tableau de bord du coffre-fort, la configuration locale de cet agent est automatiquement mise à jour.
+
+**Pour Cline :**
+- Changement de modèle dans le coffre-fort → événement SSE → le proxy met à jour le champ modèle dans `globalState.json`
+- Champs mis à jour : `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` et la clé API ne sont pas modifiés
+- **Un rechargement de VS Code est nécessaire (`Ctrl+Alt+R` ou `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Cline ne relit pas le fichier de configuration en cours d'exécution
+
+**Pour Claude Code :**
+- Changement de modèle dans le coffre-fort → événement SSE → le proxy met à jour le champ `model` dans `settings.json`
+- Les chemins WSL et Windows sont explorés automatiquement (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**Direction inverse (agent → coffre-fort) :**
+- Lorsqu'un agent (Cline, Claude Code, etc.) envoie une requête au proxy, celui-ci inclut les informations de service et de modèle du client dans le heartbeat
+- Le service et le modèle actuellement utilisés s'affichent en temps réel sur la carte de l'agent dans le tableau de bord
+
+> 💡 **Point clé** : le proxy identifie l'agent via le token d'autorisation de la requête et route automatiquement vers le service/modèle configuré dans le coffre-fort. Même si Cline ou Claude Code envoie un nom de modèle différent, le proxy le remplace par la configuration du coffre-fort.
+
+---
+
+### Utiliser Cline dans VS Code — guide détaillé
+
+#### Étape 1 : Installer Cline
+
+Installez **Cline** (ID : `saoudrizwan.claude-dev`) depuis la marketplace des extensions VS Code.
+
+#### Étape 2 : Enregistrer l'agent dans le coffre-fort
+
+1. Ouvrez le tableau de bord du coffre-fort (`http://IP-du-coffre:56243`)
+2. Dans la section **Agents**, cliquez sur **+ Ajouter**
+3. Remplissez les champs suivants :
+
+| Champ | Valeur | Description |
+|-------|--------|-------------|
+| ID | `mon_cline` | Identifiant unique (lettres, sans espaces) |
+| Nom | `Mon Cline` | Nom affiché dans le tableau de bord |
+| Type d'agent | `cline` | ← sélectionnez impérativement `cline` |
+| Service | Choisissez le service souhaité (ex. : `google`) | |
+| Modèle | Saisissez le modèle souhaité (ex. : `gemini-2.5-flash`) | |
+
+4. Cliquez sur **Enregistrer** — un token est généré automatiquement
+
+#### Étape 3 : Connecter Cline
+
+**Méthode A — Application automatique (recommandée)**
+
+1. Vérifiez que le **proxy** wall-vault est en cours d'exécution sur cette machine (`localhost:56244`)
+2. Cliquez sur le bouton **⚡ Appliquer la configuration Cline** sur la carte de l'agent
+3. Si le message « Configuration appliquée ! » apparaît, c'est réussi
+4. Rechargez VS Code (`Ctrl+Alt+R`)
+
+**Méthode B — Configuration manuelle**
+
+Ouvrez les paramètres (⚙️) dans la barre latérale de Cline et configurez :
+- **API Provider** : `OpenAI Compatible`
+- **Base URL** : `http://adresse-du-proxy:56244/v1`
+  - Sur la même machine : `http://localhost:56244/v1`
+  - Sur un autre appareil (ex. : Mac Mini) : `http://192.168.0.6:56244/v1`
+- **API Key** : le token délivré par le coffre-fort (copié depuis la carte de l'agent)
+- **Model ID** : le modèle configuré dans le coffre-fort (ex. : `gemini-2.5-flash`)
+
+#### Étape 4 : Vérification
+
+Envoyez n'importe quel message dans le chat Cline. Si tout fonctionne :
+- Un **point vert (● En cours d'exécution)** apparaît sur la carte de l'agent dans le tableau de bord
+- Le service et le modèle actuels s'affichent sur la carte (ex. : `google / gemini-2.5-flash`)
+
+#### Changer de modèle
+
+Pour changer le modèle de Cline, modifiez-le depuis le **tableau de bord du coffre-fort** :
+
+1. Changez le service/modèle dans le menu déroulant de la carte de l'agent
+2. Cliquez sur **Appliquer**
+3. Rechargez VS Code (`Ctrl+Alt+R`) — le nom du modèle dans le pied de page de Cline sera mis à jour
+4. Les requêtes suivantes utiliseront le nouveau modèle
+
+> 💡 En réalité, le proxy identifie les requêtes de Cline par le token et les route vers le modèle configuré dans le coffre-fort. Même sans recharger VS Code, **le modèle réellement utilisé change immédiatement** — le rechargement ne sert qu'à mettre à jour l'affichage dans l'interface de Cline.
+
+#### Détection de déconnexion
+
+Lorsque vous fermez VS Code, la carte de l'agent dans le tableau de bord passe au jaune (en attente) après environ **2–3 minutes**, puis au rouge (hors ligne) après **5 minutes**.
+
+#### Résolution des problèmes
+
+| Symptôme | Cause | Solution |
+|----------|-------|----------|
+| Erreur « connexion échouée » dans Cline | Proxy non démarré ou adresse incorrecte | Vérifiez le proxy avec `curl http://localhost:56244/health` |
+| Le point vert n'apparaît pas dans le coffre-fort | La clé API (token) n'est pas configurée | Cliquez à nouveau sur **⚡ Appliquer la configuration Cline** |
+| Le modèle affiché dans le pied de page de Cline ne change pas | Cline met en cache la configuration | Rechargez VS Code (`Ctrl+Alt+R`) |
+| Un nom de modèle incorrect s'affiche | Ancien bug (corrigé dans v0.1.16) | Mettez à jour le proxy vers la version v0.1.16 ou ultérieure |
+
+---
+
 #### 🟣 Bouton « Copier la commande de déploiement » — pour installer sur une nouvelle machine
 
 Ce bouton est utile quand vous installez le proxy wall-vault sur un nouvel ordinateur et souhaitez le connecter au coffre-fort. Un clic copie l'intégralité du script d'installation. Collez-le dans le terminal du nouvel ordinateur et exécutez-le ; il effectue en une seule fois :

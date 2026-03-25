@@ -414,6 +414,117 @@ OPENAI_API_KEY=token-de-este-agente
 
 ---
 
+#### ⚡ Botón de aplicación automática — configuración completada con un solo clic
+
+Cuando el tipo de agente es `cline`, `claude-code`, `openclaw` o `nanoclaw`, aparece un botón **⚡ Aplicar configuración** en la tarjeta del agente. Al pulsarlo, el archivo de configuración local del agente correspondiente se actualiza automáticamente.
+
+| Botón | Tipo de agente | Archivo de destino |
+|-------|---------------|-------------------|
+| ⚡ Aplicar configuración de Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Aplicar configuración de Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Aplicar configuración de OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Aplicar configuración de NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+
+> ⚠️ Este botón envía una solicitud a **localhost:56244** (el proxy local). Solo funciona si el proxy está en ejecución en esa máquina.
+
+---
+
+#### 🔄 Sincronización bidireccional de modelos (v0.1.16)
+
+Cuando cambias el modelo de un agente en el panel de la bóveda, la configuración local de ese agente se actualiza automáticamente.
+
+**En el caso de Cline:**
+- Cambio de modelo en la bóveda → evento SSE → el proxy actualiza los campos de modelo en `globalState.json`
+- Campos actualizados: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- No se modifican `openAiBaseUrl` ni la clave API
+- **Es necesario recargar VS Code (`Ctrl+Alt+R` o `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Cline no relee el archivo de configuración mientras está en ejecución
+
+**En el caso de Claude Code:**
+- Cambio de modelo en la bóveda → evento SSE → el proxy actualiza el campo `model` en `settings.json`
+- Busca automáticamente en las rutas de WSL y Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+
+**En dirección inversa (agente → bóveda):**
+- Cuando un agente (Cline, Claude Code, etc.) envía una solicitud al proxy, este incluye la información de servicio y modelo del cliente en el heartbeat
+- La tarjeta del agente en el panel de la bóveda muestra en tiempo real el servicio/modelo en uso
+
+> 💡 **Punto clave**: el proxy identifica al agente mediante el token Authorization de la solicitud y lo enruta automáticamente al servicio/modelo configurado en la bóveda. Aunque Cline o Claude Code envíen un nombre de modelo diferente, el proxy lo sobrescribe con la configuración de la bóveda.
+
+---
+
+### Usar Cline en VS Code — guía detallada
+
+#### Paso 1: Instalar Cline
+
+Instala **Cline** (ID: `saoudrizwan.claude-dev`) desde el marketplace de extensiones de VS Code.
+
+#### Paso 2: Registrar el agente en la bóveda
+
+1. Abre el panel de la bóveda (`http://IP-de-la-bóveda:56243`)
+2. En la sección **Agentes**, haz clic en **+ Añadir**
+3. Rellena los campos así:
+
+| Campo | Valor | Descripción |
+|-------|-------|-------------|
+| ID | `my_cline` | Identificador único (alfanumérico, sin espacios) |
+| Nombre | `My Cline` | Nombre que aparecerá en el panel |
+| Tipo de agente | `cline` | ← Debes seleccionar `cline` obligatoriamente |
+| Servicio | Selecciona el servicio que quieras usar (ej.: `google`) | |
+| Modelo | Introduce el modelo que quieras usar (ej.: `gemini-2.5-flash`) | |
+
+4. Al pulsar **Guardar**, se genera automáticamente un token
+
+#### Paso 3: Conectar con Cline
+
+**Opción A — Aplicación automática (recomendada)**
+
+1. Comprueba que el **proxy** de wall-vault esté en ejecución en esa máquina (`localhost:56244`)
+2. En la tarjeta del agente del panel, haz clic en **⚡ Aplicar configuración de Cline**
+3. Si aparece la notificación "¡Configuración aplicada!", ha funcionado
+4. Recarga VS Code (`Ctrl+Alt+R`)
+
+**Opción B — Configuración manual**
+
+Abre la configuración (⚙️) en la barra lateral de Cline:
+- **API Provider**: `OpenAI Compatible`
+- **Base URL**: `http://dirección-del-proxy:56244/v1`
+  - En la misma máquina: `http://localhost:56244/v1`
+  - En otra máquina (como un Mini server): `http://192.168.0.6:56244/v1`
+- **API Key**: el token emitido en la bóveda (cópialo desde la tarjeta del agente)
+- **Model ID**: el modelo configurado en la bóveda (ej.: `gemini-2.5-flash`)
+
+#### Paso 4: Verificación
+
+Envía cualquier mensaje en la ventana de chat de Cline. Si todo funciona correctamente:
+- En el panel de la bóveda, la tarjeta del agente mostrará un **punto verde (● en ejecución)**
+- La tarjeta mostrará el servicio/modelo actual (ej.: `google / gemini-2.5-flash`)
+
+#### Cambiar el modelo
+
+Cuando quieras cambiar el modelo de Cline, hazlo desde el **panel de la bóveda**:
+
+1. Cambia el desplegable de servicio/modelo en la tarjeta del agente
+2. Haz clic en **Aplicar**
+3. Recarga VS Code (`Ctrl+Alt+R`) — el nombre del modelo en el pie de Cline se actualizará
+4. A partir de la siguiente solicitud se usará el nuevo modelo
+
+> 💡 En realidad, el proxy identifica las solicitudes de Cline por su token y las enruta al modelo de la configuración de la bóveda. Aunque no recargues VS Code, **el modelo que realmente se usa cambia de inmediato** — la recarga solo sirve para actualizar el nombre del modelo que muestra la interfaz de Cline.
+
+#### Detección de desconexión
+
+Al cerrar VS Code, la tarjeta del agente en el panel de la bóveda cambiará a amarillo (con retraso) tras unos **2–3 minutos**, y a rojo (sin conexión) tras **5 minutos**.
+
+#### Solución de problemas
+
+| Síntoma | Causa | Solución |
+|---------|-------|----------|
+| Error de "conexión fallida" en Cline | Proxy no ejecutándose o dirección incorrecta | Comprueba el proxy con `curl http://localhost:56244/health` |
+| No aparece el punto verde en la bóveda | Clave API (token) no configurada | Haz clic de nuevo en **⚡ Aplicar configuración de Cline** |
+| El modelo en el pie de Cline no cambia | Cline tiene la configuración en caché | Recarga VS Code (`Ctrl+Alt+R`) |
+| Se muestra un nombre de modelo incorrecto | Bug antiguo (corregido en v0.1.16) | Actualiza el proxy a v0.1.16 o superior |
+
+---
+
 #### 🟣 Botón "Copiar comando de despliegue" — para instalar en una nueva máquina
 
 Se usa cuando quieres instalar el proxy de wall-vault en un nuevo ordenador y conectarlo al almacén. Al hacer clic, se copia el script de instalación completo. Pégalo en la terminal del nuevo ordenador y ejecútalo; se procesará todo en un solo paso:

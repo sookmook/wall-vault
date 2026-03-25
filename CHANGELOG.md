@@ -12,6 +12,43 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.16] — 2026-03-25
+
+### Added
+- **Bidirectional model sync for Cline**: When motoko_vsc's model is changed in the
+  vault dashboard, the proxy automatically updates Cline's `globalState.json` with the
+  correct fields (`actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`).
+  Preserves `openAiBaseUrl` — only model fields are touched.
+- **Bidirectional model sync for Claude Code**: `updateClaudeCodeModel()` writes the
+  `model` field to `~/.claude/settings.json`. Searches both WSL and Windows paths
+  (`/mnt/c/Users/*/.claude/settings.json`).
+- **SSE `onAnyConfig` callback**: `SSEClient` now receives config changes for *any*
+  client (not just its own). Vault broadcasts `agent_type` in `config_change` events
+  so proxies can dispatch to the correct local agent updater (`cline`, `claude-code`).
+- **`agent_type` in `ConfigChangeEvent`**: Vault reads the client's `AgentType` after
+  update and includes it in the SSE broadcast.
+
+### Fixed
+- **Cline field name mismatch**: Previously wrote `actModeApiModelId` /
+  `planModeApiModelId` which Cline ignores. Now writes to the correct
+  `actModeOpenAiModelId` / `planModeOpenAiModelId` fields.
+- **Proxy's own model overwrote Cline config**: `onConfig` and `syncFromVault`
+  called `updateClineModel()` with the proxy's own model (e.g. `qwen3.5:35b`),
+  polluting Cline's settings. Removed — Cline is now only updated via `onAnyConfig`
+  when a `cline`-typed client changes.
+- **Unrelated client changes polluted Cline**: `onAnyConfig` previously fired for
+  *all* foreign clients. When raspi's model changed to `gemini-3.1-pro-preview`,
+  it overwrote Cline's config. Now filtered by `agent_type`.
+
+### Changed
+- **Faster foreign client disconnect detection**: `clientActs` TTL reduced from
+  5 minutes to 90 seconds. Combined with tighter dashboard thresholds for
+  SSE=false clients (2min live / 5min delay vs 3min/10min for native proxies),
+  VS Code closure is reflected in ~2.5 minutes instead of ~8 minutes.
+- **Version bump**: `BASE_VERSION` → `v0.1.16`.
+
+---
+
 ## [0.1.15] — 2026-03-22 (patch 11)
 
 ### Changed

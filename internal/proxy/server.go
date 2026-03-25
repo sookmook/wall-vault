@@ -24,9 +24,17 @@ var Version = "dev"
 
 // tokenCacheEntry: cached result of a token→model lookup from the vault
 type tokenCacheEntry struct {
+	clientID  string // vault client ID for this token
 	service   string
 	model     string
 	expiresAt time.Time
+}
+
+// clientAct: last-seen activity record for a non-proxy client served by this proxy
+type clientAct struct {
+	service  string
+	model    string
+	lastSeen time.Time
 }
 
 // Server: proxy HTTP server
@@ -45,6 +53,8 @@ type Server struct {
 	ollamaMu        sync.Mutex // protect single concurrent Ollama request
 	tokenCacheMu    sync.RWMutex
 	tokenCache      map[string]*tokenCacheEntry // Bearer token → client model config
+	clientActMu     sync.Mutex
+	clientActs      map[string]*clientAct // clientID → last-seen activity (for heartbeat reporting)
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -60,6 +70,7 @@ func NewServer(cfg *config.Config) *Server {
 		model:      "",
 		registry:   models.NewRegistry(10 * time.Minute),
 		tokenCache: make(map[string]*tokenCacheEntry),
+		clientActs: make(map[string]*clientAct),
 	}
 
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
@@ -199,6 +210,7 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	}
 
 	var result struct {
+		ID             string `json:"id"`
 		DefaultService string `json:"default_service"`
 		DefaultModel   string `json:"default_model"`
 	}
@@ -207,9 +219,20 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	}
 
 	entry := &tokenCacheEntry{
+		clientID:  result.ID,
 		service:   result.DefaultService,
 		model:     result.DefaultModel,
 		expiresAt: time.Now().Add(5 * time.Second),
+	}
+	// Record client activity so the heartbeat can report it to vault
+	if result.ID != "" {
+		s.clientActMu.Lock()
+		s.clientActs[result.ID] = &clientAct{
+			service:  result.DefaultService,
+			model:    result.DefaultModel,
+			lastSeen: time.Now(),
+		}
+		s.clientActMu.Unlock()
 	}
 	s.tokenCacheMu.Lock()
 	// evict expired entries when cache grows large
@@ -827,27 +850,31 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 	}
 	var data []oaiModel
 
-	s.mu.RLock()
-	curModel := s.model
-	curService := s.service
-	s.mu.RUnlock()
+	// If request comes from a client-specific token (e.g. Cline's own token),
+	// return that client's configured model — not the proxy's own model.
+	curModel := ""
+	curService := ""
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
+		if entry := s.lookupTokenConfig(reqToken); entry != nil && entry.model != "" {
+			curModel = entry.model
+			curService = entry.service
+		}
+	}
+	// Fall back to proxy's own model
+	if curModel == "" {
+		s.mu.RLock()
+		curModel = s.model
+		curService = s.service
+		s.mu.RUnlock()
+	}
 
 	if curModel != "" {
-		// Return only the currently configured model so Cline's model list
-		// always reflects the model set in the wall-vault dashboard.
-		data = []oaiModel{{
-			ID:      curModel,
-			Object:  "model",
-			OwnedBy: curService,
-		}}
+		data = []oaiModel{{ID: curModel, Object: "model", OwnedBy: curService}}
 	} else {
 		// Standalone mode (no vault): return full registry list.
 		for _, m := range s.registry.All("") {
-			data = append(data, oaiModel{
-				ID:      m.ID,
-				Object:  "model",
-				OwnedBy: m.Service,
-			})
+			data = append(data, oaiModel{ID: m.ID, Object: "model", OwnedBy: m.Service})
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

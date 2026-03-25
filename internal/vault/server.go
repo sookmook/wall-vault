@@ -418,6 +418,31 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 			"sse":       ps.SSE,
 		},
 	})
+	// broadcast proxy_update for each recently-active client served by this proxy
+	// so their agent cards also show green with the correct model
+	for _, ac := range ps.ActiveClients {
+		if ac.ClientID == "" || ac.ClientID == ps.ClientID {
+			continue // skip self
+		}
+		sub := ProxyStatus{
+			ClientID:  ac.ClientID,
+			Service:   ac.Service,
+			Model:     ac.Model,
+			Version:   ps.Version,
+			SSE:       false, // client itself is not SSE-connected
+		}
+		s.store.UpdateProxyStatus(&sub)
+		s.broker.Broadcast(SSEEvent{
+			Type: "proxy_update",
+			Data: map[string]interface{}{
+				"client_id": ac.ClientID,
+				"service":   ac.Service,
+				"model":     ac.Model,
+				"version":   ps.Version,
+				"sse":       false,
+			},
+		})
+	}
 
 	// always broadcast full key states so the dashboard reflects reality without a fetch
 	{

@@ -127,10 +127,18 @@ type ProxyStatus struct {
 	StartedAt  time.Time         `json:"started_at,omitempty"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	Vault      VaultInfo         `json:"vault,omitempty"`
-	ActiveKeys   map[string]string `json:"active_keys,omitempty"`   // service → key ID
-	KeyUsage     map[string]int    `json:"key_usage,omitempty"`     // key ID → successful tokens today
-	KeyAttempts  map[string]int    `json:"key_attempts,omitempty"`  // key ID → total requests today
-	KeyCooldowns map[string]string `json:"key_cooldowns,omitempty"` // key ID → cooldown RFC3339
+	ActiveKeys    map[string]string  `json:"active_keys,omitempty"`    // service → key ID
+	KeyUsage      map[string]int     `json:"key_usage,omitempty"`      // key ID → successful tokens today
+	KeyAttempts   map[string]int     `json:"key_attempts,omitempty"`   // key ID → total requests today
+	KeyCooldowns  map[string]string  `json:"key_cooldowns,omitempty"`  // key ID → cooldown RFC3339
+	ActiveClients []ActiveClientItem `json:"active_clients,omitempty"` // recently-served non-proxy clients
+}
+
+// ActiveClientItem: a non-proxy client recently served through this proxy
+type ActiveClientItem struct {
+	ClientID string `json:"client_id"`
+	Service  string `json:"service"`
+	Model    string `json:"model"`
 }
 
 type VaultInfo struct {

@@ -1847,15 +1847,23 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		} else {
 			age := time.Since(p.UpdatedAt)
 			ageSec := int(age.Seconds())
+			// Foreign clients (SSE=false, reported via proxy heartbeat ActiveClients) use tighter
+			// thresholds: their 90s clientActs TTL means they disappear ~90s after last activity.
+			liveThresh := 3 * time.Minute
+			delayThresh := 10 * time.Minute
+			if !p.SSE {
+				liveThresh = 2 * time.Minute
+				delayThresh = 5 * time.Minute
+			}
 			switch {
-			case age < 3*time.Minute:
+			case age < liveThresh:
 				dotClass = "dot-green"
 				cardStatusCls = "ac-live"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-live"><span data-i18n="st_running">● 실행 중</span> — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%.0f초 전</span></span> <span class="status-version">%s</span></div>`,
 					p.Service, trimServicePrefix(p.Service, p.Model), ageSec, age.Seconds(), p.Version,
 				)
-			case age < 10*time.Minute:
+			case age < delayThresh:
 				dotClass = "dot-yellow"
 				cardStatusCls = "ac-delay"
 				statusChip = fmt.Sprintf(

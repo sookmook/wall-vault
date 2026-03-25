@@ -18,19 +18,21 @@ type SSEClient struct {
 	vaultURL        string
 	clientID        string
 	connected       bool
-	onConfig        func(service, model string) // config change callback (own client only)
-	onConfigFlush   func()                      // flush token cache on any config_change event
-	onKeyChange     func()                      // key added/deleted callback
-	onUsageReset    func()                      // midnight daily-counter reset callback
-	onServiceChange func([]string)              // proxy service list change callback
-	onReconnect     func()                      // called after SSE reconnect to re-sync state
+	onConfig        func(service, model string)              // config change callback (own client only)
+	onAnyConfig     func(clientID, agentType, service, model string) // config change callback (any other client)
+	onConfigFlush   func()                                   // flush token cache on any config_change event
+	onKeyChange     func()                                   // key added/deleted callback
+	onUsageReset    func()                                   // midnight daily-counter reset callback
+	onServiceChange func([]string)                           // proxy service list change callback
+	onReconnect     func()                                   // called after SSE reconnect to re-sync state
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string), onReconnect func()) *SSEClient {
+func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onAnyConfig func(clientID, agentType, service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string), onReconnect func()) *SSEClient {
 	return &SSEClient{
 		vaultURL:        vaultURL,
 		clientID:        clientID,
 		onConfig:        onConfig,
+		onAnyConfig:     onAnyConfig,
 		onConfigFlush:   onConfigFlush,
 		onKeyChange:     onKeyChange,
 		onUsageReset:    onUsageReset,
@@ -109,6 +111,7 @@ func (c *SSEClient) handleEvent(data string) {
 			ClientID      string   `json:"client_id"`
 			Service       string   `json:"service"`
 			Model         string   `json:"model"`
+			AgentType     string   `json:"agent_type"`
 			ProxyServices []string `json:"proxy_services"`
 		} `json:"data"`
 	}
@@ -126,6 +129,9 @@ func (c *SSEClient) handleEvent(data string) {
 			if c.onConfig != nil {
 				c.onConfig(evt.Data.Service, evt.Data.Model)
 			}
+		} else if c.onAnyConfig != nil {
+			log.Printf("[SSE] 🔔 foreign config change: %s(%s) → %s/%s", evt.Data.ClientID, evt.Data.AgentType, evt.Data.Service, evt.Data.Model)
+			c.onAnyConfig(evt.Data.ClientID, evt.Data.AgentType, evt.Data.Service, evt.Data.Model)
 		}
 	case "key_added", "key_deleted":
 		log.Printf("[SSE] 🔑 key event: %s — re-syncing keys", evt.Type)

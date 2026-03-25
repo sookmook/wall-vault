@@ -524,7 +524,7 @@ Cuando quieras cambiar el modelo de Cline, hazlo desde el **panel de la bóveda*
 
 #### Detección de desconexión
 
-Al cerrar VS Code, la tarjeta del agente en el panel de la bóveda cambiará a amarillo (con retraso) tras unos **2–3 minutos**, y a rojo (sin conexión) tras **5 minutos**.
+Al cerrar VS Code, la tarjeta del agente en el panel de la bóveda cambiará a amarillo (con retraso) tras unos **90 segundos**, y a rojo (sin conexión) tras **3 minutos**. (Desde v0.1.18, el intervalo de verificación de estado de 15 segundos permite una detección de desconexión más rápida.)
 
 #### Solución de problemas
 

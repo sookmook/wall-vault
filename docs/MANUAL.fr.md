@@ -524,7 +524,7 @@ Pour changer le modèle de Cline, modifiez-le depuis le **tableau de bord du cof
 
 #### Détection de déconnexion
 
-Lorsque vous fermez VS Code, la carte de l'agent dans le tableau de bord passe au jaune (en attente) après environ **2–3 minutes**, puis au rouge (hors ligne) après **5 minutes**.
+Lorsque vous fermez VS Code, la carte de l'agent dans le tableau de bord passe au jaune (en attente) après environ **90 secondes**, puis au rouge (hors ligne) après **3 minutes**. (Depuis la v0.1.18, l'intervalle de vérification d'état de 15 secondes permet une détection hors ligne plus rapide.)
 
 #### Résolution des problèmes
 

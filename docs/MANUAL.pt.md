@@ -524,7 +524,7 @@ Para trocar o modelo do Cline, altere-o no **painel do cofre**:
 
 #### Detecção de desconexão
 
-Ao fechar o VS Code, o cartão do agente no painel muda para amarelo (com atraso) após aproximadamente **2–3 minutos** e para vermelho (offline) após **5 minutos**.
+Ao fechar o VS Code, o cartão do agente no painel muda para amarelo (com atraso) após aproximadamente **90 segundos** e para vermelho (offline) após **3 minutos**. (Desde a v0.1.18, o intervalo de verificação de status de 15 segundos permite uma detecção de offline mais rápida.)
 
 #### Solução de problemas
 

@@ -35,6 +35,7 @@ type clientAct struct {
 	service  string
 	model    string
 	lastSeen time.Time
+	applied  bool // true if config was applied via /agent/apply — never expires from heartbeat
 }
 
 // Server: proxy HTTP server
@@ -184,6 +185,19 @@ func NewServer(cfg *config.Config) *Server {
 	return s
 }
 
+// refreshClientAct: update lastSeen for a tracked client after response completion.
+// This ensures long-running streaming requests keep the client alive on the dashboard.
+func (s *Server) refreshClientAct(clientID string) {
+	if clientID == "" {
+		return
+	}
+	s.clientActMu.Lock()
+	if act, ok := s.clientActs[clientID]; ok {
+		act.lastSeen = time.Now()
+	}
+	s.clientActMu.Unlock()
+}
+
 // lookupTokenConfig: resolve a Bearer token to {service, model} via vault's /api/token/config.
 // Results are cached for 30 seconds to avoid per-request vault calls.
 // Returns nil if vault URL is not configured or the token is not found.
@@ -199,6 +213,14 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	s.tokenCacheMu.RLock()
 	if e, ok := s.tokenCache[token]; ok && time.Now().Before(e.expiresAt) {
 		s.tokenCacheMu.RUnlock()
+		// Refresh clientAct lastSeen on cache hits so heartbeat keeps reporting this client
+		if e.clientID != "" {
+			s.clientActMu.Lock()
+			if act, ok := s.clientActs[e.clientID]; ok {
+				act.lastSeen = time.Now()
+			}
+			s.clientActMu.Unlock()
+		}
 		return e
 	}
 	s.tokenCacheMu.RUnlock()
@@ -234,13 +256,20 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 		model:     result.DefaultModel,
 		expiresAt: time.Now().Add(5 * time.Second),
 	}
-	// Record client activity so the heartbeat can report it to vault
+	// Record client activity so the heartbeat can report it to vault.
+	// Preserve the applied flag if the entry was previously set via /agent/apply,
+	// so that the agent keeps its longer grace period on the dashboard.
 	if result.ID != "" {
 		s.clientActMu.Lock()
+		wasApplied := false
+		if existing, ok := s.clientActs[result.ID]; ok {
+			wasApplied = existing.applied
+		}
 		s.clientActs[result.ID] = &clientAct{
 			service:  result.DefaultService,
 			model:    result.DefaultModel,
 			lastSeen: time.Now(),
+			applied:  wasApplied,
 		}
 		s.clientActMu.Unlock()
 	}
@@ -482,12 +511,15 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 }
 
 // pushConfigToVault: write-through proxy model change to vault (bidirectional sync)
+// Includes client_id query param so the vault can identify this proxy unambiguously,
+// even when multiple proxies share the same token.
 func (s *Server) pushConfigToVault(service, model string) {
 	if s.cfg.Proxy.VaultURL == "" || s.cfg.Proxy.VaultToken == "" {
 		return
 	}
 	payload, _ := json.Marshal(map[string]string{"service": service, "model": model})
-	req, err := http.NewRequest(http.MethodPut, s.cfg.Proxy.VaultURL+"/api/config", bytes.NewReader(payload))
+	url := s.cfg.Proxy.VaultURL + "/api/config?client_id=" + s.cfg.Proxy.ClientID
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payload))
 	if err != nil {
 		return
 	}
@@ -592,9 +624,11 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	// look up that client's dashboard-configured model and override the request model.
 	// This allows third-party clients (Cline, Cursor, etc.) to be controlled from
 	// the wall-vault dashboard without changing their local settings.
+	var resolvedClientID string
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
 		if entry := s.lookupTokenConfig(reqToken); entry != nil {
+			resolvedClientID = entry.clientID
 			if entry.service != "" {
 				svc = entry.service
 			}
@@ -603,6 +637,9 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Refresh lastSeen after response completes so long-running requests
+	// (streaming AI responses) keep the client visible on the dashboard.
+	defer s.refreshClientAct(resolvedClientID)
 
 	// OpenClaw sends models as "provider/model-id" (e.g. "wall-vault/gemini-2.5-flash",
 	// "anthropic/claude-opus-4-6"). Parse and route accordingly.
@@ -795,9 +832,18 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Token-based model override: same logic as handleOpenAI.
+	// Anthropic API uses x-api-key header instead of Authorization: Bearer,
+	// so check both to support Claude Code and other Anthropic-format clients.
+	var resolvedClientID string
+	reqToken := ""
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
-		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
+		reqToken = strings.TrimPrefix(authHeader, "Bearer ")
+	} else if xKey := r.Header.Get("x-api-key"); xKey != "" {
+		reqToken = xKey
+	}
+	if reqToken != "" {
 		if entry := s.lookupTokenConfig(reqToken); entry != nil {
+			resolvedClientID = entry.clientID
 			if entry.service != "" {
 				svc = entry.service
 			}
@@ -806,21 +852,30 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	defer s.refreshClientAct(resolvedClientID)
 
 	// Parse provider/model form (e.g. "anthropic/claude-opus-4-6")
 	svc, mdl = parseProviderModel(svc, mdl)
 
-	// Native Anthropic passthrough: when Anthropic is available, forward the
-	// original request body directly — no GeminiRequest round-trip conversion.
-	// This preserves tool calls, tool_results, and multi-block content.
-	anthropicAllowed := len(allowedServices) == 0
-	for _, sv := range allowedServices {
-		if sv == "anthropic" {
-			anthropicAllowed = true
-			break
+	// Native Anthropic passthrough: only when the resolved service IS anthropic
+	// (or the model is a Claude model). Non-Claude models (e.g. google/gemini-*)
+	// must go through dispatch() so they are routed to the correct backend.
+	// Previously this tried passthrough for ALL models when anthropic was allowed,
+	// which silently forced non-Claude models to claude-haiku and returned wrong results.
+	usePassthrough := false
+	if svc == "anthropic" || strings.HasPrefix(mdl, "claude-") {
+		if len(allowedServices) == 0 {
+			usePassthrough = true
+		} else {
+			for _, sv := range allowedServices {
+				if sv == "anthropic" {
+					usePassthrough = true
+					break
+				}
+			}
 		}
 	}
-	if anthropicAllowed {
+	if usePassthrough {
 		if body, _, err := s.callAnthropicPassthrough(&req, mdl); err == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(body) //nolint:errcheck
@@ -830,8 +885,11 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fallback: convert to GeminiRequest and dispatch via Google/OpenRouter
+	// Fallback: convert to GeminiRequest and dispatch via Google/OpenRouter.
+	// AnthropicToGemini is lossy (drops tool_calls); attach an OpenAI-equivalent
+	// via RawOAI so that OpenRouter-based fallback preserves tools.
 	geminiReq := AnthropicToGemini(&req)
+	geminiReq.RawOAI = anthropicToOpenAIReq(&req, mdl)
 	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
 	if err != nil {
 		log.Printf("[anthropic] dispatch error: %v", err)
@@ -880,6 +938,17 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 
 	if curModel != "" {
 		data = []oaiModel{{ID: curModel, Object: "model", OwnedBy: curService}}
+		// When the vault-configured model is a non-Claude model (e.g. google/gemini-*),
+		// Claude Code's settings.json still has a Claude model (because updateClaudeCodeModel
+		// skips non-Claude models). Include common Claude aliases so Claude Code's model
+		// validation passes regardless of what alias is in settings.json.
+		if !strings.HasPrefix(curModel, "claude-") {
+			for _, alias := range []string{"opus", "sonnet", "haiku"} {
+				if alias != curModel {
+					data = append(data, oaiModel{ID: alias, Object: "model", OwnedBy: "proxy"})
+				}
+			}
+		}
 	} else {
 		// Standalone mode (no vault): return full registry list.
 		for _, m := range s.registry.All("") {

@@ -524,7 +524,7 @@ Um das Modell von Cline zu ändern, ändere es im **Tresor-Dashboard**:
 
 #### Verbindungsabbruch erkennen
 
-Wenn du VS Code schließt, wechselt die Agentenkarte im Dashboard nach etwa **2–3 Minuten** auf Gelb (Verzögert) und nach **5 Minuten** auf Rot (Offline).
+Wenn du VS Code schließt, wechselt die Agentenkarte im Dashboard nach etwa **90 Sekunden** auf Gelb (Verzögert) und nach **3 Minuten** auf Rot (Offline). (Seit v0.1.18 ermöglicht das 15-Sekunden-Statusprüfungsintervall eine schnellere Offline-Erkennung.)
 
 #### Problemlösung
 

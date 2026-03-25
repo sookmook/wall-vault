@@ -12,6 +12,45 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.18] — 2026-03-26
+
+### Fixed
+- **Dashboard online/offline detection**: Agent cards stayed "live" forever when a
+  proxy died because the dashboard only received status updates inside heartbeat
+  handlers — no heartbeats meant no offline transition. Redesigned with a unified
+  `agents_sync` SSE event model:
+  - Server computes status once, broadcasts ONE event with status + service/model/version.
+  - Replaced dual `proxy_update` + `clients_status` events that could race each other.
+  - Added 15-second periodic status ticker so the dashboard detects proxy death
+    independently of incoming heartbeats.
+  - SSE reconnect sync: new connections receive full state immediately via
+    `Broker.OnConnect` callback.
+  - Client-side watchdog monitors SSE health; `visibilitychange` handler catches
+    stale state when returning to a background tab.
+
+### Changed
+- **Anthropic handler passthrough**: Non-Claude models (e.g. `google/gemini-*`)
+  routed through Anthropic endpoint now correctly dispatch to the appropriate
+  backend instead of silently falling back to `claude-haiku`.
+- **Anthropic → OpenAI conversion**: Added `anthropicToOpenAIReq()` converter that
+  preserves tool_use / tool_result content blocks when dispatching via OpenRouter.
+- **Claude Code model sync**: `updateClaudeCodeModel()` now skips non-Claude models
+  to avoid "There's an issue with the selected model" errors; `isClaudeModel()`
+  helper added. OpenAI models endpoint includes Claude aliases when the configured
+  model is non-Claude.
+- **Claude Code apply**: Now passes `model` parameter through to `settings.json`.
+- **Client identification**: `pushConfigToVault` includes `client_id` query param
+  for unambiguous proxy identification. `handleClientConfig` prioritizes explicit
+  `client_id` over token-based lookup.
+- **Heartbeat active-client tracking**: `clientActs` TTL tightened from 5min/7min
+  to 90s/3min; `applied` flag preserves longer grace for freshly-applied agents;
+  `refreshClientAct` keeps long-running streaming requests visible.
+- **Status thresholds**: Unified to 90s (live→delay) / 3min (delay→offline) across
+  server render, SSE broadcast, and uptime reset (was 3min/10min).
+- **Version bump**: `BASE_VERSION` → `v0.1.18`.
+
+---
+
 ## [0.1.17] — 2026-03-25
 
 ### Added

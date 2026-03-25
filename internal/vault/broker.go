@@ -9,8 +9,9 @@ import (
 
 // Broker: SSE event broadcaster
 type Broker struct {
-	mu      sync.RWMutex
-	clients map[chan string]struct{}
+	mu        sync.RWMutex
+	clients   map[chan string]struct{}
+	OnConnect func() // called (in a goroutine) after a new SSE client connects
 }
 
 func NewBroker() *Broker {
@@ -81,6 +82,11 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// send ping immediately on connect
 	fmt.Fprintf(w, "data: {\"type\":\"connected\",\"clients\":%d}\n\n", b.Count())
 	flusher.Flush()
+
+	// broadcast full state so newly connected / reconnected clients are in sync
+	if b.OnConnect != nil {
+		go b.OnConnect()
+	}
 
 	ctx := r.Context()
 	for {

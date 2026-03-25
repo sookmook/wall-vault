@@ -723,7 +723,12 @@ func (s *Store) UpdateProxyStatus(ps *ProxyStatus) {
 	defer s.mu.Unlock()
 	ps.UpdatedAt = time.Now()
 	if existing, ok := s.proxies[ps.ClientID]; ok && !existing.StartedAt.IsZero() {
-		ps.StartedAt = existing.StartedAt
+		// If the agent was offline (last update too old), reset uptime timer
+		if ps.UpdatedAt.Sub(existing.UpdatedAt) > 5*time.Minute {
+			ps.StartedAt = ps.UpdatedAt
+		} else {
+			ps.StartedAt = existing.StartedAt
+		}
 	} else if ps.StartedAt.IsZero() {
 		ps.StartedAt = ps.UpdatedAt
 	}

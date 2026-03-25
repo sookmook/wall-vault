@@ -24,6 +24,14 @@ type heartbeatPayload struct {
 	KeyUsage      map[string]int    `json:"key_usage,omitempty"`      // key ID → successful tokens today
 	KeyAttempts   map[string]int    `json:"key_attempts,omitempty"`   // key ID → total requests today (including rate-limited)
 	KeyCooldowns  map[string]string `json:"key_cooldowns,omitempty"`  // key ID → cooldown RFC3339
+	ActiveClients []activeClientItem `json:"active_clients,omitempty"` // recently-served non-proxy clients
+}
+
+// activeClientItem: activity record for a client served through this proxy
+type activeClientItem struct {
+	ClientID string `json:"client_id"`
+	Service  string `json:"service"`
+	Model    string `json:"model"`
 }
 
 // readLocalAvatar reads the configured avatar file and returns a base64 data URI.
@@ -88,15 +96,33 @@ func (s *Server) sendHeartbeat() {
 		}
 	}
 
+	// Collect recently-active non-proxy clients (last 5 minutes)
+	var activeClients []activeClientItem
+	cutoff := time.Now().Add(-5 * time.Minute)
+	s.clientActMu.Lock()
+	for cid, act := range s.clientActs {
+		if act.lastSeen.After(cutoff) {
+			activeClients = append(activeClients, activeClientItem{
+				ClientID: cid,
+				Service:  act.service,
+				Model:    act.model,
+			})
+		} else {
+			delete(s.clientActs, cid) // evict stale entries
+		}
+	}
+	s.clientActMu.Unlock()
+
 	payload := heartbeatPayload{
-		ClientID:     s.cfg.Proxy.ClientID,
-		Version:      Version,
-		Service:      svc,
-		Model:        mdl,
-		SSE:          sseConn,
-		Avatar:       readLocalAvatar(s.cfg.Proxy.Avatar),
-		ActiveKeys:   activeKeys,
-		KeyUsage:     s.keyMgr.UsageSnapshot(),
+		ClientID:      s.cfg.Proxy.ClientID,
+		Version:       Version,
+		Service:       svc,
+		Model:         mdl,
+		SSE:           sseConn,
+		Avatar:        readLocalAvatar(s.cfg.Proxy.Avatar),
+		ActiveKeys:    activeKeys,
+		ActiveClients: activeClients,
+		KeyUsage:      s.keyMgr.UsageSnapshot(),
 		KeyAttempts:  s.keyMgr.AttemptsSnapshot(),
 		KeyCooldowns: s.keyMgr.CooldownSnapshot(),
 	}

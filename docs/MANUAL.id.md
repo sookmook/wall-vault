@@ -30,7 +30,7 @@ wall-vault menyimpan semua tanda masuk digital Anda di dalam brankas yang aman, 
 Masalah yang diselesaikan wall-vault:
 
 - **Rotasi kunci API otomatis**: Jika satu kunci mencapai batasnya atau sedang diblokir sementara (cooldown), wall-vault secara diam-diam beralih ke kunci berikutnya. OpenClaw terus bekerja tanpa gangguan.
-- **Pergantian layanan otomatis (fallback)**: Jika Google tidak merespons, otomatis beralih ke OpenRouter. Jika itu pun gagal, beralih ke Ollama (AI lokal di komputer Anda sendiri). Sesi tidak terputus.
+- **Pergantian layanan otomatis (fallback)**: Jika Google tidak merespons, otomatis beralih ke OpenRouter. Jika itu pun gagal, beralih ke Ollama (AI lokal di komputer Anda sendiri). Sesi tidak terputus. Ketika layanan asal pulih, secara otomatis kembali ke layanan tersebut mulai dari permintaan berikutnya (v0.1.18+).
 - **Sinkronisasi real-time (SSE)**: Jika Anda mengganti model AI di dashboard brankas, perubahan akan tercermin di layar OpenClaw dalam 1–3 detik. SSE (Server-Sent Events) adalah teknologi di mana server mendorong perubahan ke klien secara real-time.
 - **Notifikasi real-time**: Kejadian seperti kunci habis atau gangguan layanan langsung ditampilkan di bagian bawah layar TUI (tampilan terminal) OpenClaw.
 

@@ -30,7 +30,7 @@ wall-vault yana ajiye waɗannan maɓallan cikin **ɓaure mai aminci**, kuma yana
 Matsalolin da wall-vault ke warware:
 
 - **Jujjuya Maɓallin ta Atomatik**: Idan amfanin maɓalli ɗaya ya kai iyakansa ko ya tsaya na ɗan lokaci (cooldown), sai a yi amfani da na gaba a ɓoye. OpenClaw yana ci gaba da aiki ba tare da katse ba.
-- **Musanya Ayyuka ta Atomatik (Fallback)**: Idan Google bai amsa ba, sai a yi amfani da OpenRouter; idan haka ma bai yi aiki ba, sai a koma Ollama (AI na gida akan kwamfutarka). Zaman ba ya katse.
+- **Musanya Ayyuka ta Atomatik (Fallback)**: Idan Google bai amsa ba, sai a yi amfani da OpenRouter; idan haka ma bai yi aiki ba, sai a koma Ollama (AI na gida akan kwamfutarka). Zaman ba ya katse. Idan ayyukan asali sun dawo, za a koma kan su ta atomatik daga buƙatar gaba (v0.1.18+).
 - **Daidaita Aiki a Lokaci Ɗaya (SSE)**: Idan ka canza ƙirar a dashboard ɗin ɓaure, za a nuna canje-canjen akan allon OpenClaw cikin dakika 1–3. SSE (Server-Sent Events) wata fasaha ce da ke ba wa sabar damar tura sabuntawa zuwa ga abokin ciniki a lokaci ɗaya.
 - **Sanarwa a Lokaci Ɗaya**: Idan maɓalli ya ƙare ko akwai matsalar aiki, za a nuna wannan a ƙasan allon TUI na OpenClaw nan da nan.
 

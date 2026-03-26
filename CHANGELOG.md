@@ -15,6 +15,12 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 ## [0.1.18] — 2026-03-26
 
 ### Fixed
+- **Fallback service stuck on Ollama**: When a primary service (e.g. Google) hit a
+  transient error and fell back to Ollama, the proxy permanently overwrote its
+  configured service/model and pushed the change to vault — making recovery impossible
+  even after the primary key's cooldown expired. Now the user's preferred
+  service/model is immutable during fallback; the proxy retries the preferred service
+  first on every request and automatically recovers when keys become available again.
 - **Dashboard online/offline detection**: Agent cards stayed "live" forever when a
   proxy died because the dashboard only received status updates inside heartbeat
   handlers — no heartbeats meant no offline transition. Redesigned with a unified

@@ -42,8 +42,10 @@ type clientAct struct {
 type Server struct {
 	cfg             *config.Config
 	mu              sync.RWMutex
-	service         string
-	model           string
+	service         string            // user-configured preferred service (from vault dashboard)
+	model           string            // user-configured preferred model (from vault dashboard)
+	lastActualSvc   string            // last service that actually handled a request (for heartbeat)
+	lastActualMdl   string            // last model that actually handled a request (for heartbeat)
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
 	serviceURLs     map[string]string // service ID → local URL from vault config
 	keyMgr          *KeyManager
@@ -1010,10 +1012,20 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 			continue
 		}
 		if err == nil {
-			// When a fallback service is used, update s.service/s.model so the
-			// next heartbeat, vault UI, and openclaw TUI all reflect the actual model.
+			// Track the actual service/model used (for heartbeat reporting).
+			// Do NOT mutate s.service/s.model — those are the user's preferred
+			// settings from the vault dashboard and must survive transient fallback.
+			actualMdl := s.resolveActualModel(svc, model)
+			s.mu.Lock()
+			s.lastActualSvc = svc
+			s.lastActualMdl = actualMdl
+			s.mu.Unlock()
 			if svc != service {
-				go s.onFallback(svc, s.resolveActualModel(svc, model))
+				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, actualMdl)
+				s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
+					"service": svc,
+					"model":   actualMdl,
+				})
 			}
 			return resp, nil
 		}
@@ -1427,20 +1439,6 @@ func stripControlTokens(s string) string {
 
 // onFallback: called when dispatch succeeds on a service other than the requested one.
 // Updates s.service/s.model so the next heartbeat, vault UI, and openclaw TUI reflect reality.
-func (s *Server) onFallback(actualSvc, actualMdl string) {
-	s.mu.Lock()
-	s.service = actualSvc
-	s.model = actualMdl
-	s.mu.Unlock()
-	log.Printf("[proxy] fallback active: %s/%s", actualSvc, actualMdl)
-	s.pushConfigToVault(actualSvc, actualMdl)
-	go updateOpenClawJSON(actualSvc, actualMdl)
-	s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
-		"service": actualSvc,
-		"model":   actualMdl,
-	})
-}
-
 // resolveActualModel returns the model name that will actually be used for the given service.
 // Ollama ignores the upstream model and uses a local env-configured model instead.
 func (s *Server) resolveActualModel(svc, model string) string {

@@ -84,6 +84,12 @@ func (s *Server) sendHeartbeat() {
 	s.mu.RLock()
 	svc := s.service
 	mdl := s.model
+	// Report the actual service/model that last handled a request,
+	// so the dashboard shows what's really being used (may be a fallback).
+	if s.lastActualSvc != "" {
+		svc = s.lastActualSvc
+		mdl = s.lastActualMdl
+	}
 	s.mu.RUnlock()
 
 	sseConn := s.sse != nil && s.sse.IsConnected()

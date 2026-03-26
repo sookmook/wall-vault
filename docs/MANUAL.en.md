@@ -30,7 +30,7 @@ wall-vault keeps your passes safe in an encrypted vault, and acts as a **proxy (
 Here's what wall-vault takes care of for you:
 
 - **Automatic key rotation**: When one key hits its limit or gets temporarily blocked (cooldown), wall-vault quietly switches to the next key. OpenClaw keeps working without interruption.
-- **Automatic service fallback**: If Google doesn't respond, it falls back to OpenRouter. If that fails too, it automatically switches to Ollama running locally on your machine. Your session never drops.
+- **Automatic service fallback**: If Google doesn't respond, it falls back to OpenRouter. If that fails too, it automatically switches to Ollama running locally on your machine. Your session never drops. When the original service recovers, it automatically switches back from the next request onward (v0.1.18+).
 - **Real-time sync (SSE)**: Change the model in the vault dashboard, and OpenClaw reflects it within 1–3 seconds. SSE (Server-Sent Events) is a technology where the server pushes updates to clients in real time.
 - **Real-time notifications**: Events like key exhaustion or service outages appear immediately in OpenClaw's TUI (terminal UI) at the bottom of the screen.
 

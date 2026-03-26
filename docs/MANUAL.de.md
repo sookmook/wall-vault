@@ -30,7 +30,7 @@ wall-vault bewahrt diese Ausweise sicher in einem verschlüsselten Tresor auf un
 Probleme, die wall-vault für dich löst:
 
 - **Automatische Schlüsselrotation**: Wenn ein Schlüssel sein Limit erreicht oder vorübergehend gesperrt ist (Cooldown), wechselt wall-vault still und leise zum nächsten. OpenClaw läuft ohne Unterbrechung weiter.
-- **Automatischer Dienstwechsel (Fallback)**: Antwortet Google nicht, wechselt wall-vault automatisch zu OpenRouter – und wenn das auch nicht klappt, zu Ollama (lokal auf deinem Computer). Die Sitzung bleibt erhalten.
+- **Automatischer Dienstwechsel (Fallback)**: Antwortet Google nicht, wechselt wall-vault automatisch zu OpenRouter – und wenn das auch nicht klappt, zu Ollama (lokal auf deinem Computer). Die Sitzung bleibt erhalten. Wenn der ursprüngliche Dienst wiederhergestellt ist, wird ab der nächsten Anfrage automatisch zurückgewechselt (v0.1.18+).
 - **Echtzeit-Synchronisierung (SSE)**: Wenn du im Dashboard ein Modell wechselst, wird die Änderung innerhalb von 1–3 Sekunden in OpenClaw übernommen. SSE (Server-Sent Events) ist eine Technologie, bei der der Server Änderungen sofort an den Client schickt – ohne dass der Client nachfragen muss.
 - **Echtzeit-Benachrichtigungen**: Ereignisse wie ein erschöpfter Schlüssel oder ein Dienstausfall werden sofort in der TUI-Oberfläche (Terminal-Anzeige) von OpenClaw angezeigt.
 

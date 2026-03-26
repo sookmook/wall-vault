@@ -30,7 +30,7 @@ wall-vault huhifadhi vibali hivi katika ghala salama na hufanya kazi kama **waka
 Matatizo ambayo wall-vault huyatatua:
 
 - **Mzunguko wa Otomatiki wa Funguo**: Ufunguo ukifikia kikomo au kuzuiwa kwa muda (cooldown), wall-vault hubadilika kimya kimya kwenye ufunguo unaofuata. OpenClaw inaendelea kufanya kazi bila kukatizwa.
-- **Ubadilishaji Otomatiki wa Huduma (Fallback)**: Kama Google haikujibu, inabadilika kwenye OpenRouter. Kama hiyo pia haikufanya kazi, inabadilika kwenye Ollama (AI inayofanya kazi ndani ya kompyuta yako). Kikao hakikatizwi.
+- **Ubadilishaji Otomatiki wa Huduma (Fallback)**: Kama Google haikujibu, inabadilika kwenye OpenRouter. Kama hiyo pia haikufanya kazi, inabadilika kwenye Ollama (AI inayofanya kazi ndani ya kompyuta yako). Kikao hakikatizwi. Huduma ya awali inaporejea, inabadilika kurudi kwake kiotomatiki kuanzia ombi linalofuata (v0.1.18+).
 - **Usawazishaji wa Wakati Halisi (SSE)**: Ukibadilisha mfano wa AI kwenye dashibodi ya ghala, OpenClaw itaonyesha mabadiliko hayo ndani ya sekunde 1–3. SSE (Server-Sent Events) ni teknolojia ambapo seva hutuma mabadiliko moja kwa moja kwa mteja wakati wowote yanapotokea.
 - **Arifa za Wakati Halisi**: Matukio kama ufunguo kuisha au tatizo la huduma yanaonyeshwa mara moja kwenye chini ya skrini ya TUI ya OpenClaw.
 

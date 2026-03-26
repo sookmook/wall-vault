@@ -30,7 +30,7 @@ O wall-vault guarda esses crachás em um cofre seguro e atua como **intermediár
 Problemas que o wall-vault resolve para você:
 
 - **Rotação automática de chaves**: quando uma chave atinge o limite de uso ou fica temporariamente bloqueada (cooldown), o wall-vault passa silenciosamente para a próxima chave. O OpenClaw continua funcionando sem interrupção.
-- **Troca automática de serviço (fallback)**: se o Google não responder, o wall-vault tenta o OpenRouter; se esse também falhar, usa o Ollama (IA local na sua máquina). A sessão não cai.
+- **Troca automática de serviço (fallback)**: se o Google não responder, o wall-vault tenta o OpenRouter; se esse também falhar, usa o Ollama (IA local na sua máquina). A sessão não cai. Quando o serviço original se recupera, a troca de volta acontece automaticamente a partir da próxima requisição (v0.1.18+).
 - **Sincronização em tempo real (SSE)**: se você mudar o modelo no painel do cofre, a mudança aparece no OpenClaw em 1 a 3 segundos. SSE (Server-Sent Events) é uma tecnologia em que o servidor empurra atualizações diretamente para o cliente em tempo real.
 - **Notificações em tempo real**: eventos como esgotamento de chave ou falha de serviço aparecem imediatamente na linha de status do TUI (tela de terminal) do OpenClaw.
 

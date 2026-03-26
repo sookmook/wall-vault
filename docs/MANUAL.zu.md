@@ -30,7 +30,7 @@ I-wall-vault igcina lezi zikhiye endaweni evikelekile (i-vault), bese isebenza n
 Izinkinga i-wall-vault ezixazululayo:
 
 - **Ukuphendulana kwazikhiye ngokuzenzakalela**: Uma ukhiye owodwa ufika emkhawulweni wawo noma ubanjwe okwesikhashana (i-cooldown), i-wall-vault iyaguqukelela ngokuthula kukhiye olulandelayo. OpenClaw iqhubeka ngaphandle kokuma.
-- **Ukushintsha Kwezinsizakalo Ngokuzenzakalela (i-fallback)**: Uma Google ingaphenduli, iyaguqukelela ku-OpenRouter; uma nako kungasebenzi, iyaguqukela ku-Ollama (i-AI ekhompyutheni yakho). Iseshini ayipheli.
+- **Ukushintsha Kwezinsizakalo Ngokuzenzakalela (i-fallback)**: Uma Google ingaphenduli, iyaguqukelela ku-OpenRouter; uma nako kungasebenzi, iyaguqukela ku-Ollama (i-AI ekhompyutheni yakho). Iseshini ayipheli. Uma insizakalo yokuqala ibuyela esimweni esijwayelekile, iyashintsha ibuyele kuyo ngokuzenzakalela kusukela esicwelweni esilandelayo (v0.1.18+).
 - **Ukuvumelaniswa Ngesikhathi Sangempela (SSE)**: Uma ushintsha imodeli ku-vault dashboard, izinguquko zibonakala ku-OpenClaw phakathi kwamasekhendi angu-1 no-3. I-SSE (Server-Sent Events) yiteknoloji lapho iserver ithumela iziguquko zangempela-isikhathi ngokuqondile kuklayenti.
 - **Izaziso Zangempela-Isikhathi**: Izikhombisi zokuphela kwazikhiye noma ukuphazamiseka kwensizakalo zibonakala ngokuphazima ngephansi kwe-TUI (isikrini setheminali) ye-OpenClaw.
 

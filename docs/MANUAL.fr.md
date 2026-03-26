@@ -30,7 +30,7 @@ wall-vault conserve tous ces badges dans un coffre-fort sécurisé, et joue le r
 Ce que wall-vault résout pour vous :
 
 - **Rotation automatique des clés** : quand une clé atteint sa limite ou est temporairement bloquée (cooldown), wall-vault bascule discrètement vers la clé suivante. OpenClaw continue de fonctionner sans interruption.
-- **Basculement automatique de service (fallback)** : si Google ne répond pas, wall-vault passe à OpenRouter ; si OpenRouter est aussi indisponible, il bascule vers Ollama (IA locale installée sur votre machine). La session n'est jamais interrompue.
+- **Basculement automatique de service (fallback)** : si Google ne répond pas, wall-vault passe à OpenRouter ; si OpenRouter est aussi indisponible, il bascule vers Ollama (IA locale installée sur votre machine). La session n'est jamais interrompue. Lorsque le service d'origine est rétabli, le retour s'effectue automatiquement dès la requête suivante (v0.1.18+).
 - **Synchronisation en temps réel (SSE)** : si vous changez de modèle dans le tableau de bord, le changement se reflète dans OpenClaw en 1 à 3 secondes. SSE (Server-Sent Events) est une technologie où le serveur pousse les mises à jour vers le client en temps réel.
 - **Notifications en temps réel** : les événements comme l'épuisement d'une clé ou une panne de service s'affichent immédiatement en bas de l'interface TUI (terminal) d'OpenClaw.
 

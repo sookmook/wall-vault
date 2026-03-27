@@ -19,6 +19,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

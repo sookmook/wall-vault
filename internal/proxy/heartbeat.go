@@ -47,12 +47,26 @@ func readLocalAvatar(avatarPath string) string {
 	if relPath == "" {
 		relPath = filepath.Join("workspace", "avatar.png")
 	}
-	data, err := os.ReadFile(filepath.Join(home, ".openclaw", relPath))
+	// path traversal guard: reject absolute paths and ".." components
+	if strings.HasPrefix(relPath, "/") || strings.Contains(relPath, "..") {
+		return ""
+	}
+	cleaned := filepath.Clean(relPath)
+	if strings.HasPrefix(cleaned, "..") || filepath.IsAbs(cleaned) {
+		return ""
+	}
+	baseDir := filepath.Join(home, ".openclaw")
+	fullPath := filepath.Join(baseDir, cleaned)
+	// verify the resolved path is still under the base directory
+	if !strings.HasPrefix(fullPath, baseDir+string(filepath.Separator)) {
+		return ""
+	}
+	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return ""
 	}
 	mime := "image/png"
-	switch strings.ToLower(filepath.Ext(relPath)) {
+	switch strings.ToLower(filepath.Ext(cleaned)) {
 	case ".jpg", ".jpeg", ".hpg":
 		mime = "image/jpeg"
 	case ".webp":

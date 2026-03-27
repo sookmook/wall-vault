@@ -18,18 +18,46 @@ func panicHandler(w http.ResponseWriter, r *http.Request) {
 func TestCORS_Headers(t *testing.T) {
 	h := CORS(http.HandlerFunc(okHandler))
 
+	// request with allowed local origin
 	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "http://localhost:56243")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Errorf("ACAO = %q, want *", w.Header().Get("Access-Control-Allow-Origin"))
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:56243" {
+		t.Errorf("ACAO = %q, want http://localhost:56243", w.Header().Get("Access-Control-Allow-Origin"))
 	}
 	if w.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Error("ACAM 헤더 없음")
 	}
 	if w.Header().Get("Access-Control-Allow-Headers") == "" {
 		t.Error("ACAH 헤더 없음")
+	}
+}
+
+func TestCORS_RejectsExternalOrigin(t *testing.T) {
+	h := CORS(http.HandlerFunc(okHandler))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "http://evil.com")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("ACAO should be empty for external origin, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestCORS_AllowsLAN(t *testing.T) {
+	h := CORS(http.HandlerFunc(okHandler))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "http://192.168.0.6:56243")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://192.168.0.6:56243" {
+		t.Errorf("ACAO = %q, want http://192.168.0.6:56243", w.Header().Get("Access-Control-Allow-Origin"))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/sookmook/wall-vault/internal/i18n"
 	"github.com/sookmook/wall-vault/internal/theme"
 )
+
+// esc escapes user-controlled strings for safe HTML embedding.
+func esc(s string) string { return html.EscapeString(s) }
 
 func buildDashboard(s *Server, t *theme.Theme) string {
 	keys := s.store.ListKeys()
@@ -824,7 +828,7 @@ let es;
 const cardAlive = {};        // clientId → epoch sec (last proof-of-life)
 let lastSSETime = Date.now(); // ms — last ANY SSE event received
 function connectSSE() {
-  es = new EventSource('/api/events');
+  var sseUrl='/api/events'; var sseToken=getAdminToken()||_SERVER_TOKEN||''; if(sseToken) sseUrl+='?token='+encodeURIComponent(sseToken); es = new EventSource(sseUrl);
   es.onopen = () => {
     const t=I18N[curLang]||I18N.ko;
     const st=document.getElementById('sse-status');
@@ -1803,7 +1807,7 @@ func buildServiceOptions(services []*ServiceConfig, selected string) string {
 		if sv.ID == selected {
 			sel = " selected"
 		}
-		sb.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, sv.ID, sel, sv.Name))
+		sb.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, esc(sv.ID), sel, esc(sv.Name)))
 	}
 	return sb.String()
 }
@@ -1840,14 +1844,28 @@ func resolveAvatarDataURI(avatarVal string) string {
 		relPath = filepath.Join("workspace", "avatar.png")
 	}
 
-	data, err := os.ReadFile(filepath.Join(ocBase, relPath))
+	// path traversal guard: reject absolute paths and ".." components
+	if strings.HasPrefix(relPath, "/") || strings.Contains(relPath, "..") {
+		return ""
+	}
+	cleaned := filepath.Clean(relPath)
+	if strings.HasPrefix(cleaned, "..") || filepath.IsAbs(cleaned) {
+		return ""
+	}
+	fullPath := filepath.Join(ocBase, cleaned)
+	// verify the resolved path is still under the base directory
+	if !strings.HasPrefix(fullPath, ocBase+string(filepath.Separator)) {
+		return ""
+	}
+
+	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return ""
 	}
 
 	// detect mime type from file extension
 	mime := "image/png"
-	switch strings.ToLower(filepath.Ext(relPath)) {
+	switch strings.ToLower(filepath.Ext(cleaned)) {
 	case ".jpg", ".jpeg", ".hpg":
 		mime = "image/jpeg"
 	case ".webp":
@@ -1916,22 +1934,22 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 				statusChip = fmt.Sprintf(`<div class="agent-status">`+
 					`<span class="status-dc">◎ Claude Code</span>`+
 					`<button class="btn-apply-hint btn-cfg-claude" onclick="applyAgentConfig('%s','claude-code')" data-i18n="cfg_claude_apply">⚡ 설정 적용</button>`+
-					`</div>`, c.ID)
+					`</div>`, esc(c.ID))
 			case "cline":
 				statusChip = fmt.Sprintf(`<div class="agent-status">`+
 					`<span class="status-dc">◎ Cline</span>`+
 					`<button class="btn-apply-hint" onclick="applyAgentConfig('%s','cline')">⚡ 설정 적용</button>`+
-					`</div>`, c.ID)
+					`</div>`, esc(c.ID))
 			case "openclaw":
 				statusChip = fmt.Sprintf(`<div class="agent-status">`+
 					`<span class="status-dc">◎ OpenClaw</span>`+
 					`<button class="btn-apply-hint btn-cfg-openclaw" onclick="applyAgentConfig('%s','openclaw')">⚡ 설정 적용</button>`+
-					`</div>`, c.ID)
+					`</div>`, esc(c.ID))
 			case "nanoclaw":
 				statusChip = fmt.Sprintf(`<div class="agent-status">`+
 					`<span class="status-dc">◎ NanoClaw</span>`+
 					`<button class="btn-apply-hint btn-cfg-nanoclaw" onclick="applyAgentConfig('%s','nanoclaw')">⚡ 설정 적용</button>`+
-					`</div>`, c.ID)
+					`</div>`, esc(c.ID))
 			case "cokacdir":
 				statusChip = `<div class="agent-status">` +
 					`<span class="status-dc">◎ cokacdir</span>` +
@@ -1966,14 +1984,14 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 				cardStatusCls = "ac-live"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-live"><span data-i18n="st_running">● 실행 중</span> — %s / %s</span> <span class="status-hint"><span class="bot-ago" data-ago-sec="%d">%.0f초 전</span></span> <span class="status-version">%s</span></div>`,
-					p.Service, trimServicePrefix(p.Service, p.Model), ageSec, age.Seconds(), p.Version,
+					esc(p.Service), esc(trimServicePrefix(p.Service, p.Model)), ageSec, age.Seconds(), esc(p.Version),
 				)
 			case age < delayThresh:
 				dotClass = "dot-yellow"
 				cardStatusCls = "ac-delay"
 				statusChip = fmt.Sprintf(
 					`<div class="agent-status"><span class="status-delay"><span data-i18n="st_delayed">◑ 지연</span> <span class="bot-ago" data-ago-sec="%d">%.0f분 전</span> — %s / %s</span></div>`,
-					ageSec, age.Minutes(), p.Service, trimServicePrefix(p.Service, p.Model),
+					ageSec, age.Minutes(), esc(p.Service), esc(trimServicePrefix(p.Service, p.Model)),
 				)
 			default:
 				dotClass = "dot-red"
@@ -2005,19 +2023,19 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			if bc, ok := typeCls[c.AgentType]; ok {
 				cls = bc
 			}
-			typeBadge = fmt.Sprintf(`<span class="atbadge %s">%s</span>`, cls, c.AgentType)
+			typeBadge = fmt.Sprintf(`<span class="atbadge %s">%s</span>`, cls, esc(c.AgentType))
 		}
 
 		// ── 설명 & 메타 ──
 		metaLines := ""
 		if c.WorkDir != "" {
-			metaLines += fmt.Sprintf(`<div class="agent-meta">📁 %s</div>`, c.WorkDir)
+			metaLines += fmt.Sprintf(`<div class="agent-meta">📁 %s</div>`, esc(c.WorkDir))
 		}
 		if c.Description != "" {
-			metaLines += fmt.Sprintf(`<div class="agent-desc">%s</div>`, c.Description)
+			metaLines += fmt.Sprintf(`<div class="agent-desc">%s</div>`, esc(c.Description))
 		}
 		if len(c.IPWhitelist) > 0 {
-			metaLines += fmt.Sprintf(`<div class="agent-meta">🔒 %s</div>`, strings.Join(c.IPWhitelist, ", "))
+			metaLines += fmt.Sprintf(`<div class="agent-meta">🔒 %s</div>`, esc(strings.Join(c.IPWhitelist, ", ")))
 		}
 
 		// ── 타입별 설정 복사 버튼 ──
@@ -2026,35 +2044,35 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		case "openclaw":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg btn-cfg-openclaw" onclick="applyAgentConfig('%s','openclaw')" title="~/.openclaw/openclaw.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_openclaw">⚡ OpenClaw 설정 적용</button>`,
-				c.ID)
+				esc(c.ID))
 		case "nanoclaw":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg btn-cfg-nanoclaw" onclick="applyAgentConfig('%s','nanoclaw')" title="~/.openclaw/openclaw.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_nanoclaw">⚡ NanoClaw 설정 적용</button>`,
-				c.ID)
+				esc(c.ID))
 		case "claude-code":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg btn-cfg-claude" onclick="applyAgentConfig('%s','claude-code')" title="~/.claude/settings.json 자동 적용 (localhost:56244 필요)" data-i18n="cfg_claude">⚡ Claude Code 설정 적용</button>`,
-				c.ID)
+				esc(c.ID))
 		case "cokacdir":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg btn-cfg-cokacdir" onclick="copyAgentConfig('%s','cokacdir')" title="cokacdir 환경변수 설정 복사" data-i18n="cfg_cokacdir">📂 cokacdir 설정 복사</button>`,
-				c.ID)
+				esc(c.ID))
 		case "cursor":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyAgentConfig('%s','cursor')" data-i18n-title="cfg_cursor_title" title="Cursor AI 프록시 설정 복사" data-i18n="cfg_cursor">⌨ Cursor 설정 복사</button>`,
-				c.ID)
+				esc(c.ID))
 		case "cline":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="applyAgentConfig('%s','cline')" title="로컬 Cline 설정 자동 적용 (localhost:56244 필요)">⚡ Cline 설정 적용</button>`,
-				c.ID)
+				esc(c.ID))
 		case "gemini-cli":
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyAgentConfig('%s','gemini-cli')" data-i18n-title="cfg_gemini_cli_title" title="Gemini CLI 프록시 설정 복사" data-i18n="cfg_gemini_cli">💎 Gemini CLI 설정 복사</button>`,
-				c.ID)
+				esc(c.ID))
 		default:
 			cfgButton = fmt.Sprintf(
 				`<button class="btn-cfg" onclick="copyOpenClawConfig('%s')" data-i18n-title="cfg_copy_title" title="프록시 설정 복사" data-i18n="cfg_copy">📋 설정 복사</button>`,
-				c.ID)
+				esc(c.ID))
 		}
 
 		// ── uptime 속성 ──
@@ -2065,7 +2083,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 
 		// ── 개별 에이전트 카드 조립 ──
 		var item strings.Builder
-		item.WriteString(fmt.Sprintf(`<div class="agent-card %s%s"%s data-client="%s">`, cardStatusCls, disabledClass, uptimeAttr, c.ID))
+		item.WriteString(fmt.Sprintf(`<div class="agent-card %s%s"%s data-client="%s">`, cardStatusCls, disabledClass, uptimeAttr, esc(c.ID)))
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
 		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
@@ -2079,41 +2097,41 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 			avatarSrc = defaultAvatar
 		}
 		if avatarSrc != "" {
-			item.WriteString(fmt.Sprintf(`<img src="%s" class="ac-avatar" alt="%s">`, avatarSrc, displayName))
+			item.WriteString(fmt.Sprintf(`<img src="%s" class="ac-avatar" alt="%s">`, avatarSrc, esc(displayName)))
 		} else {
 			item.WriteString(fmt.Sprintf(`<div class="ac-type-icon">%s</div>`, typeIcon))
 		}
 		item.WriteString(`<div class="ac-info">`)
 		item.WriteString(fmt.Sprintf(`<div class="agent-name">%s <span style="color:var(--text-muted);font-size:.7rem">(%s)</span>%s</div>`,
-			displayName, c.ID, typeBadge))
+			esc(displayName), esc(c.ID), typeBadge))
 		item.WriteString(statusChip)
 		if metaLines != "" {
 			item.WriteString(metaLines)
 		}
 		item.WriteString(`</div>`) // ac-info
 		item.WriteString(`<div class="ac-btns">`)
-		item.WriteString(fmt.Sprintf(`<button class="btn-action" onclick="openEditClient('%s')" data-i18n-title="edit" title="편집">✎</button>`, c.ID))
-		item.WriteString(fmt.Sprintf(`<button class="btn-action btn-action-del" onclick="deleteClient('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action" onclick="openEditClient('%s')" data-i18n-title="edit" title="편집">✎</button>`, esc(c.ID)))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action btn-action-del" onclick="deleteClient('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, esc(c.ID)))
 		item.WriteString(`</div>`) // ac-btns
 		item.WriteString(`</div>`) // ac-top
 		// 하단 액션 버튼 행 (모델 변경 토글 + 설정 복사)
 		item.WriteString(`<div class="ac-actions">`)
-		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide" onclick="toggleModelForm('%s')" data-i18n="toggle_model">⚙ 모델 변경</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide" onclick="toggleModelForm('%s')" data-i18n="toggle_model">⚙ 모델 변경</button>`, esc(c.ID)))
 		// 설정 복사 버튼 (btn-action-wide 스타일 적용)
 		cfgWide := strings.ReplaceAll(cfgButton, `class="btn-cfg`, `class="btn-action-wide btn-cfg`)
 		item.WriteString(cfgWide)
 		// 배포 명령어 복사 버튼
-		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide btn-cfg btn-cfg-deploy" onclick="copyDeployScript('%s')" data-i18n-title="cfg_deploy_title" title="Linux 배포 명령어 복사" data-i18n="cfg_deploy">🚀 배포 명령어</button>`, c.ID))
+		item.WriteString(fmt.Sprintf(`<button class="btn-action-wide btn-cfg btn-cfg-deploy" onclick="copyDeployScript('%s')" data-i18n-title="cfg_deploy_title" title="Linux 배포 명령어 복사" data-i18n="cfg_deploy">🚀 배포 명령어</button>`, esc(c.ID)))
 		item.WriteString(`</div>`) // ac-actions
 		// 모델 폼 (기본 숨김, 토글로 표시)
-		item.WriteString(fmt.Sprintf(`<div class="model-form" data-client="%s">`, c.ID))
+		item.WriteString(fmt.Sprintf(`<div class="model-form" data-client="%s">`, esc(c.ID)))
 		item.WriteString(fmt.Sprintf(`<div class="model-form-row"><select id="svc-%s" class="agent-svc-sel" onchange="onAgentServiceChange('mdl-%s','mdl-sel-%s',this.value)">%s</select>`,
-			c.ID, c.ID, c.ID, buildServiceOptions(services, c.DefaultService)))
+			esc(c.ID), esc(c.ID), esc(c.ID), buildServiceOptions(services, c.DefaultService)))
 		item.WriteString(fmt.Sprintf(`<select id="mdl-sel-%s" onchange="onModelSelect('mdl-sel-%s','mdl-%s')"><option value="" data-i18n="sel_model">— 모델 선택 —</option></select></div>`,
-			c.ID, c.ID, c.ID))
+			esc(c.ID), esc(c.ID), esc(c.ID)))
 		item.WriteString(fmt.Sprintf(`<div class="model-form-row"><input id="mdl-%s" type="text" data-i18n-ph="ph_mdl" placeholder="모델명" value="%s" oninput="document.getElementById('mdl-sel-%s').value=''">`,
-			c.ID, c.DefaultModel, c.ID))
-		item.WriteString(fmt.Sprintf(`<button class="btn btn-save" onclick="changeModel('%s')" data-i18n="apply">💾 저장</button></div>`, c.ID))
+			esc(c.ID), esc(c.DefaultModel), esc(c.ID)))
+		item.WriteString(fmt.Sprintf(`<button class="btn btn-save" onclick="changeModel('%s')" data-i18n="apply">💾 저장</button></div>`, esc(c.ID)))
 		item.WriteString(`</div>`) // model-form
 		item.WriteString(`</div>`) // agent-card
 		sb.WriteString(item.String())
@@ -2169,7 +2187,7 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 				sumAct += ref
 			}
 		}
-		sb.WriteString(fmt.Sprintf(`<div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--accent);margin-bottom:.4rem">▸ %s</div>`, svc))
+		sb.WriteString(fmt.Sprintf(`<div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--accent);margin-bottom:.4rem">▸ %s</div>`, esc(svc)))
 		for _, k := range svcKeys {
 			var barPct int
 			if k.DailyLimit > 0 {
@@ -2248,7 +2266,7 @@ func buildKeysCard(keys []*APIKey, services []*ServiceConfig, activeKeys map[str
 			}
 			sb.WriteString(fmt.Sprintf(
 				`<div class="key-item%s" data-key-id="%s" data-cd-ms="%d"><div class="key-header"><span class="key-label">%s%s</span><span style="display:flex;align-items:center;gap:.4rem"><span class="key-meta">%s</span><button class="btn-del" onclick="deleteKey('%s')" data-i18n-title="btn_del" title="삭제">✕</button></span></div><div class="bar-track"><div class="bar-fill %s" style="width:%d%%"></div></div></div>`,
-				activeClass, k.ID, cdMs, statusIcon, label, meta, k.ID, barClass, barPct,
+				activeClass, esc(k.ID), cdMs, statusIcon, esc(label), meta, esc(k.ID), barClass, barPct,
 			))
 		}
 		sb.WriteString(`</div>`)
@@ -2287,7 +2305,7 @@ func buildServicesCard(services []*ServiceConfig) string {
   <input type="checkbox" id="svc-proxy-%s"%s style="accent-color:var(--accent);cursor:pointer" onchange="toggleProxyService('%s',this.checked)">
   <span data-i18n="proxy_use">프록시 사용</span>
 </label>`,
-			sv.ID, proxyChecked, sv.ID,
+			esc(sv.ID), proxyChecked, esc(sv.ID),
 		)
 		localURLField := ""
 		localDot := ""
@@ -2311,13 +2329,13 @@ func buildServicesCard(services []*ServiceConfig) string {
   <button class="btn-sm" onclick="saveServiceURL('%s')" data-i18n="save">저장</button>
   <button class="btn-sm" onclick="detectLocalModels('%s')" data-i18n-title="auto_detect" title="자동 감지">🔍</button>
 </div>`,
-				sv.ID, placeholder, sv.LocalURL, sv.ID, sv.ID,
+				esc(sv.ID), placeholder, esc(sv.LocalURL), esc(sv.ID), esc(sv.ID),
 			)
-			localDot = fmt.Sprintf(`<span id="svc-dot-%s" style="font-size:.8rem;color:var(--text-muted)" title="연결 확인 중">●</span>`, sv.ID)
+			localDot = fmt.Sprintf(`<span id="svc-dot-%s" style="font-size:.8rem;color:var(--text-muted)" title="연결 확인 중">●</span>`, esc(sv.ID))
 		}
 		deleteBtn := ""
 		if sv.Custom {
-			deleteBtn = fmt.Sprintf(`<button class="btn-del" onclick="deleteService('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, sv.ID)
+			deleteBtn = fmt.Sprintf(`<button class="btn-del" onclick="deleteService('%s')" data-i18n-title="btn_del" title="삭제">✕</button>`, esc(sv.ID))
 		}
 		sb.WriteString(fmt.Sprintf(
 			`<div class="svc-item" id="svc-item-%s">
@@ -2332,9 +2350,9 @@ func buildServicesCard(services []*ServiceConfig) string {
 </div>
 %s
 </div>`,
-			sv.ID,
-			sv.ID, enabledChecked, sv.ID,
-			sv.Name,
+			esc(sv.ID),
+			esc(sv.ID), enabledChecked, esc(sv.ID),
+			esc(sv.Name),
 			localDot,
 			proxyCheckbox,
 			deleteBtn,

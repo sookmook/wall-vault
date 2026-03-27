@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -29,6 +30,14 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate token: must be either the proxy's own vault token or a known client token.
+	// Without this check, any non-empty token could write local agent config files.
+	if !s.isValidAgentToken(token) {
+		jsonError(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxConfigBodySize)
 	var body struct {
 		AgentType string `json:"agentType"`
 		BaseURL   string `json:"baseUrl"`
@@ -401,6 +410,21 @@ func updateClineModel(model string) {
 	state["planModeOpenAiModelId"] = model
 	state["openAiModelId"] = model
 	_ = writeJSON(path, state)
+}
+
+// isValidAgentToken checks whether a Bearer token is authorized to call /agent/apply.
+// Accepted tokens: the proxy's own vault token, or any token that the vault recognizes
+// as a registered client (verified via lookupTokenConfig which calls /api/token/config).
+func (s *Server) isValidAgentToken(token string) bool {
+	// Accept the proxy's own vault token
+	if s.cfg.Proxy.VaultToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) == 1 {
+		return true
+	}
+	// Accept any token registered as a vault client
+	if entry := s.lookupTokenConfig(token); entry != nil {
+		return true
+	}
+	return false
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────

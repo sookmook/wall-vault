@@ -2,6 +2,7 @@ package vault
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -477,7 +478,7 @@ func (s *Store) GetClientByToken(token string) *Client {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, c := range s.clients {
-		if c.Token == token {
+		if subtle.ConstantTimeCompare([]byte(c.Token), []byte(token)) == 1 {
 			return c
 		}
 	}

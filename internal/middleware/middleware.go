@@ -4,6 +4,7 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -52,10 +53,40 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// CORS: CORS header middleware
+// isAllowedOrigin checks if the origin is from a local network address.
+func isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	// strip scheme to get host:port
+	host := origin
+	for _, prefix := range []string{"http://", "https://"} {
+		if strings.HasPrefix(host, prefix) {
+			host = strings.TrimPrefix(host, prefix)
+			break
+		}
+	}
+	// strip port
+	if idx := strings.LastIndex(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+	if host == "localhost" || host == "127.0.0.1" {
+		return true
+	}
+	if strings.HasPrefix(host, "192.168.") {
+		return true
+	}
+	return false
+}
+
+// CORS: CORS header middleware — only allows local network origins
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if isAllowedOrigin(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {

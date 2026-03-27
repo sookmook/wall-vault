@@ -22,6 +22,12 @@ import (
 // main.go calls proxy.Version = version before starting the server.
 var Version = "dev"
 
+// request body size limits
+const (
+	maxAIBodySize     = 50 << 20 // 50 MB for AI request endpoints (large prompts/context)
+	maxConfigBodySize = 1 << 20  // 1 MB for config endpoints
+)
+
 // tokenCacheEntry: cached result of a token→model lookup from the vault
 type tokenCacheEntry struct {
 	clientID  string // vault client ID for this token
@@ -94,7 +100,7 @@ func NewServer(cfg *config.Config) *Server {
 
 	// distributed mode: sync keys from vault
 	if cfg.Proxy.VaultURL != "" {
-		s.sse = NewSSEClient(cfg.Proxy.VaultURL, cfg.Proxy.ClientID, func(svc, mdl string) {
+		s.sse = NewSSEClient(cfg.Proxy.VaultURL, cfg.Proxy.ClientID, cfg.Proxy.VaultToken, func(svc, mdl string) {
 			s.mu.Lock()
 			oldSvc, oldMdl := s.service, s.model
 			if svc != "" {
@@ -293,9 +299,17 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 
 // syncFromVault: sync client config and keys from vault
 func (s *Server) syncFromVault() {
-	// fetch client config
+	// fetch client config (authenticated to receive agent_type in response)
 	url := fmt.Sprintf("%s/api/clients", s.cfg.Proxy.VaultURL)
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("[sync] 금고 연결 실패: %v", err)
+		return
+	}
+	if s.cfg.Proxy.VaultToken != "" {
+		req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		log.Printf("[sync] 금고 연결 실패: %v", err)
 		return
@@ -489,6 +503,7 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxConfigBodySize)
 	var body struct {
 		Service string `json:"service"`
 		Model   string `json:"model"`
@@ -563,6 +578,7 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -614,6 +630,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
 
 	var oaiReq OpenAIRequest
 	if err := json.NewDecoder(r.Body).Decode(&oaiReq); err != nil {
@@ -825,6 +842,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
 
 	var req AnthropicRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

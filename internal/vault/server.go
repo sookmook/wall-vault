@@ -1,9 +1,11 @@
 package vault
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +19,17 @@ import (
 	"github.com/sookmook/wall-vault/internal/models"
 	"github.com/sookmook/wall-vault/internal/theme"
 )
+
+// request body size limits
+const (
+	maxBodySize      = 1 << 20 // 1 MB for normal JSON endpoints
+	maxHeartbeatSize = 5 << 20 // 5 MB for heartbeat (includes base64 avatar)
+)
+
+// secureCompare performs constant-time string comparison to prevent timing attacks.
+func secureCompare(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
 
 // authLimiter: tracks auth failure count per IP (rate limiting)
 type authLimiter struct {
@@ -80,6 +93,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			cfg.Lang = st.Lang
 		}
 	}
+	if cfg.Vault.AdminToken == "" {
+		log.Println("[WARNING] ======================================================")
+		log.Println("[WARNING]  No admin token configured.")
+		log.Println("[WARNING]  All admin endpoints are UNPROTECTED.")
+		log.Println("[WARNING]  Set admin_token in config to secure the vault.")
+		log.Println("[WARNING] ======================================================")
+	}
 	srv := &Server{
 		cfg:       cfg,
 		store:     store,
@@ -103,7 +123,7 @@ func (s *Server) Handler() http.Handler {
 
 	// public
 	mux.HandleFunc("/api/status", s.handleStatus)
-	mux.HandleFunc("/api/events", s.broker.ServeHTTP)
+	mux.HandleFunc("/api/events", s.sseAuth(s.broker.ServeHTTP))
 	mux.HandleFunc("/api/clients", s.handlePublicClients)
 
 	// proxy-only (client token auth)
@@ -155,7 +175,7 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		token := bearerToken(r)
-		if token != s.cfg.Vault.AdminToken {
+		if !secureCompare(token, s.cfg.Vault.AdminToken) {
 			s.limiter.record(ip)
 			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -173,8 +193,8 @@ func bearerToken(r *http.Request) string {
 func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := bearerToken(r)
-		// admin token also accepted
-		if s.cfg.Vault.AdminToken != "" && token == s.cfg.Vault.AdminToken {
+		// admin token also accepted (constant-time comparison)
+		if s.cfg.Vault.AdminToken != "" && secureCompare(token, s.cfg.Vault.AdminToken) {
 			next(w, r)
 			return
 		}
@@ -187,9 +207,60 @@ func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// sseAuth: protect the SSE endpoint when admin token is configured.
+// If no admin token is set, the endpoint remains open (backward compatible).
+// When a token IS configured, require a valid client token or admin token.
+// The token can be provided via Authorization header or ?token= query param
+// (the query param is needed because EventSource API cannot set headers).
+func (s *Server) sseAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// If no admin token is configured, SSE is open (backward compatible)
+		if s.cfg.Vault.AdminToken == "" {
+			next(w, r)
+			return
+		}
+		// Try Authorization header first, then ?token= query param
+		token := bearerToken(r)
+		if token == "" {
+			token = r.URL.Query().Get("token")
+		}
+		// Accept admin token
+		if secureCompare(token, s.cfg.Vault.AdminToken) {
+			next(w, r)
+			return
+		}
+		// Accept registered client token
+		if s.store.GetClientByToken(token) != nil {
+			next(w, r)
+			return
+		}
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+	}
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	// When admin token is configured, only expose detailed counts to authenticated callers.
+	// Unauthenticated callers get a minimal response to reduce information leakage.
+	authenticated := false
+	if s.cfg.Vault.AdminToken == "" {
+		authenticated = true // no token configured — open access (backward compatible)
+	} else {
+		token := bearerToken(r)
+		if secureCompare(token, s.cfg.Vault.AdminToken) || s.store.GetClientByToken(token) != nil {
+			authenticated = true
+		}
+	}
+
+	if !authenticated {
+		jsonOK(w, map[string]interface{}{
+			"status":  "ok",
+			"version": Version,
+		})
+		return
+	}
+
 	keys := s.store.ListKeys()
 	clients := s.store.ListClients()
 	jsonOK(w, map[string]interface{}{
@@ -224,16 +295,44 @@ func (s *Server) handleTokenConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {
 	clients := s.store.ListClients()
+
+	// When authenticated, include agent_type (needed by proxy's syncFromVault).
+	// When unauthenticated, omit agent_type to reduce information leakage.
+	authenticated := false
+	if s.cfg.Vault.AdminToken == "" {
+		authenticated = true
+	} else {
+		token := bearerToken(r)
+		if secureCompare(token, s.cfg.Vault.AdminToken) || s.store.GetClientByToken(token) != nil {
+			authenticated = true
+		}
+	}
+
+	if authenticated {
+		type pub struct {
+			ID             string `json:"id"`
+			Name           string `json:"name"`
+			DefaultService string `json:"default_service"`
+			DefaultModel   string `json:"default_model"`
+			AgentType      string `json:"agent_type,omitempty"`
+		}
+		result := make([]pub, 0, len(clients))
+		for _, c := range clients {
+			result = append(result, pub{c.ID, c.Name, c.DefaultService, c.DefaultModel, c.AgentType})
+		}
+		jsonOK(w, result)
+		return
+	}
+
 	type pub struct {
 		ID             string `json:"id"`
 		Name           string `json:"name"`
 		DefaultService string `json:"default_service"`
 		DefaultModel   string `json:"default_model"`
-		AgentType      string `json:"agent_type,omitempty"`
 	}
 	result := make([]pub, 0, len(clients))
 	for _, c := range clients {
-		result = append(result, pub{c.ID, c.Name, c.DefaultService, c.DefaultModel, c.AgentType})
+		result = append(result, pub{c.ID, c.Name, c.DefaultService, c.DefaultModel})
 	}
 	jsonOK(w, result)
 }
@@ -245,6 +344,7 @@ func (s *Server) handleAdminClients(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		jsonOK(w, s.store.ListClients())
 	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		var inp ClientInput
 		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
@@ -269,6 +369,7 @@ func (s *Server) handleAdminClientsReorder(w http.ResponseWriter, r *http.Reques
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	var body struct {
 		Order []string `json:"order"`
 	}
@@ -302,6 +403,7 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonOK(w, c)
 	case http.MethodPut:
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		var inp ClientUpdateInput
 		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
@@ -369,6 +471,7 @@ func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonOK(w, result)
 	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		var body struct {
 			Service    string `json:"service"`
 			Key        string `json:"key"`
@@ -424,6 +527,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxHeartbeatSize)
 	var ps ProxyStatus
 	if err := json.NewDecoder(r.Body).Decode(&ps); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -504,7 +608,7 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 	if clientID == "" {
 		if c := s.store.GetClientByToken(token); c != nil {
 			clientID = c.ID
-		} else if token == s.cfg.Vault.AdminToken {
+		} else if secureCompare(token, s.cfg.Vault.AdminToken) {
 			// admin token without client_id — cannot resolve
 		}
 	}
@@ -512,6 +616,7 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "client not found", http.StatusUnauthorized)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	var inp struct {
 		Service string `json:"service"`
 		Model   string `json:"model"`
@@ -553,7 +658,7 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 
 	// identify requesting client
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	isAdmin := s.cfg.Vault.AdminToken != "" && token == s.cfg.Vault.AdminToken
+	isAdmin := s.cfg.Vault.AdminToken != "" && secureCompare(token, s.cfg.Vault.AdminToken)
 	client := s.store.GetClientByToken(token)
 	// deny key access to disabled clients
 	if client != nil && !client.Enabled {
@@ -638,6 +743,7 @@ func (s *Server) handleAdminLang(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	var body struct {
 		Lang string `json:"lang"`
 	}
@@ -666,6 +772,7 @@ func (s *Server) handleAdminTheme(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	var body struct {
 		Theme string `json:"theme"`
 	}
@@ -693,6 +800,7 @@ func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		jsonOK(w, s.store.ListServices())
 	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		var inp ServiceConfig
 		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil || inp.ID == "" {
 			jsonError(w, "id 필수", http.StatusBadRequest)
@@ -754,6 +862,7 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPut:
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
@@ -976,11 +1085,9 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 	fmt.Fprintf(w, `{"error":%q}`, msg)
 }
 
-// realIP: extract real IP from X-Forwarded-For or RemoteAddr
+// realIP: extract IP from RemoteAddr (strip port).
+// Does NOT trust X-Forwarded-For to prevent rate-limiter bypass via spoofed headers.
 func realIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.SplitN(xff, ",", 2)[0]
-	}
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if ip == "" {
 		return r.RemoteAddr

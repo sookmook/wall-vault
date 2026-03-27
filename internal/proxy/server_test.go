@@ -267,7 +267,7 @@ func TestHandleCORS(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Errorf("CORS 헤더 없음: %v", w.Header())
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+		t.Errorf("CORS 헤더 없음 또는 불일치: %v", w.Header())
 	}
 }

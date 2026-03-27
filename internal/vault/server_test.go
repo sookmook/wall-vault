@@ -36,6 +36,7 @@ func TestVaultStatus(t *testing.T) {
 	defer cleanup()
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
+	req.Header.Set("Authorization", "Bearer test-admin")
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 

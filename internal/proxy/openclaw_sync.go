@@ -58,7 +58,12 @@ func notifyOpenClaw(primaryModel string) {
 	}
 
 	// 3. sessions.patch로 세션 스토어 갱신 (다음 TUI 연결 시 반영)
-	params := `{"key":"main","model":"` + primaryModel + `"}`
+	type patchParams struct {
+		Key   string `json:"key"`
+		Model string `json:"model"`
+	}
+	paramsBytes, _ := json.Marshal(patchParams{Key: "main", Model: primaryModel})
+	params := string(paramsBytes)
 	cmd2 := exec.Command(bin, "gateway", "call", "sessions.patch", "--params", params)
 	cmd2.Env = baseEnv
 	if _, err := cmd2.CombinedOutput(); err != nil {
@@ -66,8 +71,31 @@ func notifyOpenClaw(primaryModel string) {
 	}
 }
 
+// sanitizeModelForTmux strips control characters, newlines, and other dangerous
+// bytes from a model name before passing it to tmux send-keys. This prevents
+// tmux command injection via crafted model names.
+func sanitizeModelForTmux(model string) string {
+	var b strings.Builder
+	b.Grow(len(model))
+	for _, r := range model {
+		// Allow only printable, non-control ASCII characters (space through tilde).
+		// This blocks newlines, carriage returns, escape sequences, and any unicode
+		// control characters that could be interpreted by tmux or the shell.
+		if r >= 0x20 && r <= 0x7e {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // injectModelToTUI: 실행 중인 tmux 패인에서 openclaw TUI를 찾아 /model 명령 주입
 func injectModelToTUI(primaryModel string) {
+	// Sanitize model name to prevent tmux command injection
+	primaryModel = sanitizeModelForTmux(primaryModel)
+	if primaryModel == "" {
+		return
+	}
+
 	tmuxBin, err := exec.LookPath("tmux")
 	if err != nil {
 		return // tmux 없음 — 조용히 건너뜀

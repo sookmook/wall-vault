@@ -17,6 +17,7 @@ type SSEClient struct {
 	mu              sync.RWMutex
 	vaultURL        string
 	clientID        string
+	token           string // vault token for SSE authentication
 	connected       bool
 	onConfig        func(service, model string)              // config change callback (own client only)
 	onAnyConfig     func(clientID, agentType, service, model string) // config change callback (any other client)
@@ -27,10 +28,11 @@ type SSEClient struct {
 	onReconnect     func()                                   // called after SSE reconnect to re-sync state
 }
 
-func NewSSEClient(vaultURL, clientID string, onConfig func(service, model string), onAnyConfig func(clientID, agentType, service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string), onReconnect func()) *SSEClient {
+func NewSSEClient(vaultURL, clientID, token string, onConfig func(service, model string), onAnyConfig func(clientID, agentType, service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string), onReconnect func()) *SSEClient {
 	return &SSEClient{
 		vaultURL:        vaultURL,
 		clientID:        clientID,
+		token:           token,
 		onConfig:        onConfig,
 		onAnyConfig:     onAnyConfig,
 		onConfigFlush:   onConfigFlush,
@@ -80,17 +82,28 @@ func (c *SSEClient) connect() error {
 	if c.vaultURL == "" {
 		return fmt.Errorf("vault URL 없음")
 	}
-	url := c.vaultURL + "/api/events"
-	resp, err := http.Get(url)
+	sseURL := c.vaultURL + "/api/events"
+	req, err := http.NewRequest("GET", sseURL, nil)
+	if err != nil {
+		return err
+	}
+	// Authenticate with the vault token (required when admin_token is configured)
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("SSE auth failed (401) — check vault_token config")
+	}
 
 	c.mu.Lock()
 	c.connected = true
 	c.mu.Unlock()
-	log.Printf("[SSE] ✅ vault connected: %s", url)
+	log.Printf("[SSE] ✅ vault connected: %s", sseURL)
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {

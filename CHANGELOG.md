@@ -12,6 +12,40 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.20] — 2026-03-28
+
+### Security
+- **Stored XSS prevention**: All user-controlled data (client names, IDs,
+  descriptions, models, services, agent types, IP whitelists, key labels) is
+  now HTML-escaped via `html.EscapeString` (41 injection points fixed in ui.go).
+- **Constant-time token comparison**: Replaced all `==` token checks with
+  `crypto/subtle.ConstantTimeCompare` to prevent timing-based token extraction
+  (6 comparisons in vault server + 1 in store).
+- **CORS restriction**: Changed `Access-Control-Allow-Origin` from wildcard `*`
+  to whitelist: localhost, 127.0.0.1, and 192.168.* LAN origins only.
+- **Request body size limits**: Added `http.MaxBytesReader` to all endpoints
+  (1 MB general, 5 MB heartbeat, 50 MB AI proxy) to prevent OOM DoS.
+- **Path traversal prevention**: Avatar file path now rejects `..` segments and
+  absolute paths, with `filepath.Clean` + boundary verification (vault ui.go +
+  proxy heartbeat.go).
+- **Agent apply token validation**: `/agent/apply` endpoint now validates
+  Authorization token against vault token or registered client tokens (was
+  accepting any non-empty header).
+- **SSE endpoint authentication**: When admin token is configured, SSE `/api/events`
+  now requires valid admin or client token (via header or `?token=` query param).
+- **Rate limiter hardening**: Removed X-Forwarded-For trust in `realIP()`, always
+  using `r.RemoteAddr` to prevent rate-limiter bypass via spoofed headers.
+- **JSON injection prevention**: Model name in `openclaw_sync.go` now serialized
+  via `json.Marshal` instead of string concatenation.
+- **tmux command injection prevention**: Added `sanitizeModelForTmux()` to strip
+  control characters from model names before `tmux send-keys`.
+- **Empty admin token warning**: Prominent multi-line warning logged at startup
+  when no admin token is configured.
+- **Info leak reduction**: Unauthenticated `/api/status` returns only version;
+  `/api/clients` hides `agent_type` for unauthenticated callers.
+
+---
+
 ## [0.1.19] — 2026-03-27
 
 ### Added

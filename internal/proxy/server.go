@@ -44,8 +44,9 @@ type Server struct {
 	mu              sync.RWMutex
 	service         string            // user-configured preferred service (from vault dashboard)
 	model           string            // user-configured preferred model (from vault dashboard)
-	lastActualSvc   string            // last service that actually handled a request (for heartbeat)
-	lastActualMdl   string            // last model that actually handled a request (for heartbeat)
+	lastActualSvc      string            // last service that actually handled a request (for heartbeat)
+	lastActualMdl      string            // last model that actually handled a request (for heartbeat)
+	claudeCodeClientID string            // vault client ID for the local claude-code agent (from syncFromVault)
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
 	serviceURLs     map[string]string // service ID → local URL from vault config
 	keyMgr          *KeyManager
@@ -305,11 +306,16 @@ func (s *Server) syncFromVault() {
 		ID             string `json:"id"`
 		DefaultService string `json:"default_service"`
 		DefaultModel   string `json:"default_model"`
+		AgentType      string `json:"agent_type"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
 		return
 	}
+	ccID := ""
 	for _, c := range clients {
+		if c.AgentType == "claude-code" {
+			ccID = c.ID
+		}
 		if c.ID == s.cfg.Proxy.ClientID {
 			s.mu.Lock()
 			oldSvc, oldMdl := s.service, s.model
@@ -325,9 +331,11 @@ func (s *Server) syncFromVault() {
 			if newSvc != oldSvc || newMdl != oldMdl {
 				go updateOpenClawJSON(newSvc, newMdl)
 			}
-			break
 		}
 	}
+	s.mu.Lock()
+	s.claudeCodeClientID = ccID
+	s.mu.Unlock()
 
 	// sync keys
 	if err := s.keyMgr.SyncFromVault(); err != nil {

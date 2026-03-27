@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -128,6 +129,14 @@ func (s *Server) sendHeartbeat() {
 	}
 	s.clientActMu.Unlock()
 
+	// Detect locally-running Claude Code (uses Anthropic OAuth directly, bypasses proxy)
+	s.mu.RLock()
+	ccClientID := s.claudeCodeClientID
+	s.mu.RUnlock()
+	if cc := detectClaudeCode(ccClientID); cc != nil {
+		activeClients = append(activeClients, *cc)
+	}
+
 	payload := heartbeatPayload{
 		ClientID:      s.cfg.Proxy.ClientID,
 		Version:       Version,
@@ -159,4 +168,36 @@ func (s *Server) sendHeartbeat() {
 		return
 	}
 	resp.Body.Close()
+}
+
+// detectClaudeCode checks if a Claude Code process is running locally
+// and returns its activity info, or nil if not running.
+func detectClaudeCode(clientID string) *activeClientItem {
+	if clientID == "" {
+		return nil
+	}
+	if err := exec.Command("pgrep", "-x", "claude").Run(); err != nil {
+		return nil
+	}
+	// read model from ~/.claude/settings.json
+	model := ""
+	for _, path := range findClaudeSettingsPaths() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var settings map[string]interface{}
+		if err := json.Unmarshal(data, &settings); err != nil {
+			continue
+		}
+		if m, ok := settings["model"].(string); ok && m != "" {
+			model = m
+			break
+		}
+	}
+	return &activeClientItem{
+		ClientID: clientID,
+		Service:  "anthropic",
+		Model:    model,
+	}
 }

@@ -12,6 +12,21 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.19] — 2026-03-27
+
+### Added
+- **Claude Code online detection**: Proxy detects locally-running Claude Code
+  processes via `pgrep -x claude` and reports them in the heartbeat's
+  `ActiveClients`. Since Claude Code uses Anthropic OAuth directly (bypassing
+  the proxy), it was always shown as offline on the dashboard. Now the proxy
+  injects a synthetic activity entry every heartbeat cycle (20s), so the
+  dashboard correctly shows Claude Code as online with its current model.
+- **`agent_type` in public clients API**: `/api/clients` response now includes
+  `agent_type` field, allowing proxies to discover which vault client
+  corresponds to a local claude-code agent.
+
+---
+
 ## [0.1.18] — 2026-03-26
 
 ### Fixed

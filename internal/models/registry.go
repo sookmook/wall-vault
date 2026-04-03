@@ -112,6 +112,9 @@ func fetchGoogle() []Model {
 		{ID: "gemini-1.5-flash",              Name: "Gemini 1.5 Flash",              Service: "google", Context: 1048576},
 		// Embedding (OpenClaw 3.11 memorySearch)
 		{ID: "gemini-embedding-2-preview",    Name: "Gemini Embedding 2 Preview",    Service: "google", Context: 8192},
+		// Gemma 4 (open models served via Gemini API)
+		{ID: "gemma-4-31b-it",                Name: "Gemma 4 31B IT",                Service: "google", Context: 262144},
+		{ID: "gemma-4-26b-a4b-it",            Name: "Gemma 4 26B MoE (4B active)",   Service: "google", Context: 262144},
 	}
 }
 

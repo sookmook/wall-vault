@@ -44,7 +44,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	if urlModel := extractModelFromPath(r.URL.Path); urlModel != "" {
-		if strings.HasPrefix(urlModel, "gemini-") {
+		if strings.HasPrefix(urlModel, "gemini-") || strings.HasPrefix(urlModel, "gemma-") {
 			svc = "google"
 			mdl = urlModel
 		}

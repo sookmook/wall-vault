@@ -12,6 +12,16 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.21] — 2026-04-03
+
+### Added
+- **Gemma 4 model support**: Proxy now routes `gemma-*` prefixed models to
+  Google Gemini API alongside `gemini-*` models. Added `gemma-4-31b-it` and
+  `gemma-4-26b-a4b-it` to the model registry (256K context). Streaming handler
+  and `parseProviderModel()` updated accordingly.
+
+---
+
 ## [0.1.20] — 2026-03-28
 
 ### Security

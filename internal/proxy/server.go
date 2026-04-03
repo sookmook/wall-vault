@@ -603,7 +603,7 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	if urlModel := extractModelFromPath(r.URL.Path); urlModel != "" {
-		if strings.HasPrefix(urlModel, "gemini-") {
+		if strings.HasPrefix(urlModel, "gemini-") || strings.HasPrefix(urlModel, "gemma-") {
 			svc = "google"
 			mdl = urlModel
 		}
@@ -1423,7 +1423,7 @@ func parseProviderModel(svc, mdl string) (string, string) {
 	case "wall-vault":
 		bare = strings.TrimSuffix(bare, ":cloud")
 		switch {
-		case strings.HasPrefix(bare, "gemini-"):
+		case strings.HasPrefix(bare, "gemini-"), strings.HasPrefix(bare, "gemma-"):
 			// Keep "google/bare" so OpenRouter fallback receives a valid model ID
 			return "google", "google/" + bare
 		case strings.HasPrefix(bare, "claude-"):

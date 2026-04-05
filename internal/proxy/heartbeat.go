@@ -99,12 +99,9 @@ func (s *Server) sendHeartbeat() {
 	s.mu.RLock()
 	svc := s.service
 	mdl := s.model
-	// Report the actual service/model that last handled a request,
-	// so the dashboard shows what's really being used (may be a fallback).
-	if s.lastActualSvc != "" {
-		svc = s.lastActualSvc
-		mdl = s.lastActualMdl
-	}
+	// Always report the user's configured service/model.
+	// Fallback is transient — showing it in the dashboard confuses users
+	// (e.g. "LM Studio configured but dashboard says Ollama").
 	s.mu.RUnlock()
 
 	sseConn := s.sse != nil && s.sse.IsConnected()

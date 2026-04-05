@@ -1,5 +1,5 @@
 # Izikhombisi Zomsebenzisi ze-wall-vault
-*(Kucishwa kamuva: 2026-03-20 — v0.1.15)*
+*(Kucishwa kamuva: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Ikhadi lokuvula noma ukuvala nokuseta izinsizakalo ze-AI:
 - Ukushintsha ukusebenza / ukuvala ngokuguquguquka ngensizakalo ngayinye
 - Uma ufaka ikheli yeserver ye-AI yendawo (Ollama, LM Studio, vLLM, njll. esebenza ekhompyutheni yakho), i-wall-vault izowathola ngokuzenzakalela amamodeli atholakalayo.
 - **Ukubonisa Isimo Sokuqhagamshelana Kwensizakalo Yendawo**: Indingilizi ● eceleni kwegama lensizakalo — **oluhlaza** = ixhunywe, **impunga** = ayixhunyiwe
-- **Ukuvumelaniswa Kokhetho Ngokuzenzakalela**: Uma uvula ikhasi, izinsizakalo zendawo ezisebenzayo (njenge-Ollama) zikhombisa ngokuzenzakalela njengezikhethelwe.
+- **Isikhombisi Sesimo Sensizakalo Yendawo**: Uma uvula ikhasi, izinsizakalo zendawo ezisebenzayo (njenge-Ollama), indingilizi ● iguqulela oluhlaza — kodwa isimo sokukhetha asishintshwa.
 
 > 💡 **Uma insizakalo yendawo isebenza kwelinye ikhompyutha**: Faka i-IP yekhompyutha leyo enkinobheni ye-URL yensizakalo. Isib: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Uma isebenza kwelinye ikhompyutha
 > ⚠️ Uma i-Ollama ingaphenduli, qalisa i-Ollama kuqala ngesicelo `ollama serve`.
 
 > ⚠️ **Amamodeli amakhulu aphendula kancane**: Amamodeli amakhulu anjenge-`qwen3.5:35b` noma `deepseek-r1` angathatha imizuzu eminingana ukuze aphendule. Uma kubonakala sengathi akukho mphendulo, ingabe lokho kushintshwa okujwayelekile — linda nje.
+
+---
+
+## Izinguquko Zakamuva (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Ukwesekwa kwamamodeli e-Gemma 4**: Amamodeli e-Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) manje athunyelwa nge-Google Gemini API.
+- **Ukwesekwa kwe-LM Studio / vLLM**: Lezi zinsizakalo zendawo manje zithunyelwa ngendlela efanele esikhundleni sokubuyela ku-Ollama.
+- **Ukulungisa iDashboard**: Ihlala ibonisa insizakalo esethiwe, hhayi insizakalo yokubuyisela.
+- **Ukhetho lwensizakalo yendawo lugciniwe**: IDashboard ayisavali izinsizakalo zendawo ngokuzenzakalela uma ikhasi lifakwa.
+- **Okuguquguqukayo kwesihlungi sethuluzi**: Ukweseka `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Ukuqiniswa kokuphepha okwanele**: Ukuvimbela i-XSS (amaphuzu angu-41), ukuqhathanisa izikhiye ngesikhathi esilingana, ukuvinjelwa kwe-CORS, imikhawulo yobukhulu besicelo nokunye.
+
+### v0.1.19 (2026-03-27)
+- **Ukutholwa kwe-Claude Code ku-inthanethi**: I-Claude Code iboniswa ku-inthanethi ku-dashboard noma iqhela iproksi.
+
+### v0.1.18 (2026-03-26)
+- **Ukulungisa ukubuyiselwa**: Ibuyela ngokuzenzakalela ensizakalweni ekhethiwe uma itholakalayo.
+- **Ukuthola ukungaxhunywanga okuthuthukisiwe**: Ukuhlola isimo njalo ngemizuzwana eyi-15.
+
+### v0.1.17 (2026-03-25)
+- **Ukuhlelwa kabusha kwamakhadi ngokudonsela nokudedela**.
+- **Izinkinobho zokusebenzisa ngaphakathi komugqa zama-ajenti angaxhunyiwe**.
+- **Uhlobo lwe-ajenti ye-cokacdir lwengeziwe**.
+
+### v0.1.16 (2026-03-25)
+- **Ukuvumelaniswa kwamamodeli ngezinhlangothi zombili** kwe-Cline ne-Claude Code.
 
 ---
 

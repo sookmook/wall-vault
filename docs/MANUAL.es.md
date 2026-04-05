@@ -1,5 +1,5 @@
 # Manual de Usuario de wall-vault
-*(Última actualización: 2026-03-20 — v0.1.15)*
+*(Última actualización: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Una tarjeta para activar o desactivar los servicios de IA y configurar sus opcio
 - Interruptores de activación/desactivación por servicio
 - Si introduces la dirección de un servidor de IA local (Ollama, LM Studio, vLLM, etc. corriendo en tu ordenador), encontrará automáticamente los modelos disponibles.
 - **Indicador de estado del servicio local**: el punto ● junto al nombre del servicio es **verde** si está conectado, **gris** si no lo está.
-- **Sincronización automática de casillas**: si un servicio local (como Ollama) está en ejecución al abrir la página, la casilla se marcará automáticamente.
+- **Indicador de estado del servicio local**: si un servicio local (como Ollama) está en ejecución al abrir la página, el punto ● se vuelve verde, pero el estado de la casilla no se modifica.
 
 > 💡 **Si el servicio local corre en otro ordenador**: introduce la IP de ese ordenador en el campo de URL del servicio. Por ejemplo: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Si Ollama corre en otro ordenador
 > ⚠️ Si Ollama no responde, inícialo primero con el comando `ollama serve`.
 
 > ⚠️ **Los modelos grandes son lentos**: modelos como `qwen3.5:35b` o `deepseek-r1` pueden tardar varios minutos en generar una respuesta. Si parece que no hay respuesta, puede que el proceso esté funcionando con normalidad; ten paciencia.
+
+---
+
+## Cambios recientes (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Soporte de modelos Gemma 4**: los modelos Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) ahora se enrutan a través de la API de Google Gemini.
+- **Soporte de LM Studio / vLLM**: estos servicios locales ahora se despachan correctamente en lugar de recurrir a Ollama.
+- **Corrección del panel de control**: siempre muestra el servicio configurado, no el servicio de respaldo.
+- **Casilla del servicio local preservada**: el panel de control ya no desactiva automáticamente los servicios locales al cargar la página.
+- **Variable de entorno de filtro de herramientas**: soporte para `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Endurecimiento integral de seguridad**: prevención XSS (41 puntos), comparación de tokens en tiempo constante, restricción CORS, límites de tamaño de solicitud y más.
+
+### v0.1.19 (2026-03-27)
+- **Detección en línea de Claude Code**: Claude Code se muestra como en línea en el panel aunque esté evitando el proxy.
+
+### v0.1.18 (2026-03-26)
+- **Corrección de recuperación de respaldo**: recuperación automática al servicio preferido cuando está disponible.
+- **Detección mejorada de desconexión**: sondeo de estado cada 15 segundos.
+
+### v0.1.17 (2026-03-25)
+- **Reordenación de tarjetas mediante arrastrar y soltar**.
+- **Botones de aplicación en línea para agentes desconectados**.
+- **Tipo de agente cokacdir añadido**.
+
+### v0.1.16 (2026-03-25)
+- **Sincronización bidireccional de modelos** para Cline y Claude Code.
 
 ---
 

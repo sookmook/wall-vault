@@ -1101,13 +1101,16 @@ async function _setSvcEnabled(id, enabled, token) {
   } catch {}
 }
 async function _checkLocalSvc(id, svcEnabled, token) {
-  const cb = document.getElementById('svc-en-'+id);
+  // Only update the status dot (●) — never auto-toggle the enabled checkbox.
+  // The user manually enables/disables local services; auto-probe should not override that.
+  const dot = document.getElementById('svc-dot-'+id);
   try {
     const resp = await fetch('/admin/services/'+id+'/ping', {headers:{'Authorization':'Bearer '+token}});
     const up = resp.ok && (await resp.json()).ok === true;
-    if (up !== svcEnabled) await _setSvcEnabled(id, up, token);
-    else if (cb) cb.checked = up;
-  } catch { if (svcEnabled) await _setSvcEnabled(id, false, token); }
+    if (dot) { dot.style.color = up ? 'var(--green)' : 'var(--text-muted)'; dot.title = up ? '연결됨' : '연결 안 됨'; }
+  } catch {
+    if (dot) { dot.style.color = 'var(--text-muted)'; dot.title = '연결 안 됨'; }
+  }
 }
 // 호출할 때마다 최신 키/서비스 현황을 서버에서 조회해 처리
 async function autoCheckServices() {

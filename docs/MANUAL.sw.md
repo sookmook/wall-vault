@@ -1,5 +1,5 @@
 # Mwongozo wa Mtumiaji wa wall-vault
-*(Ilisasishwa mara ya mwisho: 2026-03-20 — v0.1.15)*
+*(Ilisasishwa mara ya mwisho: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Kadi ya kuwasha/kuzima na kusanidi huduma za AI unazotaka kutumia.
 - Swichi ya kuwasha/kuzima kwa kila huduma
 - Ukiingiza anwani ya seva ya AI ya ndani (Ollama, LM Studio, vLLM n.k. inayofanya kazi kwenye kompyuta yako), mifano inayopatikana itapatikana kiotomatiki.
 - **Hali ya Muunganisho wa Huduma za Ndani**: Nukta ● karibu na jina la huduma ikiwa **ya kijani** inamaanisha imeunganishwa, **ya kijivu** inamaanisha haijaungana.
-- **Usawazishaji wa Otomatiki wa Kisanduku cha Kuangalia**: Wakati ukifungua ukurasa, kama huduma za ndani (kama Ollama) zinafanya kazi, hali ya kuangaliwa itasasishwa kiotomatiki.
+- **Kiashirio cha hali ya huduma za ndani**: Wakati ukifungua ukurasa, kama huduma za ndani (kama Ollama) zinafanya kazi, nukta ● inageuka kijani — lakini hali ya kisanduku cha kuangalia haibadilishwi.
 
 > 💡 **Kama huduma ya ndani inafanya kazi kwenye kompyuta nyingine**: Ingiza IP ya kompyuta hiyo kwenye sehemu ya URL ya huduma. Mfano: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Kama inafanya kazi kwenye kompyut
 > ⚠️ Kama Ollama haijibu, ianzishe kwanza kwa amri ya `ollama serve`.
 
 > ⚠️ **Mifano mikubwa inajibu polepole**: Mifano mikubwa kama `qwen3.5:35b` au `deepseek-r1` inaweza kuchukua dakika kadhaa kuunda jibu. Hata kama inaonekana kama haijibu, inaweza kuwa inafanya kazi kawaida — subiri.
+
+---
+
+## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Msaada wa mifano ya Gemma 4**: Mifano ya Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) sasa inaelekezwa kupitia Google Gemini API.
+- **Msaada wa LM Studio / vLLM**: Huduma hizi za ndani sasa zinatumwa kwa usahihi badala ya kurudi nyuma kwa Ollama.
+- **Marekebisho ya dashibodi**: Daima inaonyesha huduma iliyosanidiwa, si huduma ya akiba.
+- **Kisanduku cha kuangalia cha huduma za ndani kinahifadhiwa**: Dashibodi haizimi tena huduma za ndani kiotomatiki ukurasa unapopakia.
+- **Kigezo cha mazingira cha kichujio cha zana**: Msaada wa `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Uimarishaji wa usalama wa kina**: Kuzuia XSS (pointi 41), ulinganisho wa tokeni kwa muda uliowekwa, vizuizi vya CORS, vikomo vya ukubwa wa maombi na zaidi.
+
+### v0.1.19 (2026-03-27)
+- **Kugundua Claude Code mtandaoni**: Claude Code inaonyeshwa mtandaoni kwenye dashibodi hata inapopita proksi.
+
+### v0.1.18 (2026-03-26)
+- **Marekebisho ya urejeshaji wa akiba**: Inarudi kiotomatiki kwa huduma inayopendekezwa inapopatikana.
+- **Kugundua nje ya mtandao kuliboreshwa**: Uchunguzi wa hali kila sekunde 15.
+
+### v0.1.17 (2026-03-25)
+- **Kupanga upya kadi kwa kuvuta na kudondosha**.
+- **Vitufe vya kutumia ndani ya mstari kwa mawakala ambao hawajaunganishwa**.
+- **Aina ya wakala wa cokacdir imeongezwa**.
+
+### v0.1.16 (2026-03-25)
+- **Usawazishaji wa mifano wa njia mbili** kwa Cline na Claude Code.
 
 ---
 

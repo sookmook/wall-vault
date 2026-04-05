@@ -1,5 +1,5 @@
 # Manual do Usuário wall-vault
-*(Última atualização: 2026-03-20 — v0.1.15)*
+*(Última atualização: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Cartão para ativar, desativar ou configurar os serviços de IA disponíveis.
 - Chave de ativação/desativação por serviço
 - Ao informar o endereço de um servidor de IA local (Ollama, LM Studio, vLLM etc. rodando na sua máquina), os modelos disponíveis são detectados automaticamente.
 - **Indicador de status do serviço local**: o ponto ● ao lado do nome do serviço fica **verde** quando conectado e **cinza** quando desconectado.
-- **Sincronização automática das caixas de seleção**: ao abrir a página, se um serviço local (como Ollama) estiver em execução, ele é marcado automaticamente.
+- **Indicador de status do serviço local**: ao abrir a página, se um serviço local (como Ollama) estiver em execução, o ponto ● fica verde — mas o estado da caixa de seleção não é alterado.
 
 > 💡 **Se o serviço local estiver rodando em outro computador**: insira o IP daquela máquina no campo de URL do serviço. Exemplos: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # se estiver rodando em outra máqu
 > ⚠️ Se o Ollama não responder, inicie-o primeiro com o comando `ollama serve`.
 
 > ⚠️ **Modelos grandes são lentos**: modelos como `qwen3.5:35b` e `deepseek-r1` podem levar vários minutos para gerar uma resposta. Se parecer que não está respondendo, pode ser processamento normal — aguarde com paciência.
+
+---
+
+## Alterações recentes (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Suporte a modelos Gemma 4**: modelos Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) agora são roteados pela API Google Gemini.
+- **Suporte a LM Studio / vLLM**: esses serviços locais agora são despachados corretamente em vez de cair para o Ollama.
+- **Correção do painel**: sempre exibe o serviço configurado, não o serviço de fallback.
+- **Caixa de seleção do serviço local preservada**: o painel não desativa mais automaticamente os serviços locais ao carregar a página.
+- **Variável de ambiente de filtro de ferramentas**: suporte a `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Reforço abrangente de segurança**: prevenção de XSS (41 pontos), comparação de tokens em tempo constante, restrição CORS, limites de tamanho de requisição e mais.
+
+### v0.1.19 (2026-03-27)
+- **Detecção online do Claude Code**: Claude Code aparece como online no painel mesmo quando está contornando o proxy.
+
+### v0.1.18 (2026-03-26)
+- **Correção de recuperação de fallback**: recupera automaticamente para o serviço preferido quando disponível.
+- **Detecção offline aprimorada**: polling de status a cada 15 segundos.
+
+### v0.1.17 (2026-03-25)
+- **Reordenação de cartões por arrastar e soltar**.
+- **Botões de aplicação inline para agentes desconectados**.
+- **Tipo de agente cokacdir adicionado**.
+
+### v0.1.16 (2026-03-25)
+- **Sincronização bidirecional de modelos** para Cline e Claude Code.
 
 ---
 

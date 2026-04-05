@@ -1,5 +1,5 @@
 # wall-vault User Manual
-*(Last updated: 2026-03-20 — v0.1.15)*
+*(Last updated: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ A card for enabling/disabling and configuring the AI services you want to use.
 - Toggle switches to enable or disable each service
 - Enter the address of a local AI server (Ollama, LM Studio, vLLM, etc. running on your machine) and wall-vault will automatically discover its available models.
 - **Local service connection indicator**: A ● dot next to the service name turns **green** when connected, **gray** when not connected.
-- **Checkbox auto-sync**: When you open the page, if a local service (like Ollama) is already running, its checkbox will automatically be checked.
+- **Local service status dot**: When you open the page, if a local service (like Ollama) is already running, the ● dot turns green — but the checkbox state is not changed.
 
 > 💡 **If your local service is running on a different machine**: Enter that machine's IP in the service URL field. For example: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # if it's running on a different ma
 > ⚠️ If Ollama isn't responding, start it first with the `ollama serve` command.
 
 > ⚠️ **Large models are slow**: Models like `qwen3.5:35b` or `deepseek-r1` can take several minutes to generate a response. If it looks like nothing is happening, it may just be processing — give it some time.
+
+---
+
+## Recent Changes (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Gemma 4 model support**: Gemma models (gemma-4-31b-it, gemma-4-26b-a4b-it) now routed via Google Gemini API.
+- **LM Studio / vLLM support**: These local services now properly dispatched instead of falling back to Ollama.
+- **Dashboard fix**: Always shows configured service, not fallback service.
+- **Local service checkbox preserved**: Dashboard no longer auto-disables local services on page load.
+- **Tool filter env var**: `WV_TOOL_FILTER=passthrough` environment variable support.
+
+### v0.1.20 (2026-03-28)
+- **Comprehensive security hardening**: XSS prevention (41 points), constant-time token comparison, CORS restriction, request size limits, and more.
+
+### v0.1.19 (2026-03-27)
+- **Claude Code online detection**: Claude Code shown as online on dashboard even when bypassing proxy.
+
+### v0.1.18 (2026-03-26)
+- **Fallback recovery fix**: Auto-recovers to preferred service when available.
+- **Improved offline detection**: 15-second status polling.
+
+### v0.1.17 (2026-03-25)
+- **Drag-and-drop card reordering**.
+- **Inline apply buttons for disconnected agents**.
+- **cokacdir agent type added**.
+
+### v0.1.16 (2026-03-25)
+- **Bidirectional model sync** for Cline and Claude Code.
 
 ---
 

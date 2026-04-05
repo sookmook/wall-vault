@@ -1,5 +1,5 @@
 # Manuel Utilisateur wall-vault
-*(Dernière mise à jour: 2026-03-20 — v0.1.15)*
+*(Dernière mise à jour: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Cette carte permet d'activer ou de désactiver chaque service IA, et d'en config
 - Interrupteur d'activation/désactivation par service
 - Entrez l'adresse d'un serveur IA local (Ollama, LM Studio, vLLM, etc. tournant sur votre machine) pour que wall-vault détecte automatiquement les modèles disponibles.
 - **Indicateur d'état de connexion locale** : le point ● à côté du nom du service est **vert** si connecté, **gris** sinon.
-- **Synchronisation automatique des cases à cocher** : si un service local (Ollama, etc.) est en cours d'exécution lors de l'ouverture de la page, la case correspondante se coche automatiquement.
+- **Indicateur d'état du service local** : si un service local (Ollama, etc.) est en cours d'exécution lors de l'ouverture de la page, le point ● devient vert — mais l'état de la case à cocher n'est pas modifié.
 
 > 💡 **Si votre service local tourne sur une autre machine** : saisissez l'IP de cette machine dans le champ URL du service. Exemple : `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Si Ollama tourne sur une autre ma
 > ⚠️ Si Ollama ne répond pas, lancez-le d'abord avec la commande `ollama serve`.
 
 > ⚠️ **Les grands modèles sont lents à répondre** : des modèles imposants comme `qwen3.5:35b` ou `deepseek-r1` peuvent mettre plusieurs minutes à générer une réponse. Si rien ne semble se passer, c'est probablement normal — patientez.
+
+---
+
+## Changements récents (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Prise en charge des modèles Gemma 4** : les modèles Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) sont désormais routés via l'API Google Gemini.
+- **Prise en charge de LM Studio / vLLM** : ces services locaux sont désormais correctement acheminés au lieu de basculer vers Ollama.
+- **Correction du tableau de bord** : affiche toujours le service configuré, et non le service de secours.
+- **Conservation de la case à cocher du service local** : le tableau de bord ne désactive plus automatiquement les services locaux au chargement de la page.
+- **Variable d'environnement de filtre d'outils** : prise en charge de `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Renforcement complet de la sécurité** : prévention XSS (41 points), comparaison de jetons en temps constant, restriction CORS, limites de taille de requête, et plus.
+
+### v0.1.19 (2026-03-27)
+- **Détection en ligne de Claude Code** : Claude Code apparaît en ligne sur le tableau de bord même lorsqu'il contourne le proxy.
+
+### v0.1.18 (2026-03-26)
+- **Correction de la récupération de secours** : récupération automatique vers le service préféré lorsqu'il est disponible.
+- **Détection hors ligne améliorée** : interrogation de l'état toutes les 15 secondes.
+
+### v0.1.17 (2026-03-25)
+- **Réorganisation des cartes par glisser-déposer**.
+- **Boutons d'application en ligne pour les agents déconnectés**.
+- **Type d'agent cokacdir ajouté**.
+
+### v0.1.16 (2026-03-25)
+- **Synchronisation bidirectionnelle des modèles** pour Cline et Claude Code.
 
 ---
 

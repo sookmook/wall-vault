@@ -183,6 +183,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WV_AVATAR"); v != "" {
 		cfg.Proxy.Avatar = v
 	}
+	if v := os.Getenv("WV_TOOL_FILTER"); v != "" {
+		cfg.Proxy.ToolFilter = v
+	}
 	// Windows: auto-set data path based on APPDATA
 	if cfg.Vault.DataDir == "" {
 		if appdata := os.Getenv("APPDATA"); appdata != "" {

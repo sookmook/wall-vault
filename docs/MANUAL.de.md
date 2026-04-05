@@ -1,5 +1,5 @@
 # wall-vault Benutzerhandbuch
-*(Zuletzt aktualisiert: 2026-03-20 — v0.1.15)*
+*(Zuletzt aktualisiert: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Eine Karte zum Aktivieren, Deaktivieren und Konfigurieren der KI-Dienste.
 - Ein-/Aus-Schalter je Dienst
 - Wenn du die Adresse eines lokalen KI-Servers (z. B. Ollama, LM Studio oder vLLM, der auf deinem eigenen Computer läuft) eingibst, werden verfügbare Modelle automatisch erkannt.
 - **Verbindungsstatus für lokale Dienste**: Der Punkt ● neben dem Dienstnamen ist **grün**, wenn verbunden, und **grau**, wenn nicht verbunden.
-- **Automatische Checkbox-Synchronisierung**: Wenn beim Öffnen der Seite ein lokaler Dienst (z. B. Ollama) läuft, wird er automatisch als aktiv markiert.
+- **Statusanzeige für lokale Dienste**: Wenn beim Öffnen der Seite ein lokaler Dienst (z. B. Ollama) läuft, wird der ● Punkt grün — die Checkbox wird jedoch nicht verändert.
 
 > 💡 **Wenn ein lokaler Dienst auf einem anderen Computer läuft**: Gib die IP-Adresse dieses Computers in das URL-Feld des Dienstes ein. Beispiel: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Falls Ollama auf einem anderen Co
 > ⚠️ Wenn Ollama nicht antwortet, starte es zuerst mit dem Befehl `ollama serve`.
 
 > ⚠️ **Große Modelle brauchen Zeit**: Modelle wie `qwen3.5:35b` oder `deepseek-r1` können mehrere Minuten benötigen, um eine Antwort zu generieren. Wenn es so aussieht, als würde nichts passieren, ist die Verarbeitung wahrscheinlich trotzdem im Gange – bitte warte geduldig.
+
+---
+
+## Letzte Änderungen (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Gemma 4 Modell-Unterstützung**: Gemma-Modelle (gemma-4-31b-it, gemma-4-26b-a4b-it) werden jetzt über die Google Gemini API geroutet.
+- **LM Studio / vLLM Unterstützung**: Diese lokalen Dienste werden jetzt korrekt weitergeleitet, statt auf Ollama zurückzufallen.
+- **Dashboard-Fix**: Zeigt immer den konfigurierten Dienst an, nicht den Fallback-Dienst.
+- **Lokale Dienste Checkbox beibehalten**: Das Dashboard deaktiviert lokale Dienste beim Laden der Seite nicht mehr automatisch.
+- **Tool-Filter Umgebungsvariable**: Unterstützung der Umgebungsvariable `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Umfassende Sicherheitshärtung**: XSS-Schutz (41 Stellen), zeitkonstanter Token-Vergleich, CORS-Einschränkung, Anfragegrößenbegrenzung und mehr.
+
+### v0.1.19 (2026-03-27)
+- **Claude Code Online-Erkennung**: Claude Code wird im Dashboard als online angezeigt, auch wenn es den Proxy umgeht.
+
+### v0.1.18 (2026-03-26)
+- **Fallback-Wiederherstellung**: Automatische Rückkehr zum bevorzugten Dienst, wenn dieser wieder verfügbar ist.
+- **Verbesserte Offline-Erkennung**: 15-Sekunden-Status-Abfrage.
+
+### v0.1.17 (2026-03-25)
+- **Drag-and-Drop Karten-Neuanordnung**.
+- **Inline-Anwenden-Schaltflächen für nicht verbundene Agenten**.
+- **cokacdir Agententyp hinzugefügt**.
+
+### v0.1.16 (2026-03-25)
+- **Bidirektionale Modellsynchronisierung** für Cline und Claude Code.
 
 ---
 

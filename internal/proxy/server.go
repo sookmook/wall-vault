@@ -50,8 +50,6 @@ type Server struct {
 	mu              sync.RWMutex
 	service         string            // user-configured preferred service (from vault dashboard)
 	model           string            // user-configured preferred model (from vault dashboard)
-	lastActualSvc      string            // last service that actually handled a request (for heartbeat)
-	lastActualMdl      string            // last model that actually handled a request (for heartbeat)
 	claudeCodeClientID string            // vault client ID for the local claude-code agent (from syncFromVault)
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
 	serviceURLs     map[string]string // service ID → local URL from vault config
@@ -1034,18 +1032,13 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 			resp, err = s.callOpenAI(model, req)
 		case "anthropic":
 			resp, err = s.callAnthropic(model, req)
+		case "lmstudio", "vllm":
+			resp, err = s.callLocalService(svc, model, req)
 		default:
 			continue
 		}
 		if err == nil {
-			// Track the actual service/model used (for heartbeat reporting).
-			// Do NOT mutate s.service/s.model — those are the user's preferred
-			// settings from the vault dashboard and must survive transient fallback.
 			actualMdl := s.resolveActualModel(svc, model)
-			s.mu.Lock()
-			s.lastActualSvc = svc
-			s.lastActualMdl = actualMdl
-			s.mu.Unlock()
 			if svc != service {
 				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, actualMdl)
 				s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
@@ -1319,6 +1312,57 @@ func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, erro
 	}
 	if oaiResp.Error != nil {
 		return nil, fmt.Errorf("Ollama: %s", oaiResp.Error.Message)
+	}
+	return OpenAIRespToGemini(&oaiResp), nil
+}
+
+// callLocalService: generic OpenAI-compatible local server (LM Studio, vLLM, etc.)
+// Unlike callOllama which overrides the model, this passes the requested model through.
+func (s *Server) callLocalService(serviceID, model string, req *GeminiRequest) (*GeminiResponse, error) {
+	s.mu.RLock()
+	baseURL := s.serviceURLs[serviceID]
+	s.mu.RUnlock()
+	if baseURL == "" {
+		defaults := map[string]string{"lmstudio": "http://localhost:1234", "vllm": "http://localhost:8000"}
+		baseURL = defaults[serviceID]
+	}
+	if baseURL == "" {
+		return nil, fmt.Errorf("%s: URL 미설정", serviceID)
+	}
+
+	// Strip provider prefix from model (e.g. "google/gemma-4-26b-a4b" → "gemma-4-26b-a4b")
+	if i := strings.Index(model, "/"); i >= 0 {
+		model = model[i+1:]
+	}
+
+	oaiReq := GeminiToOpenAI(model, req)
+	oaiReq.Stream = false
+	data, _ := json.Marshal(oaiReq)
+
+	httpReq, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("%s 요청 생성 실패: %w", serviceID, err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 0}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("%s 연결 실패 (%s): %w", serviceID, baseURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("%s 오류: HTTP %d: %s", serviceID, resp.StatusCode, body)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var oaiResp OpenAIResponse
+	if err := json.Unmarshal(body, &oaiResp); err != nil {
+		return nil, fmt.Errorf("%s 응답 파싱 오류: %w", serviceID, err)
+	}
+	if oaiResp.Error != nil {
+		return nil, fmt.Errorf("%s: %s", serviceID, oaiResp.Error.Message)
 	}
 	return OpenAIRespToGemini(&oaiResp), nil
 }

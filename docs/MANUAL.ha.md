@@ -1,5 +1,5 @@
 # Jagoran Amfani da wall-vault
-*(Ƙarshen sabuntawa: 2026-03-20 — v0.1.15)*
+*(Ƙarshen sabuntawa: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Kati ne don kunna ko kashe, da kuma saita ayyukan AI da za a yi amfani da su.
 - Maɓallin canzawa don kunna/kashe kowane aiki
 - Idan ka shigar da adireshi na uwar garken AI na gida (Ollama, LM Studio, vLLM da sauransu da ke gudana a kwamfutarka), za a nemo ƙirar da ake da shi ta atomatik.
 - **Nuna Halin Haɗin Ayyuka na Gida**: Ɗigo ● kusa da sunan aiki yana **kore** idan an haɗa, **toka** idan ba a haɗa.
-- **Daidaita Akwatin Zaɓi ta Atomatik**: Idan ayyukan gida (Ollama, da sauransu) suna gudana lokacin bude shafi, za a saka akwatin zaɓi ta atomatik.
+- **Nuna Halin Ayyukan Gida**: Idan ayyukan gida (Ollama, da sauransu) suna gudana lokacin bude shafi, ɗigo ● ya zama kore — amma halin akwatin zaɓi ba ya canzawa.
 
 > 💡 **Idan ayyukan gida na gudana a wata kwamfuta**: Shigar da IP ɗin wannan kwamfuta a filin URL na ayyuka. Misali: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan yana gudana a wata kwamfuta
 > ⚠️ Idan Ollama bai amsa ba, fara Ollama da farko da umarnin `ollama serve`.
 
 > ⚠️ **Ƙirar manyan AI suna da jinkiri**: Ƙirar da suka yi ƙamu kamar `qwen3.5:35b` ko `deepseek-r1` na iya ɗaukar mintuna da yawa don samar da amsa. Idan ya zama kamar babu amsa, yana iya zama yana aiki daidai — jira kawai.
+
+---
+
+## Sababbin Canje-canje (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Tallafin ƙirar Gemma 4**: Ƙirar Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) yanzu ana tura su ta hanyar Google Gemini API.
+- **Tallafin LM Studio / vLLM**: Waɗannan ayyukan gida yanzu ana tura su daidai maimakon komawa zuwa Ollama.
+- **Gyaran Dashboard**: Koyaushe yana nuna ayyukan da aka saita, ba ayyukan ajiya ba.
+- **An adana akwatin zaɓi na ayyukan gida**: Dashboard ba ya ƙare ayyukan gida ta atomatik lokacin da shafi ya buɗe.
+- **Canjin yanayin tace kayan aiki**: Tallafin `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Ƙarfafa tsaro gaba ɗaya**: Hana XSS (maki 41), kwatanta token na lokaci daidai, takurawa CORS, ƙayyadaddun girman buƙata da ƙari.
+
+### v0.1.19 (2026-03-27)
+- **Gano Claude Code akan layi**: Claude Code yana nuna akan layi a dashboard ko da ya ƙetare wakili.
+
+### v0.1.18 (2026-03-26)
+- **Gyaran dawo da ajiya**: Yana dawowa ta atomatik zuwa ayyukan da aka fi so idan yana samuwa.
+- **Ingantaccen gano rashin layi**: Binciken matsayi kowane daƙiƙa 15.
+
+### v0.1.17 (2026-03-25)
+- **Sake tsara kati ta ja da sauke**.
+- **Maɓallan amfani a cikin layi don wakilai da ba su haɗa ba**.
+- **An ƙara nau'in wakili na cokacdir**.
+
+### v0.1.16 (2026-03-25)
+- **Daidaiton ƙirar hanyoyi biyu** don Cline da Claude Code.
 
 ---
 

@@ -12,13 +12,30 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [0.1.21] — 2026-04-03
+## [0.1.21] — 2026-04-05
 
 ### Added
 - **Gemma 4 model support**: Proxy now routes `gemma-*` prefixed models to
   Google Gemini API alongside `gemini-*` models. Added `gemma-4-31b-it` and
   `gemma-4-26b-a4b-it` to the model registry (256K context). Streaming handler
   and `parseProviderModel()` updated accordingly.
+- **LM Studio / vLLM dispatch**: Added `callLocalService()` handler for
+  `lmstudio` and `vllm` services in the dispatch switch. Previously these
+  services were silently skipped (`default: continue`), causing all requests
+  to fall back to Ollama.
+- **`WV_TOOL_FILTER` environment variable**: Tool filter mode (`strip_all`,
+  `whitelist`, `passthrough`) can now be set via environment variable,
+  in addition to the YAML config file.
+
+### Fixed
+- **Dashboard shows fallback service instead of configured service**: Heartbeat
+  reported `lastActualSvc` (e.g. Ollama fallback) instead of the user's
+  configured service (e.g. LM Studio). Removed `lastActualSvc/lastActualMdl`
+  tracking entirely — heartbeat now always reports the configured service/model.
+- **Local service auto-probe overrides user setting**: `autoCheckServices()`
+  on dashboard load pinged local services (Ollama, LM Studio, vLLM) and
+  auto-disabled them if unreachable. Now `_checkLocalSvc()` only updates the
+  status dot (●) color without changing the enabled checkbox or saving to server.
 
 ---
 

@@ -1,5 +1,5 @@
 # Panduan Pengguna wall-vault
-*(Terakhir diperbarui: 2026-03-20 — v0.1.15)*
+*(Terakhir diperbarui: 2026-04-05 — v0.1.21)*
 
 ---
 
@@ -556,7 +556,7 @@ Kartu untuk mengaktifkan atau menonaktifkan dan mengonfigurasi layanan AI yang i
 - Sakelar toggle aktifkan/nonaktifkan per layanan
 - Masukkan alamat server AI lokal (Ollama, LM Studio, vLLM, dll. yang berjalan di komputer Anda) untuk menemukan model yang tersedia secara otomatis.
 - **Indikator status koneksi layanan lokal**: Titik ● di sebelah nama layanan berwarna **hijau** berarti terhubung, **abu-abu** berarti tidak terhubung.
-- **Sinkronisasi otomatis checkbox**: Jika layanan lokal (seperti Ollama) sedang berjalan saat halaman dibuka, statusnya akan otomatis menjadi tercentang.
+- **Indikator status layanan lokal**: Jika layanan lokal (seperti Ollama) sedang berjalan saat halaman dibuka, titik ● berubah hijau — tetapi status checkbox tidak diubah.
 
 > 💡 **Jika layanan lokal berjalan di komputer lain**: Masukkan IP komputer tersebut di kolom URL layanan. Contoh: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
 
@@ -753,6 +753,35 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Jika berjalan di komputer lain
 > ⚠️ Jika Ollama tidak merespons, mulai Ollama terlebih dahulu dengan perintah `ollama serve`.
 
 > ⚠️ **Model besar merespons lambat**: Model besar seperti `qwen3.5:35b` atau `deepseek-r1` bisa membutuhkan beberapa menit untuk menghasilkan respons. Meskipun terlihat seperti tidak ada respons, mungkin sebenarnya sedang diproses dengan normal — mohon bersabar.
+
+---
+
+## Perubahan Terbaru (v0.1.16 ~ v0.1.21)
+
+### v0.1.21 (2026-04-05)
+- **Dukungan model Gemma 4**: Model Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) sekarang diarahkan melalui Google Gemini API.
+- **Dukungan LM Studio / vLLM**: Layanan lokal ini sekarang dikirim dengan benar, bukan jatuh ke Ollama.
+- **Perbaikan dashboard**: Selalu menampilkan layanan yang dikonfigurasi, bukan layanan fallback.
+- **Checkbox layanan lokal dipertahankan**: Dashboard tidak lagi menonaktifkan layanan lokal secara otomatis saat halaman dimuat.
+- **Variabel lingkungan filter alat**: Dukungan variabel lingkungan `WV_TOOL_FILTER=passthrough`.
+
+### v0.1.20 (2026-03-28)
+- **Penguatan keamanan menyeluruh**: Pencegahan XSS (41 titik), perbandingan token waktu konstan, pembatasan CORS, batas ukuran permintaan, dan lainnya.
+
+### v0.1.19 (2026-03-27)
+- **Deteksi online Claude Code**: Claude Code ditampilkan online di dashboard meskipun melewati proxy.
+
+### v0.1.18 (2026-03-26)
+- **Perbaikan pemulihan fallback**: Otomatis pulih ke layanan pilihan saat tersedia.
+- **Deteksi offline yang ditingkatkan**: Polling status setiap 15 detik.
+
+### v0.1.17 (2026-03-25)
+- **Pengurutan ulang kartu dengan seret dan lepas**.
+- **Tombol terapkan inline untuk agen yang terputus**.
+- **Tipe agen cokacdir ditambahkan**.
+
+### v0.1.16 (2026-03-25)
+- **Sinkronisasi model dua arah** untuk Cline dan Claude Code.
 
 ---
 

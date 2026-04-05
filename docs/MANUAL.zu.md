@@ -1,5 +1,5 @@
 # Izikhombisi Zomsebenzisi ze-wall-vault
-*(Kucishwa kamuva: 2026-04-05 — v0.1.21)*
+*(Kucishwa kamuva: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Uma isebenza kwelinye ikhompyutha
 
 ---
 
-## Izinguquko Zakamuva (v0.1.16 ~ v0.1.21)
+## Izinguquko Zakamuva (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **Ukulungisa: inkambu ye-content engenalutho yalahlwa**: Lapho amamodeli okucabanga (gemini-3.1-pro, o1, claude thinking, njll.) ephelelwa yi-max_tokens ekucabangeni ngaphambi kokukhiqiza okuphumayo, i-proxy ibilahla inkambu ye-`content`/`text` engenalutho nge-`omitempty`. Amakhasimende e-OpenAI/Anthropic SDK (Claude Code, Cline, njll.) aphahlazeka nge-"Cannot read properties of undefined (reading 'trim')". Manje njalo ikhipha inkambu ngokwemisebenzi esemthethweni ye-API.
 
 ### v0.1.21 (2026-04-05)
 - **Ukwesekwa kwamamodeli e-Gemma 4**: Amamodeli e-Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) manje athunyelwa nge-Google Gemini API.

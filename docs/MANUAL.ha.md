@@ -1,5 +1,5 @@
 # Jagoran Amfani da wall-vault
-*(Ƙarshen sabuntawa: 2026-04-05 — v0.1.21)*
+*(Ƙarshen sabuntawa: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan yana gudana a wata kwamfuta
 
 ---
 
-## Sababbin Canje-canje (v0.1.16 ~ v0.1.21)
+## Sababbin Canje-canje (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **Gyara: filin content babu komai an jefar da shi**: Lokacin da samfuran tunani (gemini-3.1-pro, o1, claude thinking, da sauransu) suka ƙare max_tokens a kan tunani kafin samar da fitarwa, wakilin yana jefar da filin `content`/`text` maras komai ta hanyar `omitempty`. Abokan ciniki na OpenAI/Anthropic SDK (Claude Code, Cline, da sauransu) sun faɗi da "Cannot read properties of undefined (reading 'trim')". Yanzu koyaushe yana fitar da filin bisa ƙayyadaddun API na hukuma.
 
 ### v0.1.21 (2026-04-05)
 - **Tallafin ƙirar Gemma 4**: Ƙirar Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) yanzu ana tura su ta hanyar Google Gemini API.

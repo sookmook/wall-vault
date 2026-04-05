@@ -1,5 +1,5 @@
 # wall-vault 사용자 매뉴얼
-*(Last updated: 2026-04-05 — v0.1.21)*
+*(Last updated: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -763,7 +763,11 @@ export OLLAMA_URL=http://192.168.x.x:11434   # 다른 컴퓨터에서 실행 중
 
 ---
 
-## 최근 변경 사항 (v0.1.16 ~ v0.1.21)
+## 최근 변경 사항 (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **빈 content 필드 누락 수정**: thinking 모델(gemini-3.1-pro, o1, claude thinking 등)이 max_tokens 한도를 reasoning에 다 쓰고 실제 응답을 못 만들 때, 프록시가 응답 JSON의 `content`/`text` 필드를 `omitempty`로 누락시켜 OpenAI/Anthropic SDK 클라이언트들이 `Cannot read properties of undefined (reading 'trim')` 에러로 크래시하는 문제 수정. 공식 API 스펙대로 항상 필드를 포함하도록 변경.
+
 
 ### v0.1.21 (2026-04-05)
 - **Gemma 4 모델 지원**: Google Gemini API를 통해 `gemma-4-31b-it`, `gemma-4-26b-a4b-it` 등 Gemma 계열 모델을 사용할 수 있습니다.

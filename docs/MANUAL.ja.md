@@ -1,5 +1,5 @@
 # wall-vault ユーザーマニュアル
-*(最終更新: 2026-04-05 — v0.1.21)*
+*(最終更新: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # 別のコンピューターで動
 
 ---
 
-## 最近の変更 (v0.1.16 ~ v0.1.21)
+## 最近の変更 (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **修正: 空のcontentフィールドが欠落する問題**: 思考モデル（gemini-3.1-pro、o1、claude thinkingなど）が出力を生成する前に推論でmax_tokensを使い切った場合、プロキシが`omitempty`により空の`content`/`text`フィールドを削除していました。OpenAI/Anthropic SDKクライアント（Claude Code、Clineなど）が「Cannot read properties of undefined (reading 'trim')」でクラッシュしていました。公式API仕様に従い、常にフィールドを出力するようになりました。
 
 ### v0.1.21 (2026-04-05)
 - **Gemma 4モデル対応**: Gemmaモデル（gemma-4-31b-it、gemma-4-26b-a4b-it）がGoogle Gemini API経由でルーティングされるようになりました。

@@ -1,5 +1,5 @@
 # wall-vault 用户手册
-*(最后更新: 2026-04-05 — v0.1.21)*
+*(最后更新: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # 如果运行在其他计算机上
 
 ---
 
-## 最近更新 (v0.1.16 ~ v0.1.21)
+## 最近更新 (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **修复：空 content 字段被丢弃**：当思考模型（gemini-3.1-pro、o1、claude thinking 等）在生成输出之前耗尽推理的 max_tokens 时，代理通过 `omitempty` 丢弃了空的 `content`/`text` 字段。OpenAI/Anthropic SDK 客户端（Claude Code、Cline 等）因 "Cannot read properties of undefined (reading 'trim')" 而崩溃。现在始终按照官方 API 规范输出该字段。
 
 ### v0.1.21 (2026-04-05)
 - **Gemma 4 模型支持**：Gemma 模型（gemma-4-31b-it、gemma-4-26b-a4b-it）现在通过 Google Gemini API 路由。

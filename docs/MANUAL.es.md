@@ -1,5 +1,5 @@
 # Manual de Usuario de wall-vault
-*(Última actualización: 2026-04-05 — v0.1.21)*
+*(Última actualización: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Si Ollama corre en otro ordenador
 
 ---
 
-## Cambios recientes (v0.1.16 ~ v0.1.21)
+## Cambios recientes (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **Corrección: campo content vacío eliminado**: Cuando los modelos de razonamiento (gemini-3.1-pro, o1, claude thinking, etc.) agotan max_tokens en el razonamiento antes de producir salida, el proxy eliminaba el campo `content`/`text` vacío mediante `omitempty`. Los clientes de los SDK de OpenAI/Anthropic (Claude Code, Cline, etc.) fallaban con "Cannot read properties of undefined (reading 'trim')". Ahora siempre se emite el campo conforme a la especificación oficial de la API.
 
 ### v0.1.21 (2026-04-05)
 - **Soporte de modelos Gemma 4**: los modelos Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) ahora se enrutan a través de la API de Google Gemini.

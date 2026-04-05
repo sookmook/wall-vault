@@ -102,6 +102,33 @@ type OpenAIMessage struct {
 	Name       string          `json:"name,omitempty"`
 }
 
+// MarshalJSON ensures assistant messages always include the `content` field,
+// even when empty. Some clients (e.g. Claude Code) call .trim() on content
+// and crash with "Cannot read properties of undefined" if it's missing.
+// This can happen when thinking models (gemini-3.1-pro) exhaust max_tokens
+// on reasoning before producing visible output.
+func (m OpenAIMessage) MarshalJSON() ([]byte, error) {
+	type alias OpenAIMessage
+	if m.Role == "assistant" && m.Content == "" {
+		// Build JSON manually to include content:"" explicitly
+		out := map[string]interface{}{
+			"role":    m.Role,
+			"content": "",
+		}
+		if len(m.ToolCalls) > 0 {
+			out["tool_calls"] = m.ToolCalls
+		}
+		if m.ToolCallID != "" {
+			out["tool_call_id"] = m.ToolCallID
+		}
+		if m.Name != "" {
+			out["name"] = m.Name
+		}
+		return json.Marshal(out)
+	}
+	return json.Marshal(alias(m))
+}
+
 // UnmarshalJSON handles content as either a string or an array of content parts.
 // OpenAI spec allows both; many clients (including OpenClaw) use the array form.
 func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
@@ -276,7 +303,11 @@ func (m AnthropicMessage) ContentText() string {
 
 type AnthropicContent struct {
 	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	// No omitempty: Text must always be emitted when Type is "text",
+	// otherwise clients like Claude Code crash with "Cannot read properties of
+	// undefined (reading 'trim')" when thinking models exhaust max_tokens on
+	// reasoning before producing visible output.
+	Text string `json:"text"`
 }
 
 // AnthropicResponse: /v1/messages response

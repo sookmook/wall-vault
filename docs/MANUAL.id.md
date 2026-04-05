@@ -1,5 +1,5 @@
 # Panduan Pengguna wall-vault
-*(Terakhir diperbarui: 2026-04-05 — v0.1.21)*
+*(Terakhir diperbarui: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Jika berjalan di komputer lain
 
 ---
 
-## Perubahan Terbaru (v0.1.16 ~ v0.1.21)
+## Perubahan Terbaru (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **Perbaikan: field content kosong dihilangkan**: Ketika model thinking (gemini-3.1-pro, o1, claude thinking, dll.) menghabiskan max_tokens pada reasoning sebelum menghasilkan output, proxy menghilangkan field `content`/`text` yang kosong melalui `omitempty`. Klien OpenAI/Anthropic SDK (Claude Code, Cline, dll.) crash dengan "Cannot read properties of undefined (reading 'trim')". Sekarang field selalu dipancarkan sesuai spesifikasi API resmi.
 
 ### v0.1.21 (2026-04-05)
 - **Dukungan model Gemma 4**: Model Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) sekarang diarahkan melalui Google Gemini API.

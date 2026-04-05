@@ -1,5 +1,5 @@
 # Mwongozo wa Mtumiaji wa wall-vault
-*(Ilisasishwa mara ya mwisho: 2026-04-05 — v0.1.21)*
+*(Ilisasishwa mara ya mwisho: 2026-04-05 — v0.1.22)*
 
 ---
 
@@ -756,7 +756,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Kama inafanya kazi kwenye kompyut
 
 ---
 
-## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.21)
+## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.22)
+
+### v0.1.22 (2026-04-05)
+- **Marekebisho: sehemu ya content tupu iliyotupwa**: Wakati mifano ya kufikiria (gemini-3.1-pro, o1, claude thinking, n.k.) inamaliza max_tokens kwenye kufikiria kabla ya kutoa matokeo, proksi ilikuwa ikitupa sehemu tupu ya `content`/`text` kupitia `omitempty`. Wateja wa SDK ya OpenAI/Anthropic (Claude Code, Cline, n.k.) walianguka kwa "Cannot read properties of undefined (reading 'trim')". Sasa sehemu hutumwa kila wakati kulingana na vipimo rasmi vya API.
 
 ### v0.1.21 (2026-04-05)
 - **Msaada wa mifano ya Gemma 4**: Mifano ya Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) sasa inaelekezwa kupitia Google Gemini API.

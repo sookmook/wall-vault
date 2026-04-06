@@ -1,5 +1,5 @@
 # Mwongozo wa Mtumiaji wa wall-vault
-*(Ilisasishwa mara ya mwisho: 2026-04-06 — v0.1.23)*
+*(Ilisasishwa mara ya mwisho: 2026-04-06 — v0.1.24)*
 
 ---
 
@@ -14,8 +14,9 @@
 7. [Hali ya Kusambazwa (Boti Nyingi)](#hali-ya-kusambazwa-boti-nyingi)
 8. [Kuanzisha Kiotomatiki](#kuanzisha-kiotomatiki)
 9. [Daktari (Doctor)](#daktari-doctor)
-10. [Marejeo ya Vigeuzi vya Mazingira](#marejeo-ya-vigeuzi-vya-mazingira)
-11. [Utatuzi wa Matatizo](#utatuzi-wa-matatizo)
+10. [RTK Kuokoa Tokeni](#rtk-kuokoa-tokeni)
+11. [Marejeo ya Vigeuzi vya Mazingira](#marejeo-ya-vigeuzi-vya-mazingira)
+12. [Utatuzi wa Matatizo](#utatuzi-wa-matatizo)
 
 ---
 
@@ -92,11 +93,11 @@ Hii inatumika tu ikiwa mazingira ya programu ya Go yamesakinishwa.
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (toleo: v0.1.23.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (toleo: v0.1.24.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Toleo la muhuri wa wakati**: Unapojenga kwa `make build`, toleo linaundwa otomatiki kwa umbizo kama `v0.1.23.20260406.211004` lenye tarehe na saa. Ukijenga moja kwa moja kwa `go build ./...`, toleo litaonyesha `"dev"` tu.
+> 💡 **Toleo la muhuri wa wakati**: Unapojenga kwa `make build`, toleo linaundwa otomatiki kwa umbizo kama `v0.1.24.20260406.211004` lenye tarehe na saa. Ukijenga moja kwa moja kwa `go build ./...`, toleo litaonyesha `"dev"` tu.
 
 ---
 
@@ -688,6 +689,70 @@ wall-vault doctor all     # Uchunguzi + urekebishaji wa otomatiki mara moja
 
 > 💡 Ikiwa kitu kinaonekana si sawa, endesha `wall-vault doctor all` kwanza. Kinashughulikia matatizo mengi otomatiki.
 
+
+---
+
+## RTK Kuokoa Tokeni
+
+*(v0.1.24+)*
+
+**RTK (Zana ya Kuokoa Tokeni)** inabana otomatiki matokeo ya amri za sheli ambazo wakala wa AI wa kodishaji (Claude Code n.k.) huendesha, na kupunguza matumizi ya tokeni. Kwa mfano, matokeo ya mistari 15 ya `git status` yanabana kuwa muhtasari wa mistari 2.
+
+### Matumizi ya Msingi
+
+```bash
+# Funika amri kwa wall-vault rtk na matokeo yatachujwa otomatiki
+wall-vault rtk git status          # Inaonyesha orodha ya faili zilizobadilishwa tu
+wall-vault rtk git diff HEAD~1     # Mistari iliyobadilishwa + muktadha wa chini tu
+wall-vault rtk git log -10         # Hash + ujumbe wa mstari mmoja kwa kila ingizo
+wall-vault rtk go test ./...       # Inaonyesha majaribio yaliyoshindwa tu
+wall-vault rtk ls -la              # Amri zisizouniwa zinakatwa otomatiki
+```
+
+### Amri Zinazouniwa na Athari za Kuokoa
+
+| Amri | Njia ya Kuchuja | Kiwango cha Kuokoa |
+|------|----------|--------|
+| `git status` | Muhtasari wa faili zilizobadilishwa tu | ~87% |
+| `git diff` | Mistari iliyobadilishwa + muktadha wa mistari 3 | ~60-94% |
+| `git log` | Hash + ujumbe wa mstari wa kwanza | ~90% |
+| `git push/pull/fetch` | Ondoa maendeleo, muhtasari tu | ~80% |
+| `go test` | Onyesha kushindwa tu, hesabu kupita | ~88-99% |
+| `go build/vet` | Onyesha makosa tu | ~90% |
+| Amri nyingine zote | Mistari 50 ya mwanzo + 50 ya mwisho, upeo 32KB | Inabadilika |
+
+### Bomba la Kuchuja la Hatua 3
+
+1. **Kichujio cha muundo kwa amri** — Kinaelewa muundo wa matokeo ya git, go n.k. na kuchota sehemu zenye maana tu
+2. **Uchakataji wa baadaye wa regex** — Kuondoa misimbo ya rangi ya ANSI, kupunguza mistari tupu, kujumlisha mistari inayorudiwa
+3. **Kupitisha + kukata** — Amri zisizouniwa huhifadhi mistari 50 ya mwanzo na 50 ya mwisho tu
+
+### Kuunganisha na Claude Code
+
+Unaweza kusanidi kwa kiungo cha `PreToolUse` cha Claude Code ili amri zote za sheli zipite kupitia RTK otomatiki.
+
+```bash
+# Sakinisha kiungo (kinaongezwa otomatiki kwenye settings.json ya Claude Code)
+wall-vault rtk hook install
+```
+
+Au ongeza kwa mkono kwenye `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "command": "wall-vault rtk rewrite"
+    }]
+  }
+}
+```
+
+> 💡 **Uhifadhi wa exit code**: RTK inarudisha msimbo wa kutoka wa amri ya asili kama ilivyo. Amri ikishindwa (exit code ≠ 0), AI pia itagundua kushindwa kwa usahihi.
+
+> 💡 **Kulazimisha Kiingereza**: RTK inaendesha amri kwa `LC_ALL=C` ili kuzalisha matokeo ya Kiingereza kila wakati bila kujali mpangilio wa lugha ya mfumo. Hii inahakikisha kichujio kinafanya kazi kwa usahihi.
+
 ---
 
 ## Marejeo ya Vigeuzi vya Mazingira
@@ -766,7 +831,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Ikiwa inaendesha kwenye kompyuta 
 
 ---
 
-## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.23)
+## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.24)
+
+### v0.1.24 (2026-04-06)
+- **Amri ndogo ya RTK ya kuokoa tokeni**: `wall-vault rtk <command>` inachuja otomatiki matokeo ya amri za sheli ili kupunguza matumizi ya tokeni ya wakala wa AI kwa 60-90%. Inajumuisha vichujio maalum kwa amri kuu kama git, go, na amri zisizouniwa pia zinakatwa otomatiki. Inaunganishwa kwa uwazi na kiungo cha `PreToolUse` cha Claude Code.
 
 ### v0.1.23 (2026-04-06)
 - **Marekebisho ya kubadilisha mfano wa Ollama**: Ilirekebishwa tatizo ambapo kubadilisha mfano wa Ollama kwenye dashibodi ya ghala hakukuonyeshwa kwenye proxy halisi. Hapo awali, ni kigezo cha mazingira (`OLLAMA_MODEL`) peke yake kilichotumiwa, lakini sasa mpangilio wa ghala unapewa kipaumbele.

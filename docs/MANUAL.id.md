@@ -1,5 +1,5 @@
 # Panduan Pengguna wall-vault
-*(Last updated: 2026-04-06 — v0.1.23)*
+*(Last updated: 2026-04-06 — v0.1.24)*
 
 ---
 
@@ -14,8 +14,9 @@
 7. [Mode terdistribusi (multi bot)](#mode-terdistribusi-multi-bot)
 8. [Pengaturan start otomatis](#pengaturan-start-otomatis)
 9. [Doctor (diagnosis)](#doctor-diagnosis)
-10. [Referensi variabel lingkungan](#referensi-variabel-lingkungan)
-11. [Pemecahan masalah](#pemecahan-masalah)
+10. [RTK Penghematan token](#rtk-penghematan-token)
+11. [Referensi variabel lingkungan](#referensi-variabel-lingkungan)
+12. [Pemecahan masalah](#pemecahan-masalah)
 
 ---
 
@@ -92,11 +93,11 @@ Hanya berlaku jika lingkungan pengembangan bahasa Go sudah terinstal.
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (versi: v0.1.23.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (versi: v0.1.24.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Versi dengan timestamp build**: Ketika build dengan `make build`, versi otomatis dibuat dalam format yang menyertakan tanggal dan waktu, seperti `v0.1.23.20260406.211004`. Jika build langsung dengan `go build ./...`, versi hanya akan ditampilkan sebagai `"dev"`.
+> 💡 **Versi dengan timestamp build**: Ketika build dengan `make build`, versi otomatis dibuat dalam format yang menyertakan tanggal dan waktu, seperti `v0.1.24.20260406.225957`. Jika build langsung dengan `go build ./...`, versi hanya akan ditampilkan sebagai `"dev"`.
 
 ---
 
@@ -690,6 +691,69 @@ wall-vault doctor all     # Diagnosis + perbaikan otomatis sekaligus
 
 ---
 
+## RTK Penghematan token
+
+*(v0.1.24+)*
+
+**RTK (alat penghematan token)** secara otomatis mengompresi output perintah shell yang dijalankan oleh agen coding AI (seperti Claude Code), mengurangi konsumsi token. Misalnya, output 15 baris dari `git status` diringkas menjadi 2 baris.
+
+### Penggunaan dasar
+
+```bash
+# Bungkus perintah dengan wall-vault rtk dan output akan difilter secara otomatis
+wall-vault rtk git status          # Hanya menampilkan daftar file yang berubah
+wall-vault rtk git diff HEAD~1     # Hanya baris yang berubah + konteks minimal
+wall-vault rtk git log -10         # Hash + pesan satu baris
+wall-vault rtk go test ./...       # Hanya menampilkan tes yang gagal
+wall-vault rtk ls -la              # Perintah tidak didukung dipotong otomatis
+```
+
+### Perintah yang didukung dan penghematan
+
+| Perintah | Metode filter | Penghematan |
+|------|----------|--------|
+| `git status` | Hanya ringkasan file yang berubah | ~87% |
+| `git diff` | Baris yang berubah + 3 baris konteks | ~60-94% |
+| `git log` | Hash + baris pertama pesan | ~90% |
+| `git push/pull/fetch` | Hapus progres, hanya ringkasan | ~80% |
+| `go test` | Hanya tampilkan kegagalan, hitung yang lulus | ~88-99% |
+| `go build/vet` | Hanya tampilkan error | ~90% |
+| Semua perintah lain | 50 baris pertama + 50 baris terakhir, maks 32KB | Variabel |
+
+### Pipeline filter 3 tahap
+
+1. **Filter struktural per perintah** — Memahami format output git, go dll. dan mengekstrak hanya bagian yang bermakna
+2. **Post-processing regex** — Hapus kode warna ANSI, kurangi baris kosong, agregasi baris duplikat
+3. **Passthrough + pemotongan** — Perintah tidak didukung hanya mempertahankan 50 baris pertama/terakhir
+
+### Integrasi Claude Code
+
+Anda dapat mengonfigurasi hook `PreToolUse` Claude Code agar semua perintah shell secara otomatis melewati RTK.
+
+```bash
+# Instal hook (ditambahkan otomatis ke settings.json Claude Code)
+wall-vault rtk hook install
+```
+
+Atau tambahkan secara manual ke `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "command": "wall-vault rtk rewrite"
+    }]
+  }
+}
+```
+
+> 💡 **Preservasi exit code**: RTK mengembalikan kode keluar asli dari perintah. Jika perintah gagal (exit code ≠ 0), AI juga mendeteksi kegagalan dengan benar.
+
+> 💡 **Output dipaksa bahasa Inggris**: RTK menjalankan perintah dengan `LC_ALL=C` untuk selalu menghasilkan output bahasa Inggris, terlepas dari pengaturan bahasa sistem. Ini diperlukan agar filter bekerja dengan benar.
+
+---
+
 ## Referensi variabel lingkungan
 
 Variabel lingkungan adalah cara untuk meneruskan nilai konfigurasi ke program. Masukkan di terminal dalam format `export NAMA_VARIABEL=nilai` atau letakkan di file layanan start otomatis untuk penerapan permanen.
@@ -766,7 +830,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Jika berjalan di komputer lain
 
 ---
 
-## Perubahan terbaru (v0.1.16 ~ v0.1.23)
+## Perubahan terbaru (v0.1.16 ~ v0.1.24)
+
+### v0.1.24 (2026-04-06)
+- **Subperintah RTK penghematan token**: `wall-vault rtk <command>` secara otomatis memfilter output perintah shell untuk mengurangi konsumsi token agen AI sebesar 60-90%. Menyertakan filter khusus untuk perintah utama seperti git dan go, dan secara otomatis memotong perintah yang tidak didukung. Terintegrasi secara transparan dengan hook `PreToolUse` Claude Code.
 
 ### v0.1.23 (2026-04-06)
 - **Perbaikan perubahan model Ollama**: Diperbaiki masalah di mana perubahan model Ollama di dashboard brankas tidak tercermin di proxy. Sebelumnya hanya menggunakan variabel lingkungan (`OLLAMA_MODEL`), sekarang pengaturan brankas diprioritaskan.

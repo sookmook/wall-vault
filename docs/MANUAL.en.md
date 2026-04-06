@@ -1,5 +1,5 @@
 # wall-vault User Manual
-*(Last updated: 2026-04-06 — v0.1.23)*
+*(Last updated: 2026-04-06 — v0.1.24)*
 
 ---
 
@@ -14,8 +14,9 @@
 7. [Distributed Mode (multi-bot)](#distributed-mode-multi-bot)
 8. [Auto-start Setup](#auto-start-setup)
 9. [Doctor — Self-diagnosis Tool](#doctor--self-diagnosis-tool)
-10. [Environment Variables Reference](#environment-variables-reference)
-11. [Troubleshooting](#troubleshooting)
+10. [RTK Token Saving](#rtk-token-saving)
+11. [Environment Variables Reference](#environment-variables-reference)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -92,11 +93,11 @@ This only applies if you have a Go development environment installed.
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (version: v0.1.23.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (version: v0.1.24.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Build timestamp version**: When you build with `make build`, the version is automatically generated in a format like `v0.1.23.20260406.211004` that includes the date and time. If you build directly with `go build ./...`, the version will simply show `"dev"`.
+> 💡 **Build timestamp version**: When you build with `make build`, the version is automatically generated in a format like `v0.1.24.20260406.225957` that includes the date and time. If you build directly with `go build ./...`, the version will simply show `"dev"`.
 
 ---
 
@@ -690,6 +691,69 @@ wall-vault doctor all     # Diagnose + auto-repair in one step
 
 ---
 
+## RTK Token Saving
+
+*(v0.1.24+)*
+
+**RTK (Token Saving Tool)** automatically compresses the output of shell commands executed by AI coding agents (such as Claude Code), reducing token usage. For example, the 15-line output of `git status` is condensed to a 2-line summary.
+
+### Basic Usage
+
+```bash
+# Wrap commands with wall-vault rtk to auto-filter output
+wall-vault rtk git status          # shows only changed file list
+wall-vault rtk git diff HEAD~1     # changed lines + minimal context only
+wall-vault rtk git log -10         # hash + one-line message each
+wall-vault rtk go test ./...       # shows only failed tests
+wall-vault rtk ls -la              # unsupported commands are auto-truncated
+```
+
+### Supported Commands and Savings
+
+| Command | Filter Method | Savings |
+|---------|--------------|---------|
+| `git status` | Changed file summary only | ~87% |
+| `git diff` | Changed lines + 3-line context | ~60-94% |
+| `git log` | Hash + first line message | ~90% |
+| `git push/pull/fetch` | Remove progress, summary only | ~80% |
+| `go test` | Show failures only, count passes | ~88-99% |
+| `go build/vet` | Show errors only | ~90% |
+| All other commands | First 50 + last 50 lines, max 32KB | Variable |
+
+### 3-Stage Filter Pipeline
+
+1. **Command-specific structural filter** — Understands output formats of git, go, etc. and extracts only meaningful parts
+2. **Regex post-processing** — Removes ANSI color codes, collapses blank lines, aggregates duplicate lines
+3. **Passthrough + truncation** — Unsupported commands keep only the first/last 50 lines
+
+### Claude Code Integration
+
+You can set up a Claude Code `PreToolUse` hook to automatically route all shell commands through RTK.
+
+```bash
+# Install hook (auto-added to Claude Code settings.json)
+wall-vault rtk hook install
+```
+
+Or manually add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "command": "wall-vault rtk rewrite"
+    }]
+  }
+}
+```
+
+> 💡 **Exit code preservation**: RTK returns the original command's exit code as-is. If a command fails (exit code ≠ 0), the AI accurately detects the failure.
+
+> 💡 **Forced English output**: RTK runs commands with `LC_ALL=C`, producing English output regardless of system language settings. This ensures filters work accurately.
+
+---
+
 ## Environment Variables Reference
 
 Environment variables are a way to pass configuration values to a program. Enter them in the terminal using `export VARIABLE=value`, or add them to your auto-start service file for persistent application.
@@ -766,7 +830,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # If running on another computer
 
 ---
 
-## Recent Changes (v0.1.16 ~ v0.1.23)
+## Recent Changes (v0.1.16 ~ v0.1.24)
+
+### v0.1.24 (2026-04-06)
+- **RTK token saving subcommand**: `wall-vault rtk <command>` auto-filters shell command output to reduce AI agent token usage by 60-90%. Includes built-in filters for key commands like git and go, and auto-truncates unsupported commands. Integrates transparently with Claude Code via `PreToolUse` hook.
 
 ### v0.1.23 (2026-04-06)
 - **Ollama model change fix**: Fixed an issue where changing the Ollama model in the vault dashboard wasn't reflected in the actual proxy. Previously only the environment variable (`OLLAMA_MODEL`) was used, but now vault settings take priority.

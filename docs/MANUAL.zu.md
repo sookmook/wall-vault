@@ -1,5 +1,5 @@
 # Umhlahlandlela Womsebenzisi we-wall-vault
-*(Kucishwa kamuva: 2026-04-06 — v0.1.23)*
+*(Kucishwa kamuva: 2026-04-06 — v0.1.24)*
 
 ---
 
@@ -14,8 +14,9 @@
 7. [Imodi Eyahlukaniswayo (Ama-Bot Amaningi)](#imodi-eyahlukaniswayo-ama-bot-amaningi)
 8. [Ukusethwa Kokuqala Ngokuzenzakalela](#ukusethwa-kokuqala-ngokuzenzakalela)
 9. [I-Doctor: Isihloli](#i-doctor-isihloli)
-10. [Izinguquko Zemvelo](#izinguquko-zemvelo)
-11. [Ukuxazulula Izinkinga](#ukuxazulula-izinkinga)
+10. [I-RTK Ukonga Amathokheni](#i-rtk-ukonga-amathokheni)
+11. [Izinguquko Zemvelo](#izinguquko-zemvelo)
+12. [Ukuxazulula Izinkinga](#ukuxazulula-izinkinga)
 
 ---
 
@@ -92,11 +93,11 @@ Lokhu kusebenza kuphela uma indawo yokuthuthukisa yolimi lwe-Go ifakelwe.
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (inguqulo: v0.1.23.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (inguqulo: v0.1.24.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Inguqulo yesitembu sesikhathi**: Uma wakha ngo-`make build`, inguqulo yakhiwa ngokuzenzakalela ngesimo esifana no-`v0.1.23.20260406.211004` oluqukethe usuku nesikhathi. Uma wakha ngokuqondile ngo-`go build ./...`, inguqulo izobonisa `"dev"` kuphela.
+> 💡 **Inguqulo yesitembu sesikhathi**: Uma wakha ngo-`make build`, inguqulo yakhiwa ngokuzenzakalela ngesimo esifana no-`v0.1.24.20260406.211004` oluqukethe usuku nesikhathi. Uma wakha ngokuqondile ngo-`go build ./...`, inguqulo izobonisa `"dev"` kuphela.
 
 ---
 
@@ -688,6 +689,70 @@ wall-vault doctor all     # Ukucwaninga + ukulungisa ngokuzenzakalela ngasikhath
 
 > 💡 Uma kukhona okubonakala kungalungile, sebenzisa `wall-vault doctor all` kuqala. Kuxazulula izinkinga eziningi ngokuzenzakalela.
 
+
+---
+
+## I-RTK Ukonga Amathokheni
+
+*(v0.1.24+)*
+
+**I-RTK (Ithuluzi Lokonga Amathokheni)** icindezela ngokuzenzakalela okukhishwa imiyalo yesheli esetshenziswayo ama-agent e-AI wokukhoda (Claude Code njll.), yehlisa ukusetshenziswa kwamathokheni. Isibonelo, okukhishwa kwemigqa engu-15 ye-`git status` kucindelwa kube isifinyezo semigqa emi-2.
+
+### Ukusetshenziswa Okuyisisekelo
+
+```bash
+# Songela umyalo ngo-wall-vault rtk bese okukhishwa kuhluzelwa ngokuzenzakalela
+wall-vault rtk git status          # Ibonisa uhlu lwamafayela ashintshiwe kuphela
+wall-vault rtk git diff HEAD~1     # Imigqa eshintshiwe + i-context encane kuphela
+wall-vault rtk git log -10         # Hash + umlayezo womgqa owodwa ngokungena ngakunye
+wall-vault rtk go test ./...       # Ibonisa ukuhlolwa okuhlulekile kuphela
+wall-vault rtk ls -la              # Imiyalo engasekelwa isikwa ngokuzenzakalela
+```
+
+### Imiyalo Esekelwayo Nemiphumela Yokonga
+
+| Umyalo | Indlela Yokuhluza | Izinga Lokonga |
+|------|----------|--------|
+| `git status` | Isifinyezo samafayela ashintshiwe kuphela | ~87% |
+| `git diff` | Imigqa eshintshiwe + i-context yemigqa emi-3 | ~60-94% |
+| `git log` | Hash + umlayezo womgqa wokuqala | ~90% |
+| `git push/pull/fetch` | Susa inqubekela phambili, isifinyezo kuphela | ~80% |
+| `go test` | Bonisa ukuhluleka kuphela, bala ukuphumelela | ~88-99% |
+| `go build/vet` | Bonisa amaphutha kuphela | ~90% |
+| Yonke eminye imiyalo | Imigqa engu-50 yokuqala + 50 yokugcina, ubude obukhulu 32KB | Kuyahluka |
+
+### Iphayiphi Yokuhluza Yezigaba Ezi-3
+
+1. **Isihluzi sesakhiwo ngomyalo** -- Siqonda isimo sokukhishwa kwe-git, go njll. bese sikhipha izingxenye ezinencazelo kuphela
+2. **Ukusetshenzwa kabusha kwe-regex** -- Susa amakhodi ombala e-ANSI, nciphisa imigqa engenalutho, hlanganisela imigqa ephindaphindayo
+3. **Ukudlulisa + ukusika** -- Imiyalo engasekelwayo igcina imigqa engu-50 yokuqala ne-50 yokugcina kuphela
+
+### Ukuxhuma no-Claude Code
+
+Ungasetha nge-hook ye-`PreToolUse` ye-Claude Code ukuze yonke imiyalo yesheli idlule nge-RTK ngokuzenzakalela.
+
+```bash
+# Fakela i-hook (ingezwa ngokuzenzakalela ku-settings.json ye-Claude Code)
+wall-vault rtk hook install
+```
+
+Noma engeza ngesandla ku-`~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "command": "wall-vault rtk rewrite"
+    }]
+  }
+}
+```
+
+> 💡 **Ukugonya kwe-exit code**: I-RTK ibuyisela ikhodi yokulahla yomyalo womsuka njengoba injalo. Uma umyalo uhluleka (exit code ≠ 0), i-AI nayo izobona ukuhluleka ngokunembe.
+
+> 💡 **Ukuphoqelela isiNgisi**: I-RTK isebenzisa imiyalo ngo-`LC_ALL=C` ukukhiqiza okukhishwa kwesiNgisi njalo ngaphandle kokusetha kolimi lwesistimu. Lokhu kuqinisekisa ukuthi isihluzi sisebenza ngokunembe.
+
 ---
 
 ## Izinguquko Zemvelo
@@ -766,7 +831,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Uma isebenza kwenye ikhompyutha
 
 ---
 
-## Izinguquko Zamuva (v0.1.16 ~ v0.1.23)
+## Izinguquko Zamuva (v0.1.16 ~ v0.1.24)
+
+### v0.1.24 (2026-04-06)
+- **Umyalo omncane we-RTK wokonga amathokheni**: `wall-vault rtk <command>` uhluza ngokuzenzakalela okukhishwa yimiyalo yesheli ukwehlisa ukusetshenziswa kwamathokheni e-agent ye-AI ngo-60-90%. Iqukethe izihluzi ezikhethekileko zemiyalo eyinhloko njengo-git, go, futhi imiyalo engasekelwayo nayo isikwa ngokuzenzakalela. Ixhuma ngokucacile nge-hook ye-`PreToolUse` ye-Claude Code.
 
 ### v0.1.23 (2026-04-06)
 - **Ukulungiswa kokushintsha imodeli ye-Ollama**: Kulungisiwe inkinga lapho ukushintsha imodeli ye-Ollama kudashubhodi ye-vault kungabonakali ku-proxy yangempela. Ngaphambilini, kusetshenziswe kuphela inguquko yemvelo (`OLLAMA_MODEL`), kodwa manje okusetiwe kwe-vault kuya phambili.

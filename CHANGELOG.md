@@ -8,6 +8,25 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.24] — 2026-04-06
+
+### Added
+- **RTK subcommand (`wall-vault rtk`)**: Token reduction for shell command
+  output, ported from RTK (Rust Token Killer) concept. Filters and compresses
+  command output before it reaches the LLM context window, reducing token
+  usage by 60-90% on common development operations.
+  - 3-tier filter pipeline: command-specific → regex post-processing → passthrough
+  - Git filters: `status` (87% reduction), `diff` (context trimming), `log`
+    (hash+message only), `push/pull/fetch` (summary only)
+  - Go filters: `test` (failure-focus, hide passing), `build/vet` (errors only)
+  - General: passthrough with auto-truncation (head 50 + tail 50 lines, 32KB max)
+  - `LC_ALL=C` forced for consistent English output parsing
+  - Exit code preservation for LLM error detection
+  - `wall-vault rtk rewrite` for Claude Code PreToolUse hook integration
+  - Zero external dependencies (stdlib only)
+
+---
+
 ## [0.1.23] — 2026-04-06
 
 ### Fixed

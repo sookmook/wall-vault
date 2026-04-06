@@ -1,5 +1,5 @@
 # Jagoran Amfani da wall-vault
-*(Ƙarshen sabuntawa: 2026-04-06 — v0.1.23)*
+*(Ƙarshen sabuntawa: 2026-04-06 — v0.1.24)*
 
 ---
 
@@ -14,8 +14,9 @@
 7. [Yanayin Rarraba (Multi-Bot)](#yanayin-rarraba-multi-bot)
 8. [Saita Farawa ta Atomatik](#saita-farawa-ta-atomatik)
 9. [Doctor — Kayan Bincike](#doctor-kayan-bincike)
-10. [Bayani kan Masu-Canji na Yanayi](#bayani-kan-masu-canji-na-yanayi)
-11. [Warware Matsaloli](#warware-matsaloli)
+10. [RTK Tanadin Token](#rtk-tanadin-token)
+11. [Bayani kan Masu-Canji na Yanayi](#bayani-kan-masu-canji-na-yanayi)
+12. [Warware Matsaloli](#warware-matsaloli)
 
 ---
 
@@ -92,11 +93,11 @@ Wannan yana aiki ne kawai idan an shigar da yanayin haɓaka harshen Go.
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (sigar: v0.1.23.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (sigar: v0.1.24.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Sigar alama lokaci**: Idan ka gina da `make build`, sigar za ta ƙirƙiru ta atomatik a tsari kamar `v0.1.23.20260406.211004` tare da kwanan wata da lokaci. Idan ka gina kai tsaye da `go build ./...`, sigar za ta nuna `"dev"` kawai.
+> 💡 **Sigar alama lokaci**: Idan ka gina da `make build`, sigar za ta ƙirƙiru ta atomatik a tsari kamar `v0.1.24.20260406.211004` tare da kwanan wata da lokaci. Idan ka gina kai tsaye da `go build ./...`, sigar za ta nuna `"dev"` kawai.
 
 ---
 
@@ -688,6 +689,70 @@ wall-vault doctor all     # Bincike + gyara ta atomatik gaba ɗaya
 
 > 💡 Idan wani abu ya yi kamar bai dace ba, aiwatar da `wall-vault doctor all` da fari. Yana magance matsaloli da yawa ta atomatik.
 
+
+---
+
+## RTK Tanadin Token
+
+*(v0.1.24+)*
+
+**RTK (Kayan Tanadin Token)** yana matsar fitowar umarnin sheli da wakilin AI na kodawa (Claude Code d.s.) ke aiwatarwa ta atomatik, yana rage yawan amfanin token. Misali, fitowar layi 15 na `git status` za a matsa zuwa taƙaitaccen layi 2.
+
+### Asalin Amfani
+
+```bash
+# Nannade umarnin da wall-vault rtk kuma fitowa za ta tacewa ta atomatik
+wall-vault rtk git status          # Yana nuna jerin fayiloli da suka canza kawai
+wall-vault rtk git diff HEAD~1     # Layukan da suka canza + ƙaramin mahallin kawai
+wall-vault rtk git log -10         # Hash + saƙon layi ɗaya kowane shigarwa
+wall-vault rtk go test ./...       # Yana nuna gwaje-gwaje da suka gaza kawai
+wall-vault rtk ls -la              # Umarnin da ba a tallafa ba ana yanke su ta atomatik
+```
+
+### Umarnin da Ake Tallafawa da Tasirin Tanadi
+
+| Umarnin | Hanyar Tacewa | Adadin Tanadi |
+|------|----------|--------|
+| `git status` | Taƙaitaccen fayiloli da suka canza kawai | ~87% |
+| `git diff` | Layukan da suka canza + mahallin layi 3 | ~60-94% |
+| `git log` | Hash + saƙon layi na farko | ~90% |
+| `git push/pull/fetch` | Cire ci gaba, taƙaitacce kawai | ~80% |
+| `go test` | Nuna gazawa kawai, ƙidaya nasarori | ~88-99% |
+| `go build/vet` | Nuna kuskurori kawai | ~90% |
+| Sauran umarnin duka | Layi 50 na farko + 50 na ƙarshe, matsakaicin 32KB | Yana canzawa |
+
+### Bututun Tacewa na Mataki 3
+
+1. **Tace tsari ta umarnin** — Yana fahimtar tsarin fitowar git, go d.s. kuma yana ciro ɓangarorin da ke da ma'ana kawai
+2. **Sarrafa bayan regex** — Cire lambobin launi na ANSI, rage layukan banza, taƙaita layukan da suka maimaitu
+3. **Wucewa + yankewa** — Umarnin da ba a tallafa ba suna riƙe layi 50 na farko da 50 na ƙarshe kawai
+
+### Haɗawa da Claude Code
+
+Za ka iya saita ta hanyar ƙugiya `PreToolUse` na Claude Code don dukkan umarnin sheli su wuce ta RTK ta atomatik.
+
+```bash
+# Shigar da ƙugiya (ana ƙara ta ta atomatik cikin settings.json na Claude Code)
+wall-vault rtk hook install
+```
+
+Ko ƙara da hannu cikin `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "command": "wall-vault rtk rewrite"
+    }]
+  }
+}
+```
+
+> 💡 **Adana lambar fita**: RTK yana mayar da lambar fita ta umarnin asali kamar yadda take. Idan umarnin ya gaza (exit code ≠ 0), AI ma za ta gane gazawar daidai.
+
+> 💡 **Tilasta Turanci**: RTK yana aiwatar da umarnin da `LC_ALL=C` don samar da fitowar Turanci koyaushe ba tare da la'akari da saitin harshen tsarin ba. Wannan yana tabbatar da cewa tacewa yana aiki daidai.
+
 ---
 
 ## Bayani kan Masu-Canji na Yanayi
@@ -766,7 +831,10 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan yana aiki a wata kwamfuta
 
 ---
 
-## Canje-Canjen Kwanan Nan (v0.1.16 ~ v0.1.23)
+## Canje-Canjen Kwanan Nan (v0.1.16 ~ v0.1.24)
+
+### v0.1.24 (2026-04-06)
+- **Ƙaramin umarnin RTK na tanadin token**: `wall-vault rtk <command>` yana tace fitowar umarnin sheli ta atomatik don rage yawan amfanin token na wakilin AI da 60-90%. Yana ɗauke da tacewa na musamman ga manyan umarnin kamar git, go, kuma umarnin da ba a tallafa ba ma ana yanke su ta atomatik. Yana haɗuwa ba tare da matsala ba ta hanyar ƙugiya `PreToolUse` na Claude Code.
 
 ### v0.1.23 (2026-04-06)
 - **Gyaran canza ƙirar Ollama**: An gyara matsalar da canza ƙirar Ollama a dashboard ɗin ɓaure bai bayyana a proxy na gaske ba. A baya, mai-canji na yanayi (`OLLAMA_MODEL`) ne kawai ake amfani da shi, amma yanzu saitin ɓaure ne ake ba fifiko.

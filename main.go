@@ -12,6 +12,7 @@ import (
 
 	"github.com/sookmook/wall-vault/cmd/doctor"
 	"github.com/sookmook/wall-vault/cmd/proxy"
+	crtk "github.com/sookmook/wall-vault/cmd/rtk"
 	"github.com/sookmook/wall-vault/cmd/setup"
 	"github.com/sookmook/wall-vault/cmd/vault"
 	"github.com/sookmook/wall-vault/internal/config"
@@ -45,6 +46,8 @@ func main() {
 		setup.Run(os.Args[2:])
 	case "doctor":
 		doctor.Run(os.Args[2:])
+	case "rtk":
+		crtk.Run(os.Args[2:])
 	case "version", "--version", "-v":
 		fmt.Printf("wall-vault %s\n", version)
 	case "help", "--help", "-h":
@@ -108,6 +111,7 @@ func printHelp() {
   wall-vault proxy [flags]    프록시 서버 단독 실행
   wall-vault vault [flags]    키 금고 서버 단독 실행
   wall-vault doctor [cmd]     헬스체크·자동복구 (fix/deploy)
+  wall-vault rtk <cmd> [args]  명령 출력 축소 (토큰 절약)
 
 옵션:
   -h, --help                  도움말

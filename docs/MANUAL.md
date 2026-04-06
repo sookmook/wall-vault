@@ -1,5 +1,5 @@
 # wall-vault 사용자 매뉴얼
-*(Last updated: 2026-04-05 — v0.1.22)*
+*(Last updated: 2026-04-06 — v0.1.23)*
 
 ---
 
@@ -44,7 +44,8 @@ wall-vault가 해결해 주는 문제들:
         │
         ├─ Google Gemini API
         ├─ OpenRouter API (340개 이상 모델)
-        └─ Ollama (내 컴퓨터, 최후 보루)
+        ├─ Ollama / LM Studio / vLLM (내 컴퓨터, 최후 보루)
+        └─ OpenAI / Anthropic API
 ```
 
 ---
@@ -91,11 +92,11 @@ Go 언어 개발 환경이 설치된 경우에만 해당됩니다.
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (버전: v0.1.6.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (버전: v0.1.23.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **빌드 타임스탬프 버전**: `make build`로 빌드하면 버전이 `v0.1.6.20260314.231308`처럼 날짜·시각이 포함된 형식으로 자동 생성됩니다. `go build ./...`로 직접 빌드하면 버전이 `"dev"`로만 표시됩니다.
+> 💡 **빌드 타임스탬프 버전**: `make build`로 빌드하면 버전이 `v0.1.23.20260406.211004`처럼 날짜·시각이 포함된 형식으로 자동 생성됩니다. `go build ./...`로 직접 빌드하면 버전이 `"dev"`로만 표시됩니다.
 
 ---
 
@@ -117,7 +118,7 @@ wall-vault setup
 3. 운용 모드 — 혼자 쓸지(standalone), 여러 대에서 함께 쓸지(distributed) 선택
 4. 봇 이름 입력 — 대시보드에 표시될 이름
 5. 포트 설정 — 기본값: 프록시 56244, 금고 56243 (바꿀 필요 없으면 그냥 엔터)
-6. AI 서비스 선택 — Google / OpenRouter / Ollama 중 쓸 서비스
+6. AI 서비스 선택 — Google / OpenRouter / Ollama / LM Studio / vLLM 중 쓸 서비스
 7. 도구 보안 필터 설정
 8. 관리자 토큰 설정 — 대시보드 관리 기능을 잠그는 비밀번호. 자동 생성도 가능
 9. API 키 암호화 비밀번호 설정 — 키를 더 안전하게 저장하고 싶을 때 (선택 사항)
@@ -320,6 +321,8 @@ curl "http://localhost:56244/api/models?q=claude"
 | OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
 | OpenRouter | 346개 이상 (Hunter Alpha 1M 컨텍스트 무료, DeepSeek R1/V3, Qwen 2.5 등) |
 | Ollama | 내 컴퓨터에 설치된 로컬 서버 자동 감지 |
+| LM Studio | 내 컴퓨터 로컬 서버 (포트 1234) |
+| vLLM | 내 컴퓨터 로컬 서버 (포트 8000) |
 
 ---
 
@@ -563,9 +566,9 @@ VS Code를 닫으면 금고 대시보드에서 약 **90초** 후에 에이전트
 - 서비스별 활성화·비활성화 토글 스위치
 - 로컬 AI 서버(내 컴퓨터에서 돌리는 Ollama, LM Studio, vLLM 등)의 주소를 입력하면 사용 가능한 모델을 자동으로 찾아 줍니다.
 - **로컬 서비스 연결 상태 표시**: 서비스 이름 옆 ● 점이 **초록색**이면 연결됨, **회색**이면 연결 안 됨
-- **로컬 서비스 체크박스는 사용자가 직접 관리합니다**: 페이지를 열 때 로컬 서비스의 연결 상태를 확인하여 ● 점 색상만 업데이트합니다. 체크 상태는 변경하지 않으므로, 꺼둔 서비스가 자동으로 켜지는 일이 없습니다 (v0.1.21+).
+- **로컬 서비스 자동 신호등** (v0.1.23+): 로컬 서비스(Ollama, LM Studio, vLLM)는 연결 가능 여부에 따라 자동으로 활성화/비활성화됩니다. 서비스를 켜면 15초 이내에 ● 초록색으로 전환되고 체크박스가 켜지며, 서비스를 끄면 자동으로 꺼집니다. 클라우드 서비스(Google, OpenRouter 등)가 API 키 유무에 따라 자동 토글되는 것과 같은 방식입니다.
 
-> 💡 **로컬 서비스가 다른 컴퓨터에서 실행 중이라면**: 서비스 URL 입력란에 그 컴퓨터의 IP를 입력하세요. 예: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
+> 💡 **로컬 서비스가 다른 컴퓨터에서 실행 중이라면**: 서비스 URL 입력란에 그 컴퓨터의 IP를 입력하세요. 예: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). 서비스가 `0.0.0.0`이 아닌 `127.0.0.1`에만 바인딩되어 있으면 외부 IP로 접속이 안 되므로, 서비스 설정에서 바인딩 주소를 확인하세요.
 
 ### 관리자 토큰 입력
 
@@ -763,7 +766,11 @@ export OLLAMA_URL=http://192.168.x.x:11434   # 다른 컴퓨터에서 실행 중
 
 ---
 
-## 최근 변경 사항 (v0.1.16 ~ v0.1.22)
+## 최근 변경 사항 (v0.1.16 ~ v0.1.23)
+
+### v0.1.23 (2026-04-06)
+- **Ollama 모델 변경 수정**: 금고 대시보드에서 Ollama 모델을 변경해도 실제 프록시에 반영되지 않던 문제 수정. 이전에는 환경변수(`OLLAMA_MODEL`)만 사용했으나, 이제 금고 설정을 우선 사용합니다.
+- **로컬 서비스 자동 신호등**: Ollama·LM Studio·vLLM이 연결 가능하면 자동 활성화, 끊기면 자동 비활성화됩니다. 클라우드 서비스의 키 기반 자동 토글과 동일한 방식입니다.
 
 ### v0.1.22 (2026-04-05)
 - **빈 content 필드 누락 수정**: thinking 모델(gemini-3.1-pro, o1, claude thinking 등)이 max_tokens 한도를 reasoning에 다 쓰고 실제 응답을 못 만들 때, 프록시가 응답 JSON의 `content`/`text` 필드를 `omitempty`로 누락시켜 OpenAI/Anthropic SDK 클라이언트들이 `Cannot read properties of undefined (reading 'trim')` 에러로 크래시하는 문제 수정. 공식 API 스펙대로 항상 필드를 포함하도록 변경.
@@ -773,7 +780,7 @@ export OLLAMA_URL=http://192.168.x.x:11434   # 다른 컴퓨터에서 실행 중
 - **Gemma 4 모델 지원**: Google Gemini API를 통해 `gemma-4-31b-it`, `gemma-4-26b-a4b-it` 등 Gemma 계열 모델을 사용할 수 있습니다.
 - **LM Studio / vLLM 서비스 정식 지원**: 이전에는 이 서비스들이 프록시 라우팅에서 누락되어 항상 Ollama로 대체되었습니다. 이제 OpenAI 호환 API로 정상 라우팅됩니다.
 - **대시보드 서비스 표시 수정**: 폴백이 발생해도 대시보드에는 항상 사용자가 설정한 서비스가 표시됩니다.
-- **로컬 서비스 체크박스 보존**: 대시보드 로드 시 로컬 서비스(LM Studio 등)가 꺼져 있어도 체크가 해제되지 않습니다.
+- **로컬 서비스 상태 표시**: 대시보드 로드 시 로컬 서비스(Ollama, LM Studio, vLLM 등)의 연결 상태를 ● 점 색상으로 표시합니다.
 - **도구 필터 환경변수**: `WV_TOOL_FILTER=passthrough` 환경변수로 도구(tools) 전달 모드를 설정할 수 있습니다.
 
 ### v0.1.20 (2026-03-28)

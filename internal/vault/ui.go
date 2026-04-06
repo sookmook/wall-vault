@@ -1101,15 +1101,16 @@ async function _setSvcEnabled(id, enabled, token) {
   } catch {}
 }
 async function _checkLocalSvc(id, svcEnabled, token) {
-  // Only update the status dot (●) — never auto-toggle the enabled checkbox.
-  // The user manually enables/disables local services; auto-probe should not override that.
+  // Auto-toggle local service based on connectivity (mirrors cloud key-based toggle)
   const dot = document.getElementById('svc-dot-'+id);
   try {
     const resp = await fetch('/admin/services/'+id+'/ping', {headers:{'Authorization':'Bearer '+token}});
     const up = resp.ok && (await resp.json()).ok === true;
     if (dot) { dot.style.color = up ? 'var(--green)' : 'var(--text-muted)'; dot.title = up ? '연결됨' : '연결 안 됨'; }
+    if (svcEnabled !== up) await _setSvcEnabled(id, up, token);
   } catch {
     if (dot) { dot.style.color = 'var(--text-muted)'; dot.title = '연결 안 됨'; }
+    if (svcEnabled) await _setSvcEnabled(id, false, token);
   }
 }
 // 호출할 때마다 최신 키/서비스 현황을 서버에서 조회해 처리
@@ -1690,9 +1691,14 @@ function checkLocalService(id) {
   const token=getAdminToken();
   fetch('/admin/services/'+id+'/ping',{headers:{'Authorization':'Bearer '+(token||'')}})
   .then(r=>r.json()).then(d=>{
-    dot.style.color=d.ok?'#4caf50':'var(--text-muted)';
+    dot.style.color=d.ok?'var(--green)':'var(--text-muted)';
     dot.title=d.ok?'연결됨':'연결 안 됨'+(d.reason?' ('+d.reason+')':'');
-  }).catch(()=>{dot.style.color='var(--text-muted)';dot.title='확인 실패';});
+    const cb=document.getElementById('svc-en-'+id);
+    if(cb&&cb.checked!==d.ok) _setSvcEnabled(id,d.ok,token);
+  }).catch(()=>{dot.style.color='var(--text-muted)';dot.title='확인 실패';
+    const cb=document.getElementById('svc-en-'+id);
+    if(cb&&cb.checked) _setSvcEnabled(id,false,token);
+  });
 }
 function detectLocalModels(id) {
   const urlEl=document.getElementById('svc-url-'+id);if(!urlEl)return;

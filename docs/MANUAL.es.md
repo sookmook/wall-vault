@@ -1,76 +1,77 @@
 # Manual de Usuario de wall-vault
-*(Última actualización: 2026-04-05 — v0.1.22)*
+*(Ultima actualizacion: 2026-04-06 — v0.1.23)*
 
 ---
 
 ## Tabla de Contenidos
 
-1. [¿Qué es wall-vault?](#qué-es-wall-vault)
-2. [Instalación](#instalación)
+1. [Que es wall-vault?](#que-es-wall-vault)
+2. [Instalacion](#instalacion)
 3. [Primeros pasos (asistente setup)](#primeros-pasos)
 4. [Registro de claves API](#registro-de-claves-api)
 5. [Uso del proxy](#uso-del-proxy)
-6. [Panel de control del almacén de claves](#panel-de-control-del-almacén-de-claves)
+6. [Panel de control del almacen de claves](#panel-de-control-del-almacen-de-claves)
 7. [Modo distribuido (multi-bot)](#modo-distribuido-multi-bot)
-8. [Inicio automático](#inicio-automático)
-9. [Doctor: diagnóstico automático](#doctor-diagnóstico-automático)
+8. [Inicio automatico](#inicio-automatico)
+9. [Doctor: diagnostico automatico](#doctor-diagnostico-automatico)
 10. [Variables de entorno](#variables-de-entorno)
-11. [Solución de problemas](#solución-de-problemas)
+11. [Solucion de problemas](#solucion-de-problemas)
 
 ---
 
-## ¿Qué es wall-vault?
+## Que es wall-vault?
 
-**wall-vault = proxy de IA para OpenClaw + almacén seguro de claves API**
+**wall-vault = proxy de IA para OpenClaw + almacen seguro de claves API**
 
-Para usar servicios de IA necesitas una **clave API** (en español: "pase digital"). Una clave API es como un carnet que le dice al servicio "esta persona tiene derecho a usarme". Estas claves tienen un límite de uso diario y, si no se gestionan bien, pueden quedar expuestas.
+Para usar servicios de IA necesitas una **clave API** (un "pase digital"). Una clave API es como un carnet que le dice al servicio "esta persona tiene derecho a usarme". Estas claves tienen un limite de uso diario y, si no se gestionan bien, pueden quedar expuestas.
 
-wall-vault guarda esas claves en un almacén cifrado y actúa como **intermediario (proxy)** entre OpenClaw y los servicios de IA. En pocas palabras: OpenClaw solo necesita conectarse a wall-vault, y wall-vault se encarga de todo lo demás.
+wall-vault guarda esas claves en un almacen cifrado y actua como **intermediario (proxy)** entre OpenClaw y los servicios de IA. En pocas palabras: OpenClaw solo necesita conectarse a wall-vault, y wall-vault se encarga de todo lo demas.
 
 Problemas que wall-vault resuelve:
 
-- **Rotación automática de claves**: si una clave alcanza su límite o entra en enfriamiento (cooldown), wall-vault pasa silenciosamente a la siguiente. OpenClaw no se interrumpe.
-- **Cambio automático de servicio (fallback)**: si Google no responde, cambia a OpenRouter; si tampoco responde, cambia a Ollama (IA local en tu ordenador). La sesión no se corta. Cuando el servicio original se recupera, vuelve a él automáticamente a partir de la siguiente solicitud (v0.1.18+).
-- **Sincronización en tiempo real (SSE)**: si cambias el modelo en el panel de control, se refleja en OpenClaw en 1–3 segundos. SSE (Server-Sent Events) es una tecnología que permite al servidor enviar cambios al cliente en tiempo real.
+- **Rotacion automatica de claves**: si una clave alcanza su limite o entra en enfriamiento (cooldown), wall-vault pasa silenciosamente a la siguiente. OpenClaw no se interrumpe.
+- **Cambio automatico de servicio (fallback)**: si Google no responde, cambia a OpenRouter; si tampoco responde, cambia a Ollama, LM Studio o vLLM (IA local en tu ordenador). La sesion no se corta. Cuando el servicio original se recupera, vuelve a el automaticamente a partir de la siguiente solicitud (v0.1.18+, LM Studio/vLLM: v0.1.21+).
+- **Sincronizacion en tiempo real (SSE)**: si cambias el modelo en el panel de control, se refleja en OpenClaw en 1-3 segundos. SSE (Server-Sent Events) es una tecnologia que permite al servidor enviar cambios al cliente en tiempo real.
 - **Notificaciones en tiempo real**: eventos como claves agotadas o fallos de servicio aparecen directamente en la parte inferior de la pantalla TUI (terminal) de OpenClaw.
 
-> 💡 También puedes conectar **Claude Code, Cursor y VS Code**, pero el propósito principal de wall-vault es usarse junto con OpenClaw.
+> 💡 Tambien puedes conectar **Claude Code, Cursor y VS Code**, pero el proposito principal de wall-vault es usarse junto con OpenClaw.
 
 ```
 OpenClaw (pantalla de terminal TUI)
         │
         ▼
-  proxy wall-vault (:56244)   ← gestión de claves, enrutamiento, fallback, eventos
+  proxy wall-vault (:56244)   ← gestion de claves, enrutamiento, fallback, eventos
         │
         ├─ Google Gemini API
-        ├─ OpenRouter API (más de 340 modelos)
-        └─ Ollama (tu ordenador, último recurso)
+        ├─ OpenRouter API (mas de 340 modelos)
+        ├─ Ollama / LM Studio / vLLM (tu ordenador, ultimo recurso)
+        └─ OpenAI / Anthropic API
 ```
 
 ---
 
-## Instalación
+## Instalacion
 
 ### Linux / macOS
 
-Abre una terminal y pega el siguiente comando tal cual.
+Abre un terminal y pega los siguientes comandos:
 
 ```bash
-# Linux (PC o servidor estándar — amd64)
+# Linux (PC estandar, servidor — amd64)
 curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
   -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
 
-# macOS Apple Silicon (Mac M1/M2/M3)
+# macOS Apple Silicon (M1/M2/M3 Mac)
 curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
   -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
 ```
 
-- `curl -L ...` — descarga el archivo desde internet.
-- `chmod +x` — marca el archivo descargado como "ejecutable". Si omites este paso, obtendrás un error de "permiso denegado".
+- `curl -L ...` — Descarga un archivo de Internet.
+- `chmod +x` — Hace que el archivo descargado sea ejecutable. Si omites este paso, obtendras un error de "permiso denegado".
 
 ### Windows
 
-Abre PowerShell (con permisos de administrador) y ejecuta el siguiente comando.
+Abre PowerShell (como administrador) y ejecuta los siguientes comandos:
 
 ```powershell
 # Descargar
@@ -78,55 +79,55 @@ Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
   -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
 
-# Añadir al PATH (se aplica al reiniciar PowerShell)
+# Agregar al PATH (se aplica tras reiniciar PowerShell)
 $env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
 ```
 
-> 💡 **¿Qué es el PATH?** Es la lista de carpetas donde el sistema operativo busca los comandos. Si añades wall-vault al PATH, podrás escribir `wall-vault` en cualquier carpeta y ejecutarlo directamente.
+> 💡 **Que es el PATH?** Es la lista de carpetas donde tu ordenador busca los comandos. Al agregar wall-vault al PATH, puedes ejecutar `wall-vault` desde cualquier directorio.
 
-### Compilar desde el código fuente (para desarrolladores)
+### Compilar desde el codigo fuente (para desarrolladores)
 
-Solo es necesario si tienes instalado el entorno de desarrollo de Go.
+Solo aplica si tienes un entorno de desarrollo Go instalado.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (versión: v0.1.6.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (version: v0.1.23.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Versión con sello de tiempo**: al compilar con `make build`, la versión incluye automáticamente la fecha y hora, como `v0.1.6.20260314.231308`. Si compilas directamente con `go build ./...`, la versión aparecerá simplemente como `"dev"`.
+> 💡 **Version con marca de tiempo**: al compilar con `make build`, la version se genera automaticamente en formato `v0.1.23.20260406.211004` que incluye fecha y hora. Si compilas directamente con `go build ./...`, la version mostrara simplemente `"dev"`.
 
 ---
 
 ## Primeros pasos
 
-### Ejecutar el asistente de configuración (setup)
+### Ejecutar el asistente de configuracion
 
-La primera vez que uses wall-vault, ejecuta el **asistente de configuración** con el siguiente comando. El asistente te guiará paso a paso preguntándote cada opción necesaria.
+Despues de la instalacion, asegurate de ejecutar primero el **asistente de configuracion**. El asistente te guiara paso a paso, preguntandote la informacion necesaria.
 
 ```bash
 wall-vault setup
 ```
 
-Los pasos que recorre el asistente son los siguientes:
+Estos son los pasos que sigue el asistente:
 
 ```
-1. Selección de idioma (10 idiomas disponibles, incluido español)
-2. Selección de tema (light / dark / gold / cherry / ocean)
-3. Modo de operación — elegir entre uso individual (standalone) o en varios equipos (distributed)
-4. Nombre del bot — el nombre que aparecerá en el panel de control
-5. Configuración de puertos — por defecto: proxy 56244, almacén 56243 (pulsa Enter para dejarlo así)
-6. Selección de servicios de IA — Google / OpenRouter / Ollama
-7. Configuración del filtro de seguridad de herramientas
-8. Token de administrador — contraseña para proteger las funciones de gestión del panel. Se puede generar automáticamente
-9. Contraseña de cifrado de claves API — para mayor seguridad en el almacenamiento (opcional)
-10. Ruta donde se guardará el archivo de configuración
+1. Seleccion de idioma (10 idiomas incluido el espanol)
+2. Seleccion de tema (light / dark / gold / cherry / ocean)
+3. Modo de operacion — individual (standalone) o multiples maquinas (distributed)
+4. Nombre del bot — el nombre que se mostrara en el panel de control
+5. Configuracion de puertos — por defecto: proxy 56244, almacen 56243 (pulsa Enter para mantener)
+6. Seleccion de servicios IA — Google / OpenRouter / Ollama / LM Studio / vLLM
+7. Configuracion del filtro de seguridad de herramientas
+8. Token de administrador — una contrasena para bloquear las funciones de administracion; puede generarse automaticamente
+9. Contrasena de cifrado de claves API — para almacenamiento extra seguro (opcional)
+10. Ubicacion del archivo de configuracion
 ```
 
-> ⚠️ **Recuerda bien el token de administrador.** Lo necesitarás más adelante para añadir claves o cambiar la configuración desde el panel. Si lo pierdes, tendrás que editar el archivo de configuración manualmente.
+> ⚠️ **Asegurate de recordar tu token de administrador.** Lo necesitaras mas adelante para agregar claves o cambiar configuraciones en el panel de control. Si lo olvidas, tendras que editar manualmente el archivo de configuracion.
 
-Al completar el asistente se genera automáticamente el archivo de configuración `wall-vault.yaml`.
+Al completar el asistente, se crea automaticamente un archivo de configuracion `wall-vault.yaml`.
 
 ### Iniciar
 
@@ -134,55 +135,55 @@ Al completar el asistente se genera automáticamente el archivo de configuració
 wall-vault start
 ```
 
-Se inician simultáneamente dos servidores:
+Se inician dos servidores simultaneamente:
 
-- **Proxy** (`http://localhost:56244`) — intermediario entre OpenClaw y los servicios de IA
-- **Almacén de claves** (`http://localhost:56243`) — gestión de claves API y panel de control web
+- **Proxy** (`http://localhost:56244`) — el intermediario que conecta OpenClaw con los servicios de IA
+- **Almacen de claves** (`http://localhost:56243`) — gestion de claves API y panel de control web
 
-Abre `http://localhost:56243` en tu navegador para acceder al panel de control.
+Abre `http://localhost:56243` en tu navegador para ver el panel de control inmediatamente.
 
 ---
 
 ## Registro de claves API
 
-Hay cuatro formas de registrar una clave API. **Si estás empezando, te recomendamos el método 1 (variables de entorno)**.
+Hay cuatro formas de registrar claves API. **Para principiantes, se recomienda el metodo 1 (variables de entorno).**
 
-### Método 1: Variables de entorno (recomendado — el más sencillo)
+### Metodo 1: Variables de entorno (recomendado — el mas simple)
 
-Una variable de entorno es un **valor preconfigurado** que el programa lee al iniciarse. Escribe lo siguiente en la terminal:
+Las variables de entorno son **valores preconfigurados** que un programa lee al iniciarse. Simplemente escribe lo siguiente en tu terminal:
 
 ```bash
-# Registrar clave de Google Gemini
+# Registrar una clave de Google Gemini
 export WV_KEY_GOOGLE=AIzaSy...
 
-# Registrar clave de OpenRouter
+# Registrar una clave de OpenRouter
 export WV_KEY_OPENROUTER=sk-or-v1-...
 
-# Iniciar tras registrar
+# Iniciar tras el registro
 wall-vault start
 ```
 
-Si tienes varias claves, sepáralas con comas (`,`). wall-vault las usará de forma rotativa automática (round robin):
+Si tienes multiples claves, separalas con comas. wall-vault las rotara automaticamente (round-robin):
 
 ```bash
 export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 ```
 
-> 💡 **Consejo**: el comando `export` solo se aplica a la sesión de terminal actual. Para que persista al reiniciar el ordenador, añade esa línea a tu archivo `~/.bashrc` o `~/.zshrc`.
+> 💡 **Consejo**: el comando `export` solo se aplica a la sesion de terminal actual. Para que persista tras reinicios, agrega la linea a tu archivo `~/.bashrc` o `~/.zshrc`.
 
-### Método 2: Panel de control web (con el ratón)
+### Metodo 2: Interfaz del panel de control (clic de raton)
 
-1. Abre `http://localhost:56243` en el navegador
-2. En la tarjeta **🔑 API Keys**, haz clic en el botón `[+ Añadir]`
-3. Introduce el tipo de servicio, el valor de la clave, una etiqueta (nombre descriptivo) y el límite diario, luego guarda
+1. Abre `http://localhost:56243` en tu navegador
+2. Haz clic en el boton `[+ Agregar]` en la tarjeta **🔑 Claves API** superior
+3. Introduce el tipo de servicio, el valor de la clave, una etiqueta (nombre de nota) y el limite diario, luego guarda
 
-### Método 3: API REST (para automatización y scripts)
+### Metodo 3: API REST (para automatizacion/scripts)
 
-La API REST es una forma de que los programas intercambien datos mediante HTTP. Es útil para registrar claves automáticamente mediante scripts.
+La API REST es una forma en que los programas intercambian datos via HTTP. Util para registro automatizado mediante scripts.
 
 ```bash
 curl -X POST http://localhost:56243/admin/keys \
-  -H "Authorization: Bearer tu-token-de-administrador" \
+  -H "Authorization: Bearer tu-token-admin" \
   -H "Content-Type: application/json" \
   -d '{
     "service": "google",
@@ -192,9 +193,9 @@ curl -X POST http://localhost:56243/admin/keys \
   }'
 ```
 
-### Método 4: Flag del proxy (para pruebas rápidas)
+### Metodo 4: Flags del proxy (para pruebas rapidas)
 
-Útil cuando quieres probar una clave de forma temporal sin registrarla. Desaparece al cerrar el programa.
+Sirve para inyectar temporalmente una clave para pruebas sin registro formal. La clave desaparece cuando se detiene el programa.
 
 ```bash
 wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
@@ -204,11 +205,11 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 
 ## Uso del proxy
 
-### Uso con OpenClaw (propósito principal)
+### Uso con OpenClaw (proposito principal)
 
-Así se configura OpenClaw para conectarse a los servicios de IA a través de wall-vault.
+Asi es como se configura OpenClaw para conectarse a los servicios de IA a traves de wall-vault.
 
-Abre el archivo `~/.openclaw/openclaw.json` y añade lo siguiente:
+Abre el archivo `~/.openclaw/openclaw.json` y agrega lo siguiente:
 
 ```json5
 // ~/.openclaw/openclaw.json
@@ -217,12 +218,12 @@ Abre el archivo `~/.openclaw/openclaw.json` y añade lo siguiente:
     providers: {
       "wall-vault": {
         baseUrl: "http://localhost:56244/v1",
-        apiKey: "your-agent-token",   // token del agente en el almacén
+        apiKey: "tu-token-agente",   // token del agente del almacen
         api: "openai-completions",
         models: [
           { id: "wall-vault/gemini-2.5-flash" },
           { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // contexto 1M gratuito
+          { id: "wall-vault/hunter-alpha" },    // 1M de contexto gratuito
           { id: "wall-vault/claude-opus-4-6" }
         ]
       }
@@ -231,34 +232,34 @@ Abre el archivo `~/.openclaw/openclaw.json` y añade lo siguiente:
 }
 ```
 
-> 💡 **Manera más fácil**: pulsa el botón **🦞 Copiar configuración de OpenClaw** en la tarjeta del agente en el panel. Se copiará al portapapeles un fragmento ya relleno con tu token y dirección. Solo tienes que pegarlo.
+> 💡 **Metodo mas facil**: haz clic en el boton **🦞 Copiar config OpenClaw** en la tarjeta de agente del panel de control — copia un fragmento con el token y la direccion ya completados. Solo pega.
 
-**¿A dónde se dirige cada modelo según el prefijo `wall-vault/`?**
+**A donde se dirige el prefijo `wall-vault/` en los nombres de modelo?**
 
-wall-vault determina automáticamente a qué servicio de IA enviar la solicitud según el nombre del modelo:
+wall-vault determina automaticamente a que servicio de IA enviar la solicitud segun el nombre del modelo:
 
-| Formato del modelo | Servicio de destino |
-|-------------------|---------------------|
-| `wall-vault/gemini-*` | Conexión directa a Google Gemini |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | Conexión directa a OpenAI |
-| `wall-vault/claude-*` | Anthropic a través de OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (contexto 1M de tokens gratuito) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | Conexión a OpenRouter |
-| `google/nombre-modelo`, `openai/nombre-modelo`, `anthropic/nombre-modelo`, etc. | Conexión directa al servicio indicado |
-| `custom/google/nombre-modelo`, `custom/openai/nombre-modelo`, etc. | Elimina el prefijo `custom/` y redirige |
-| `nombre-modelo:cloud` | Elimina el sufijo `:cloud` y conecta a OpenRouter |
+| Formato del modelo | Se dirige a |
+|-------------------|-------------|
+| `wall-vault/gemini-*` | Google Gemini directo |
+| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI directo |
+| `wall-vault/claude-*` | Anthropic via OpenRouter |
+| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (contexto gratuito de 1M tokens) |
+| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
+| `google/nombre-modelo`, `openai/nombre-modelo`, `anthropic/nombre-modelo`, etc. | Directamente al servicio correspondiente |
+| `custom/google/nombre-modelo`, `custom/openai/nombre-modelo`, etc. | Elimina el prefijo `custom/` y reenviar |
+| `nombre-modelo:cloud` | Elimina el sufijo `:cloud` y envia a OpenRouter |
 
-> 💡 **¿Qué es el contexto?** Es la cantidad de conversación o texto que la IA puede "recordar" de una vez. Con 1M (un millón de tokens) se pueden procesar conversaciones muy largas o documentos extensos en una sola sesión.
+> 💡 **Que es el contexto?** Es la cantidad de conversacion que una IA puede recordar de una vez. 1M (un millon de tokens) significa que puede procesar conversaciones o documentos muy largos en una sola sesion.
 
-### Conexión directa con formato de API Gemini (compatibilidad con herramientas existentes)
+### Conexion directa en formato Gemini API (compatibilidad con herramientas existentes)
 
-Si ya usas alguna herramienta que se conecta directamente a Google Gemini API, basta con cambiar la dirección a wall-vault:
+Si tienes herramientas que ya usan directamente la API de Google Gemini, simplemente cambia la direccion a wall-vault:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:56244/google
 ```
 
-O, si la herramienta permite especificar la URL directamente:
+O si la herramienta acepta una URL directa:
 
 ```
 http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
@@ -266,35 +267,35 @@ http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 
 ### Uso con el SDK de OpenAI (Python)
 
-También puedes conectar wall-vault desde código Python que usa IA. Solo cambia `base_url`:
+Tambien puedes conectar wall-vault a codigo Python que use IA. Solo cambia el `base_url`:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:56244/v1",
-    api_key="not-needed"  # wall-vault gestiona las claves API automáticamente
+    api_key="not-needed"  # wall-vault gestiona las claves API por ti
 )
 
 response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # formato proveedor/modelo
+    model="google/gemini-2.5-flash",   # formato provider/model
     messages=[{"role": "user", "content": "Hola"}]
 )
 ```
 
-### Cambiar el modelo en tiempo de ejecución
+### Cambiar de modelo en ejecucion
 
-Si wall-vault ya está en ejecución y quieres cambiar el modelo de IA que utiliza:
+Para cambiar el modelo de IA mientras wall-vault esta en ejecucion:
 
 ```bash
-# Cambiar el modelo enviando una solicitud directamente al proxy
+# Cambiar modelo enviando una solicitud al proxy
 curl -X PUT http://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
-# En modo distribuido (multi-bot), cámbialo desde el almacén → se aplica al instante vía SSE
-curl -X PUT http://localhost:56243/admin/clients/id-de-mi-bot \
-  -H "Authorization: Bearer tu-token-de-administrador" \
+# En modo distribuido (multi-bot), cambiar en el servidor del almacen → sincronizacion SSE instantanea
+curl -X PUT http://localhost:56243/admin/clients/mi-bot-id \
+  -H "Authorization: Bearer tu-token-admin" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
 ```
@@ -305,75 +306,77 @@ curl -X PUT http://localhost:56243/admin/clients/id-de-mi-bot \
 # Ver la lista completa
 curl http://localhost:56244/api/models | python3 -m json.tool
 
-# Ver solo los modelos de Google
+# Ver solo modelos de Google
 curl "http://localhost:56244/api/models?service=google"
 
-# Buscar por nombre (ejemplo: modelos que contienen "claude")
+# Buscar por nombre (ej: modelos que contengan "claude")
 curl "http://localhost:56244/api/models?q=claude"
 ```
 
-**Resumen de modelos principales por servicio:**
+**Modelos principales por servicio:**
 
 | Servicio | Modelos principales |
-|----------|---------------------|
+|----------|-------------------|
 | Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
 | OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | Más de 346 modelos (Hunter Alpha 1M contexto gratis, DeepSeek R1/V3, Qwen 2.5, etc.) |
-| Ollama | Detecta automáticamente el servidor local instalado en tu ordenador |
+| OpenRouter | 346+ (Hunter Alpha 1M contexto gratuito, DeepSeek R1/V3, Qwen 2.5, etc.) |
+| Ollama | Deteccion automatica de modelos instalados localmente |
+| LM Studio | Servidor local (puerto 1234) |
+| vLLM | Servidor local (puerto 8000) |
 
 ---
 
-## Panel de control del almacén de claves
+## Panel de control del almacen de claves
 
-Accede al panel visitando `http://localhost:56243` en tu navegador.
+Abre `http://localhost:56243` en tu navegador para ver el panel de control.
 
-**Estructura de la pantalla:**
-- **Barra superior fija (topbar)**: logo, selector de idioma y tema, indicador de estado de conexión SSE
-- **Cuadrícula de tarjetas**: tarjetas de agentes, servicios y claves API dispuestas en forma de mosaico
+**Disposicion:**
+- **Barra superior (fija)**: logo, selectores de idioma/tema, indicador de conexion SSE
+- **Cuadricula de tarjetas**: tarjetas de agentes, servicios y claves API dispuestas en mosaico
 
-### Tarjeta de claves API
+### Tarjetas de Claves API
 
-Una tarjeta que te permite gestionar de un vistazo todas las claves API registradas.
+Tarjetas que te permiten gestionar tus claves API registradas de un vistazo.
 
-- Muestra la lista de claves agrupadas por servicio.
-- `today_usage`: número de tokens procesados con éxito hoy (texto leído y generado por la IA)
-- `today_attempts`: número total de llamadas realizadas hoy (éxitos + fallos)
-- El botón `[+ Añadir]` registra una nueva clave; `✕` la elimina.
+- Las claves se organizan por servicio.
+- `today_usage`: numero de tokens (unidades de texto que la IA lee/escribe) procesados con exito hoy
+- `today_attempts`: numero total de llamadas hoy (exitosas + fallidas)
+- Usa el boton `[+ Agregar]` para registrar nuevas claves y `✕` para eliminarlas.
 
-> 💡 **¿Qué es un token?** Es la unidad que usa la IA para procesar texto. Corresponde aproximadamente a una palabra en inglés, o a uno o dos caracteres en otros idiomas. El coste de la API suele calcularse en función del número de tokens.
+> 💡 **Que es un token?** Es la unidad que usa la IA para procesar texto. Aproximadamente una palabra en ingles, o 1-2 caracteres en espanol. Los precios de API generalmente se calculan segun el numero de tokens.
 
-### Tarjeta de agentes
+### Tarjetas de Agentes
 
-Una tarjeta que muestra el estado de los bots (agentes) conectados al proxy de wall-vault.
+Tarjetas que muestran el estado de los bots (agentes) conectados al proxy wall-vault.
 
-**El estado de conexión se muestra en 4 niveles:**
+**El estado de conexion se muestra en 4 niveles:**
 
 | Indicador | Estado | Significado |
 |-----------|--------|-------------|
-| 🟢 | En ejecución | El proxy funciona con normalidad |
-| 🟡 | Con retraso | Responde pero lentamente |
-| 🔴 | Sin conexión | El proxy no responde |
-| ⚫ | Sin conectar / inactivo | El proxy nunca se ha conectado al almacén, o está desactivado |
+| 🟢 | En ejecucion | El proxy funciona normalmente |
+| 🟡 | Retrasado | Responde pero lento |
+| 🔴 | Sin conexion | El proxy no responde |
+| ⚫ | No conectado / Desactivado | El proxy nunca se ha conectado al almacen, o esta desactivado |
 
-**Guía de botones en la parte inferior de la tarjeta del agente:**
+**Botones en la parte inferior de las tarjetas de agentes:**
 
-Cuando registras un agente, si especificas su **tipo**, aparecerán automáticamente los botones de acceso rápido correspondientes.
+Cuando registras un agente con un **tipo de agente** especifico, aparecen automaticamente botones de conveniencia adaptados a ese tipo.
 
 ---
 
-#### 🔘 Botón "Copiar configuración" — genera la configuración de conexión automáticamente
+#### 🔘 Boton Copiar configuracion — genera automaticamente los ajustes de conexion
 
-Al hacer clic, se copia al portapapeles un fragmento de configuración ya relleno con el token, la dirección del proxy y los datos del modelo de ese agente. Solo tienes que pegarlo en la ubicación indicada en la tabla siguiente para completar la configuración.
+Al hacer clic, se copia al portapapeles un fragmento de configuracion con el token del agente, la direccion del proxy y la informacion del modelo ya completados. Solo pega el contenido en la ubicacion indicada en la tabla para completar la configuracion.
 
-| Botón | Tipo de agente | Dónde pegar |
+| Boton | Tipo de agente | Donde pegar |
 |-------|---------------|-------------|
-| 🦞 Copiar configuración de OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 Copiar configuración de NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 Copiar configuración de Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⌨ Copiar configuración de Cursor | `cursor` | Cursor → Settings → AI |
-| 💻 Copiar configuración de VSCode | `vscode` | `~/.continue/config.json` |
+| 🦞 Copiar config OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| 🦀 Copiar config NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+| 🟠 Copiar config Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⌨ Copiar config Cursor | `cursor` | Cursor → Settings → AI |
+| 💻 Copiar config VSCode | `vscode` | `~/.continue/config.json` |
 
-**Ejemplo — si el tipo es Claude Code, se copia algo así:**
+**Ejemplo — Para tipo Claude Code, se copia lo siguiente:**
 
 ```json
 // ~/.claude/settings.json
@@ -384,22 +387,29 @@ Al hacer clic, se copia al portapapeles un fragmento de configuración ya rellen
 }
 ```
 
-**Ejemplo — si el tipo es VSCode (Continue):**
+**Ejemplo — Para tipo VSCode (Continue):**
 
-```json
-// ~/.continue/config.json
-{
-  "models": [{
-    "title": "wall-vault proxy",
-    "provider": "openai",
-    "model": "gemini-2.5-flash",
-    "apiBase": "http://192.168.1.20:56244/v1",
-    "apiKey": "token-de-este-agente"
-  }]
-}
+```yaml
+# ~/.continue/config.yaml  ← pegar en config.yaml, NO en config.json
+name: My Config
+version: 0.0.1
+schema: v1
+
+models:
+  - name: wall-vault proxy
+    provider: openai
+    model: gemini-2.5-flash
+    apiBase: http://192.168.1.20:56244/v1
+    apiKey: token-de-este-agente
+    roles:
+      - chat
+      - edit
+      - apply
 ```
 
-**Ejemplo — si el tipo es Cursor:**
+> ⚠️ **La ultima version de Continue usa `config.yaml`.** Si `config.yaml` existe, `config.json` se ignora completamente. Asegurate de pegar en `config.yaml`.
+
+**Ejemplo — Para tipo Cursor:**
 
 ```
 Base URL : http://192.168.1.20:56244/v1
@@ -410,185 +420,185 @@ OPENAI_BASE_URL=http://192.168.1.20:56244/v1
 OPENAI_API_KEY=token-de-este-agente
 ```
 
-> ⚠️ **Si el portapapeles no funciona**: la política de seguridad del navegador puede bloquear la copia. Si aparece un cuadro de texto emergente, selecciona todo con Ctrl+A y copia con Ctrl+C.
+> ⚠️ **Si la copia al portapapeles no funciona**: las politicas de seguridad del navegador pueden bloquear la copia. Si aparece un popup con un cuadro de texto, selecciona todo con Ctrl+A y luego copia con Ctrl+C.
 
 ---
 
-#### ⚡ Botón de aplicación automática — configuración completada con un solo clic
+#### ⚡ Boton de aplicacion automatica — un clic y listo
 
-Cuando el tipo de agente es `cline`, `claude-code`, `openclaw` o `nanoclaw`, aparece un botón **⚡ Aplicar configuración** en la tarjeta del agente. Al pulsarlo, el archivo de configuración local del agente correspondiente se actualiza automáticamente.
+Para agentes de tipo `cline`, `claude-code`, `openclaw` o `nanoclaw`, la tarjeta de agente muestra un boton **⚡ Aplicar config**. Al hacer clic, se actualiza automaticamente el archivo de configuracion local del agente.
 
-| Botón | Tipo de agente | Archivo de destino |
-|-------|---------------|-------------------|
-| ⚡ Aplicar configuración de Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ Aplicar configuración de Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⚡ Aplicar configuración de OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ Aplicar configuración de NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+| Boton | Tipo de agente | Archivo destino |
+|-------|---------------|-----------------|
+| ⚡ Aplicar config Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Aplicar config Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Aplicar config OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Aplicar config NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
 
-> ⚠️ Este botón envía una solicitud a **localhost:56244** (el proxy local). Solo funciona si el proxy está en ejecución en esa máquina.
-
----
-
-#### 🔀 Ordenar tarjetas con arrastrar y soltar (v0.1.17)
-
-Puedes **arrastrar** las tarjetas de agentes en el panel para reorganizarlas en el orden que desees.
-
-1. Toma una tarjeta de agente con el ratón y arrástrala
-2. Suéltala sobre otra tarjeta para intercambiar sus posiciones
-3. El nuevo orden se **guarda inmediatamente en el servidor** y se mantiene después de actualizar la página
-
-> 💡 Los dispositivos táctiles (móvil/tableta) aún no son compatibles. Por favor, usa un navegador de escritorio.
+> ⚠️ Este boton envia una solicitud a **localhost:56244** (proxy local). El proxy debe estar en ejecucion en esa maquina para que funcione.
 
 ---
 
-#### 🔄 Sincronización bidireccional de modelos (v0.1.16)
+#### 🔀 Ordenar tarjetas arrastrando y soltando (v0.1.17)
 
-Cuando cambias el modelo de un agente en el panel de la bóveda, la configuración local de ese agente se actualiza automáticamente.
+Puedes **arrastrar** las tarjetas de agentes en el panel de control para reorganizarlas en el orden que desees.
 
-**En el caso de Cline:**
-- Cambio de modelo en la bóveda → evento SSE → el proxy actualiza los campos de modelo en `globalState.json`
+1. Agarra una tarjeta de agente con el raton y arrastrala
+2. Sueltala sobre otra tarjeta para intercambiar posiciones
+3. El nuevo orden se **guarda en el servidor inmediatamente** y persiste tras actualizar la pagina
+
+> 💡 Los dispositivos tactiles (movil/tablet) aun no estan soportados. Usa un navegador de escritorio.
+
+---
+
+#### 🔄 Sincronizacion bidireccional de modelos (v0.1.16)
+
+Cuando cambias el modelo de un agente en el panel de control del almacen, la configuracion local del agente se actualiza automaticamente.
+
+**Para Cline:**
+- Cambio de modelo en el almacen → evento SSE → el proxy actualiza el campo de modelo en `globalState.json`
 - Campos actualizados: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- No se modifican `openAiBaseUrl` ni la clave API
-- **Es necesario recargar VS Code (`Ctrl+Alt+R` o `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - Cline no relee el archivo de configuración mientras está en ejecución
+- `openAiBaseUrl` y la clave API no se modifican
+- **Se requiere recargar VS Code (`Ctrl+Alt+R` o `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Porque Cline no vuelve a leer el archivo de configuracion durante la ejecucion
 
-**En el caso de Claude Code:**
-- Cambio de modelo en la bóveda → evento SSE → el proxy actualiza el campo `model` en `settings.json`
-- Busca automáticamente en las rutas de WSL y Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+**Para Claude Code:**
+- Cambio de modelo en el almacen → evento SSE → el proxy actualiza el campo `model` en `settings.json`
+- Busca automaticamente en rutas WSL y Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
 
-**En dirección inversa (agente → bóveda):**
-- Cuando un agente (Cline, Claude Code, etc.) envía una solicitud al proxy, este incluye la información de servicio y modelo del cliente en el heartbeat
-- La tarjeta del agente en el panel de la bóveda muestra en tiempo real el servicio/modelo en uso
+**Direccion inversa (agente → almacen):**
+- Cuando un agente (Cline, Claude Code, etc.) envia una solicitud al proxy, este incluye la informacion de servicio/modelo del cliente en el heartbeat
+- La tarjeta de agente en el panel de control muestra el servicio/modelo actualmente en uso en tiempo real
 
-> 💡 **Punto clave**: el proxy identifica al agente mediante el token Authorization de la solicitud y lo enruta automáticamente al servicio/modelo configurado en la bóveda. Aunque Cline o Claude Code envíen un nombre de modelo diferente, el proxy lo sobrescribe con la configuración de la bóveda.
+> 💡 **Punto clave**: el proxy identifica a los agentes por su token de Authorization en las solicitudes, y los redirige automaticamente al servicio/modelo configurado en el almacen. Incluso si Cline o Claude Code envia un nombre de modelo diferente, el proxy lo sobreescribe con la configuracion del almacen.
 
 ---
 
-### Usar Cline en VS Code — guía detallada
+### Usar Cline con VS Code — Guia detallada
 
 #### Paso 1: Instalar Cline
 
 Instala **Cline** (ID: `saoudrizwan.claude-dev`) desde el marketplace de extensiones de VS Code.
 
-#### Paso 2: Registrar el agente en la bóveda
+#### Paso 2: Registrar el agente en el almacen
 
-1. Abre el panel de la bóveda (`http://IP-de-la-bóveda:56243`)
-2. En la sección **Agentes**, haz clic en **+ Añadir**
-3. Rellena los campos así:
+1. Abre el panel de control del almacen (`http://IP-almacen:56243`)
+2. Haz clic en **+ Agregar** en la seccion **Agentes**
+3. Completa lo siguiente:
 
-| Campo | Valor | Descripción |
+| Campo | Valor | Descripcion |
 |-------|-------|-------------|
-| ID | `my_cline` | Identificador único (alfanumérico, sin espacios) |
-| Nombre | `My Cline` | Nombre que aparecerá en el panel |
-| Tipo de agente | `cline` | ← Debes seleccionar `cline` obligatoriamente |
-| Servicio | Selecciona el servicio que quieras usar (ej.: `google`) | |
-| Modelo | Introduce el modelo que quieras usar (ej.: `gemini-2.5-flash`) | |
+| ID | `mi_cline` | Identificador unico (alfanumerico, sin espacios) |
+| Nombre | `Mi Cline` | Nombre que se muestra en el panel de control |
+| Tipo de agente | `cline` | ← Debes seleccionar `cline` |
+| Servicio | Selecciona el servicio a usar (ej: `google`) | |
+| Modelo | Introduce el modelo a usar (ej: `gemini-2.5-flash`) | |
 
-4. Al pulsar **Guardar**, se genera automáticamente un token
+4. Haz clic en **Guardar** — se genera un token automaticamente
 
-#### Paso 3: Conectar con Cline
+#### Paso 3: Conectar Cline
 
-**Opción A — Aplicación automática (recomendada)**
+**Metodo A — Aplicacion automatica (recomendado)**
 
-1. Comprueba que el **proxy** de wall-vault esté en ejecución en esa máquina (`localhost:56244`)
-2. En la tarjeta del agente del panel, haz clic en **⚡ Aplicar configuración de Cline**
-3. Si aparece la notificación "¡Configuración aplicada!", ha funcionado
+1. Asegurate de que el **proxy** wall-vault esta en ejecucion en esa maquina (`localhost:56244`)
+2. Haz clic en el boton **⚡ Aplicar config Cline** en la tarjeta de agente del panel de control
+3. Si aparece la notificacion "Configuracion aplicada con exito!", funciono
 4. Recarga VS Code (`Ctrl+Alt+R`)
 
-**Opción B — Configuración manual**
+**Metodo B — Configuracion manual**
 
-Abre la configuración (⚙️) en la barra lateral de Cline:
+Abre Configuracion (⚙️) en la barra lateral de Cline:
 - **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://dirección-del-proxy:56244/v1`
-  - En la misma máquina: `http://localhost:56244/v1`
-  - En otra máquina (como un Mini server): `http://192.168.1.20:56244/v1`
-- **API Key**: el token emitido en la bóveda (cópialo desde la tarjeta del agente)
-- **Model ID**: el modelo configurado en la bóveda (ej.: `gemini-2.5-flash`)
+- **Base URL**: `http://direccion-proxy:56244/v1`
+  - Misma maquina: `http://localhost:56244/v1`
+  - Otra maquina (ej: Mac Mini): `http://192.168.1.20:56244/v1`
+- **API Key**: el token emitido por el almacen (copia desde la tarjeta de agente)
+- **Model ID**: el modelo configurado en el almacen (ej: `gemini-2.5-flash`)
 
-#### Paso 4: Verificación
+#### Paso 4: Verificar
 
-Envía cualquier mensaje en la ventana de chat de Cline. Si todo funciona correctamente:
-- En el panel de la bóveda, la tarjeta del agente mostrará un **punto verde (● en ejecución)**
-- La tarjeta mostrará el servicio/modelo actual (ej.: `google / gemini-2.5-flash`)
+Envia cualquier mensaje en la ventana de chat de Cline. Si funciona:
+- La tarjeta de agente en el panel de control muestra un **punto verde (● En ejecucion)**
+- La tarjeta muestra el servicio/modelo actual (ej: `google / gemini-2.5-flash`)
 
-#### Cambiar el modelo
+#### Cambiar de modelo
 
-Cuando quieras cambiar el modelo de Cline, hazlo desde el **panel de la bóveda**:
+Cuando quieras cambiar el modelo de Cline, hazlo desde el **panel de control del almacen**:
 
-1. Cambia el desplegable de servicio/modelo en la tarjeta del agente
+1. Cambia el desplegable de servicio/modelo en la tarjeta de agente
 2. Haz clic en **Aplicar**
-3. Recarga VS Code (`Ctrl+Alt+R`) — el nombre del modelo en el pie de Cline se actualizará
-4. A partir de la siguiente solicitud se usará el nuevo modelo
+3. Recarga VS Code (`Ctrl+Alt+R`) — el nombre del modelo en el pie de pagina de Cline se actualizara
+4. El nuevo modelo se usara a partir de la siguiente solicitud
 
-> 💡 En realidad, el proxy identifica las solicitudes de Cline por su token y las enruta al modelo de la configuración de la bóveda. Aunque no recargues VS Code, **el modelo que realmente se usa cambia de inmediato** — la recarga solo sirve para actualizar el nombre del modelo que muestra la interfaz de Cline.
+> 💡 En la practica, el proxy identifica las solicitudes de Cline por el token y las dirige al modelo configurado en el almacen. Incluso sin recargar VS Code, **el modelo real utilizado cambia inmediatamente** — la recarga solo sirve para actualizar la visualizacion del modelo en la interfaz de Cline.
 
-#### Detección de desconexión
+#### Deteccion de desconexion
 
-Al cerrar VS Code, la tarjeta del agente en el panel de la bóveda cambiará a amarillo (con retraso) tras unos **90 segundos**, y a rojo (sin conexión) tras **3 minutos**. (Desde v0.1.18, el intervalo de verificación de estado de 15 segundos permite una detección de desconexión más rápida.)
+Cuando VS Code se cierra, la tarjeta de agente en el panel de control cambia a amarillo (retrasado) despues de unos **90 segundos**, y a rojo (sin conexion) despues de **3 minutos**. (Desde v0.1.18, la deteccion sin conexion es mas rapida gracias a comprobaciones de estado cada 15 segundos.)
 
-#### Solución de problemas
+#### Solucion de problemas
 
-| Síntoma | Causa | Solución |
+| Sintoma | Causa | Solucion |
 |---------|-------|----------|
-| Error de "conexión fallida" en Cline | Proxy no ejecutándose o dirección incorrecta | Comprueba el proxy con `curl http://localhost:56244/health` |
-| No aparece el punto verde en la bóveda | Clave API (token) no configurada | Haz clic de nuevo en **⚡ Aplicar configuración de Cline** |
-| El modelo en el pie de Cline no cambia | Cline tiene la configuración en caché | Recarga VS Code (`Ctrl+Alt+R`) |
-| Se muestra un nombre de modelo incorrecto | Bug antiguo (corregido en v0.1.16) | Actualiza el proxy a v0.1.16 o superior |
+| Error "conexion fallida" en Cline | Proxy no iniciado o direccion incorrecta | Verifica el proxy con `curl http://localhost:56244/health` |
+| El punto verde no aparece en el almacen | Clave API (token) no configurada | Haz clic de nuevo en el boton **⚡ Aplicar config Cline** |
+| El modelo en el pie de Cline no cambia | Cline tiene la configuracion en cache | Recarga VS Code (`Ctrl+Alt+R`) |
+| Se muestra un nombre de modelo incorrecto | Bug antiguo (corregido en v0.1.16) | Actualiza el proxy a v0.1.16 o posterior |
 
 ---
 
-#### 🟣 Botón "Copiar comando de despliegue" — para instalar en una nueva máquina
+#### 🟣 Boton Copiar comando de despliegue — para instalar en una nueva maquina
 
-Se usa cuando quieres instalar el proxy de wall-vault en un nuevo ordenador y conectarlo al almacén. Al hacer clic, se copia el script de instalación completo. Pégalo en la terminal del nuevo ordenador y ejecútalo; se procesará todo en un solo paso:
+Usa este boton cuando instales por primera vez el proxy wall-vault en un nuevo ordenador y lo conectes al almacen. Al hacer clic se copia el script de instalacion completo. Pegalo en el terminal del nuevo ordenador y ejecutalo para realizar todo de una vez:
 
-1. Instalar el binario de wall-vault (se omite si ya está instalado)
-2. Registrar automáticamente el servicio de usuario en systemd
-3. Iniciar el servicio y conectarlo automáticamente al almacén
+1. Instalar el binario wall-vault (se omite si ya esta instalado)
+2. Registrar automaticamente un servicio de usuario systemd
+3. Iniciar el servicio y conectarse automaticamente al almacen
 
-> 💡 El script ya incluye el token de este agente y la dirección del servidor del almacén, por lo que puedes ejecutarlo directamente sin modificar nada.
+> 💡 El script ya contiene el token de este agente y la direccion del servidor del almacen, asi que puedes ejecutarlo directamente tras pegarlo sin ninguna modificacion.
 
 ---
 
-### Tarjeta de servicios
+### Tarjetas de Servicios
 
-Una tarjeta para activar o desactivar los servicios de IA y configurar sus opciones.
+Tarjetas para activar/desactivar y configurar los servicios de IA.
 
-- Interruptores de activación/desactivación por servicio
-- Si introduces la dirección de un servidor de IA local (Ollama, LM Studio, vLLM, etc. corriendo en tu ordenador), encontrará automáticamente los modelos disponibles.
-- **Indicador de estado del servicio local**: el punto ● junto al nombre del servicio es **verde** si está conectado, **gris** si no lo está.
-- **Indicador de estado del servicio local**: si un servicio local (como Ollama) está en ejecución al abrir la página, el punto ● se vuelve verde, pero el estado de la casilla no se modifica.
+- Interruptor de activacion/desactivacion para cada servicio
+- Introduce la direccion de un servidor de IA local (Ollama, LM Studio, vLLM, etc. en tu ordenador) para descubrir automaticamente los modelos disponibles
+- **Indicador de estado de conexion del servicio local**: un punto ● junto al nombre del servicio es **verde** si esta conectado, **gris** si no
+- **Senalizacion automatica de servicios locales** (v0.1.23+): los servicios locales (Ollama, LM Studio, vLLM) se activan/desactivan automaticamente segun la disponibilidad de conexion. Cuando un servicio se vuelve accesible, el punto ● cambia a verde y la casilla se activa en menos de 15 segundos; cuando el servicio se cae, se desactiva automaticamente. Funciona de la misma manera que los servicios en la nube (Google, OpenRouter, etc.) se alternan automaticamente segun la disponibilidad de claves API.
 
-> 💡 **Si el servicio local corre en otro ordenador**: introduce la IP de ese ordenador en el campo de URL del servicio. Por ejemplo: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio)
+> 💡 **Si el servicio local se ejecuta en otro ordenador**: introduce la IP de ese ordenador en el campo URL del servicio. Ejemplo: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Si el servicio solo esta enlazado a `127.0.0.1` en lugar de `0.0.0.0`, el acceso desde una IP externa no funcionara — verifica la direccion de enlace en la configuracion del servicio.
 
-### Introducción del token de administrador
+### Introduccion del token de administrador
 
-Cuando intentas usar funciones importantes desde el panel, como añadir o eliminar claves, aparecerá una ventana emergente pidiendo el token de administrador. Introduce el token que configuraste con el asistente setup. Una vez introducido, permanece activo hasta que cierres el navegador.
+Cuando intentas usar funciones importantes como agregar o eliminar claves en el panel de control, aparece un popup de introduccion del token de administrador. Introduce el token que configuraste en el asistente de configuracion. Una vez introducido, permanece valido hasta que cierres el navegador.
 
-> ⚠️ **Si introduces el token de forma incorrecta más de 10 veces en 15 minutos, esa IP quedará bloqueada temporalmente.** Si olvidaste el token, búscalo en la entrada `admin_token` del archivo `wall-vault.yaml`.
+> ⚠️ **Si la autenticacion falla mas de 10 veces en 15 minutos, esa IP sera bloqueada temporalmente.** Si has olvidado tu token, consulta el campo `admin_token` en el archivo `wall-vault.yaml`.
 
 ---
 
 ## Modo distribuido (multi-bot)
 
-Cuando quieres ejecutar OpenClaw simultáneamente en varios ordenadores, puedes configurarlos para que **compartan un único almacén de claves**. Así solo necesitas gestionar las claves en un lugar.
+Cuando ejecutas OpenClaw en multiples ordenadores simultaneamente, puedes **compartir un unico almacen de claves**. Es practico porque solo necesitas gestionar las claves en un lugar.
 
-### Ejemplo de configuración
+### Ejemplo de configuracion
 
 ```
-[Servidor del almacén de claves]
-  wall-vault vault    (almacén :56243, panel de control)
+[Servidor del Almacen de Claves]
+  wall-vault vault    (almacen de claves :56243, panel de control)
 
-[WSL Alpha]              [Raspberry Pi Gamma]    [Mac Mini Local]
-  wall-vault proxy         wall-vault proxy          wall-vault proxy
-  openclaw TUI             openclaw TUI              openclaw TUI
-  ↕ sincronización SSE     ↕ sincronización SSE      ↕ sincronización SSE
+[WSL Alpha]           [Raspberry Pi Gamma]    [Mac Mini Local]
+  wall-vault proxy      wall-vault proxy        wall-vault proxy
+  openclaw TUI          openclaw TUI            openclaw TUI
+  ↕ sync SSE            ↕ sync SSE              ↕ sync SSE
 ```
 
-Todos los bots apuntan al servidor del almacén central, de modo que si cambias el modelo o añades una clave en el almacén, se aplica inmediatamente a todos los bots.
+Todos los bots apuntan al servidor central del almacen, asi que cuando cambias un modelo o agregas una clave en el almacen, se refleja inmediatamente en todos los bots.
 
-### Paso 1: Iniciar el servidor del almacén de claves
+### Paso 1: Iniciar el servidor del almacen de claves
 
-Ejecuta esto en el ordenador que actuará como servidor del almacén:
+Ejecuta esto en el ordenador que servira como servidor del almacen:
 
 ```bash
 wall-vault vault
@@ -596,11 +606,11 @@ wall-vault vault
 
 ### Paso 2: Registrar cada bot (cliente)
 
-Registra de antemano la información de cada bot que se conectará al servidor del almacén:
+Registra la informacion de cada bot que se conectara al servidor del almacen:
 
 ```bash
 curl -X POST http://localhost:56243/admin/clients \
-  -H "Authorization: Bearer tu-token-de-administrador" \
+  -H "Authorization: Bearer tu-token-admin" \
   -H "Content-Type: application/json" \
   -d '{
     "id": "botA",
@@ -611,9 +621,9 @@ curl -X POST http://localhost:56243/admin/clients \
   }'
 ```
 
-### Paso 3: Iniciar el proxy en cada ordenador bot
+### Paso 3: Iniciar el proxy en cada ordenador del bot
 
-En cada ordenador bot, inicia el proxy especificando la dirección y el token del servidor del almacén:
+En cada ordenador donde hay un bot instalado, ejecuta el proxy con la direccion del servidor del almacen y el token:
 
 ```bash
 WV_VAULT_URL=http://192.168.x.x:56243 \
@@ -622,17 +632,17 @@ WV_VAULT_CLIENT_ID=botA \
 wall-vault proxy
 ```
 
-> 💡 Sustituye **`192.168.x.x`** por la IP interna real del ordenador que hace de servidor del almacén. Puedes consultarla en la configuración de tu router o con el comando `ip addr`.
+> 💡 Reemplaza **`192.168.x.x`** con la direccion IP interna real del ordenador servidor del almacen. Puedes encontrarla en la configuracion de tu router o con el comando `ip addr`.
 
 ---
 
-## Inicio automático
+## Inicio automatico
 
-Si te resulta tedioso iniciar wall-vault manualmente cada vez que reinicias el ordenador, regístralo como servicio del sistema. Una vez registrado, se iniciará automáticamente al arrancar.
+Si es tedioso iniciar manualmente wall-vault cada vez que reinicias tu ordenador, registralo como servicio del sistema. Una vez registrado, se inicia automaticamente al arrancar.
 
-### Linux — systemd (la mayoría de distribuciones Linux)
+### Linux — systemd (la mayoria de distribuciones Linux)
 
-systemd es el sistema de Linux que inicia y gestiona programas automáticamente:
+systemd es el sistema que inicia y gestiona automaticamente los programas en Linux:
 
 ```bash
 wall-vault doctor deploy
@@ -640,7 +650,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now wall-vault
 ```
 
-Ver los registros (logs):
+Consultar logs:
 
 ```bash
 journalctl --user -u wall-vault -f
@@ -648,7 +658,7 @@ journalctl --user -u wall-vault -f
 
 ### macOS — launchd
 
-El sistema de macOS encargado de la ejecución automática de programas:
+El sistema responsable del inicio automatico de programas en macOS:
 
 ```bash
 wall-vault doctor deploy launchd
@@ -657,8 +667,8 @@ launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
 
 ### Windows — NSSM
 
-1. Descarga NSSM desde [nssm.cc](https://nssm.cc/download) y añádelo al PATH.
-2. En PowerShell con permisos de administrador:
+1. Descarga NSSM desde [nssm.cc](https://nssm.cc/download) y agregalo al PATH.
+2. En PowerShell como administrador:
 
 ```powershell
 wall-vault doctor deploy windows
@@ -666,126 +676,130 @@ wall-vault doctor deploy windows
 
 ---
 
-## Doctor: diagnóstico automático
+## Doctor: diagnostico automatico
 
-El comando `doctor` es una **herramienta de autodiagnóstico y reparación** que comprueba si wall-vault está configurado correctamente.
+El comando `doctor` es una herramienta que **diagnostica y repara** automaticamente la configuracion de wall-vault.
 
 ```bash
-wall-vault doctor check   # Diagnostica el estado actual (solo lectura, no modifica nada)
-wall-vault doctor fix     # Repara los problemas automáticamente
-wall-vault doctor all     # Diagnóstico + reparación automática en un solo paso
+wall-vault doctor check   # Diagnosticar estado actual (solo lectura, no cambia nada)
+wall-vault doctor fix     # Reparar problemas automaticamente
+wall-vault doctor all     # Diagnostico + reparacion automatica en un solo paso
 ```
 
-> 💡 Si algo parece ir mal, empieza ejecutando `wall-vault doctor all`. Resuelve muchos problemas de forma automática.
+> 💡 Si algo parece ir mal, prueba primero `wall-vault doctor all`. Detecta y corrige muchos problemas automaticamente.
 
 ---
 
 ## Variables de entorno
 
-Las variables de entorno son una forma de pasar valores de configuración a un programa. Puedes introducirlas en la terminal con el formato `export NOMBRE_VARIABLE=valor`, o incluirlas en el archivo del servicio de inicio automático para que siempre estén activas.
+Las variables de entorno son una forma de pasar valores de configuracion a un programa. Introduzlas en el terminal con `export VARIABLE=valor`, o agregalas en tu archivo de servicio de inicio automatico para aplicacion permanente.
 
-| Variable | Descripción | Valor de ejemplo |
+| Variable | Descripcion | Valor de ejemplo |
 |----------|-------------|-----------------|
 | `WV_LANG` | Idioma del panel de control | `ko`, `en`, `ja` |
 | `WV_THEME` | Tema del panel de control | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Clave(s) API de Google (separadas por comas) | `AIza...,AIza...` |
+| `WV_KEY_GOOGLE` | Clave API de Google (separadas por comas para multiples) | `AIza...,AIza...` |
 | `WV_KEY_OPENROUTER` | Clave API de OpenRouter | `sk-or-v1-...` |
-| `WV_VAULT_URL` | Dirección del servidor del almacén en modo distribuido | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Token de autenticación del cliente (bot) | `my-secret-token` |
+| `WV_VAULT_URL` | Direccion del servidor del almacen en modo distribuido | `http://192.168.x.x:56243` |
+| `WV_VAULT_TOKEN` | Token de autenticacion del cliente (bot) | `my-secret-token` |
 | `WV_ADMIN_TOKEN` | Token de administrador | `admin-token-here` |
-| `WV_MASTER_PASS` | Contraseña de cifrado de las claves API | `my-password` |
-| `WV_AVATAR` | Ruta del archivo de imagen de avatar (relativa a `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Dirección del servidor local de Ollama | `http://192.168.x.x:11434` |
+| `WV_MASTER_PASS` | Contrasena de cifrado de claves API | `my-password` |
+| `WV_AVATAR` | Ruta del archivo de imagen avatar (relativa a `~/.openclaw/`) | `workspace/avatars/avatar.png` |
+| `OLLAMA_URL` | Direccion del servidor local Ollama | `http://192.168.x.x:11434` |
 
 ---
 
-## Solución de problemas
+## Solucion de problemas
 
-### El proxy no arranca
+### El proxy no se inicia
 
-Es frecuente que el puerto ya esté siendo usado por otro programa.
+El puerto suele estar en uso por otro programa.
 
 ```bash
-ss -tlnp | grep 56244   # Comprueba qué proceso está usando el puerto 56244
-wall-vault proxy --port 8080   # Inicia en un puerto diferente
+ss -tlnp | grep 56244   # Comprobar quien usa el puerto 56244
+wall-vault proxy --port 8080   # Iniciar en otro puerto
 ```
 
 ### Errores de clave API (429, 402, 401, 403, 582)
 
-| Código de error | Significado | Cómo resolverlo |
-|----------------|-------------|-----------------|
-| **429** | Demasiadas solicitudes (límite de uso superado) | Espera un momento o añade otra clave |
-| **402** | Pago requerido o créditos insuficientes | Recarga créditos en el servicio correspondiente |
-| **401 / 403** | Clave incorrecta o sin permisos | Verifica el valor de la clave y vuelve a registrarla |
-| **582** | Sobrecarga en la pasarela (cooldown de 5 minutos) | Se libera automáticamente tras 5 minutos |
+| Codigo de error | Significado | Que hacer |
+|----------------|-------------|-----------|
+| **429** | Demasiadas solicitudes (cuota excedida) | Esperar un rato o agregar mas claves |
+| **402** | Pago requerido o creditos agotados | Recargar creditos en ese servicio |
+| **401 / 403** | Clave invalida o sin permiso | Verificar el valor de la clave y volver a registrar |
+| **582** | Sobrecarga del gateway (enfriamiento de 5 minutos) | Se resuelve automaticamente en 5 minutos |
 
 ```bash
-# Ver la lista de claves registradas y su estado
-curl -H "Authorization: Bearer tu-token-de-administrador" http://localhost:56243/admin/keys
+# Consultar la lista de claves registradas y su estado
+curl -H "Authorization: Bearer tu-token-admin" http://localhost:56243/admin/keys
 
-# Reiniciar el contador de uso de las claves
-curl -X POST -H "Authorization: Bearer tu-token-de-administrador" http://localhost:56243/admin/keys/reset
+# Reiniciar contadores de uso de claves
+curl -X POST -H "Authorization: Bearer tu-token-admin" http://localhost:56243/admin/keys/reset
 ```
 
-### El agente aparece como "sin conectar"
+### El agente aparece como "No conectado"
 
-"Sin conectar" significa que el proceso del proxy no está enviando señales (heartbeat) al almacén. **No significa que la configuración se haya perdido.** El proxy debe conocer la dirección del servidor del almacén y el token para aparecer como conectado.
+"No conectado" significa que el proceso proxy no esta enviando senales (heartbeat) al almacen. **No significa que la configuracion no se haya guardado.** El proxy necesita estar en ejecucion con la direccion del servidor del almacen y el token para establecer una conexion.
 
 ```bash
-# Inicia el proxy especificando la dirección del almacén, el token y el ID de cliente
-WV_VAULT_URL=http://direccion-del-almacen:56243 \
-WV_VAULT_TOKEN=token-del-cliente \
-WV_VAULT_CLIENT_ID=id-del-cliente \
+# Iniciar proxy con direccion del servidor del almacen, token e ID de cliente
+WV_VAULT_URL=http://servidor-almacen:56243 \
+WV_VAULT_TOKEN=token-cliente \
+WV_VAULT_CLIENT_ID=id-cliente \
 wall-vault proxy
 ```
 
-Si la conexión tiene éxito, en unos 20 segundos el panel mostrará el estado 🟢 en ejecución.
+Una vez conectado, el panel de control mostrara 🟢 En ejecucion en unos 20 segundos.
 
-### Ollama no se conecta
+### Problemas de conexion con Ollama
 
-Ollama es un programa que ejecuta IA directamente en tu ordenador. Primero comprueba si Ollama está encendido.
+Ollama es un programa que ejecuta IA directamente en tu ordenador. Primero, asegurate de que Ollama esta en ejecucion.
 
 ```bash
-curl http://localhost:11434/api/tags   # Si aparece la lista de modelos, todo va bien
-export OLLAMA_URL=http://192.168.x.x:11434   # Si Ollama corre en otro ordenador
+curl http://localhost:11434/api/tags   # Si aparece una lista de modelos, funciona
+export OLLAMA_URL=http://192.168.x.x:11434   # Si se ejecuta en otro ordenador
 ```
 
-> ⚠️ Si Ollama no responde, inícialo primero con el comando `ollama serve`.
+> ⚠️ Si Ollama no responde, inicialo primero con `ollama serve`.
 
-> ⚠️ **Los modelos grandes son lentos**: modelos como `qwen3.5:35b` o `deepseek-r1` pueden tardar varios minutos en generar una respuesta. Si parece que no hay respuesta, puede que el proceso esté funcionando con normalidad; ten paciencia.
+> ⚠️ **Los modelos grandes son lentos**: modelos grandes como `qwen3.5:35b` o `deepseek-r1` pueden tardar varios minutos en generar una respuesta. Aunque parezca que no pasa nada, puede estar procesando normalmente — ten paciencia.
 
 ---
 
-## Cambios recientes (v0.1.16 ~ v0.1.22)
+## Cambios recientes (v0.1.16 ~ v0.1.23)
+
+### v0.1.23 (2026-04-06)
+- **Correccion del cambio de modelo Ollama**: se corrigio un problema donde cambiar el modelo Ollama en el panel de control del almacen no se reflejaba en el proxy real. Anteriormente solo se usaba la variable de entorno (`OLLAMA_MODEL`), pero ahora la configuracion del almacen tiene prioridad.
+- **Senalizacion automatica de servicios locales**: Ollama, LM Studio y vLLM se activan automaticamente cuando estan accesibles y se desactivan cuando no lo estan. Funciona igual que la alternancia automatica basada en claves para servicios en la nube.
 
 ### v0.1.22 (2026-04-05)
-- **Corrección: campo content vacío eliminado**: Cuando los modelos de razonamiento (gemini-3.1-pro, o1, claude thinking, etc.) agotan max_tokens en el razonamiento antes de producir salida, el proxy eliminaba el campo `content`/`text` vacío mediante `omitempty`. Los clientes de los SDK de OpenAI/Anthropic (Claude Code, Cline, etc.) fallaban con "Cannot read properties of undefined (reading 'trim')". Ahora siempre se emite el campo conforme a la especificación oficial de la API.
+- **Correccion del campo content vacio**: cuando los modelos de razonamiento (gemini-3.1-pro, o1, claude thinking, etc.) usan todos los max_tokens en el razonamiento y no pueden producir una respuesta real, el proxy omitia los campos `content`/`text` del JSON de respuesta via `omitempty`, causando que los clientes SDK de OpenAI/Anthropic se bloquearan con `Cannot read properties of undefined (reading 'trim')`. Corregido para siempre incluir los campos segun la especificacion oficial de la API.
 
 ### v0.1.21 (2026-04-05)
-- **Soporte de modelos Gemma 4**: los modelos Gemma (gemma-4-31b-it, gemma-4-26b-a4b-it) ahora se enrutan a través de la API de Google Gemini.
-- **Soporte de LM Studio / vLLM**: estos servicios locales ahora se despachan correctamente en lugar de recurrir a Ollama.
-- **Corrección del panel de control**: siempre muestra el servicio configurado, no el servicio de respaldo.
-- **Casilla del servicio local preservada**: el panel de control ya no desactiva automáticamente los servicios locales al cargar la página.
-- **Variable de entorno de filtro de herramientas**: soporte para `WV_TOOL_FILTER=passthrough`.
+- **Soporte de modelos Gemma 4**: los modelos de la familia Gemma como `gemma-4-31b-it` y `gemma-4-26b-a4b-it` ahora pueden usarse a traves de la API de Google Gemini.
+- **Soporte de servicios LM Studio / vLLM**: anteriormente estos servicios no estaban en el enrutamiento del proxy y siempre volvian a Ollama. Ahora se enrutan correctamente via la API compatible con OpenAI.
+- **Correccion de visualizacion de servicios en el panel**: incluso cuando ocurre un fallback, el panel siempre muestra el servicio configurado por el usuario.
+- **Visualizacion del estado de servicios locales**: al cargar el panel, el estado de conexion de los servicios locales (Ollama, LM Studio, vLLM, etc.) se muestra con el color del punto ●.
+- **Variable de entorno para filtro de herramientas**: usa `WV_TOOL_FILTER=passthrough` para configurar el modo de paso de herramientas.
 
 ### v0.1.20 (2026-03-28)
-- **Endurecimiento integral de seguridad**: prevención XSS (41 puntos), comparación de tokens en tiempo constante, restricción CORS, límites de tamaño de solicitud y más.
+- **Fortalecimiento integral de seguridad**: prevencion XSS (41 ubicaciones), comparacion de tokens en tiempo constante, restricciones CORS, limites de tamano de solicitud, prevencion de travesia de rutas, autenticacion SSE, endurecimiento del limitador de velocidad y 12 mejoras de seguridad adicionales.
 
 ### v0.1.19 (2026-03-27)
-- **Detección en línea de Claude Code**: Claude Code se muestra como en línea en el panel aunque esté evitando el proxy.
+- **Deteccion en linea de Claude Code**: las instancias de Claude Code que no pasan por el proxy ahora se muestran como en linea en el panel de control.
 
 ### v0.1.18 (2026-03-26)
-- **Corrección de recuperación de respaldo**: recuperación automática al servicio preferido cuando está disponible.
-- **Detección mejorada de desconexión**: sondeo de estado cada 15 segundos.
+- **Correccion del servicio de fallback pegajoso**: despues de un error temporal que causa un fallback a Ollama, se vuelve automaticamente al servicio original cuando se recupera.
+- **Mejora en la deteccion sin conexion**: las comprobaciones de estado cada 15 segundos hacen que la deteccion de caidas del proxy sea mas rapida.
 
 ### v0.1.17 (2026-03-25)
-- **Reordenación de tarjetas mediante arrastrar y soltar**.
-- **Botones de aplicación en línea para agentes desconectados**.
-- **Tipo de agente cokacdir añadido**.
+- **Ordenar tarjetas arrastrando y soltando**: las tarjetas de agentes se pueden arrastrar y soltar para cambiar su orden.
+- **Boton de aplicacion de configuracion en linea**: el boton [⚡ Aplicar config] se muestra en las tarjetas de agentes sin conexion.
+- **Tipo de agente cokacdir agregado**.
 
 ### v0.1.16 (2026-03-25)
-- **Sincronización bidireccional de modelos** para Cline y Claude Code.
+- **Sincronizacion bidireccional de modelos**: al cambiar un modelo de Cline o Claude Code en el panel de control del almacen, se refleja automaticamente.
 
 ---
 
-*Para información más detallada sobre la API, consulta [API.md](API.md).*
+*Para informacion mas detallada sobre la API, consulta [API.md](API.md).*

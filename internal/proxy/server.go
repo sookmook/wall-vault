@@ -1262,9 +1262,11 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 
 // ─── Ollama (single concurrent request via mutex) ────────────────────────────
 
-func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, error) {
-	// always use the configured Ollama model, ignoring the upstream service's model name
-	model := os.Getenv("OLLAMA_MODEL")
+func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
+	// use the provided model (from vault config); fall back to env var or default
+	if model == "" {
+		model = os.Getenv("OLLAMA_MODEL")
+	}
 	if model == "" {
 		model = os.Getenv("WV_OLLAMA_MODEL")
 	}
@@ -1317,7 +1319,7 @@ func (s *Server) callOllama(_ string, req *GeminiRequest) (*GeminiResponse, erro
 }
 
 // callLocalService: generic OpenAI-compatible local server (LM Studio, vLLM, etc.)
-// Unlike callOllama which overrides the model, this passes the requested model through.
+// Generic OpenAI-compatible local server handler.
 func (s *Server) callLocalService(serviceID, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	s.mu.RLock()
 	baseURL := s.serviceURLs[serviceID]
@@ -1510,9 +1512,9 @@ func stripControlTokens(s string) string {
 // onFallback: called when dispatch succeeds on a service other than the requested one.
 // Updates s.service/s.model so the next heartbeat, vault UI, and openclaw TUI reflect reality.
 // resolveActualModel returns the model name that will actually be used for the given service.
-// Ollama ignores the upstream model and uses a local env-configured model instead.
+// Uses the vault-configured model; falls back to env var or default for Ollama.
 func (s *Server) resolveActualModel(svc, model string) string {
-	if svc == "ollama" {
+	if svc == "ollama" && model == "" {
 		if m := os.Getenv("OLLAMA_MODEL"); m != "" {
 			return m
 		}

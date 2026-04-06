@@ -8,7 +8,22 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
-## [Unreleased]
+## [0.1.23] — 2026-04-06
+
+### Fixed
+- **Ollama model change from vault dashboard had no effect**: `callOllama()`
+  ignored the vault-configured model and always read from environment variables
+  (`OLLAMA_MODEL` / `WV_OLLAMA_MODEL`) or hardcoded default `qwen3.5:35b`.
+  Same issue in `resolveActualModel()`. Now uses the vault model first, falling
+  back to env vars only when unset.
+
+### Changed
+- **Local service auto-toggle based on connectivity**: Local services (Ollama,
+  LM Studio, vLLM) now auto-enable when reachable and auto-disable when
+  unreachable, mirroring cloud services' key-based auto-toggle. Both the
+  initial `autoCheckServices()` and the 15-second periodic ping update the
+  enabled checkbox. Previously, only the status dot (●) color was updated
+  while the checkbox required manual toggling (v0.1.21 behavior).
 
 ---
 

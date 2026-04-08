@@ -8,6 +8,28 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.26] — 2026-04-08
+
+### Fixed
+- **RTK filterGitLog panic**: Fixed index-out-of-bounds crash when git log
+  output has lines shorter than 19 chars or commit messages before any hash.
+- **Doctor nil response dereference**: Separated nil check and status code
+  check to prevent panic when HTTP request fails entirely.
+- **XSS in agent card status**: Service and model names in dashboard agent
+  cards are now set via `textContent` instead of `innerHTML`, preventing
+  potential script injection.
+- **Broker broadcast race condition**: SSE broadcast now copies the client
+  channel list before iterating, preventing concurrent map read/write panics.
+- **Hook command goroutine leak**: Shell hook commands now have a 30-second
+  context timeout, preventing indefinite goroutine accumulation.
+- **Local service infinite timeout**: Ollama and LM Studio/vLLM HTTP clients
+  now use 10-minute timeout instead of unbounded (Timeout: 0).
+- **Silent Anthropic model fallback**: Non-Claude models routed to Anthropic
+  now log a warning when falling back to claude-haiku.
+- **Cache TTL comment mismatch**: Fixed misleading comment (said 30s, actual 5s).
+
+---
+
 ## [0.1.25] — 2026-04-08
 
 ### Added

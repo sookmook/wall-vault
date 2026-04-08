@@ -15,6 +15,7 @@ import (
 // Returns the raw Anthropic response body, or an error.
 func (s *Server) callAnthropicPassthrough(req *AnthropicRequest, model string) ([]byte, *localKey, error) {
 	if !strings.HasPrefix(model, "claude-") {
+		log.Printf("[anthropic] non-Claude model %q → fallback to claude-haiku-4-5", model)
 		model = "claude-haiku-4-5-20251001"
 	}
 

@@ -1044,21 +1044,30 @@ function applyAgentsSync(data) {
       const svc = info.svc || '';
       let mdl = info.mdl || '';
       if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
-      statusDiv.innerHTML =
-        '<span style="color:#e67e22;font-weight:600">' + (t.agent_dead||'⚠ 에이전트 프로세스 중단') + '</span> — ' + svc + ' / ' + mdl;
+      statusDiv.textContent = (t.agent_dead||'⚠ 에이전트 프로세스 중단') + ' — ' + svc + ' / ' + mdl;
+      statusDiv.querySelector('span')?.remove();
+      const w = document.createElement('span'); w.style.cssText='color:#e67e22;font-weight:600';
+      w.textContent = t.agent_dead||'⚠ 에이전트 프로세스 중단'; statusDiv.prepend(w);
     } else if (st === 'live') {
       const svc = info.svc || '';
       let mdl = info.mdl || '';
       if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
-      const ver = info.ver ? '<span class="status-version">' + info.ver + '</span>' : '';
-      statusDiv.innerHTML =
-        '<span class="status-live"><span>' + (t.st_running||'● 실행 중') + '</span> — ' + svc + ' / ' + mdl + '</span> ' +
-        '<span class="status-hint"><span class="bot-ago">' + (t.st_just||'방금') + '</span></span> ' + ver;
+      statusDiv.textContent = '';
+      const sp = document.createElement('span'); sp.className='status-live';
+      sp.textContent = (t.st_running||'● 실행 중') + ' — ' + svc + ' / ' + mdl;
+      statusDiv.appendChild(sp);
+      const hint = document.createElement('span'); hint.className='status-hint';
+      const ago = document.createElement('span'); ago.className='bot-ago'; ago.textContent=t.st_just||'방금';
+      hint.appendChild(ago); statusDiv.appendChild(document.createTextNode(' ')); statusDiv.appendChild(hint);
+      if (info.ver) { const v=document.createElement('span'); v.className='status-version'; v.textContent=info.ver; statusDiv.appendChild(document.createTextNode(' ')); statusDiv.appendChild(v); }
     } else if (st === 'delay') {
       const svc = info.svc || '';
       let mdl = info.mdl || '';
       if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
-      statusDiv.innerHTML = '<span class="status-delay">' + (t.st_delayed||'◑ 지연') + ' — ' + svc + ' / ' + mdl + '</span>';
+      statusDiv.textContent = '';
+      const sp = document.createElement('span'); sp.className='status-delay';
+      sp.textContent = (t.st_delayed||'◑ 지연') + ' — ' + svc + ' / ' + mdl;
+      statusDiv.appendChild(sp);
     } else if (st === 'offline') {
       statusDiv.innerHTML = '<span class="status-offline">' + (t.st_offline||'✕ 오프라인') + '</span>';
     }

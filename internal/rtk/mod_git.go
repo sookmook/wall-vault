@@ -140,14 +140,14 @@ func filterGitLog(raw string) string {
 	gotMessage := false
 
 	for _, line := range lines {
-		if reGitLogCommit.MatchString(line) {
+		if reGitLogCommit.MatchString(line) && len(line) >= 19 {
 			hash := line[7:19] // short hash
 			out = append(out, hash)
 			inCommit = true
 			gotMessage = false
 			continue
 		}
-		if inCommit {
+		if inCommit && len(out) > 0 {
 			if strings.HasPrefix(line, "    ") && !gotMessage {
 				out[len(out)-1] += " " + strings.TrimSpace(line)
 				gotMessage = true

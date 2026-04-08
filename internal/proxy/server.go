@@ -207,7 +207,7 @@ func (s *Server) refreshClientAct(clientID string) {
 }
 
 // lookupTokenConfig: resolve a Bearer token to {service, model} via vault's /api/token/config.
-// Results are cached for 30 seconds to avoid per-request vault calls.
+// Results are cached for 5 seconds to avoid per-request vault calls.
 // Returns nil if vault URL is not configured or the token is not found.
 func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	if s.cfg.Proxy.VaultURL == "" || token == "" {
@@ -1305,7 +1305,7 @@ func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, 
 		return nil, fmt.Errorf("Ollama 요청 생성 실패: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	ollamaClient := &http.Client{Timeout: 0} // no timeout — inference duration is unbounded
+	ollamaClient := &http.Client{Timeout: 10 * time.Minute} // generous timeout for local inference
 	resp, err := ollamaClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("Ollama 연결 실패 (%s): %w", ollamaURL, err)
@@ -1356,7 +1356,7 @@ func (s *Server) callLocalService(serviceID, model string, req *GeminiRequest) (
 		return nil, fmt.Errorf("%s 요청 생성 실패: %w", serviceID, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 0}
+	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("%s 연결 실패 (%s): %w", serviceID, baseURL, err)

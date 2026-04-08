@@ -2,6 +2,7 @@
 package hooks
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -53,9 +54,11 @@ func (m *Manager) fire(evt EventType, data map[string]string) {
 		Data:      data,
 	}
 
-	// 1. execute shell command
+	// 1. execute shell command (with timeout to prevent goroutine leak)
 	if cmd, ok := m.shellCmds[evt]; ok && cmd != "" {
-		exec.Command("sh", "-c", cmd).Run() //nolint:errcheck
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		exec.CommandContext(ctx, "sh", "-c", cmd).Run() //nolint:errcheck
 	}
 
 	// 2. notify OpenClaw TUI socket

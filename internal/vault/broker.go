@@ -46,8 +46,12 @@ func (b *Broker) Broadcast(evt SSEEvent) {
 	msg := fmt.Sprintf("data: %s\n\n", data)
 
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	snapshot := make([]chan string, 0, len(b.clients))
 	for ch := range b.clients {
+		snapshot = append(snapshot, ch)
+	}
+	b.mu.RUnlock()
+	for _, ch := range snapshot {
 		select {
 		case ch <- msg:
 		default:

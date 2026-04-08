@@ -48,8 +48,8 @@ func Check(cfg *config.Config) []ServiceStatus {
 			s.Detail = "응답 없음"
 			continue
 		}
-		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		s.Running = resp.StatusCode == http.StatusOK
 		s.Version = extractVersion(body)
 		if s.Running {
@@ -403,11 +403,13 @@ func FixVaultServices(cfg *config.Config) error {
 			req.Header.Set("Authorization", "Bearer "+cfg.Vault.AdminToken)
 			req.Header.Set("Content-Type", "application/json")
 			resp, err := client.Do(req)
-			if err != nil || resp.StatusCode != http.StatusOK {
-				fmt.Printf("[fix-services] ✗ %s proxy_enabled 활성화 실패\n", id)
-				if resp != nil {
-					resp.Body.Close()
-				}
+			if err != nil {
+				fmt.Printf("[fix-services] ✗ %s 활성화 실패: %v\n", id, err)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				fmt.Printf("[fix-services] ✗ %s 활성화 실패 (HTTP %d)\n", id, resp.StatusCode)
 				continue
 			}
 			resp.Body.Close()

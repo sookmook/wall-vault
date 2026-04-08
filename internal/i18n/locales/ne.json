@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Linux systemd सेटअप स्क्रिप्ट कपी",
   "cfg_deploy_hint": "लक्ष्य मेसिनको टर्मिनलमा टाँस्नुहोस्",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 सेट गरेर पुनः सुरु गर्नुहोस्",
-  "key_att": "प्रयास"
+  "key_att": "प्रयास",
+  "drag_reorder": "क्रम बदल्न तान्नुहोस्",
+  "agent_dead": "⚠ एजेन्ट प्रक्रिया रोकियो"
 }

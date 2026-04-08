@@ -135,5 +135,7 @@
   "cfg_deploy_title": "复制 Linux systemd 安装脚本",
   "cfg_deploy_hint": "粘贴到目标机器的终端",
   "st_gemini_hint": "设置 GEMINI_API_BASE_URL=http://localhost:56244 后重启",
-  "key_att": "次试"
+  "key_att": "次试",
+  "drag_reorder": "拖拽以重新排序",
+  "agent_dead": "⚠ 代理进程已停止"
 }

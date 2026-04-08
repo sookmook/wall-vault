@@ -201,8 +201,11 @@ a{color:var(--accent);text-decoration:none}
 .agent-card.ac-offline{border-left-color:var(--red)}
 .agent-card.ac-noconn{border-left-color:var(--text-muted)}
 /* ── 드래그 앤 드롭 ── */
-.agent-card[draggable=true]{cursor:grab}
 .agent-card.dragging{opacity:.35;transform:scale(.96)}
+.drag-handle{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:grab;padding:4px 2px;margin-top:.1rem;border-radius:4px;user-select:none}
+.drag-handle:hover{background:var(--accent-light,rgba(0,0,0,.06))}
+.drag-handle:active{cursor:grabbing}
+.drag-handle .dot{margin:0}
 .agent-card.drag-over{border-top:3px solid var(--accent);margin-top:-2px}
 .ac-top{display:flex;align-items:flex-start;gap:.5rem}
 .ac-type-icon{font-size:5.28rem;line-height:1;flex-shrink:0;margin-top:0;filter:drop-shadow(0 2px 6px rgba(0,0,0,.20))}
@@ -231,6 +234,7 @@ a{color:var(--accent);text-decoration:none}
 .dot-green{background:var(--green);box-shadow:0 0 5px var(--green)}
 .dot-yellow{background:var(--yellow);box-shadow:0 0 4px var(--yellow)}
 .dot-red{background:var(--red);box-shadow:0 0 4px var(--red)}
+.dot-orange{background:#e67e22;box-shadow:0 0 5px #e67e22;animation:pulse-orange 1.5s infinite}
 .dot-gray{background:var(--border)}
 /* ── 에이전트 카드 (레거시 호환 — agent-card에서 사용) ── */
 .agent-name{font-size:.88rem;color:var(--text);font-weight:700;margin-bottom:.08rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -314,6 +318,7 @@ a{color:var(--accent);text-decoration:none}
 /* ── Cherry 꽃잎 — 애니메이션은 JS에서 고유 keyframe 생성 ── */
 .cherry-petal{position:fixed;top:0;pointer-events:none;z-index:1;border-radius:50% 0 50% 0;background:radial-gradient(ellipse at 30% 20%,#ffe8f4 0%,#ff80b8 50%,#f01870 100%);box-shadow:0 0 6px #ff90c038}
 /* ── Ocean 효과 ── */
+@keyframes pulse-orange{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes wave1{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 @keyframes wave2{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
 @keyframes cloud-drift{0%{left:-260px;opacity:0}6%{opacity:.85}94%{opacity:.85}100%{left:112vw;opacity:0}}
@@ -1020,7 +1025,12 @@ function applyAgentsSync(data) {
     card.classList.remove('ac-live','ac-delay','ac-offline','ac-noconn');
     card.classList.add(clsMap[st] || 'ac-offline');
     const dot = card.querySelector('.dot');
-    if (dot) dot.className = 'dot ' + (dotMap[st] || 'dot-red');
+    // Agent process dead while proxy alive → override dot to orange
+    if (info.agent_alive === false && (st === 'live' || st === 'delay')) {
+      if (dot) { dot.className = 'dot dot-orange'; dot.title = t.agent_dead||'에이전트 프로세스 중단'; }
+    } else {
+      if (dot) { dot.className = 'dot ' + (dotMap[st] || 'dot-red'); dot.title = ''; }
+    }
     // Uptime sync
     if (info.sec && isAlive) {
       card.dataset.startedSec = String(info.sec);
@@ -1030,7 +1040,13 @@ function applyAgentsSync(data) {
     // Status text — every state handled in one place
     const statusDiv = card.querySelector('.agent-status');
     if (!statusDiv) return;
-    if (st === 'live') {
+    if (info.agent_alive === false && (st === 'live' || st === 'delay')) {
+      const svc = info.svc || '';
+      let mdl = info.mdl || '';
+      if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
+      statusDiv.innerHTML =
+        '<span style="color:#e67e22;font-weight:600">' + (t.agent_dead||'⚠ 에이전트 프로세스 중단') + '</span> — ' + svc + ' / ' + mdl;
+    } else if (st === 'live') {
       const svc = info.svc || '';
       let mdl = info.mdl || '';
       if (svc && mdl.startsWith(svc + '/')) mdl = mdl.slice(svc.length + 1);
@@ -1156,8 +1172,14 @@ document.addEventListener('DOMContentLoaded', function() {
 let _dragSrc = null;
 function initDragSort() {
   document.querySelectorAll('.agent-card[data-client]').forEach(card => {
-    card.setAttribute('draggable', 'true');
+    // only the drag-handle initiates drag, not the whole card
+    const handle = card.querySelector('.drag-handle');
+    if (handle) {
+      handle.addEventListener('mousedown', () => card.setAttribute('draggable', 'true'));
+      handle.addEventListener('touchstart', () => card.setAttribute('draggable', 'true'), {passive:true});
+    }
     card.addEventListener('dragstart', e => {
+      if (!e.target.closest('.drag-handle') && e.target !== card) { e.preventDefault(); return; }
       _dragSrc = card;
       card.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -1165,6 +1187,7 @@ function initDragSort() {
     });
     card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
+      card.removeAttribute('draggable');
       document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
       _dragSrc = null;
     });
@@ -2095,7 +2118,7 @@ func buildAgentsCard(clients []*Client, proxies []*ProxyStatus, services []*Serv
 		item.WriteString(fmt.Sprintf(`<div class="agent-card %s%s"%s data-client="%s">`, cardStatusCls, disabledClass, uptimeAttr, esc(c.ID)))
 		// 카드 상단: 상태점 + 이름/뱃지 + 편집/삭제 버튼
 		item.WriteString(`<div class="ac-top">`)
-		item.WriteString(fmt.Sprintf(`<div class="dot %s" style="margin-top:.3rem"></div>`, dotClass))
+		item.WriteString(fmt.Sprintf(`<div class="drag-handle" data-i18n-title="drag_reorder" title="%s"><span class="dot %s"></span></div>`, esc(i18n.T("drag_reorder")), dotClass))
 		// avatar priority: client avatar path/URI > default workspace avatar > emoji icon
 		// c.Avatar may be a data URI, a relative path under ~/.openclaw/, or empty
 		avatarSrc := ""

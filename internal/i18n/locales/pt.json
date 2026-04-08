@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Copiar script de configuração systemd Linux",
   "cfg_deploy_hint": "Cole no terminal da máquina alvo",
   "st_gemini_hint": "Defina GEMINI_API_BASE_URL=http://localhost:56244 e reinicie",
-  "key_att": "tent."
+  "key_att": "tent.",
+  "drag_reorder": "Arrastar para reordenar",
+  "agent_dead": "⚠ Processo do agente parado"
 }

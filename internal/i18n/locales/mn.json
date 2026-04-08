@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Linux systemd тохиргооны скрипт хуулах",
   "cfg_deploy_hint": "Зорилтот машины терминалд буулгах",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 тохируулаад дахин эхлүүлнэ үү",
-  "key_att": "оролд."
+  "key_att": "оролд.",
+  "drag_reorder": "Дахин эрэмбэлэхийн тулд чирнэ үү",
+  "agent_dead": "⚠ Агентын процесс зогссон"
 }

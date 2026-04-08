@@ -133,6 +133,7 @@ type ProxyStatus struct {
 	KeyAttempts   map[string]int     `json:"key_attempts,omitempty"`   // key ID → total requests today
 	KeyCooldowns  map[string]string  `json:"key_cooldowns,omitempty"`  // key ID → cooldown RFC3339
 	ActiveClients []ActiveClientItem `json:"active_clients,omitempty"` // recently-served non-proxy clients
+	AgentAlive    *bool              `json:"agent_alive,omitempty"`    // local agent process alive (nanoclaw/openclaw)
 }
 
 // ActiveClientItem: a non-proxy client recently served through this proxy

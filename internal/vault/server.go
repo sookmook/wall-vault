@@ -986,6 +986,9 @@ func (s *Server) broadcastAgentsSync() {
 			if !p.StartedAt.IsZero() {
 				entry["sec"] = p.StartedAt.Unix()
 			}
+			if p.AgentAlive != nil {
+				entry["agent_alive"] = *p.AgentAlive
+			}
 		} else {
 			entry["st"] = "noconn"
 		}

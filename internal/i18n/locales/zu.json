@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Kopisha iskripthi lokumisa Linux systemd",
   "cfg_deploy_hint": "Namathisela ekhompyutheni ephokiwe",
   "st_gemini_hint": "Setha i-GEMINI_API_BASE_URL=http://localhost:56244 bese uqala kabusha",
-  "key_att": "izinz."
+  "key_att": "izinz.",
+  "drag_reorder": "Hudulela ukuze uhlelele kabusha",
+  "agent_dead": "⚠ Inqubo ye-agenti imile"
 }

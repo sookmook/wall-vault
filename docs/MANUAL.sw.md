@@ -1,5 +1,5 @@
 # Mwongozo wa Mtumiaji wa wall-vault
-*(Ilisasishwa mara ya mwisho: 2026-04-06 — v0.1.24)*
+*(Last updated: 2026-04-08 — v0.1.25)*
 
 ---
 
@@ -22,30 +22,30 @@
 
 ## wall-vault ni nini?
 
-**wall-vault = Wakala wa AI (proxy) + Ghala la Funguo za API kwa ajili ya OpenClaw**
+**wall-vault = Wakala (Proxy) wa AI + Ghala la Funguo za API kwa ajili ya OpenClaw**
 
-Ili kutumia huduma za AI, unahitaji **ufunguo wa API**. Ufunguo wa API ni kama **kibali cha kidijitali** kinachothibitisha kwamba una ruhusa ya kutumia huduma hiyo. Kibali hiki kina kikomo cha matumizi kwa siku, na kikiachwa bila ulinzi, kinaweza kuvamiwa.
+Ili kutumia huduma za AI, unahitaji **ufunguo wa API**. Ufunguo wa API ni kama **kitambulisho cha kidijitali** kinachothibitisha kwamba "mtu huyu ana ruhusa ya kutumia huduma hii". Hata hivyo, kitambulisho hiki kina kikomo cha matumizi ya kila siku, na ikiwa hakidhibitiwi vizuri, kinaweza kufichuliwa.
 
-wall-vault huhifadhi vibali hivi katika ghala salama na hufanya kazi kama **wakala (proxy)** kati ya OpenClaw na huduma za AI. Kwa urahisi: OpenClaw inaunganishwa na wall-vault peke yake, na wall-vault ndiye anayeshughulikia kila kitu kingine.
+wall-vault huhifadhi vitambulisho hivi katika ghala salama na kufanya kazi kama **wakala (proxy)** kati ya OpenClaw na huduma za AI. Kwa maneno rahisi, OpenClaw inahitaji tu kuunganishwa na wall-vault, na wall-vault itashughulikia mambo mengine yote.
 
-Matatizo ambayo wall-vault huyatatua:
+Matatizo ambayo wall-vault inasuluhisha:
 
-- **Mzunguko wa Otomatiki wa Funguo**: Ufunguo ukifikia kikomo au kuzuiwa kwa muda (cooldown), wall-vault hubadilika kimya kimya kwenye ufunguo unaofuata. OpenClaw inaendelea kufanya kazi bila kukatizwa.
-- **Ubadilishaji Otomatiki wa Huduma (Fallback)**: Kama Google haikujibu, inabadilika kwenye OpenRouter. Kama hiyo pia haikufanya kazi, inabadilika kwenye Ollama, LM Studio, au vLLM (AI inayofanya kazi ndani ya kompyuta yako). Kikao hakikatizwi. Huduma ya awali inaporejea, inabadilisha kurudi kwake kiotomatiki kuanzia ombi linalofuata (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Usawazishaji wa Wakati Halisi (SSE)**: Ukibadilisha mfano wa AI kwenye dashibodi ya ghala, OpenClaw itaonyesha mabadiliko hayo ndani ya sekunde 1–3. SSE (Server-Sent Events) ni teknolojia ambapo seva hutuma mabadiliko moja kwa moja kwa mteja wakati wowote yanapotokea.
-- **Arifa za Wakati Halisi**: Matukio kama ufunguo kuisha au tatizo la huduma yanaonyeshwa mara moja kwenye chini ya skrini ya TUI ya OpenClaw.
+- **Mzunguko wa Kiotomatiki wa Funguo za API**: Ufunguo mmoja ukifikia kikomo au ukizuiliwa kwa muda (cooldown), inabadilika kimya kimya hadi ufunguo unaofuata. OpenClaw inaendelea kufanya kazi bila kukatika.
+- **Ubadilishaji wa Kiotomatiki wa Huduma (Fallback)**: Google ikiwa haijibu, inabadilika hadi OpenRouter, na ikishindikana, inabadilika hadi Ollama/LM Studio/vLLM (AI ya ndani) iliyosanikishwa kwenye kompyuta yako. Kipindi hakikatiki. Huduma ya awali inapoanza tena, maombi yanayofuata yanarudi kiotomatiki (v0.1.18+, LM Studio/vLLM: v0.1.21+).
+- **Usawazishaji wa Papo Hapo (SSE)**: Ukibadilisha modeli kwenye dashibodi ya ghala, inajitokeza kwenye skrini ya OpenClaw ndani ya sekunde 1-3. SSE (Server-Sent Events) ni teknolojia ambapo seva inasukuma mabadiliko kwa wateja kwa wakati halisi.
+- **Arifa za Papo Hapo**: Matukio kama funguo kuisha au huduma kushindwa yanaonyeshwa mara moja chini ya TUI (skrini ya terminali) ya OpenClaw.
 
-> 💡 **Claude Code, Cursor, VS Code** pia zinaweza kuunganishwa na wall-vault, lakini madhumuni ya msingi ya wall-vault ni kutumika pamoja na OpenClaw.
+> 💡 **Claude Code, Cursor, VS Code** pia zinaweza kuunganishwa, lakini madhumuni ya asili ya wall-vault ni kutumika na OpenClaw.
 
 ```
-OpenClaw (skrini ya TUI ya terminal)
+OpenClaw (TUI skrini ya terminali)
         │
         ▼
   wall-vault proxy (:56244)   ← usimamizi wa funguo, uelekezaji, fallback, matukio
         │
         ├─ Google Gemini API
-        ├─ OpenRouter API (mifano 340+)
-        ├─ Ollama / LM Studio / vLLM (kompyuta yako, hifadhi ya mwisho)
+        ├─ OpenRouter API (modeli 340+)
+        ├─ Ollama / LM Studio / vLLM (kompyuta yako, kimbilio la mwisho)
         └─ OpenAI / Anthropic API
 ```
 
@@ -55,7 +55,7 @@ OpenClaw (skrini ya TUI ya terminal)
 
 ### Linux / macOS
 
-Fungua terminal na ubandike amri hizi kama zilivyo.
+Fungua terminali na ubandike amri zilizo hapa chini.
 
 ```bash
 # Linux (PC ya kawaida, seva — amd64)
@@ -67,68 +67,68 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
   -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
 ```
 
-- `curl -L ...` — Inapakua faili kutoka kwenye mtandao.
-- `chmod +x` — Inafanya faili iliyopakuliwa iweze "kutekelezwa". Ukipitisha hatua hii utapata kosa la "ruhusa imekataliwa".
+- `curl -L ...` — Inapakua faili kutoka mtandaoni.
+- `chmod +x` — Inafanya faili iliyopakuliwa "iweze kutekelezwa". Ukiacha hatua hii, utapata kosa la "ruhusa imekataliwa".
 
 ### Windows
 
-Fungua PowerShell (kama msimamizi) na uendeshe amri zifuatazo.
+Fungua PowerShell (kama msimamizi) na utekeleze amri zifuatazo.
 
 ```powershell
-# Kupakua
+# Pakua
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
   -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
 
-# Kuongeza PATH (inatumika baada ya kufungua tena PowerShell)
+# Ongeza kwenye PATH (inatumika baada ya PowerShell kuanzishwa upya)
 $env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
 ```
 
-> 💡 **PATH ni nini?** Ni orodha ya folda ambazo kompyuta hutafuta amri ndani yake. Ukiongeza kwenye PATH, unaweza kuandika `wall-vault` kutoka folda yoyote na kuiendesha.
+> 💡 **PATH ni nini?** Ni orodha ya folda ambapo kompyuta inatafuta amri. Unahitaji kuongeza kwenye PATH ili uweze kuandika `wall-vault` na kuitekeleza kutoka folda yoyote.
 
-### Kujenga kutoka Chanzo (kwa wasanidi programu)
+### Kujenga kutoka kwa Msimbo wa Chanzo (kwa watengenezaji)
 
-Hii inatumika tu ikiwa mazingira ya programu ya Go yamesakinishwa.
+Hii inatumika tu ikiwa una mazingira ya maendeleo ya lugha ya Go yaliyosanikishwa.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (toleo: v0.1.24.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (toleo: v0.1.25.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Toleo la muhuri wa wakati**: Unapojenga kwa `make build`, toleo linaundwa otomatiki kwa umbizo kama `v0.1.24.20260406.211004` lenye tarehe na saa. Ukijenga moja kwa moja kwa `go build ./...`, toleo litaonyesha `"dev"` tu.
+> 💡 **Toleo la muhuri wa wakati wa kujenga**: Ukijenga na `make build`, toleo litaundwa kiotomatiki katika muundo unaojumuisha tarehe na wakati kama `v0.1.25.20260408.022325`. Ukijenga moja kwa moja na `go build ./...`, toleo litaonyeshwa tu kama `"dev"`.
 
 ---
 
 ## Kuanza kwa Mara ya Kwanza
 
-### Kuendesha mchawi wa setup
+### Kuendesha Mchawi wa Setup
 
-Baada ya ufungaji, hakikisha umetekeleza **mchawi wa usanidi** kwa amri ifuatayo. Mchawi atakuongoza kupitia vipengele vyote muhimu kwa kuuliza moja kwa moja.
+Baada ya ufungaji, hakikisha unatekeleza **mchawi wa usanidi** kwa amri ifuatayo. Mchawi utakuuliza maswali moja kwa moja na kukuongoza.
 
 ```bash
 wall-vault setup
 ```
 
-Hatua ambazo mchawi anazipitia ni hizi:
+Hatua ambazo mchawi anafuata ni hizi:
 
 ```
-1. Uchaguzi wa lugha (lugha 10 ikiwa ni pamoja na Kiswahili)
-2. Uchaguzi wa mandhari (light / dark / gold / cherry / ocean)
-3. Hali ya uendeshaji — peke yako (standalone), au pamoja na vifaa vingi (distributed)
-4. Jina la boti — jina litakaloonekana kwenye dashibodi
-5. Mpangilio wa bandari — chaguo-msingi: proxy 56244, ghala 56243 (bonyeza Enter ikiwa huhitaji kubadilisha)
-6. Uchaguzi wa huduma za AI — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Mpangilio wa kichujio cha zana za usalama
-8. Mpangilio wa tokeni ya msimamizi — nenosiri la kufunga vipengele vya usimamizi wa dashibodi. Inaweza kuzalishwa otomatiki
-9. Mpangilio wa nenosiri la usimbuaji wa ufunguo wa API — kwa uhifadhi salama zaidi (hiari)
-10. Eneo la kuhifadhi faili ya usanidi
+1. Chagua lugha (lugha 10 ikiwa ni pamoja na Kiswahili)
+2. Chagua mandhari (light / dark / gold / cherry / ocean)
+3. Hali ya uendeshaji — chagua kama utatumia peke yako (standalone) au kwenye mashine nyingi (distributed)
+4. Ingiza jina la boti — jina litakaloonyeshwa kwenye dashibodi
+5. Mipangilio ya bandari — chaguomsingi: proxy 56244, ghala 56243 (bonyeza Enter kama huhitaji kubadilisha)
+6. Chagua huduma za AI — Google / OpenRouter / Ollama / LM Studio / vLLM
+7. Mipangilio ya kichujio cha zana za usalama
+8. Weka tokeni ya msimamizi — nenosiri la kufunga vipengele vya usimamizi wa dashibodi. Unaweza pia kuizalisha kiotomatiki
+9. Weka nenosiri la usimbuaji wa ufunguo wa API — ikiwa unataka kuhifadhi funguo kwa usalama zaidi (hiari)
+10. Njia ya kuhifadhi faili ya usanidi
 ```
 
-> ⚠️ **Kumbuka tokeni ya msimamizi.** Utaihitaji baadaye kuongeza funguo kwenye dashibodi au kubadilisha mipangilio. Ukiipoteza utahitaji kuhariri moja kwa moja faili ya usanidi.
+> ⚠️ **Hakikisha unaikumbuka tokeni ya msimamizi.** Utaihitaji baadaye unapoongeza funguo au kubadilisha mipangilio kwenye dashibodi. Ukiipoteza, utahitaji kuhariri faili ya usanidi moja kwa moja.
 
-Mchawi ukikamilika, faili ya usanidi `wall-vault.yaml` itaundwa otomatiki.
+Baada ya mchawi kukamilika, faili ya usanidi `wall-vault.yaml` itaundwa kiotomatiki.
 
 ### Kuendesha
 
@@ -141,46 +141,46 @@ Seva mbili zitaanza kwa wakati mmoja:
 - **Proxy** (`http://localhost:56244`) — wakala anayeunganisha OpenClaw na huduma za AI
 - **Ghala la Funguo** (`http://localhost:56243`) — usimamizi wa ufunguo wa API na dashibodi ya wavuti
 
-Fungua kivinjari na uende `http://localhost:56243` kuona dashibodi moja kwa moja.
+Fungua `http://localhost:56243` kwenye kivinjari chako ili kuona dashibodi mara moja.
 
 ---
 
 ## Kusajili Ufunguo wa API
 
-Kuna njia nne za kusajili ufunguo wa API. **Kwa wanaoanza, njia ya 1 (vigeuzi vya mazingira) inashauriwa**.
+Kuna njia nne za kusajili ufunguo wa API. **Kwa wanaoanza, Njia ya 1 (vigeuzi vya mazingira) inapendekezwa**.
 
-### Njia ya 1: Vigeuzi vya Mazingira (Inashauriwa — rahisi zaidi)
+### Njia ya 1: Vigeuzi vya Mazingira (Inayopendekezwa — Rahisi Zaidi)
 
-Vigeuzi vya mazingira ni **thamani zilizowekwa mapema** ambazo programu husoma wakati inapoanza. Andika kwenye terminal kama hivi:
+Vigeuzi vya mazingira ni **thamani zilizowekwa mapema** ambazo programu inasoma inapoanza. Andika katika terminali kama ifuatavyo.
 
 ```bash
-# Kusajili ufunguo wa Google Gemini
+# Sajili ufunguo wa Google Gemini
 export WV_KEY_GOOGLE=AIzaSy...
 
-# Kusajili ufunguo wa OpenRouter
+# Sajili ufunguo wa OpenRouter
 export WV_KEY_OPENROUTER=sk-or-v1-...
 
-# Kuendesha baada ya kusajili
+# Endesha baada ya kusajili
 wall-vault start
 ```
 
-Ikiwa una funguo nyingi, unganisha kwa koma (,). wall-vault itatumia funguo kwa zamu otomatiki (round robin):
+Ikiwa una funguo nyingi, ziunganishe kwa koma (,). wall-vault itatumia funguo kwa zamu kiotomatiki (round robin):
 
 ```bash
 export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 ```
 
-> 💡 **Kidokezo**: Amri ya `export` inatumika tu kwenye kikao cha sasa cha terminal. Ili ibaki hata baada ya kuanzisha upya kompyuta, ongeza mstari huo kwenye faili ya `~/.bashrc` au `~/.zshrc`.
+> 💡 **Kidokezo**: Amri ya `export` inatumika tu kwenye kipindi cha sasa cha terminali. Ili kudumu hata baada ya kuanzisha upya kompyuta, ongeza mstari huo kwenye faili ya `~/.bashrc` au `~/.zshrc`.
 
-### Njia ya 2: Dashibodi ya UI (bonyeza kwa kipanya)
+### Njia ya 2: Dashibodi ya UI (Bonyeza kwa Kipanya)
 
-1. Fungua kivinjari na uende `http://localhost:56243`
-2. Kwenye kadi ya **🔑 API Funguo** juu, bonyeza kitufe cha `[+ Ongeza]`
+1. Tembelea `http://localhost:56243` kwenye kivinjari
+2. Kwenye kadi ya **🔑 Funguo za API** hapo juu, bonyeza kitufe cha `[+ Ongeza]`
 3. Ingiza aina ya huduma, thamani ya ufunguo, lebo (jina la kumbukumbu), na kikomo cha kila siku, kisha uhifadhi
 
-### Njia ya 3: REST API (kwa ajili ya otomatiki na hati)
+### Njia ya 3: REST API (kwa Otomatiki/Hati)
 
-REST API ni njia ya programu kubadilishana data kupitia HTTP. Inafaa kwa usajili wa otomatiki kupitia hati.
+REST API ni njia ambapo programu hubadilishana data kupitia HTTP. Ni muhimu kwa kusajili kiotomatiki kupitia hati.
 
 ```bash
 curl -X POST http://localhost:56243/admin/keys \
@@ -194,9 +194,9 @@ curl -X POST http://localhost:56243/admin/keys \
   }'
 ```
 
-### Njia ya 4: Alama za proxy (kwa majaribio ya muda mfupi)
+### Njia ya 4: Bendera za Proxy (kwa Majaribio ya Muda Mfupi)
 
-Tumia hii kuweka ufunguo kwa muda bila usajili rasmi. Ufunguo utatoweka programu inapozimwa.
+Inatumika wakati unataka kujaribu kwa muda bila usajili rasmi. Inapotea unapozima programu.
 
 ```bash
 wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
@@ -206,9 +206,9 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 
 ## Jinsi ya Kutumia Wakala (Proxy)
 
-### Kutumia na OpenClaw (madhumuni ya msingi)
+### Matumizi na OpenClaw (Madhumuni Makuu)
 
-Hivi ndivyo unavyoweka OpenClaw iunganishwe na huduma za AI kupitia wall-vault.
+Jinsi ya kusanidi OpenClaw ili iunganishwe na huduma za AI kupitia wall-vault.
 
 Fungua faili ya `~/.openclaw/openclaw.json` na uongeze yaliyomo yafuatayo:
 
@@ -224,7 +224,7 @@ Fungua faili ya `~/.openclaw/openclaw.json` na uongeze yaliyomo yafuatayo:
         models: [
           { id: "wall-vault/gemini-2.5-flash" },
           { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // muktadha wa bure wa 1M
+          { id: "wall-vault/hunter-alpha" },    // muktadha wa 1M bila malipo
           { id: "wall-vault/claude-opus-4-6" }
         ]
       }
@@ -233,95 +233,95 @@ Fungua faili ya `~/.openclaw/openclaw.json` na uongeze yaliyomo yafuatayo:
 }
 ```
 
-> 💡 **Njia rahisi zaidi**: Bonyeza kitufe cha **🦞 Nakili Usanidi wa OpenClaw** kwenye kadi ya wakala katika dashibodi. Kipande chenye tokeni na anwani tayari kimejazwa kitanakiliwa kwenye ubao wa kunakilia. Bandika tu.
+> 💡 **Njia Rahisi Zaidi**: Bonyeza kitufe cha **🦞 Nakili Usanidi wa OpenClaw** kwenye kadi ya wakala wa dashibodi na snippet yenye tokeni na anwani zilizojazwa tayari itanakiliwa kwenye ubao wa kunakili. Bandika tu.
 
-**`wall-vault/` kabla ya jina la mfano inaelekezwa wapi?**
+**`wall-vault/` kabla ya jina la modeli inaelekezwa wapi?**
 
-Kulingana na jina la mfano, wall-vault inajua otomatiki ni huduma ipi ya AI ya kupeleka ombi:
+wall-vault inaamua kiotomatiki huduma ipi ya AI itumie kulingana na jina la modeli:
 
-| Umbizo la Mfano | Huduma Inayounganishwa |
+| Muundo wa Modeli | Huduma Inayounganishwa |
 |----------|--------------|
-| `wall-vault/gemini-*` | Google Gemini moja kwa moja |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI moja kwa moja |
-| `wall-vault/claude-*` | Anthropic kupitia OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (muktadha wa bure wa tokeni milioni 1) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
-| `google/jina-la-mfano`, `openai/jina-la-mfano`, `anthropic/jina-la-mfano` n.k. | Huduma husika moja kwa moja |
-| `custom/google/jina-la-mfano`, `custom/openai/jina-la-mfano` n.k. | Ondoa sehemu ya `custom/` na uelekeze upya |
-| `jina-la-mfano:cloud` | Ondoa sehemu ya `:cloud` na uunganishe kupitia OpenRouter |
+| `wall-vault/gemini-*` | Muunganisho wa moja kwa moja na Google Gemini |
+| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | Muunganisho wa moja kwa moja na OpenAI |
+| `wall-vault/claude-*` | Muunganisho na Anthropic kupitia OpenRouter |
+| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (tokeni milioni 1 za muktadha bila malipo) |
+| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | Muunganisho na OpenRouter |
+| `google/jina-la-modeli`, `openai/jina-la-modeli`, `anthropic/jina-la-modeli` n.k. | Muunganisho wa moja kwa moja na huduma husika |
+| `custom/google/jina-la-modeli`, `custom/openai/jina-la-modeli` n.k. | Sehemu ya `custom/` inaondolewa na kuelekeza upya |
+| `jina-la-modeli:cloud` | Sehemu ya `:cloud` inaondolewa na kuunganishwa na OpenRouter |
 
-> 💡 **Muktadha (context) ni nini?** Ni kiasi cha mazungumzo ambacho AI kinaweza kukumbuka kwa wakati mmoja. 1M (tokeni milioni 1) inamaanisha mazungumzo marefu sana au nyaraka ndefu zinaweza kushughulikiwa mara moja.
+> 💡 **Muktadha (context) ni nini?** Ni kiasi cha mazungumzo ambacho AI inaweza kukumbuka kwa wakati mmoja. 1M (tokeni milioni moja) inamaanisha mazungumzo marefu sana au hati ndefu zinaweza kushughulikiwa kwa wakati mmoja.
 
-### Kuunganisha Moja kwa Moja kwa Umbizo la Gemini API (utangamano wa zana zilizopo)
+### Muunganisho wa Moja kwa Moja kwa Muundo wa Gemini API (utangamano na zana zilizopo)
 
-Ikiwa una zana zilizokuwa zikitumia Google Gemini API moja kwa moja, badilisha tu anwani kuwa ya wall-vault:
+Ikiwa una zana zilizokuwa zikitumia Google Gemini API moja kwa moja, badilisha anwani tu hadi wall-vault:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:56244/google
 ```
 
-Au ikiwa zana yako inatumia URL moja kwa moja:
+Au ikiwa zana yako inabainisha URL moja kwa moja:
 
 ```
 http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
-### Kutumia na OpenAI SDK (Python)
+### Matumizi na OpenAI SDK (Python)
 
-Unaweza pia kuunganisha wall-vault kwenye nambari ya Python inayotumia AI. Badilisha `base_url` tu:
+Unaweza pia kuunganisha wall-vault katika msimbo wa Python unaotumia AI. Badilisha tu `base_url`:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:56244/v1",
-    api_key="not-needed"  # wall-vault inasimamia ufunguo wa API
+    api_key="not-needed"  # wall-vault inasimamia funguo za API kiotomatiki
 )
 
 response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # ingiza kwa umbizo la provider/model
+    model="google/gemini-2.5-flash",   # muundo wa mtoa-huduma/modeli
     messages=[{"role": "user", "content": "Habari"}]
 )
 ```
 
-### Kubadilisha Mfano Wakati wa Uendeshaji
+### Kubadilisha Modeli Wakati wa Uendeshaji
 
-Ili kubadilisha mfano wa AI wakati wall-vault tayari inaendesha:
+Ili kubadilisha modeli ya AI wakati wall-vault tayari inaendesha:
 
 ```bash
-# Kubadilisha mfano kwa kuomba moja kwa moja kwa proxy
+# Badilisha modeli kwa kuomba moja kwa moja kwa proxy
 curl -X PUT http://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
-# Katika hali ya kusambazwa (boti nyingi), badilisha kwenye seva ya ghala → itaonyeshwa mara moja kupitia SSE
-curl -X PUT http://localhost:56243/admin/clients/boti-yangu-id \
+# Katika hali ya kusambazwa (boti nyingi), badilisha kwenye seva ya ghala → inaakisiwa mara moja kupitia SSE
+curl -X PUT http://localhost:56243/admin/clients/kitambulisho-cha-boti \
   -H "Authorization: Bearer tokeni-ya-msimamizi" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
 ```
 
-### Kuangalia Orodha ya Mifano Inayopatikana
+### Kuangalia Orodha ya Modeli Zinazopatikana
 
 ```bash
-# Angalia orodha yote
+# Tazama orodha kamili
 curl http://localhost:56244/api/models | python3 -m json.tool
 
-# Mifano ya Google peke yake
+# Tazama modeli za Google tu
 curl "http://localhost:56244/api/models?service=google"
 
-# Tafuta kwa jina (mfano: mifano yenye "claude")
+# Tafuta kwa jina (mfano: modeli zinazojumuisha "claude")
 curl "http://localhost:56244/api/models?q=claude"
 ```
 
-**Muhtasari wa mifano kuu kwa huduma:**
+**Muhtasari wa Modeli Kuu kwa Huduma:**
 
-| Huduma | Mifano Kuu |
+| Huduma | Modeli Kuu |
 |--------|----------|
 | Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
 | OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | Zaidi ya 346 (Hunter Alpha 1M muktadha bure, DeepSeek R1/V3, Qwen 2.5 n.k.) |
-| Ollama | Inagundua otomatiki mifano ya seva ya ndani kwenye kompyuta yako |
+| OpenRouter | 346+ (Hunter Alpha 1M muktadha bila malipo, DeepSeek R1/V3, Qwen 2.5 n.k.) |
+| Ollama | Inagundua seva ya ndani iliyosanikishwa kwenye kompyuta yako kiotomatiki |
 | LM Studio | Seva ya ndani kwenye kompyuta yako (bandari 1234) |
 | vLLM | Seva ya ndani kwenye kompyuta yako (bandari 8000) |
 
@@ -329,45 +329,45 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Dashibodi ya Ghala la Funguo
 
-Fungua kivinjari na uende `http://localhost:56243` kuona dashibodi.
+Tembelea `http://localhost:56243` kwenye kivinjari ili kuona dashibodi.
 
-**Mpangilio wa skrini:**
-- **Baa ya juu iliyobandikwa (topbar)**: Nembo, kichaguzi cha lugha na mandhari, hali ya muunganisho wa SSE
-- **Gridi ya kadi**: Kadi za wakala, huduma, na ufunguo wa API zimepangwa kwa vigae
+**Mpangilio wa Skrini:**
+- **Baa ya juu iliyoimarishwa (topbar)**: Nembo, kichaguzi cha lugha na mandhari, hali ya muunganisho wa SSE
+- **Gridi ya kadi**: Kadi za wakala, huduma, na ufunguo wa API zilizopangwa kama vigae
 
 ### Kadi ya Ufunguo wa API
 
-Kadi inayokuruhusu kusimamia funguo zote za API zilizosajiliwa kwa mtazamo mmoja.
+Kadi inayokuruhusu kusimamia funguo za API zilizosajiliwa kwa mtazamo mmoja.
 
-- Inaonyesha orodha ya funguo zilizogawanywa kwa huduma.
-- `today_usage`: Tokeni (idadi ya herufi ambazo AI imesoma na kuandika) zilizochakatwa kwa mafanikio leo
-- `today_attempts`: Jumla ya maombi ya leo (mafanikio + kushindwa)
-- Kitufe cha `[+ Ongeza]` cha kusajili ufunguo mpya, na `✕` kufuta ufunguo.
+- Inaonyesha orodha ya funguo zikigawanywa kwa huduma.
+- `today_usage`: Idadi ya tokeni zilizofanikiwa kushughulikiwa leo (idadi ya herufi AI ilizosoma na kuandika)
+- `today_attempts`: Jumla ya simu za leo (mafanikio + kushindwa)
+- Kitufe cha `[+ Ongeza]` kusajili ufunguo mpya, na `✕` kufuta ufunguo.
 
-> 💡 **Tokeni (token) ni nini?** Ni kipimo kinachotumiwa na AI kuchakata maandishi. Kwa takriban ni neno moja la Kiingereza, au herufi 1–2 za lugha nyingine. Gharama za API kawaida huhesabiwa kulingana na idadi ya tokeni.
+> 💡 **Tokeni ni nini?** Ni kitengo ambacho AI inatumia kusindika maandishi. Takriban ni sawa na neno moja la Kiingereza, au herufi 1-2 za Kikorea. Malipo ya API kwa kawaida yanahesabiwa kulingana na idadi hii ya tokeni.
 
 ### Kadi ya Wakala
 
-Kadi inayoonyesha hali ya boti (wakala) zilizounganishwa na proxy ya wall-vault.
+Kadi inayoonyesha hali ya boti (mawakala) waliounganishwa na proxy ya wall-vault.
 
-**Hali ya muunganisho inaonyeshwa katika viwango 4:**
+**Hali ya muunganisho inaonyeshwa katika hatua 4:**
 
-| Alama | Hali | Maana |
+| Onyesho | Hali | Maana |
 |------|------|------|
-| 🟢 | Inaendesha | Proxy inafanya kazi vizuri |
-| 🟡 | Kuchelewa | Inajibu lakini polepole |
-| 🔴 | Nje ya mtandao | Proxy haijibu |
-| ⚫ | Haijaunganishwa/Imezimwa | Proxy haijawahi kuunganishwa na ghala au imezimwa |
+| 🟢 | Inaendesha | Proxy inafanya kazi kawaida |
+| 🟡 | Imechelewa | Inajibu lakini polepole |
+| 🔴 | Nje ya Mtandao | Proxy haijibu |
+| ⚫ | Haijaungangishwa/Imezimwa | Proxy haijawahi kuunganishwa na ghala au imezimwa |
 
-**Maelezo ya vitufe chini ya kadi ya wakala:**
+**Mwongozo wa Vitufe Chini ya Kadi ya Wakala:**
 
-Unaposajili wakala na kubainisha **aina ya wakala**, vitufe vya urahisi vinavyofaa aina hiyo vitaonekana otomatiki.
+Unaposajili wakala na kubainisha **aina ya wakala**, vitufe vya urahisi vilivyokusudiwa aina hiyo vinaonekana kiotomatiki.
 
 ---
 
-#### 🔘 Kitufe cha Kunakili Usanidi — Kinaunda usanidi wa muunganisho otomatiki
+#### 🔘 Kitufe cha Kunakili Usanidi — Kinaunda mipangilio ya muunganisho kiotomatiki
 
-Ukibonyeza kitufe, kipande cha usanidi chenye tokeni, anwani ya proxy, na taarifa za mfano za wakala huyo kitanakiliwa kwenye ubao wa kunakilia. Bandika tu kwenye mahali panapoonyeshwa kwenye jedwali hapa chini na usanidi wa muunganisho utakamilika.
+Unapobonyeza kitufe, snippet ya usanidi yenye tokeni ya wakala huyo, anwani ya proxy, na taarifa za modeli zilizojazwa tayari inanakiliwa kwenye ubao wa kunakili. Bandika tu maudhui yaliyonakiliwa kwenye eneo lililoonyeshwa kwenye jedwali hapa chini ili kukamilisha usanidi wa muunganisho.
 
 | Kitufe | Aina ya Wakala | Mahali pa Kubandika |
 |------|-------------|-------------|
@@ -377,7 +377,7 @@ Ukibonyeza kitufe, kipande cha usanidi chenye tokeni, anwani ya proxy, na taarif
 | ⌨ Nakili Usanidi wa Cursor | `cursor` | Cursor → Settings → AI |
 | 💻 Nakili Usanidi wa VSCode | `vscode` | `~/.continue/config.json` |
 
-**Mfano — Ikiwa ni aina ya Claude Code, hii ndiyo itakayonakiliwa:**
+**Mfano — Ikiwa ni aina ya Claude Code, yafuatayo yatanakiliwa:**
 
 ```json
 // ~/.claude/settings.json
@@ -421,15 +421,15 @@ OPENAI_BASE_URL=http://192.168.0.6:56244/v1
 OPENAI_API_KEY=tokeni-ya-wakala-huyu
 ```
 
-> ⚠️ **Ikiwa kunakili kwenye ubao wa kunakilia hakufanyi kazi**: Sera za usalama za kivinjari zinaweza kuzuia kunakili. Ikiwa sanduku la maandishi litafunguka kama dirisha-dogo, bonyeza Ctrl+A kuchagua yote kisha Ctrl+C kunakili.
+> ⚠️ **Kunakili kwenye ubao wa kunakili kukishindikana**: Sera ya usalama ya kivinjari inaweza kuzuia kunakili. Ikiwa sanduku la maandishi litafunguka kama popup, tumia Ctrl+A kuchagua yote kisha Ctrl+C kunakili.
 
 ---
 
-#### ⚡ Kitufe cha Kutumia Otomatiki — Bonyeza mara moja na usanidi umekamilika
+#### ⚡ Kitufe cha Kutumia Kiotomatiki — Bonyeza mara moja na usanidi umekamilika
 
-Ikiwa aina ya wakala ni `cline`, `claude-code`, `openclaw`, au `nanoclaw`, kitufe cha **⚡ Tumia Usanidi** kitaonyeshwa kwenye kadi ya wakala. Ukibonyeza kitufe hiki, faili ya usanidi wa ndani ya wakala itasasishwa otomatiki.
+Ikiwa aina ya wakala ni `cline`, `claude-code`, `openclaw`, au `nanoclaw`, kitufe cha **⚡ Tumia Usanidi** kinaonyeshwa kwenye kadi ya wakala. Unapobonyeza kitufe hiki, faili ya usanidi ya ndani ya wakala huyo inasasishwa kiotomatiki.
 
-| Kitufe | Aina ya Wakala | Faili Inayotumika |
+| Kitufe | Aina ya Wakala | Faili Inayolengwa |
 |------|-------------|-------------|
 | ⚡ Tumia Usanidi wa Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
 | ⚡ Tumia Usanidi wa Claude Code | `claude-code` | `~/.claude/settings.json` |
@@ -440,166 +440,176 @@ Ikiwa aina ya wakala ni `cline`, `claude-code`, `openclaw`, au `nanoclaw`, kituf
 
 ---
 
-#### 🔀 Kupanga Kadi kwa Kuburuta na Kudondosha (v0.1.17)
+#### 🔀 Kupanga Kadi kwa Kuburuta na Kudondosha (v0.1.17, iliyoboreshwa v0.1.25)
 
-Unaweza **kuburuta** kadi za wakala kwenye dashibodi na kuzipanga kwa mpangilio unaotaka.
+Unaweza **kuburuta** kadi za wakala kwenye dashibodi ili kuzipanga upya kwa mpangilio unaotaka.
 
-1. Shika kadi ya wakala kwa kipanya na uiburute
-2. Iache juu ya kadi unayotaka na mpangilio utabadilika
-3. Mpangilio mpya **unahifadhiwa mara moja kwenye seva** na unabaki hata baada ya kupakia upya
+1. Shika eneo la **taa za trafiki (●)** upande wa kushoto juu wa kadi na uburute kwa kipanya
+2. Iache kwenye kadi unayotaka na mpangilio utabadilika
 
-> 💡 Vifaa vya kuguswa (simu za mkononi/kompyuta kibao) bado havijauniwa. Tumia kivinjari cha kompyuta ya mezani.
+> 💡 Maudhui ya kadi (sehemu za kuingiza, vitufe n.k.) hayaburutwi. Unaweza kushika tu kutoka eneo la taa za trafiki.
+
+#### 🟠 Kugundua Mchakato wa Wakala (v0.1.25)
+
+Wakati proxy inafanya kazi vizuri lakini mchakato wa wakala wa ndani (NanoClaw, OpenClaw) umekufa, taa ya kadi inabadilika kuwa **rangi ya machungwa (inapepesa)** na ujumbe "Mchakato wa wakala umesimama" unaonyeshwa.
+
+- 🟢 Kijani: Proxy + wakala vinafanya kazi vizuri
+- 🟠 Machungwa (inapepesa): Proxy inafanya kazi vizuri, wakala amekufa
+- 🔴 Nyekundu: Proxy nje ya mtandao
+3. Mpangilio uliobadilishwa **unahifadhiwa kwenye seva mara moja** na unadumu hata baada ya kuburudisha
+
+> 💡 Kwenye vifaa vya kugusa (simu/kibao bapa) bado hakutumiki. Tumia kivinjari cha kompyuta.
 
 ---
 
-#### 🔄 Usawazishaji wa Mifano Pande Mbili (v0.1.16)
+#### 🔄 Usawazishaji wa Modeli wa Pande Mbili (v0.1.16)
 
-Ukibadilisha mfano wa wakala kwenye dashibodi ya ghala, usanidi wa ndani wa wakala husasishwa otomatiki.
+Ukibadilisha modeli ya wakala kwenye dashibodi ya ghala, usanidi wa ndani wa wakala huyo unasasishwa kiotomatiki.
 
 **Kwa Cline:**
-- Kubadilisha mfano kwenye ghala → tukio la SSE → proxy inasasisha sehemu ya mfano katika `globalState.json`
-- Sehemu zinazosasishwa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` na ufunguo wa API hazigusiwi
+- Modeli ikibadilishwa kwenye ghala → Tukio la SSE → Proxy inasasisha sehemu ya modeli katika `globalState.json`
+- Malengo ya kusasishwa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` na ufunguo wa API haviathiriwi
 - **Kupakia upya VS Code (`Ctrl+Alt+R` au `Ctrl+Shift+P` → `Developer: Reload Window`) kunahitajika**
-  - Cline haisomi tena faili ya usanidi wakati inaendesha
+  - Kwa sababu Cline haisomi faili ya usanidi tena inapoendesha
 
 **Kwa Claude Code:**
-- Kubadilisha mfano kwenye ghala → tukio la SSE → proxy inasasisha sehemu ya `model` katika `settings.json`
-- Inatafuta otomatiki njia za WSL na Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+- Modeli ikibadilishwa kwenye ghala → Tukio la SSE → Proxy inasasisha sehemu ya `model` katika `settings.json`
+- Inatafuta kiotomatiki njia za WSL na Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
 
-**Mwelekeo wa nyuma (wakala → ghala):**
-- Wakala (Cline, Claude Code n.k.) anapotuma ombi kwa proxy, proxy inajumuisha taarifa za huduma/mfano wa mteja katika heartbeat
-- Huduma/mfano inayotumiwa sasa inaonyeshwa kwa wakati halisi kwenye kadi ya wakala katika dashibodi ya ghala
+**Mwelekeo wa Nyuma (wakala → ghala):**
+- Wakala (Cline, Claude Code n.k.) anapotuma ombi kwa proxy, proxy inajumuisha taarifa za huduma/modeli za mteja katika heartbeat
+- Huduma/modeli inayotumika sasa inaonyeshwa kwa wakati halisi kwenye kadi ya wakala kwenye dashibodi ya ghala
 
-> 💡 **Jambo kuu**: Proxy inatambua wakala kwa tokeni ya Authorization ya ombi na kuelekeza otomatiki kwa huduma/mfano iliyowekwa kwenye ghala. Hata kama Cline au Claude Code inatuma jina tofauti la mfano, proxy inabadilisha kuwa mpangilio wa ghala.
+> 💡 **Jambo Muhimu**: Proxy inatambua wakala kupitia tokeni ya Authorization ya ombi, na kuelekeza kiotomatiki kwa huduma/modeli iliyowekwa kwenye ghala. Hata Cline au Claude Code ikituma jina tofauti la modeli, proxy inabatilisha na usanidi wa ghala.
 
 ---
 
 ### Kutumia Cline kwenye VS Code — Mwongozo wa Kina
 
-#### Hatua ya 1: Sakinisha Cline
+#### Hatua ya 1: Sanikisha Cline
 
-Sakinisha **Cline** (ID: `saoudrizwan.claude-dev`) kutoka soko la nyongeza za VS Code.
+Sanikisha **Cline** (ID: `saoudrizwan.claude-dev`) kutoka soko la viendelezi vya VS Code.
 
-#### Hatua ya 2: Sajili wakala kwenye ghala
+#### Hatua ya 2: Sajili Wakala kwenye Ghala
 
 1. Fungua dashibodi ya ghala (`http://IP-ya-ghala:56243`)
-2. Bonyeza **+ Ongeza** katika sehemu ya **Wakala**
-3. Ingiza kama ifuatavyo:
+2. Katika sehemu ya **Mawakala**, bonyeza **+ Ongeza**
+3. Ingiza yafuatayo:
 
 | Sehemu | Thamani | Maelezo |
 |------|----|------|
-| ID | `cline_yangu` | Kitambulisho cha kipekee (herufi za Kiingereza, bila nafasi) |
+| ID | `yangu_cline` | Kitambulisho cha kipekee (Kiingereza, bila nafasi) |
 | Jina | `Cline Yangu` | Jina litakaloonyeshwa kwenye dashibodi |
-| Aina ya Wakala | `cline` | ← lazima uchague `cline` |
+| Aina ya Wakala | `cline` | ← Lazima uchague `cline` |
 | Huduma | Chagua huduma ya kutumia (mfano: `google`) | |
-| Mfano | Ingiza mfano wa kutumia (mfano: `gemini-2.5-flash`) | |
+| Modeli | Ingiza modeli ya kutumia (mfano: `gemini-2.5-flash`) | |
 
-4. Bonyeza **Hifadhi** na tokeni itazalishwa otomatiki
+4. Bonyeza **Hifadhi** na tokeni itaundwa kiotomatiki
 
-#### Hatua ya 3: Unganisha Cline
+#### Hatua ya 3: Unganisha na Cline
 
-**Njia A — Kutumia otomatiki (inashauriwa)**
+**Njia A — Kutumia Kiotomatiki (Inayopendekezwa)**
 
 1. Hakikisha **proxy** ya wall-vault inaendesha kwenye mashine hiyo (`localhost:56244`)
-2. Bonyeza kitufe cha **⚡ Tumia Usanidi wa Cline** kwenye kadi ya wakala katika dashibodi
-3. Ikiwa arifa "Usanidi umetumika!" inaonekana, umefanikiwa
+2. Bonyeza kitufe cha **⚡ Tumia Usanidi wa Cline** kwenye kadi ya wakala kwenye dashibodi
+3. Arifa "Usanidi umetumika!" ikionekana, imefanikiwa
 4. Pakia upya VS Code (`Ctrl+Alt+R`)
 
-**Njia B — Usanidi wa mwenyewe**
+**Njia B — Usanidi wa Mikono**
 
-Fungua mipangilio (⚙️) kwenye upau wa pembeni wa Cline:
+Fungua mipangilio (⚙️) kwenye upau wa pembeni wa Cline na uweke:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://anwani-ya-proxy:56244/v1`
-  - Mashine ile ile: `http://localhost:56244/v1`
-  - Mashine nyingine kama seva ya Mini: `http://192.168.0.6:56244/v1`
+  - Kwenye mashine ile ile: `http://localhost:56244/v1`
+  - Kwenye mashine nyingine kama seva ya Mini: `http://192.168.0.6:56244/v1`
 - **API Key**: Tokeni iliyotolewa kutoka ghala (nakili kutoka kadi ya wakala)
-- **Model ID**: Mfano uliowekwa kwenye ghala (mfano: `gemini-2.5-flash`)
+- **Model ID**: Modeli iliyowekwa kwenye ghala (mfano: `gemini-2.5-flash`)
 
 #### Hatua ya 4: Thibitisha
 
-Tuma ujumbe wowote kwenye sanduku la mazungumzo la Cline. Ikiwa ni sawa:
-- Nukta ya kijani (● Inaendesha) itaonekana kwenye kadi ya wakala katika dashibodi ya ghala
-- Huduma/mfano wa sasa itaonyeshwa kwenye kadi (mfano: `google / gemini-2.5-flash`)
+Tuma ujumbe wowote kwenye mazungumzo ya Cline. Ikiwa kila kitu ni sawa:
+- **Alama ya kijani (● Inaendesha)** inaonyeshwa kwenye kadi ya wakala kwenye dashibodi ya ghala
+- Huduma/modeli ya sasa inaonyeshwa kwenye kadi (mfano: `google / gemini-2.5-flash`)
 
-#### Kubadilisha Mfano
+#### Kubadilisha Modeli
 
-Unapotaka kubadilisha mfano wa Cline, badilisha kwenye **dashibodi ya ghala**:
+Unapotaka kubadilisha modeli ya Cline, ibadilishe kwenye **dashibodi ya ghala**:
 
-1. Badilisha menyu kunjuzi ya huduma/mfano kwenye kadi ya wakala
+1. Badilisha kichupo cha huduma/modeli kwenye kadi ya wakala
 2. Bonyeza **Tumia**
-3. Pakia upya VS Code (`Ctrl+Alt+R`) — jina la mfano kwenye chini ya Cline litasasishwa
-4. Kuanzia ombi linalofuata, mfano mpya utatumiwa
+3. Pakia upya VS Code (`Ctrl+Alt+R`) — jina la modeli katika kijachini cha Cline litasasishwa
+4. Modeli mpya itatumika kuanzia ombi linalofuata
 
-> 💡 Kwa kweli, proxy inatambua ombi la Cline kwa tokeni na kuelekeza kwa mfano wa mpangilio wa ghala. Hata usipopakia upya VS Code **mfano unaotumika hubadilika mara moja** — kupakia upya ni kwa ajili ya kusasisha onyesho la mfano kwenye UI ya Cline tu.
+> 💡 Kwa kweli, proxy inatambua ombi la Cline kupitia tokeni na kuelekeza kwa modeli ya usanidi wa ghala. Hata bila kupakia upya VS Code, **modeli inayotumika kweli inabadilika mara moja** — kupakia upya ni kusasisha onyesho la modeli kwenye UI ya Cline tu.
 
 #### Kugundua Kukatika kwa Muunganisho
 
-Ukifunga VS Code, kadi ya wakala kwenye dashibodi ya ghala itageuka njano (kuchelewa) baada ya takriban **sekunde 90**, na nyekundu (nje ya mtandao) baada ya **dakika 3**. (Kuanzia v0.1.18, ukaguzi wa hali wa sekunde 15 umefanya kugundua kuwa nje ya mtandao kuwa haraka zaidi.)
+Unapofunga VS Code, kadi ya wakala kwenye dashibodi ya ghala inabadilika kuwa njano (imechelewa) baada ya takriban **sekunde 90**, na kuwa nyekundu (nje ya mtandao) baada ya **dakika 3**. (Kuanzia v0.1.18, ukaguzi wa hali kwa vipindi vya sekunde 15 unafanya ugunduzi wa nje ya mtandao kuwa wa haraka zaidi.)
 
 #### Utatuzi wa Matatizo
 
 | Dalili | Sababu | Suluhisho |
 |------|------|------|
-| Kosa la "kushindwa kuunganisha" kwenye Cline | Proxy haiendesha au anwani si sahihi | Thibitisha proxy kwa `curl http://localhost:56244/health` |
-| Nukta ya kijani haionekani kwenye ghala | Ufunguo wa API (tokeni) haujawekwa | Bonyeza tena kitufe cha **⚡ Tumia Usanidi wa Cline** |
-| Mfano kwenye chini ya Cline haubadiliki | Cline imehifadhi usanidi kwenye kashe | Pakia upya VS Code (`Ctrl+Alt+R`) |
-| Jina la mfano lisilo sahihi linaonekana | Hitilafu ya zamani (ilisahihishwa katika v0.1.16) | Sasisha proxy hadi v0.1.16 au zaidi |
+| Kosa la "muunganisho umeshindikana" kwenye Cline | Proxy haiendesha au anwani si sahihi | Thibitisha proxy kwa `curl http://localhost:56244/health` |
+| Alama ya kijani haionekani kwenye ghala | Ufunguo wa API (tokeni) haujawekwa | Bonyeza kitufe cha **⚡ Tumia Usanidi wa Cline** tena |
+| Modeli kwenye kijachini cha Cline haibadiliki | Cline ina akiba ya usanidi | Pakia upya VS Code (`Ctrl+Alt+R`) |
+| Jina la modeli lisilo sahihi linaonyeshwa | Hitilafu ya zamani (ilisahihishwa katika v0.1.16) | Sasisha proxy hadi v0.1.16 au zaidi |
 
 ---
 
 #### 🟣 Kitufe cha Kunakili Amri ya Kupeleka — Kinatumika wakati wa kusakinisha kwenye mashine mpya
 
-Kinatumika unaposakinisha proxy ya wall-vault kwa mara ya kwanza kwenye kompyuta mpya na kuiunganisha na ghala. Bonyeza kitufe na hati nzima ya usakinishaji itanakiliwa. Bandika kwenye terminal ya kompyuta mpya na uiendeshe — yafuatayo yatashughulikiwa mara moja:
+Kinatumika wakati wa kusakinisha proxy ya wall-vault kwa mara ya kwanza kwenye kompyuta mpya na kuiunganisha na ghala. Ukibonyeza kitufe, hati nzima ya usakinishaji inanakiliwa. Ibandike kwenye terminali ya kompyuta mpya na uitekeleze, na yafuatayo yatashughulikiwa kwa wakati mmoja:
 
-1. Usakinishaji wa faili ya wall-vault (itarukwa ikiwa tayari imesakinishwa)
-2. Usajili wa otomatiki wa huduma ya mtumiaji ya systemd
-3. Kuanza huduma na kuunganisha otomatiki na ghala
+1. Sakinisha binary ya wall-vault (inarukwa ikiwa tayari imesanikishwa)
+2. Sajili huduma ya mtumiaji ya systemd kiotomatiki
+3. Anzisha huduma na uunganishe na ghala kiotomatiki
 
-> 💡 Tokeni ya wakala huyu na anwani ya seva ya ghala tayari zimejazwa ndani ya hati, kwa hivyo unaweza kuiendesha mara moja baada ya kubandika bila marekebisho yoyote.
+> 💡 Hati tayari ina tokeni ya wakala huyu na anwani ya seva ya ghala zilizojazwa, kwa hivyo unaweza kuitekeleza moja kwa moja baada ya kubandika bila marekebisho yoyote.
 
 ---
 
 ### Kadi ya Huduma
 
-Kadi ya kuwasha na kuzima au kusanidi huduma za AI utakazotumia.
+Kadi ya kuwasha/kuzima au kusanidi huduma za AI za kutumia.
 
-- Swichi za kila huduma za kuwasha na kuzima
-- Ukiingiza anwani ya seva ya AI ya ndani (Ollama, LM Studio, vLLM n.k. inayoendesha kwenye kompyuta yako), itagundua otomatiki mifano inayopatikana.
-- **Onyesho la hali ya muunganisho wa huduma ya ndani**: Nukta ● karibu na jina la huduma ikiwa **kijani** imeunganishwa, ikiwa **kijivu** haijaunganishwa
-- **Taa za trafiki otomatiki za huduma ya ndani** (v0.1.23+): Huduma za ndani (Ollama, LM Studio, vLLM) zinawashwa na kuzimwa otomatiki kulingana na iwapo zinaweza kuunganishwa. Ukiwasha huduma, ndani ya sekunde 15 nukta ● itageuka kijani na kisanduku cha kukagua kitawashwa; ukizima huduma, itazimwa otomatiki. Hii inafanya kazi kwa njia ile ile na huduma za wingu (Google, OpenRouter n.k.) zinazowashwa na kuzimwa otomatiki kulingana na uwepo wa ufunguo wa API.
+- Swichi za kubadilisha kuwezesha/kuzima kwa kila huduma
+- Ukiingiza anwani ya seva ya AI ya ndani (Ollama, LM Studio, vLLM n.k. inayoendesha kwenye kompyuta yako), modeli zinazopatikana zitagundulika kiotomatiki.
+- **Onyesho la hali ya muunganisho wa huduma ya ndani**: Alama ya ● karibu na jina la huduma ni **kijani** ikiwa imeunganishwa, **kijivu** ikiwa haijaunganishwa
+- **Taa za trafiki za kiotomatiki za huduma ya ndani** (v0.1.23+): Huduma za ndani (Ollama, LM Studio, vLLM) zinawezeshwa kiotomatiki zinapoweza kuunganishwa, na kuzimwa zinapokatika. Ukiwasha huduma, inabadilika kuwa ● kijani ndani ya sekunde 15 na kisanduku cha kuangalia kinawaka, na ukiizima, inazimwa kiotomatiki. Hii inafanya kazi sawa na jinsi huduma za wingu (Google, OpenRouter n.k.) zinavyobadilika kiotomatiki kulingana na uwepo wa ufunguo wa API.
 
-> 💡 **Ikiwa huduma ya ndani inaendesha kwenye kompyuta nyingine**: Ingiza IP ya kompyuta hiyo kwenye kisanduku cha URL ya huduma. Mfano: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio). Ikiwa huduma imefungwa kwa `127.0.0.1` badala ya `0.0.0.0`, itashindwa kufikia kupitia IP ya nje, kwa hivyo kagua anwani ya kufunga katika mpangilio wa huduma.
+> 💡 **Ikiwa huduma ya ndani inaendesha kwenye kompyuta nyingine**: Ingiza IP ya kompyuta hiyo kwenye sehemu ya kuingiza URL ya huduma. Mfano: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio). Ikiwa huduma imefungwa kwa `127.0.0.1` tu badala ya `0.0.0.0`, haitaweza kufikiwa kupitia IP ya nje, kwa hivyo angalia anwani ya kufunga kwenye usanidi wa huduma.
 
 ### Kuingiza Tokeni ya Msimamizi
 
-Unapojaribu kutumia vipengele muhimu kama kuongeza au kufuta funguo kwenye dashibodi, dirisha-dogo la kuingiza tokeni ya msimamizi litaonekana. Ingiza tokeni uliyoiweka wakati wa mchawi wa setup. Mara tu ukiingiza, itabaki hadi utakapofunga kivinjari.
+Unapojaribu kutumia vipengele muhimu kama kuongeza au kufuta funguo kwenye dashibodi, popup ya kuingiza tokeni ya msimamizi itaonekana. Ingiza tokeni uliyoiweka kwenye mchawi wa setup. Mara tu ukiiingiza, inadumu hadi ufunge kivinjari.
 
-> ⚠️ **Ikiwa uthibitisho utashindwa zaidi ya mara 10 ndani ya dakika 15, IP hiyo itazuiwa kwa muda.** Ikiwa umesahau tokeni, angalia kipengele cha `admin_token` kwenye faili ya `wall-vault.yaml`.
+> ⚠️ **Ikiwa uthibitishaji utashindikana mara zaidi ya 10 ndani ya dakika 15, IP hiyo itazuiliwa kwa muda.** Ikiwa umesahau tokeni yako, angalia kipengee cha `admin_token` kwenye faili ya `wall-vault.yaml`.
 
 ---
 
 ## Hali ya Kusambazwa (Boti Nyingi)
 
-Unapoendeshea OpenClaw kwenye kompyuta nyingi kwa wakati mmoja, huu ni mpangilio wa **kushiriki ghala moja la funguo**. Ni rahisi kwa sababu unahitaji kusimamia funguo mahali pamoja tu.
+Usanidi wa **kushiriki ghala moja ya funguo** wakati unaendesha OpenClaw kwenye kompyuta nyingi kwa wakati mmoja. Ni rahisi kwa sababu unahitaji tu kusimamia funguo katika sehemu moja.
 
-### Mfano wa Mpangilio
+### Mfano wa Usanidi
 
 ```
 [Seva ya Ghala la Funguo]
   wall-vault vault    (ghala la funguo :56243, dashibodi)
 
-[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini Local]
+[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini Ndani]
   wall-vault proxy      wall-vault proxy        wall-vault proxy
   openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ usawazishaji SSE    ↕ usawazishaji SSE      ↕ usawazishaji SSE
+  ↕ Usawazishaji wa SSE  ↕ Usawazishaji wa SSE    ↕ Usawazishaji wa SSE
 ```
 
-Boti zote zinaelekeza kwenye seva ya ghala katikati, kwa hivyo kubadilisha mfano au kuongeza ufunguo kwenye ghala kunaonyeshwa mara moja kwenye boti zote.
+Boti zote zinaangalia seva ya ghala katikati, kwa hivyo ukibadilisha modeli au kuongeza funguo kwenye ghala, inaakisiwa kwa boti zote mara moja.
 
-### Hatua ya 1: Anza Seva ya Ghala la Funguo
+### Hatua ya 1: Anzisha Seva ya Ghala la Funguo
 
-Endesha kwenye kompyuta itakayotumika kama seva ya ghala:
+Endesha kwenye kompyuta utakayoitumia kama seva ya ghala:
 
 ```bash
 wall-vault vault
@@ -607,7 +617,7 @@ wall-vault vault
 
 ### Hatua ya 2: Sajili Kila Boti (Mteja)
 
-Sajili mapema taarifa za kila boti itakayounganishwa na seva ya ghala:
+Sajili taarifa za kila boti inayounganishwa na seva ya ghala mapema:
 
 ```bash
 curl -X POST http://localhost:56243/admin/clients \
@@ -622,9 +632,9 @@ curl -X POST http://localhost:56243/admin/clients \
   }'
 ```
 
-### Hatua ya 3: Anza Proxy kwenye Kila Kompyuta ya Boti
+### Hatua ya 3: Anzisha Proxy kwenye Kila Kompyuta ya Boti
 
-Endesha proxy kwenye kila kompyuta yenye boti kwa kubainisha anwani ya seva ya ghala na tokeni:
+Endesha proxy kwenye kila kompyuta ambayo boti imesanikishwa, ukibainisha anwani ya seva ya ghala na tokeni:
 
 ```bash
 WV_VAULT_URL=http://192.168.x.x:56243 \
@@ -633,17 +643,17 @@ WV_VAULT_CLIENT_ID=botA \
 wall-vault proxy
 ```
 
-> 💡 Badilisha **`192.168.x.x`** na anwani halisi ya IP ya ndani ya kompyuta ya seva ya ghala. Unaweza kuikagua kupitia mpangilio wa router au amri ya `ip addr`.
+> 💡 Badilisha sehemu ya **`192.168.x.x`** na anwani halisi ya IP ya ndani ya kompyuta ya seva ya ghala. Unaweza kuithibitisha kupitia mipangilio ya router au amri ya `ip addr`.
 
 ---
 
 ## Kuanzisha Kiotomatiki
 
-Ikiwa ni kero kuwasha wall-vault kwa mkono kila kompyuta inapoanzishwa upya, sajili kama huduma ya mfumo. Mara tu ukisajili, itaanza otomatiki wakati wa boot.
+Ikiwa ni usumbufu kuwasha wall-vault kwa mkono kila wakati unapoanzisha upya kompyuta, isajili kama huduma ya mfumo. Mara tu ikiwa imesajiliwa, itaanza kiotomatiki wakati wa kupakia.
 
 ### Linux — systemd (Linux nyingi)
 
-systemd ni mfumo wa Linux wa kuanza na kusimamia programu otomatiki:
+systemd ni mfumo unaowasha na kusimamia programu kiotomatiki kwenye Linux:
 
 ```bash
 wall-vault doctor deploy
@@ -651,7 +661,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now wall-vault
 ```
 
-Kuangalia kumbukumbu:
+Angalia kumbukumbu:
 
 ```bash
 journalctl --user -u wall-vault -f
@@ -659,7 +669,7 @@ journalctl --user -u wall-vault -f
 
 ### macOS — launchd
 
-Mfumo unaosimamia utekelezaji otomatiki wa programu kwenye macOS:
+Mfumo unaosimamia uanzishaji wa kiotomatiki wa programu kwenye macOS:
 
 ```bash
 wall-vault doctor deploy launchd
@@ -669,7 +679,7 @@ launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
 ### Windows — NSSM
 
 1. Pakua NSSM kutoka [nssm.cc](https://nssm.cc/download) na uiongeze kwenye PATH.
-2. Kwenye PowerShell ya msimamizi:
+2. Katika PowerShell ya msimamizi:
 
 ```powershell
 wall-vault doctor deploy windows
@@ -679,16 +689,15 @@ wall-vault doctor deploy windows
 
 ## Daktari (Doctor)
 
-Amri ya `doctor` ni zana ya wall-vault ya **kujichunguza na kujisahihisha**.
+Amri ya `doctor` ni **zana inayojichunguza na kujirekebisha** kuangalia kama wall-vault imesanidiwa kwa usahihi.
 
 ```bash
-wall-vault doctor check   # Chunguza hali ya sasa (soma tu, hakuna kinachobadilishwa)
-wall-vault doctor fix     # Rekebisha matatizo otomatiki
-wall-vault doctor all     # Uchunguzi + urekebishaji wa otomatiki mara moja
+wall-vault doctor check   # Chunguza hali ya sasa (inasoma tu, haibadilishi chochote)
+wall-vault doctor fix     # Rekebisha matatizo kiotomatiki
+wall-vault doctor all     # Uchunguzi + kurekebisha kiotomatiki kwa wakati mmoja
 ```
 
-> 💡 Ikiwa kitu kinaonekana si sawa, endesha `wall-vault doctor all` kwanza. Kinashughulikia matatizo mengi otomatiki.
-
+> 💡 Ikiwa kitu kinaonekana si sawa, endesha `wall-vault doctor all` kwanza. Inashughulikia matatizo mengi kiotomatiki.
 
 ---
 
@@ -696,43 +705,43 @@ wall-vault doctor all     # Uchunguzi + urekebishaji wa otomatiki mara moja
 
 *(v0.1.24+)*
 
-**RTK (Zana ya Kuokoa Tokeni)** inabana otomatiki matokeo ya amri za sheli ambazo wakala wa AI wa kodishaji (Claude Code n.k.) huendesha, na kupunguza matumizi ya tokeni. Kwa mfano, matokeo ya mistari 15 ya `git status` yanabana kuwa muhtasari wa mistari 2.
+**RTK (Zana ya Kuokoa Tokeni)** inashinikiza kiotomatiki matokeo ya amri za shell zinazotekelezwa na mawakala wa AI wa msimbo (kama Claude Code) ili kupunguza matumizi ya tokeni. Kwa mfano, matokeo ya mistari 15 ya `git status` yanapunguzwa hadi muhtasari wa mistari 2.
 
 ### Matumizi ya Msingi
 
 ```bash
-# Funika amri kwa wall-vault rtk na matokeo yatachujwa otomatiki
-wall-vault rtk git status          # Inaonyesha orodha ya faili zilizobadilishwa tu
-wall-vault rtk git diff HEAD~1     # Mistari iliyobadilishwa + muktadha wa chini tu
-wall-vault rtk git log -10         # Hash + ujumbe wa mstari mmoja kwa kila ingizo
-wall-vault rtk go test ./...       # Inaonyesha majaribio yaliyoshindwa tu
-wall-vault rtk ls -la              # Amri zisizouniwa zinakatwa otomatiki
+# Funga amri kwa wall-vault rtk na matokeo yatachujwa kiotomatiki
+wall-vault rtk git status          # Orodha ya faili zilizobadilishwa tu
+wall-vault rtk git diff HEAD~1     # Mistari iliyobadilishwa + muktadha wa chini
+wall-vault rtk git log -10         # Hash + ujumbe wa mstari mmoja
+wall-vault rtk go test ./...       # Majaribio yaliyoshindikana tu
+wall-vault rtk ls -la              # Amri zisizotumika zinakatwa kiotomatiki
 ```
 
-### Amri Zinazouniwa na Athari za Kuokoa
+### Amri Zinazotumika na Athari ya Kupunguza
 
-| Amri | Njia ya Kuchuja | Kiwango cha Kuokoa |
+| Amri | Njia ya Kuchuja | Kiwango cha Kupunguza |
 |------|----------|--------|
 | `git status` | Muhtasari wa faili zilizobadilishwa tu | ~87% |
 | `git diff` | Mistari iliyobadilishwa + muktadha wa mistari 3 | ~60-94% |
 | `git log` | Hash + ujumbe wa mstari wa kwanza | ~90% |
 | `git push/pull/fetch` | Ondoa maendeleo, muhtasari tu | ~80% |
-| `go test` | Onyesha kushindwa tu, hesabu kupita | ~88-99% |
+| `go test` | Onyesha kushindikana tu, hesabu kupita | ~88-99% |
 | `go build/vet` | Onyesha makosa tu | ~90% |
-| Amri nyingine zote | Mistari 50 ya mwanzo + 50 ya mwisho, upeo 32KB | Inabadilika |
+| Amri nyingine yoyote | Mistari 50 ya kwanza + 50 ya mwisho, ukubwa wa juu 32KB | Inategemea |
 
-### Bomba la Kuchuja la Hatua 3
+### Mfumo wa Kuchuja wa Hatua 3
 
-1. **Kichujio cha muundo kwa amri** — Kinaelewa muundo wa matokeo ya git, go n.k. na kuchota sehemu zenye maana tu
-2. **Uchakataji wa baadaye wa regex** — Kuondoa misimbo ya rangi ya ANSI, kupunguza mistari tupu, kujumlisha mistari inayorudiwa
-3. **Kupitisha + kukata** — Amri zisizouniwa huhifadhi mistari 50 ya mwanzo na 50 ya mwisho tu
+1. **Kichujio cha muundo kwa kila amri** — Kinaelewa muundo wa matokeo ya git, go n.k. na kuchukua sehemu zenye maana tu
+2. **Usindikaji wa baadaye wa regex** — Ondoa misimbo ya rangi ya ANSI, punguza mistari tupu, jumlisha mistari inayojirudia
+3. **Passthrough + kukata** — Amri zisizotumika huhifadhi mistari 50 ya kwanza/mwisho tu
 
-### Kuunganisha na Claude Code
+### Muunganisho na Claude Code
 
-Unaweza kusanidi kwa kiungo cha `PreToolUse` cha Claude Code ili amri zote za sheli zipite kupitia RTK otomatiki.
+Unaweza kusanidi amri zote za shell kupitia RTK kiotomatiki kupitia hook ya `PreToolUse` ya Claude Code.
 
 ```bash
-# Sakinisha kiungo (kinaongezwa otomatiki kwenye settings.json ya Claude Code)
+# Sakinisha hook (inaongezwa kiotomatiki kwenye Claude Code settings.json)
 wall-vault rtk hook install
 ```
 
@@ -749,125 +758,129 @@ Au ongeza kwa mkono kwenye `~/.claude/settings.json`:
 }
 ```
 
-> 💡 **Uhifadhi wa exit code**: RTK inarudisha msimbo wa kutoka wa amri ya asili kama ilivyo. Amri ikishindwa (exit code ≠ 0), AI pia itagundua kushindwa kwa usahihi.
+> 💡 **Kuhifadhi Exit code**: RTK inarudisha msimbo wa kutoka wa amri ya asili kama ilivyo. Ikiwa amri itashindikana (exit code ≠ 0), AI pia itagundua kushindikana kwa usahihi.
 
-> 💡 **Kulazimisha Kiingereza**: RTK inaendesha amri kwa `LC_ALL=C` ili kuzalisha matokeo ya Kiingereza kila wakati bila kujali mpangilio wa lugha ya mfumo. Hii inahakikisha kichujio kinafanya kazi kwa usahihi.
+> 💡 **Kulazimisha Kiingereza**: RTK inatekeleza amri na `LC_ALL=C` ili kutoa matokeo ya Kiingereza kila wakati bila kujali mipangilio ya lugha ya mfumo. Hii inahakikisha kichujio kinafanya kazi kwa usahihi.
 
 ---
 
 ## Marejeo ya Vigeuzi vya Mazingira
 
-Vigeuzi vya mazingira ni njia ya kupitisha thamani za usanidi kwenye programu. Ingiza kwa umbizo la `export jina-la-kigezo=thamani` kwenye terminal, au viweke kwenye faili ya huduma ya kuanza otomatiki ili vitumike kila wakati.
+Vigeuzi vya mazingira ni njia ya kupitisha thamani za usanidi kwa programu. Ingiza kwa muundo wa `export jina-la-kigezo=thamani` kwenye terminali, au weka kwenye faili ya huduma ya kuanzisha kiotomatiki ili itumike kila wakati.
 
 | Kigezo | Maelezo | Thamani ya Mfano |
 |------|------|---------|
 | `WV_LANG` | Lugha ya dashibodi | `ko`, `en`, `ja` |
 | `WV_THEME` | Mandhari ya dashibodi | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Ufunguo wa API wa Google (nyingi kwa koma) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | Ufunguo wa API wa OpenRouter | `sk-or-v1-...` |
+| `WV_KEY_GOOGLE` | Ufunguo wa Google API (nyingi kwa koma) | `AIza...,AIza...` |
+| `WV_KEY_OPENROUTER` | Ufunguo wa OpenRouter API | `sk-or-v1-...` |
 | `WV_VAULT_URL` | Anwani ya seva ya ghala katika hali ya kusambazwa | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Tokeni ya uthibitisho ya mteja (boti) | `my-secret-token` |
+| `WV_VAULT_TOKEN` | Tokeni ya uthibitishaji ya mteja (boti) | `my-secret-token` |
 | `WV_ADMIN_TOKEN` | Tokeni ya msimamizi | `admin-token-here` |
 | `WV_MASTER_PASS` | Nenosiri la usimbuaji wa ufunguo wa API | `my-password` |
-| `WV_AVATAR` | Njia ya faili ya picha ya avatar (njia inayohusiana na `~/.openclaw/`) | `workspace/avatars/avatar.png` |
+| `WV_AVATAR` | Njia ya faili ya picha ya avatar (njia ya jamaa kutoka `~/.openclaw/`) | `workspace/avatars/avatar.png` |
 | `OLLAMA_URL` | Anwani ya seva ya ndani ya Ollama | `http://192.168.x.x:11434` |
 
 ---
 
 ## Utatuzi wa Matatizo
 
-### Proxy Haianzishi
+### Wakati Proxy Haiwezi Kuanza
 
-Mara nyingi bandari tayari inatumika na programu nyingine.
+Mara nyingi, bandari tayari inatumika na programu nyingine.
 
 ```bash
-ss -tlnp | grep 56244   # Angalia ni nani anayetumia bandari 56244
-wall-vault proxy --port 8080   # Anza kwa nambari ya bandari nyingine
+ss -tlnp | grep 56244   # Angalia nani anatumia bandari 56244
+wall-vault proxy --port 8080   # Anza na nambari tofauti ya bandari
 ```
 
-### Makosa ya Ufunguo wa API (429, 402, 401, 403, 582)
+### Wakati Kosa la Ufunguo wa API Linatokea (429, 402, 401, 403, 582)
 
-| Nambari ya Kosa | Maana | Jinsi ya Kushughulikia |
+| Msimbo wa Kosa | Maana | Jinsi ya Kushughulikia |
 |----------|------|----------|
-| **429** | Maombi mengi sana (kikomo cha matumizi kimezidishwa) | Subiri kidogo au ongeza ufunguo mwingine |
-| **402** | Malipo yanahitajika au salio limeisha | Jumuisha salio kwenye huduma husika |
-| **401 / 403** | Ufunguo si sahihi au huna ruhusa | Thibitisha tena thamani ya ufunguo na usajili upya |
-| **582** | Msongamano wa lango (cooldown dakika 5) | Itafunguliwa otomatiki baada ya dakika 5 |
+| **429** | Maombi mengi sana (matumizi yamezidi) | Subiri kidogo au ongeza ufunguo mwingine |
+| **402** | Malipo yanahitajika au mkopo hautoshi | Jaza mkopo kwenye huduma husika |
+| **401 / 403** | Ufunguo si sahihi au hakuna ruhusa | Thibitisha thamani ya ufunguo na usajili tena |
+| **582** | Mzigo wa gateway (cooldown dakika 5) | Inaondolewa kiotomatiki baada ya dakika 5 |
 
 ```bash
-# Angalia orodha ya funguo zilizosajiliwa na hali zake
+# Angalia orodha na hali ya funguo zilizosajiliwa
 curl -H "Authorization: Bearer tokeni-ya-msimamizi" http://localhost:56243/admin/keys
 
-# Weka upya vihesabio vya matumizi ya ufunguo
+# Weka upya vihesabio vya matumizi ya funguo
 curl -X POST -H "Authorization: Bearer tokeni-ya-msimamizi" http://localhost:56243/admin/keys/reset
 ```
 
-### Wakala Anaonyeshwa kama "Haijaunganishwa"
+### Wakati Wakala Anaonyeshwa kama "Haijaunganishwa"
 
-"Haijaunganishwa" inamaanisha mchakato wa proxy hautumi ishara (heartbeat) kwa ghala. **Haimaanishi kuwa usanidi haujahifadhiwa.** Proxy lazima iwe inajua anwani ya seva ya ghala na tokeni na kuendesha ili kubadilika kuwa hali ya kuunganishwa.
+"Haijaunganishwa" inamaanisha mchakato wa proxy hautumi ishara (heartbeat) kwa ghala. **Haimaanishi kwamba mipangilio haijahifadhiwa.** Proxy lazima iendesha ikijua anwani ya seva ya ghala na tokeni ili hali ya muunganisho ibadilke.
 
 ```bash
-# Anza proxy kwa kubainisha anwani ya seva ya ghala, tokeni, na ID ya mteja
+# Anza proxy ukibainisha anwani ya seva ya ghala, tokeni, na kitambulisho cha mteja
 WV_VAULT_URL=http://anwani-ya-seva-ya-ghala:56243 \
 WV_VAULT_TOKEN=tokeni-ya-mteja \
-WV_VAULT_CLIENT_ID=id-ya-mteja \
+WV_VAULT_CLIENT_ID=kitambulisho-cha-mteja \
 wall-vault proxy
 ```
 
-Muunganisho ukifanikiwa, itabadilika kuwa 🟢 Inaendesha kwenye dashibodi ndani ya takriban sekunde 20.
+Muunganisho ukifanikiwa, inabadilika kuwa 🟢 Inaendesha kwenye dashibodi ndani ya takriban sekunde 20.
 
-### Ollama Haiunganishwi
+### Wakati Ollama Haiwezi Kuunganishwa
 
-Ollama ni programu ya kuendesha AI moja kwa moja kwenye kompyuta yako. Kwanza hakikisha Ollama inafanya kazi.
+Ollama ni programu inayoendesha AI moja kwa moja kwenye kompyuta yako. Kwanza hakikisha Ollama imewashwa.
 
 ```bash
-curl http://localhost:11434/api/tags   # Ikiwa orodha ya mifano inaonekana, ni sawa
+curl http://localhost:11434/api/tags   # Orodha ya modeli ikionekana, ni kawaida
 export OLLAMA_URL=http://192.168.x.x:11434   # Ikiwa inaendesha kwenye kompyuta nyingine
 ```
 
-> ⚠️ Ikiwa Ollama haijibu, anza kwanza Ollama kwa amri ya `ollama serve`.
+> ⚠️ Ikiwa Ollama haijibu, anza Ollama kwanza kwa amri ya `ollama serve`.
 
-> ⚠️ **Mifano mikubwa ina muda mrefu wa kujibu**: Mifano mikubwa kama `qwen3.5:35b`, `deepseek-r1` inaweza kuchukua dakika kadhaa kuzalisha jibu. Hata ikionekana kama hakuna jibu, inaweza kuwa inachakata kawaida, kwa hivyo subiri.
+> ⚠️ **Modeli kubwa ni polepole**: Modeli kubwa kama `qwen3.5:35b`, `deepseek-r1` zinaweza kuchukua dakika kadhaa kuzalisha jibu. Hata ikionekana kama hakuna jibu, inaweza kuwa inashughulika kawaida, kwa hivyo subiri.
 
 ---
 
-## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.24)
+## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.25)
+
+### v0.1.25 (2026-04-08)
+- **Kugundua Mchakato wa Wakala**: Proxy inagundua hali ya uhai ya wakala wa ndani (NanoClaw/OpenClaw) na kuonyesha kwa taa ya machungwa kwenye dashibodi.
+- **Uboreshaji wa Kishiko cha Kuburuta**: Imebadilishwa ili kadi zishikwe tu kutoka eneo la taa za trafiki (●) wakati wa kupanga. Sehemu za kuingiza au vitufe havikurutiwi kwa bahati mbaya.
 
 ### v0.1.24 (2026-04-06)
-- **Amri ndogo ya RTK ya kuokoa tokeni**: `wall-vault rtk <command>` inachuja otomatiki matokeo ya amri za sheli ili kupunguza matumizi ya tokeni ya wakala wa AI kwa 60-90%. Inajumuisha vichujio maalum kwa amri kuu kama git, go, na amri zisizouniwa pia zinakatwa otomatiki. Inaunganishwa kwa uwazi na kiungo cha `PreToolUse` cha Claude Code.
+- **Amri ndogo ya RTK ya Kuokoa Tokeni**: `wall-vault rtk <command>` inachuja kiotomatiki matokeo ya amri za shell ili kupunguza matumizi ya tokeni ya mawakala wa AI kwa 60-90%. Inajumuisha vichujio maalum kwa amri kuu kama git, go, na amri zisizotumika pia zinakatwa kiotomatiki. Inaunganishwa kwa uwazi kupitia hook ya `PreToolUse` ya Claude Code.
 
 ### v0.1.23 (2026-04-06)
-- **Marekebisho ya kubadilisha mfano wa Ollama**: Ilirekebishwa tatizo ambapo kubadilisha mfano wa Ollama kwenye dashibodi ya ghala hakukuonyeshwa kwenye proxy halisi. Hapo awali, ni kigezo cha mazingira (`OLLAMA_MODEL`) peke yake kilichotumiwa, lakini sasa mpangilio wa ghala unapewa kipaumbele.
-- **Taa za trafiki otomatiki za huduma ya ndani**: Ollama, LM Studio, na vLLM zinawashwa otomatiki zinapoweza kuunganishwa na kuzimwa otomatiki zinapokatika. Hii inafanya kazi kwa njia ile ile na ubadilishaji otomatiki wa huduma za wingu unaotegemea ufunguo.
+- **Urekebishaji wa Kubadilisha Modeli ya Ollama**: Tatizo ambapo kubadilisha modeli ya Ollama kwenye dashibodi ya ghala hakuakisiwa kwenye proxy limesahihishwa. Hapo awali ilitumia kigezo cha mazingira (`OLLAMA_MODEL`) tu, lakini sasa usanidi wa ghala unapewa kipaumbele.
+- **Taa za Trafiki za Kiotomatiki za Huduma ya Ndani**: Ollama, LM Studio, vLLM zinawezeshwa kiotomatiki zinapoweza kuunganishwa, na kuzimwa kiotomatiki zinapokatika. Inafanya kazi kwa njia ile ile na ubadilishaji wa kiotomatiki unaotegemea ufunguo wa huduma za wingu.
 
 ### v0.1.22 (2026-04-05)
-- **Marekebisho ya sehemu tupu ya content iliyokosekana**: Mifano ya kufikiri (gemini-3.1-pro, o1, claude thinking n.k.) ilipotumia kikomo cha max_tokens yote kwa reasoning na kushindwa kutoa jibu halisi, proxy iliondoa sehemu za `content`/`text` za JSON ya jibu kwa `omitempty`, na kusababisha makosa ya `Cannot read properties of undefined (reading 'trim')` kwenye wateja wa SDK wa OpenAI/Anthropic. Imebadilishwa ili sehemu zijumuishwe kila wakati kulingana na vipimo rasmi vya API.
+- **Urekebishaji wa Kukosa Sehemu Tupu ya content**: Modeli za fikira (gemini-3.1-pro, o1, claude thinking n.k.) zinapotumia kikomo chote cha max_tokens kwa hoja na kushindwa kuzalisha jibu halisi, proxy ilikuwa ikiacha sehemu za `content`/`text` kwenye JSON ya jibu kwa `omitempty`, na kusababisha wateja wa OpenAI/Anthropic SDK kupata kosa la `Cannot read properties of undefined (reading 'trim')`. Imebadilishwa kujumuisha sehemu kila wakati kulingana na ubainisho rasmi wa API.
 
 ### v0.1.21 (2026-04-05)
-- **Msaada wa mifano ya Gemma 4**: Mifano ya familia ya Gemma kama `gemma-4-31b-it`, `gemma-4-26b-a4b-it` inaweza kutumiwa kupitia Google Gemini API.
-- **Msaada rasmi wa huduma za LM Studio / vLLM**: Hapo awali huduma hizi zilirukwa katika uelekezaji wa proxy na kila mara zilibadilishwa na Ollama. Sasa zinaelekezwa vizuri kupitia API inayoendana na OpenAI.
-- **Marekebisho ya onyesho la huduma kwenye dashibodi**: Hata wakati wa fallback, dashibodi inaonyesha kila wakati huduma iliyowekwa na mtumiaji.
-- **Onyesho la hali ya huduma ya ndani**: Hali ya muunganisho wa huduma za ndani (Ollama, LM Studio, vLLM n.k.) inaonyeshwa kwa rangi ya nukta ● wakati dashibodi inapakia.
-- **Kigezo cha mazingira cha kichujio cha zana**: Hali ya kupitisha zana (tools) inaweza kuwekwa kwa kigezo cha mazingira `WV_TOOL_FILTER=passthrough`.
+- **Msaada wa Modeli ya Gemma 4**: Modeli za familia ya Gemma kama `gemma-4-31b-it`, `gemma-4-26b-a4b-it` zinaweza kutumika kupitia Google Gemini API.
+- **Msaada Rasmi wa Huduma za LM Studio / vLLM**: Hapo awali huduma hizi zilirukwa kwenye uelekezaji wa proxy na daima zilbadilishwa na Ollama. Sasa zinaelekezwa kawaida kupitia API inayooana na OpenAI.
+- **Urekebishaji wa Onyesho la Huduma kwenye Dashibodi**: Hata fallback ikitokea, dashibodi daima inaonyesha huduma iliyowekwa na mtumiaji.
+- **Onyesho la Hali ya Huduma ya Ndani**: Hali ya muunganisho wa huduma za ndani (Ollama, LM Studio, vLLM n.k.) inaonyeshwa kwa rangi ya alama ya ● wakati dashibodi inapakia.
+- **Kigezo cha Mazingira cha Kichujio cha Zana**: Hali ya kupitisha zana inaweza kuwekwa na kigezo cha mazingira `WV_TOOL_FILTER=passthrough`.
 
 ### v0.1.20 (2026-03-28)
-- **Uimarishaji wa kina wa usalama**: Kinga dhidi ya XSS (maeneo 41), ulinganisho wa tokeni wa muda wa kudumu, vizuizi vya CORS, vikomo vya ukubwa wa ombi, kinga dhidi ya kupita njia, uthibitisho wa SSE, uimarishaji wa kizuizi cha kasi n.k. vipengele 12 vya usalama vilivyoboreshwa.
+- **Uimarishaji Kamili wa Usalama**: Uboreshaji wa vipengee 12 vya usalama ikiwa ni pamoja na kuzuia XSS (sehemu 41), ulinganishaji wa tokeni wa muda usio na tofauti, vikwazo vya CORS, vikomo vya ukubwa wa ombi, kuzuia kupita njia, uthibitishaji wa SSE, uimarishaji wa kikomo cha kasi n.k.
 
 ### v0.1.19 (2026-03-27)
-- **Kugundua Claude Code mtandaoni**: Claude Code ambayo haipiti kupitia proxy pia inaonyeshwa mtandaoni kwenye dashibodi.
+- **Kugundua Claude Code Mtandaoni**: Claude Code isiyopitia proxy pia inaonyeshwa kama mtandaoni kwenye dashibodi.
 
 ### v0.1.18 (2026-03-26)
-- **Marekebisho ya huduma ya fallback iliyokwama**: Baada ya fallback kwa Ollama kwa sababu ya kosa la muda mfupi, ikiwa huduma ya awali inrejea, inabadilika kurudi otomatiki.
-- **Uboreshaji wa kugundua nje ya mtandao**: Ukaguzi wa hali wa sekunde 15 umefanya kugundua kukatika kwa proxy kuwa haraka zaidi.
+- **Urekebishaji wa Kukwama kwa Huduma ya Fallback**: Baada ya kurudi kwa Ollama kutokana na kosa la muda, huduma ya asili ikianza tena, inarudi kiotomatiki.
+- **Uboreshaji wa Kugundua Nje ya Mtandao**: Ukaguzi wa hali kwa vipindi vya sekunde 15 unafanya ugunduzi wa proxy kusimama kuwa wa haraka zaidi.
 
 ### v0.1.17 (2026-03-25)
-- **Kupanga kadi kwa kuburuta na kudondosha**: Kadi za wakala zinaweza kuburutwa kupanga upya mpangilio.
-- **Vitufe vya kutumia usanidi ndani ya mstari**: Kitufe cha [⚡ Tumia Usanidi] kinaonyeshwa kwa wakala wasio mtandaoni.
-- **Aina mpya ya wakala cokacdir**.
+- **Kupanga Kadi kwa Kuburuta na Kudondosha**: Kadi za wakala zinaweza kuburutwa ili kubadilisha mpangilio.
+- **Kitufe cha Kutumia Usanidi cha Mstari**: Kitufe cha [⚡ Tumia Usanidi] kinaonyeshwa kwenye mawakala walio nje ya mtandao.
+- **Aina ya wakala wa cokacdir imeongezwa**.
 
 ### v0.1.16 (2026-03-25)
-- **Usawazishaji wa mifano pande mbili**: Kubadilisha mfano wa Cline au Claude Code kwenye dashibodi ya ghala kunaonyeshwa otomatiki.
+- **Usawazishaji wa Modeli wa Pande Mbili**: Kubadilisha modeli ya Cline au Claude Code kwenye dashibodi ya ghala kunasababisha kuakisiwa kiotomatiki.
 
 ---
 
-*Kwa taarifa zaidi za API, tazama [API.md](API.md).*
+*Kwa taarifa za kina zaidi za API, tazama [API.md](API.md).*

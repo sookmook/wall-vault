@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Linux systemd-Einrichtungsskript kopieren",
   "cfg_deploy_hint": "Im Terminal des Zielrechners einfügen",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 setzen und neu starten",
-  "key_att": "Vers."
+  "key_att": "Vers.",
+  "drag_reorder": "Ziehen zum Neuordnen",
+  "agent_dead": "⚠ Agentenprozess gestoppt"
 }

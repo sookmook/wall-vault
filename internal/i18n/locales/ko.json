@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Linux systemd 자동 설치 스크립트 복사",
   "cfg_deploy_hint": "대상 머신 터미널에 붙여넣으세요",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 설정 후 재시작",
-  "key_att": "시도"
+  "key_att": "시도",
+  "drag_reorder": "드래그하여 순서 변경",
+  "agent_dead": "⚠ 에이전트 프로세스 중단"
 }

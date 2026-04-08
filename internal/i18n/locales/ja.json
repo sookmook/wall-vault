@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Linux systemd セットアップスクリプトをコピー",
   "cfg_deploy_hint": "ターゲットマシンのターミナルに貼り付けてください",
   "st_gemini_hint": "GEMINI_API_BASE_URL=http://localhost:56244 を設定して再起動してください",
-  "key_att": "試行"
+  "key_att": "試行",
+  "drag_reorder": "ドラッグして並び替え",
+  "agent_dead": "⚠ エージェントプロセス停止"
 }

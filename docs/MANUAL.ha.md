@@ -1,5 +1,5 @@
 # Jagoran Amfani da wall-vault
-*(Ƙarshen sabuntawa: 2026-04-06 — v0.1.24)*
+*(Last updated: 2026-04-08 — v0.1.25)*
 
 ---
 
@@ -22,30 +22,30 @@
 
 ## Menene wall-vault?
 
-**wall-vault = Wakilin AI (Proxy) + Ɓaure na Maɓallin API — na OpenClaw**
+**wall-vault = Wakili na AI (Proxy) + Ɓauren Maɓallin API don OpenClaw**
 
-Don amfani da ayyukan AI, kana buƙatar **maɓallin API**. Maɓallin API shi ne **takardar shiga ta dijital** wanda ke tabbatar cewa ana ba ka izinin amfani da ayyukan. Amma wannan takardar shiga tana da ƙayyadaddun amfani a kowace rana, kuma idan ba a lura da ita sosai ba, tana iya fita a hannun marasa izini.
+Don amfani da sabis na AI, kana buƙatar **maɓallin API**. Maɓallin API kamar **katin shiga na dijital** ne wanda ke tabbatar da "wannan mutumin yana da ikon amfani da wannan sabis ɗin". Sai dai, wannan katin shiga yana iyakar amfani a kowace rana, kuma idan ba a kula shi da hankali ba, yana iya bayyana.
 
-wall-vault yana ajiye waɗannan maɓallan cikin **ɓaure mai aminci**, kuma yana aiki a matsayin **wakili (proxy)** tsakanin OpenClaw da ayyukan AI. A taƙaice, OpenClaw yana haɗawa da wall-vault kawai, sannan wall-vault yana kula da sauran abubuwan.
+wall-vault na adana waɗannan katin shiga a cikin ɓaure mai tsaro kuma yana aiki a matsayin **wakili (proxy)** tsakanin OpenClaw da sabis na AI. A taƙaice, OpenClaw kawai yana buƙatar haɗawa da wall-vault, sauran abubuwan da suka fi rikitarwa wall-vault zai magance su.
 
-Matsalolin da wall-vault ke warware:
+Matsaloli da wall-vault ke warwarewa:
 
-- **Jujjuya Maɓallin ta Atomatik**: Idan amfanin maɓalli ɗaya ya kai iyakansa ko ya tsaya na ɗan lokaci (cooldown), sai a yi amfani da na gaba a ɓoye. OpenClaw yana ci gaba da aiki ba tare da katse ba.
-- **Musanya Ayyuka ta Atomatik (Fallback)**: Idan Google bai amsa ba, sai a yi amfani da OpenRouter; idan haka ma bai yi aiki ba, sai a koma Ollama, LM Studio, ko vLLM (AI na gida akan kwamfutarka). Zaman ba ya katse. Idan ayyukan asali sun dawo, za a koma kan su ta atomatik daga buƙatar gaba (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Daidaita Aiki a Lokaci Ɗaya (SSE)**: Idan ka canza ƙirar a dashboard ɗin ɓaure, za a nuna canje-canjen akan allon OpenClaw cikin dakika 1–3. SSE (Server-Sent Events) wata fasaha ce da ke ba wa sabar damar tura sabuntawa zuwa ga abokin ciniki a lokaci ɗaya.
-- **Sanarwa a Lokaci Ɗaya**: Idan maɓalli ya ƙare ko akwai matsalar aiki, za a nuna wannan a ƙasan allon TUI na OpenClaw nan da nan.
+- **Sauya Maɓallin API ta Atomatik**: Idan maɓalli ɗaya ya kai iyaka ko aka dakatar da shi na ɗan lokaci (cooldown), za a canza shi a hankali zuwa maɓalli na gaba. OpenClaw na ci gaba da aiki ba tare da katsewar ba.
+- **Sauya Sabis ta Atomatik (Fallback)**: Idan Google ba ya amsa ba, za a canza zuwa OpenRouter, idan hakan ma bai yi ba, za a canza zuwa Ollama/LM Studio/vLLM (AI na gida) da aka shigar a kwamfutarka. Zaman ba ya katse ba. Idan sabis na asali ya dawo, buƙatun da ke tafe za su koma ta atomatik (v0.1.18+, LM Studio/vLLM: v0.1.21+).
+- **Daidaita Ainihin Lokaci (SSE)**: Idan ka canza ƙirar a dashboard na ɓaure, zai bayyana a fuskar OpenClaw cikin daƙiƙa 1-3. SSE (Server-Sent Events) fasaha ce inda sabar ke tura canje-canje zuwa abokan ciniki a ainihin lokaci.
+- **Sanarwa ta Ainihin Lokaci**: Abubuwan da suka faru kamar maɓalli sun ƙare ko sabis ya gaza ana nuna su nan da nan a ƙasan TUI (fuskar terminal) na OpenClaw.
 
-> 💡 **Claude Code, Cursor, da VS Code** suma za a iya haɗa su, amma babban manufar wall-vault ita ce amfani tare da OpenClaw.
+> 💡 **Claude Code, Cursor, VS Code** ma ana iya haɗa su, amma manufar asali ta wall-vault ita ce a yi amfani da ita tare da OpenClaw.
 
 ```
-OpenClaw (Allon TUI na Terminal)
+OpenClaw (TUI fuskar terminal)
         │
         ▼
-  wall-vault proxy (:56244)   ← Sarrafa maɓalli, routing, fallback, abubuwan da ke faruwa
+  wall-vault proxy (:56244)   ← sarrafa maɓalli, jagoranci, fallback, abubuwa
         │
         ├─ Google Gemini API
-        ├─ OpenRouter API (fiye da ƙirar 340)
-        ├─ Ollama / LM Studio / vLLM (Kwamfutarka, na ƙarshe)
+        ├─ OpenRouter API (ƙira 340+)
+        ├─ Ollama / LM Studio / vLLM (kwamfutarka, mafita na ƙarshe)
         └─ OpenAI / Anthropic API
 ```
 
@@ -55,10 +55,10 @@ OpenClaw (Allon TUI na Terminal)
 
 ### Linux / macOS
 
-Buɗe terminal ɗinka sannan ka manna waɗannan umarni kamar yadda suke.
+Buɗe terminal kuma ka manna umarni a ƙasa.
 
 ```bash
-# Linux (PC na sabar — amd64)
+# Linux (PC na yau da kullum, sabar — amd64)
 curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
   -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
 
@@ -67,120 +67,120 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
   -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
 ```
 
-- `curl -L ...` — Yana sauko da fayil daga intanet.
-- `chmod +x` — Yana sa fayil ɗin da aka sauko da shi ya "iya aiki". Idan ka tsallake wannan matakin za ka sami kuskuren "babu izini".
+- `curl -L ...` — Yana sauke fayil daga yanar gizo.
+- `chmod +x` — Yana sa fayil ɗin da aka sauke ya zama "ana iya gudanarwa". Idan ka tsallake wannan matakin, za ka samu kuskuren "ba a ba da izini ba".
 
 ### Windows
 
-Buɗe PowerShell (a matsayin mai gudanarwa) ka aiwatar da waɗannan umarni.
+Buɗe PowerShell (a matsayin mai gudanarwa) kuma ka gudanar da umarni masu zuwa.
 
 ```powershell
-# Sauko
+# Sauke
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
   -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
 
-# Ƙara PATH (yana aiki bayan sake buɗe PowerShell)
+# Ƙara zuwa PATH (yana aiki bayan sake farawa PowerShell)
 $env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
 ```
 
-> 💡 **Menene PATH?** Jerin manyan fayiloli ne da kwamfuta ke bincika umarni a ciki. Idan ka ƙara cikin PATH, za ka iya rubuta `wall-vault` daga kowace babban fayil ka aiwatar da shi.
+> 💡 **Menene PATH?** Jerin manyan fayil ne inda kwamfuta ke neman umarni. Kana buƙatar ƙara zuwa PATH don ka iya rubuta `wall-vault` kuma ka gudanar da shi daga kowace babban fayil.
 
-### Gina daga Tushe (na Masu Haɓaka)
+### Gina daga Tushen Lambar (don masu haɓakawa)
 
-Wannan yana aiki ne kawai idan an shigar da yanayin haɓaka harshen Go.
+Wannan yana aiki ne kawai idan kana da yanayin haɓakawa na harshen Go da aka shigar.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (sigar: v0.1.24.YYYYMMDD.HHmmss)
+make build       # bin/wall-vault (sigar: v0.1.25.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Sigar alama lokaci**: Idan ka gina da `make build`, sigar za ta ƙirƙiru ta atomatik a tsari kamar `v0.1.24.20260406.211004` tare da kwanan wata da lokaci. Idan ka gina kai tsaye da `go build ./...`, sigar za ta nuna `"dev"` kawai.
+> 💡 **Sigar tambarin lokaci na gina**: Idan ka gina da `make build`, sigar za ta samar ta atomatik a tsarin da ya haɗa kwanan wata da lokaci kamar `v0.1.25.20260408.022325`. Idan ka gina kai tsaye da `go build ./...`, sigar za ta bayyana a matsayin `"dev"` kawai.
 
 ---
 
 ## Farkon Farawa
 
-### Aiwatar da magatakarda na setup
+### Gudanar da Magatakarda na Setup
 
-Bayan shigarwa, dole ne ka aiwatar da **magatakarda na saiti** ta amfani da umarnin da ke ƙasa. Magatakarda za ta jagorance ka cikin abubuwan da ake buƙata ɗaya bayan ɗaya ta hanyar tambayoyi.
+Bayan shigarwa, tabbatar ka gudanar da **magatakarda na saiti** da umarni mai zuwa. Magatakarda za ta tambaye ka tambayoyi ɗaya bayan ɗaya kuma ta jagorance ka.
 
 ```bash
 wall-vault setup
 ```
 
-Matakai da magatakarda ke bi su ne kamar haka:
+Matakan da magatakarda ke bi su ne:
 
 ```
-1. Zaɓin harshe (harsuna 10 ciki har da Hausa)
-2. Zaɓin jigo (light / dark / gold / cherry / ocean)
-3. Yanayin aiki — kai kaɗai (standalone), ko tare da na'urori da yawa (distributed)
-4. Sunan bot — sunan da zai bayyana a dashboard
-5. Saita tasha — tsohuwar darajar: proxy 56244, ɓaure 56243 (danna Enter idan ba ka buƙatar canzawa ba)
-6. Zaɓin ayyukan AI — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Saita tace kayan aikin tsaro
-8. Saita alamar mai gudanarwa — kalmar sirri don kulle ayyukan gudanarwa na dashboard. Ana iya ƙirƙira ta atomatik
-9. Saita kalmar sirrin ɓoye maɓallin API — don ajiye maɓallan cikin aminci sosai (zaɓi)
-10. Wurin ajiye fayil ɗin saiti
+1. Zaɓi harshe (harsuna 10 haɗe da Hausa)
+2. Zaɓi jigo (light / dark / gold / cherry / ocean)
+3. Yanayin aiki — zaɓi ko za ka yi amfani da shi ka kaɗai (standalone) ko a na'urori da yawa (distributed)
+4. Shigar da sunan bot — sunan da za a nuna a dashboard
+5. Saita tashar — tsohuwar ƙima: proxy 56244, ɓaure 56243 (danna Enter idan ba ka buƙatar canzawa ba)
+6. Zaɓi sabis na AI — Google / OpenRouter / Ollama / LM Studio / vLLM
+7. Saita tacen kayan aikin tsaro
+8. Saita alamar mai gudanarwa — kalmar sirri don kulle fasalolin gudanarwa na dashboard. Ana iya samar da ita ta atomatik
+9. Saita kalmar sirrin ɓoye maɓallin API — idan kana son adana maɓalli cikin aminci (zaɓi)
+10. Hanyar adana fayil na saiti
 ```
 
-> ⚠️ **Ku tuna alamar mai gudanarwa.** Za ka buƙace ta daga baya don ƙara maɓallan a dashboard ko canza saiti. Idan ka manta da ita za ka buƙaci gyara fayil ɗin saiti kai tsaye.
+> ⚠️ **Tabbatar ka tuna alamar mai gudanarwa.** Za ka buƙace ta daga baya lokacin da kake ƙara maɓalli ko canza saiti a dashboard. Idan ka rasa ta, za ka buƙaci gyara fayil na saiti kai tsaye.
 
-Idan magatakarda ta ƙare, fayil ɗin saiti `wall-vault.yaml` za ta ƙirƙiru ta atomatik.
+Bayan magatakarda ta ƙare, fayil na saiti `wall-vault.yaml` za ta samar ta atomatik.
 
-### Aiwatarwa
+### Gudanarwa
 
 ```bash
 wall-vault start
 ```
 
-Sabobi biyu za fara aiki a lokaci guda:
+Sabar biyu za su fara a lokaci ɗaya:
 
-- **Proxy** (`http://localhost:56244`) — wakilin da ke haɗa OpenClaw da ayyukan AI
-- **Ɓaure na Maɓallan** (`http://localhost:56243`) — sarrafa maɓallin API da dashboard na yanar gizo
+- **Proxy** (`http://localhost:56244`) — wakili da ke haɗa OpenClaw da sabis na AI
+- **Ɓauren Maɓalli** (`http://localhost:56243`) — sarrafa maɓallin API da dashboard na gidan yanar gizo
 
-Buɗe browser ka je `http://localhost:56243` don ganin dashboard nan da nan.
+Buɗe `http://localhost:56243` a cikin mai binciken ka don ganin dashboard nan da nan.
 
 ---
 
 ## Yin Rajista na Maɓallin API
 
-Akwai hanyoyi huɗu don yin rajista da maɓallin API. **Ga masu farawa, hanya ta 1 (masu-canji na yanayi) ce aka ba da shawara**.
+Akwai hanyoyi huɗu don yin rajista na maɓallin API. **Ga masu farawa, ana ba da shawarar Hanya ta 1 (masu-canji na yanayi)**.
 
-### Hanya ta 1: Masu-Canji na Yanayi (Ana Ba Da Shawara — Mafi Sauƙi)
+### Hanya ta 1: Masu-Canji na Yanayi (Ana Ba da Shawarar — Mafi Sauƙi)
 
-Masu-canji na yanayi su ne **ƙimomi da aka saita tun farko** waɗanda shiri ke karantawa lokacin da ya fara. Rubuta a terminal kamar haka:
+Masu-canji na yanayi sune **ƙimomi da aka riga aka saita** waɗanda shirin ke karantawa lokacin da ya fara. Rubuta a terminal kamar haka.
 
 ```bash
-# Rajista maɓallin Google Gemini
+# Yin rajista da maɓallin Google Gemini
 export WV_KEY_GOOGLE=AIzaSy...
 
-# Rajista maɓallin OpenRouter
+# Yin rajista da maɓallin OpenRouter
 export WV_KEY_OPENROUTER=sk-or-v1-...
 
-# Aiwatarwa bayan rajista
+# Gudanar bayan yin rajista
 wall-vault start
 ```
 
-Idan kana da maɓallan da yawa, haɗa su da waƙafi (,). wall-vault zai yi amfani da maɓallan a jere ta atomatik (round robin):
+Idan kana da maɓalli da yawa, haɗa su da waƙafi (,). wall-vault za ta yi amfani da maɓalli a jeri ta atomatik (round robin):
 
 ```bash
 export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 ```
 
-> 💡 **Shawara**: Umarnin `export` yana aiki ne kawai a zaman terminal na yanzu. Don ya kasance bayan sake kunna kwamfuta, ƙara wannan layin cikin fayil ɗin `~/.bashrc` ko `~/.zshrc`.
+> 💡 **Tukwici**: Umarni na `export` yana aiki ne kawai a zaman terminal na yanzu. Don ya ci gaba ko bayan sake farawa kwamfuta, ƙara layin a fayil na `~/.bashrc` ko `~/.zshrc`.
 
-### Hanya ta 2: Dashboard na UI (dannawa da linzami)
+### Hanya ta 2: Dashboard na UI (Danna da linzami)
 
-1. Buɗe browser ka je `http://localhost:56243`
-2. A kan katin **🔑 Maɓallin API** a sama, danna maɓallin `[+ Ƙara]`
-3. Shigar da irin ayyuka, ƙimar maɓalli, lakabi (sunan tunawa), da iyakar yau da kullum, sannan ka ajiye
+1. Ziyarci `http://localhost:56243` a cikin mai bincike
+2. A katin **🔑 Maɓallin API** a sama, danna maɓallin `[+ Ƙara]`
+3. Shigar da irin sabis, ƙimar maɓalli, alamar (sunan tunani), da iyakar yau da kullum, sa'an nan ka ajiye
 
-### Hanya ta 3: REST API (don aiki ta atomatik da rubutun)
+### Hanya ta 3: REST API (don Atomatik/Rubutun)
 
-REST API hanya ce ta shirye-shirye don musanyar bayanai ta HTTP. Yana da amfani don rajista ta atomatik ta hanyar rubutun.
+REST API hanya ce inda shirye-shirye ke musayar bayanai ta HTTP. Yana da amfani don yin rajista ta atomatik ta hanyar rubutu.
 
 ```bash
 curl -X POST http://localhost:56243/admin/keys \
@@ -189,14 +189,14 @@ curl -X POST http://localhost:56243/admin/keys \
   -d '{
     "service": "google",
     "key": "AIzaSy...",
-    "label": "Babban Maɓalli",
+    "label": "Maɓallin Babba",
     "daily_limit": 1000
   }'
 ```
 
-### Hanya ta 4: Alamomin proxy (don ɗan gwaji na ɗan lokaci)
+### Hanya ta 4: Tutar Proxy (don Gwajin na Ɗan Lokaci)
 
-Yi amfani da wannan don sanya maɓalli na ɗan lokaci ba tare da rajista na hukuma ba. Maɓallin zai ɓace idan shirin ya tsaya.
+Ana amfani da shi lokacin da kake so ka gwada na ɗan lokaci ba tare da yin rajista na hukuma ba. Yana ɓacewa lokacin da ka kashe shirin.
 
 ```bash
 wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
@@ -208,9 +208,9 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 
 ### Amfani da OpenClaw (Babban Manufa)
 
-Yadda ake saita OpenClaw don haɗawa da ayyukan AI ta hanyar wall-vault.
+Yadda ake saita OpenClaw don haɗawa da sabis na AI ta wall-vault.
 
-Buɗe fayil ɗin `~/.openclaw/openclaw.json` ka ƙara abubuwan da ke ƙasa:
+Buɗe fayil na `~/.openclaw/openclaw.json` kuma ka ƙara abubuwan da ke ƙasa:
 
 ```json5
 // ~/.openclaw/openclaw.json
@@ -224,7 +224,7 @@ Buɗe fayil ɗin `~/.openclaw/openclaw.json` ka ƙara abubuwan da ke ƙasa:
         models: [
           { id: "wall-vault/gemini-2.5-flash" },
           { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // mahallin kyauta na 1M
+          { id: "wall-vault/hunter-alpha" },    // context na 1M kyauta
           { id: "wall-vault/claude-opus-4-6" }
         ]
       }
@@ -233,34 +233,34 @@ Buɗe fayil ɗin `~/.openclaw/openclaw.json` ka ƙara abubuwan da ke ƙasa:
 }
 ```
 
-> 💡 **Hanya mafi sauƙi**: Danna maɓallin **🦞 Kwafi Saitin OpenClaw** a katin wakili a dashboard. Yankin da ke ɗauke da alama da adireshi wanda aka riga aka cika za a kwafa zuwa clipboard. Ka manna shi kawai.
+> 💡 **Hanya Mafi Sauƙi**: Danna maɓallin **🦞 Kwafi Saitin OpenClaw** a katin wakili na dashboard kuma snippet da alamar da adireshi da aka riga aka cika za a kwafa zuwa clipboard. Ka manna kawai.
 
-**`wall-vault/` a gaban sunan ƙirar yana kai ina?**
+**`wall-vault/` kafin sunan ƙirar yana nufin ina?**
 
-Da sunan ƙirar, wall-vault ta san ta atomatik wace ayyukan AI za ta aika buƙata zuwa gare ta:
+wall-vault yana yanke shawara ta atomatik wace sabis na AI za a yi amfani da ita dangane da sunan ƙirar:
 
-| Tsarin Ƙira | Ayyukan da Ake Haɗawa |
+| Tsarin Ƙirar | Sabis da Ake Haɗawa |
 |----------|--------------|
-| `wall-vault/gemini-*` | Google Gemini kai tsaye |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI kai tsaye |
-| `wall-vault/claude-*` | Anthropic ta hanyar OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (mahallin kyauta na token miliyan 1) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
-| `google/sunan-ƙira`, `openai/sunan-ƙira`, `anthropic/sunan-ƙira` d.s. | Ayyukan kai tsaye |
-| `custom/google/sunan-ƙira`, `custom/openai/sunan-ƙira` d.s. | Cire ɓangaren `custom/` sannan a sake turawa |
-| `sunan-ƙira:cloud` | Cire ɓangaren `:cloud` sannan a haɗa ta hanyar OpenRouter |
+| `wall-vault/gemini-*` | Haɗin kai tsaye da Google Gemini |
+| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | Haɗin kai tsaye da OpenAI |
+| `wall-vault/claude-*` | Haɗawa da Anthropic ta OpenRouter |
+| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (tokeni miliyan 1 na context kyauta) |
+| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | Haɗawa da OpenRouter |
+| `google/sunan-ƙirar`, `openai/sunan-ƙirar`, `anthropic/sunan-ƙirar` da sauransu | Haɗin kai tsaye da sabis ɗin da ya dace |
+| `custom/google/sunan-ƙirar`, `custom/openai/sunan-ƙirar` da sauransu | Sashen `custom/` ana cirewa kuma ana sake jagora |
+| `sunan-ƙirar:cloud` | Sashen `:cloud` ana cirewa kuma ana haɗawa da OpenRouter |
 
-> 💡 **Menene mahallin (context)?** Shine adadin tattaunawar da AI ke iya tunawa a lokaci guda. 1M (token miliyan 1) yana nufin ana iya sarrafa tattaunawa mai tsawo sosai ko takardu masu tsawo a lokaci guda.
+> 💡 **Menene context?** Adadin tattaunawa da AI ke iya tunawa a lokaci ɗaya. 1M (tokeni miliyan ɗaya) yana nufin za a iya sarrafa tattaunawa mai tsawo ko takardu masu tsawo a lokaci ɗaya.
 
-### Haɗawa Kai Tsaye da Tsarin Gemini API (don dacewa da kayan aiki na yanzu)
+### Haɗin Kai Tsaye da Tsarin Gemini API (dacewa da kayan aikin da ake da su)
 
-Idan kana da kayan aiki da suka kasance suna amfani da Google Gemini API kai tsaye, kawai ka canza adireshin zuwa na wall-vault:
+Idan kana da kayan aiki da suka kasance suna amfani da Google Gemini API kai tsaye, kawai canza adireshin zuwa wall-vault:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:56244/google
 ```
 
-Ko kuma idan kayan aikinka na amfani da URL kai tsaye:
+Ko idan kayan aikinka suna bayyana URL kai tsaye:
 
 ```
 http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
@@ -268,106 +268,106 @@ http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 
 ### Amfani da OpenAI SDK (Python)
 
-Za ka iya haɗa wall-vault cikin lambar Python da ke amfani da AI. Kawai ka canza `base_url`:
+Kuma za ka iya haɗa wall-vault a cikin lambar Python da ke amfani da AI. Kawai canza `base_url`:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:56244/v1",
-    api_key="not-needed"  # wall-vault yana sarrafa maɓallin API
+    api_key="not-needed"  # wall-vault yana sarrafa maɓallin API ta atomatik
 )
 
 response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # shigar da tsarin provider/model
+    model="google/gemini-2.5-flash",   # tsarin mai-bayarwa/ƙirar
     messages=[{"role": "user", "content": "Sannu"}]
 )
 ```
 
-### Canza Ƙira Yayin Aiki
+### Canza Ƙirar Yayin Gudanarwa
 
-Don canza ƙirar AI yayin da wall-vault ke aiki:
+Don canza ƙirar AI yayin da wall-vault tana aiki:
 
 ```bash
-# Canza ƙirar ta hanyar neman kai tsaye ga proxy
+# Canza ƙirar ta hanyar nema kai tsaye ga proxy
 curl -X PUT http://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
-# A yanayin rarraba (boti da yawa), canza a sabar ɓaure → za a nuna nan da nan ta SSE
+# A yanayin rarraba (boti da yawa), canza a sabar ɓaure → ana nuna nan da nan ta SSE
 curl -X PUT http://localhost:56243/admin/clients/id-na-bot \
   -H "Authorization: Bearer alamar-mai-gudanarwa" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
 ```
 
-### Duba Jerin Ƙirori da Ake Samu
+### Duba Jerin Ƙira da Ake Samu
 
 ```bash
-# Duba dukkan jerin
+# Duba jerin gaba ɗaya
 curl http://localhost:56244/api/models | python3 -m json.tool
 
-# Ƙirorin Google kawai
+# Duba ƙirar Google kawai
 curl "http://localhost:56244/api/models?service=google"
 
-# Bincika da suna (misali: ƙirori da ke ɗauke da "claude")
+# Bincika da suna (misali: ƙira da suka haɗa da "claude")
 curl "http://localhost:56244/api/models?q=claude"
 ```
 
-**Taƙaitaccen manyan ƙirori ta ayyuka:**
+**Taƙaitaccen Babban Ƙira ta Sabis:**
 
-| Ayyuka | Manyan Ƙirori |
+| Sabis | Babban Ƙira |
 |--------|----------|
 | Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
 | OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | Fiye da 346 (Hunter Alpha 1M mahallin kyauta, DeepSeek R1/V3, Qwen 2.5 d.s.) |
-| Ollama | Yana gano ƙirorin sabar gida a kwamfutarka ta atomatik |
-| LM Studio | Sabar gida a kwamfutarka (tasha 1234) |
-| vLLM | Sabar gida a kwamfutarka (tasha 8000) |
+| OpenRouter | 346+ (Hunter Alpha 1M context kyauta, DeepSeek R1/V3, Qwen 2.5 da sauransu) |
+| Ollama | Yana gano sabar na gida da aka shigar a kwamfutarka ta atomatik |
+| LM Studio | Sabar na gida a kwamfutarka (tashar 1234) |
+| vLLM | Sabar na gida a kwamfutarka (tashar 8000) |
 
 ---
 
 ## Dashboard na Ɓaure
 
-Buɗe browser ka je `http://localhost:56243` don ganin dashboard.
+Ziyarci `http://localhost:56243` a cikin mai bincike don ganin dashboard.
 
-**Tsarin allon:**
-- **Layin sama mai ɗaurewa (topbar)**: Alama, zaɓin harshe da jigo, matsayin haɗin SSE
-- **Grid ɗin katuna**: Katuna na wakili, ayyuka, da maɓallin API sun tsara a tsarin tiles
+**Tsarin Fuskar:**
+- **Sandar sama mai ɗaurewa (topbar)**: Alamar kamfani, mai zaɓin harshe da jigo, yanayin haɗin SSE
+- **Grid na kati**: Katin wakili, sabis, da maɓallin API da aka jera kamar tiles
 
 ### Katin Maɓallin API
 
-Kati wanda ke ba ka damar sarrafa dukkan maɓallin API da aka rajista a duba guda ɗaya.
+Kati da ke ba ka damar sarrafa maɓallin API da aka yi rajista a duba ɗaya.
 
-- Yana nuna jerin maɓallan da aka raba ta ayyuka.
-- `today_usage`: Token (adadin haruffa da AI ta karanta da rubuta) da aka sarrafa cikin nasara a yau
-- `today_attempts`: Jimlar buƙatu na yau (nasara + gazawa)
-- Maɓallin `[+ Ƙara]` don rajista sabon maɓalli, da `✕` don share maɓalli.
+- Yana nuna jerin maɓalli da aka raba ta sabis.
+- `today_usage`: Adadin tokeni da aka sarrafa cikin nasara yau (adadin haruffa da AI ta karanta da rubuta)
+- `today_attempts`: Jimlar kiran yau (nasara + gazawa)
+- Maɓallin `[+ Ƙara]` don yin rajista da sabon maɓalli, da `✕` don share maɓalli.
 
-> 💡 **Menene token?** Shine ma'aunin da AI ke amfani da shi don sarrafa rubutu. Kusan kalma ɗaya ta Turanci, ko haruffa 1–2 na wasu harsuna. Kuɗin API yawanci ana ƙididdige su ta hanyar adadin token.
+> 💡 **Menene tokeni?** Ƙayyadaddun sashe ne da AI ke amfani da shi wajen sarrafa rubutu. Kusan daidai yake da kalma ɗaya na Turanci, ko haruffa 1-2 na Koriya. Kuɗin API yawanci ana kididdige su dangane da adadin tokeni.
 
 ### Katin Wakili
 
-Kati da ke nuna matsayin bot (wakili) da ke haɗe da proxy na wall-vault.
+Kati da ke nuna yanayin bots (masu wakilci) da aka haɗa da proxy na wall-vault.
 
-**Matsayin haɗin ana nuna shi a mataki 4:**
+**Ana nuna yanayin haɗin a matakai 4:**
 
-| Alama | Matsayi | Ma'ana |
+| Nuni | Yanayi | Ma'ana |
 |------|------|------|
 | 🟢 | Yana Aiki | Proxy yana aiki yadda ya kamata |
-| 🟡 | Jinkiri | Yana amsawa amma a hankali |
-| 🔴 | Ba ya Aiki | Proxy ba ya amsawa |
+| 🟡 | An Jinkirta | Yana amsawa amma a hankali |
+| 🔴 | Ba a Kan Layi Ba | Proxy ba ya amsawa |
 | ⚫ | Ba a Haɗa/An Kashe | Proxy bai taɓa haɗawa da ɓaure ba ko an kashe shi |
 
-**Bayani kan maɓallan ƙasan katin wakili:**
+**Jagorar Maɓallan da ke Ƙasan Katin Wakili:**
 
-Lokacin da aka rajista wakili kuma aka ƙayyade **irin wakilin**, maɓallan sauƙi masu dacewa da irin wakilin za su bayyana ta atomatik.
+Lokacin da ka yi rajista da wakili kuma ka bayyana **irin wakili**, maɓallan sauƙi da aka yi niyya don wannan irin suna bayyana ta atomatik.
 
 ---
 
-#### 🔘 Maɓallin Kwafi Saiti — Yana ƙirƙira saitin haɗin ta atomatik
+#### 🔘 Maɓallin Kwafin Saiti — Yana samar da saitin haɗin ta atomatik
 
-Idan ka danna maɓallin, yanki na saiti wanda ke ɗauke da alamar wakili, adireshin proxy, da bayanan ƙirar da aka riga aka cika za a kwafa zuwa clipboard. Kawai ka manna a wurin da aka nuna a teburin da ke ƙasa kuma saitin haɗin zai ƙare.
+Lokacin da ka danna maɓallin, snippet na saiti da ke ɗauke da alamar wannan wakili, adireshin proxy, da bayanan ƙirar da aka riga aka cika ana kwafa zuwa clipboard. Kawai ka manna abubuwan da aka kwafa a wurin da aka nuna a tebur na ƙasa don kammala saitin haɗin.
 
 | Maɓalli | Irin Wakili | Wurin Mannawa |
 |------|-------------|-------------|
@@ -377,7 +377,7 @@ Idan ka danna maɓallin, yanki na saiti wanda ke ɗauke da alamar wakili, adires
 | ⌨ Kwafi Saitin Cursor | `cursor` | Cursor → Settings → AI |
 | 💻 Kwafi Saitin VSCode | `vscode` | `~/.continue/config.json` |
 
-**Misali — Idan irin Claude Code ne, ga abin da za a kwafa:**
+**Misali — Idan irin Claude Code ne, abubuwan da ke ƙasa za a kwafa su:**
 
 ```json
 // ~/.claude/settings.json
@@ -408,7 +408,7 @@ models:
       - apply
 ```
 
-> ⚠️ **Sabuwar sigar Continue tana amfani da `config.yaml`.** Idan `config.yaml` yana nan, za a yi watsi da `config.json` gaba ɗaya. Tabbatar ka manna a cikin `config.yaml`.
+> ⚠️ **Sabon sigar Continue yana amfani da `config.yaml`.** Idan `config.yaml` ya wanzu, `config.json` za a yi watsi da shi gaba ɗaya. Tabbatar ka manna a cikin `config.yaml`.
 
 **Misali — Idan irin Cursor ne:**
 
@@ -421,57 +421,67 @@ OPENAI_BASE_URL=http://192.168.1.20:56244/v1
 OPENAI_API_KEY=alamar-wannan-wakili
 ```
 
-> ⚠️ **Idan kwafin clipboard bai yi aiki ba**: Manufofin tsaro na browser na iya hana kwafin. Idan akwatin rubutu ya buɗe a matsayin pop-up, danna Ctrl+A don zaɓar duka sannan Ctrl+C don kwafa.
+> ⚠️ **Idan kwafin clipboard bai yi aiki ba**: Manufar tsaro na mai bincike na iya hana kwafi. Idan akwatin rubutu ya buɗe a matsayin popup, yi amfani da Ctrl+A don zaɓar duka sa'an nan Ctrl+C don kwafi.
 
 ---
 
-#### ⚡ Maɓallin Aiwatar da Atomatik — Danna sau ɗaya saitin ya ƙare
+#### ⚡ Maɓallin Aiwatar ta Atomatik — Danna sau ɗaya kuma saitin ya ƙare
 
-Idan irin wakilin shine `cline`, `claude-code`, `openclaw`, ko `nanoclaw`, maɓallin **⚡ Aiwatar da Saiti** zai bayyana a katin wakili. Idan ka danna wannan maɓallin, fayil ɗin saitin gida na wakilin zai sabunta ta atomatik.
+Idan irin wakili shine `cline`, `claude-code`, `openclaw`, ko `nanoclaw`, maɓallin **⚡ Aiwatar da Saiti** yana bayyana a katin wakili. Lokacin da ka danna wannan maɓallin, fayil na saitin na gida na wannan wakili ana sabunta shi ta atomatik.
 
-| Maɓalli | Irin Wakili | Fayil ɗin da Ake Aiwatarwa |
+| Maɓalli | Irin Wakili | Fayil da Ake Niyya |
 |------|-------------|-------------|
 | ⚡ Aiwatar da Saitin Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
 | ⚡ Aiwatar da Saitin Claude Code | `claude-code` | `~/.claude/settings.json` |
 | ⚡ Aiwatar da Saitin OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
 | ⚡ Aiwatar da Saitin NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
 
-> ⚠️ Wannan maɓallin yana aika buƙata zuwa **localhost:56244** (proxy na gida). Dole ne proxy ya kasance tana aiki a kan wannan na'urar don ta yi aiki.
+> ⚠️ Wannan maɓallin yana aika buƙata zuwa **localhost:56244** (proxy na gida). Dole ne proxy ya kasance tana aiki a wannan na'urar don ya yi aiki.
 
 ---
 
-#### 🔀 Tsara Katuna ta Ja-da-Saki (v0.1.17)
+#### 🔀 Tsara Kati ta Ja da Sauke (v0.1.17, an inganta v0.1.25)
 
-Za ka iya **jawo** katuna na wakili a dashboard ka sake tsara su yadda kake so.
+Za ka iya **jan** katin wakili a dashboard don sake tsara su a tsarin da kake so.
 
-1. Ka kama katin wakili da linzami ka jawo shi
-2. Ka saka shi a kan katin da kake so kuma tsarin zai canza
-3. Sabon tsarin **an ajiye shi nan da nan a sabar** kuma zai kasance ko bayan sake sabuntawa
+1. Kama yankin **hasken zirga-zirga (●)** a saman hagu na kati da linzami kuma ka ja
+2. Sauke shi a kan katin da kake so kuma tsarin zai canja
 
-> 💡 Na'urori masu taɓawa (wayoyin hannu/tablets) ba su da tallafin yanzu. Yi amfani da browser na kwamfutar tebur.
+> 💡 Abubuwan cikin kati (wuraren shigarwa, maɓallai da sauransu) ba a iya jan su ba. Za ka iya kamawa ne kawai daga yankin hasken zirga-zirga.
+
+#### 🟠 Ganowa Tsarin Wakili (v0.1.25)
+
+Lokacin da proxy ke aiki yadda ya kamata amma tsarin wakili na gida (NanoClaw, OpenClaw) ya mutu, hasken katin ya canja zuwa **launin lemu (yana kyaftawa)** kuma saƙon "Tsarin wakili ya tsaya" yana bayyana.
+
+- 🟢 Kore: Proxy + wakili suna aiki yadda ya kamata
+- 🟠 Launin lemu (yana kyaftawa): Proxy yana aiki yadda ya kamata, wakili ya mutu
+- 🔴 Ja: Proxy ba a kan layi ba
+3. Tsarin da aka canza **ana adana shi a sabar nan da nan** kuma yana ci gaba ko bayan sake lodi
+
+> 💡 A na'urorin tabawa (wayar hannu/kwamfutar hannu) har yanzu ba a goyon baya ba. Yi amfani da mai binciken kwamfuta.
 
 ---
 
-#### 🔄 Daidaita Ƙira A Bangarori Biyu (v0.1.16)
+#### 🔄 Daidaita Ƙirar ta Bangarori Biyu (v0.1.16)
 
-Idan ka canza ƙirar wakili a dashboard ɗin ɓaure, saitin gida na wakilin zai sabunta ta atomatik.
+Idan ka canza ƙirar wakili a dashboard na ɓaure, saitin na gida na wannan wakili ana sabunta shi ta atomatik.
 
-**Ga Cline:**
-- Canza ƙira a ɓaure → lambar SSE → proxy yana sabunta yankin ƙira a cikin `globalState.json`
-- Yankuna da ake sabuntawa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+**Don Cline:**
+- Idan aka canza ƙirar a ɓaure → Abin da ya faru na SSE → Proxy yana sabunta sashen ƙirar a `globalState.json`
+- Maƙasudi na sabuntawa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
 - `openAiBaseUrl` da maɓallin API ba a taɓa su ba
-- **Ana buƙatar sake ɗaukar VS Code (`Ctrl+Alt+R` ko `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - Cline ba ya sake karanta fayil ɗin saiti yayin aiki
+- **Sake lodin VS Code (`Ctrl+Alt+R` ko `Ctrl+Shift+P` → `Developer: Reload Window`) yana da buƙata**
+  - Saboda Cline ba ta sake karanta fayil na saiti yayin aiki ba
 
-**Ga Claude Code:**
-- Canza ƙira a ɓaure → lambar SSE → proxy yana sabunta yankin `model` a cikin `settings.json`
+**Don Claude Code:**
+- Idan aka canza ƙirar a ɓaure → Abin da ya faru na SSE → Proxy yana sabunta sashen `model` a `settings.json`
 - Yana bincika hanyoyin WSL da Windows ta atomatik (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
 
-**Akasin hanya (wakili → ɓaure):**
-- Lokacin da wakili (Cline, Claude Code d.s.) ya aika buƙata zuwa proxy, proxy yana ƙara bayanan ayyuka/ƙira na abokin ciniki a cikin heartbeat
-- Ayyukan/ƙira da ake amfani da su a yanzu suna bayyana a lokaci ɗaya a katin wakili a dashboard ɗin ɓaure
+**Bangaren Baya (wakili → ɓaure):**
+- Lokacin da wakili (Cline, Claude Code da sauransu) ya aika buƙata zuwa proxy, proxy yana haɗa bayanan sabis/ƙirar abokin ciniki a heartbeat
+- Sabis/ƙirar da ake amfani da ita a yanzu ana nuna ta a ainihin lokaci a katin wakili a dashboard na ɓaure
 
-> 💡 **Muhimmin abu**: Proxy yana gane wakili ta hanyar alamar Authorization na buƙatar kuma yana turawa ta atomatik zuwa ayyukan/ƙirar da aka saita a ɓaure. Ko da Cline ko Claude Code ya aika wani sunan ƙira daban, proxy yana maye gurbinsa da saitin ɓaure.
+> 💡 **Mahimmin Abu**: Proxy yana gane wakili ta alamar Authorization na buƙatar, kuma yana jagoranci ta atomatik zuwa sabis/ƙirar da aka saita a ɓaure. Ko Cline ko Claude Code ta aika sunan ƙirar daban, proxy yana maye gurbinsa da saitin ɓaure.
 
 ---
 
@@ -479,135 +489,135 @@ Idan ka canza ƙirar wakili a dashboard ɗin ɓaure, saitin gida na wakilin zai 
 
 #### Mataki na 1: Shigar da Cline
 
-Shigar da **Cline** (ID: `saoudrizwan.claude-dev`) daga kasuwar ƙarin VS Code.
+Shigar da **Cline** (ID: `saoudrizwan.claude-dev`) daga kasuwar ƙari na VS Code.
 
-#### Mataki na 2: Rajista wakili a ɓaure
+#### Mataki na 2: Yi Rajista da Wakili a Ɓaure
 
-1. Buɗe dashboard ɗin ɓaure (`http://IP-na-ɓaure:56243`)
-2. Danna **+ Ƙara** a sashen **Wakili**
-3. Shigar da kamar haka:
+1. Buɗe dashboard na ɓaure (`http://IP-na-ɓaure:56243`)
+2. A sashen **Masu Wakilci**, danna **+ Ƙara**
+3. Shigar da abubuwan da ke ƙasa:
 
-| Yanki | Ƙima | Bayani |
+| Filin | Ƙima | Bayani |
 |------|----|------|
-| ID | `cline_na` | Alamar musamman (haruffa na Turanci, ba tazara) |
-| Suna | `Cline Na` | Sunan da zai bayyana a dashboard |
-| Irin Wakili | `cline` | ← dole ne ka zaɓi `cline` |
-| Ayyuka | Zaɓi ayyukan da za a yi amfani (misali: `google`) | |
-| Ƙira | Shigar da ƙirar da za a yi amfani (misali: `gemini-2.5-flash`) | |
+| ID | `cline_na` | Musamman mai ganowa (Turanci, ba tazara) |
+| Suna | `Cline Nawa` | Sunan da za a nuna a dashboard |
+| Irin Wakili | `cline` | ← Dole ne ka zaɓi `cline` |
+| Sabis | Zaɓi sabis don amfani (misali: `google`) | |
+| Ƙirar | Shigar da ƙirar don amfani (misali: `gemini-2.5-flash`) | |
 
-4. Danna **Ajiye** kuma alama za ta ƙirƙiru ta atomatik
+4. Danna **Ajiye** kuma za a samar da alama ta atomatik
 
-#### Mataki na 3: Haɗa Cline
+#### Mataki na 3: Haɗa da Cline
 
-**Hanya A — Aiwatar da atomatik (ana ba da shawara)**
+**Hanya A — Aiwatar ta Atomatik (Ana Ba da Shawarar)**
 
-1. Tabbatar cewa **proxy** na wall-vault yana aiki a kan wannan na'urar (`localhost:56244`)
+1. Tabbatar **proxy** na wall-vault yana aiki a wannan na'urar (`localhost:56244`)
 2. Danna maɓallin **⚡ Aiwatar da Saitin Cline** a katin wakili a dashboard
-3. Idan sanarwar "An aiwatar da saiti!" ta bayyana, an yi nasara
-4. Sake ɗaukar VS Code (`Ctrl+Alt+R`)
+3. Idan sanarwar "An aiwatar da saiti!" ta bayyana, ya yi nasara
+4. Sake lodin VS Code (`Ctrl+Alt+R`)
 
-**Hanya B — Saitin hannu**
+**Hanya B — Saita da Hannu**
 
-Buɗe saiti (⚙️) a gefen Cline:
+Buɗe saituna (⚙️) a gefen Cline kuma ka saita:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://adireshin-proxy:56244/v1`
-  - Na'ura ɗaya: `http://localhost:56244/v1`
-  - Wata na'ura kamar sabar Mini: `http://192.168.1.20:56244/v1`
-- **API Key**: Alama da aka bayar daga ɓaure (kwafa daga katin wakili)
+  - A wannan na'urar: `http://localhost:56244/v1`
+  - A wata na'urar kamar sabar Mini: `http://192.168.1.20:56244/v1`
+- **API Key**: Alamar da aka bayar daga ɓaure (kwafa daga katin wakili)
 - **Model ID**: Ƙirar da aka saita a ɓaure (misali: `gemini-2.5-flash`)
 
 #### Mataki na 4: Tabbatarwa
 
-Aika kowace saƙo a cikin akwatin tattaunawar Cline. Idan yana aiki yadda ya kamata:
-- Aya kore (● Yana Aiki) za ta bayyana a katin wakili a dashboard ɗin ɓaure
-- Ayyuka/ƙira na yanzu za a nuna a katin (misali: `google / gemini-2.5-flash`)
+Aika kowace saƙo a tattaunawar Cline. Idan komai ya yi daidai:
+- **Alamar kore (● Yana Aiki)** tana bayyana a katin wakili a dashboard na ɓaure
+- Sabis/ƙirar na yanzu ana nuna ta a katin (misali: `google / gemini-2.5-flash`)
 
-#### Canza Ƙira
+#### Canza Ƙirar
 
-Idan kana son canza ƙirar Cline, canza a **dashboard ɗin ɓaure**:
+Lokacin da kake so ka canza ƙirar Cline, canza ta a **dashboard na ɓaure**:
 
-1. Canza menu na ayyuka/ƙira a katin wakili
+1. Canza zaɓin sabis/ƙirar a katin wakili
 2. Danna **Aiwatar**
-3. Sake ɗaukar VS Code (`Ctrl+Alt+R`) — sunan ƙirar a ƙasan Cline zai sabunta
-4. Daga buƙatar gaba, sabuwar ƙirar za ta fara amfani
+3. Sake lodin VS Code (`Ctrl+Alt+R`) — sunan ƙirar a ƙasan Cline zai sabunta
+4. Za a yi amfani da sabuwar ƙirar tun daga buƙatar da ke tafe
 
-> 💡 A zahiri, proxy yana gane buƙatar Cline ta hanyar alama kuma yana turawa zuwa ƙirar saitin ɓaure. Ko ba ka sake ɗaukar VS Code ba **ƙirar da ake amfani da ita ta canza nan da nan** — sake ɗaukar don sabunta nuni na ƙira a UI na Cline ne kawai.
+> 💡 A zahiri, proxy yana gane buƙatar Cline ta alama kuma yana jagoran zuwa ƙirar saitin ɓaure. Ko ba tare da sake lodin VS Code ba, **ƙirar da ake amfani da ita a zahiri tana canzawa nan da nan** — sake lodin don sabunta nunin ƙirar a UI na Cline ne kawai.
 
-#### Gano Katsewar Haɗin
+#### Ganowa Katsewar Haɗin
 
-Idan ka rufe VS Code, katin wakili a dashboard ɗin ɓaure zai zama rawaya (jinkiri) bayan kusan **daƙiƙa 90**, kuma ja (ba ya aiki) bayan **minti 3**. (Daga v0.1.18, binciken matsayi na daƙiƙa 15 ya sa gano kasancewar ba a kan layi ba ya zama da sauri.)
+Lokacin da ka rufe VS Code, katin wakili a dashboard na ɓaure yana canzawa zuwa rawaya (an jinkirta) bayan kusan **dakika 90**, kuma zuwa ja (ba a kan layi ba) bayan **minti 3**. (Tun daga v0.1.18, binciken yanayi a kowane dakika 15 yana sa ganowa ba a kan layi ba ta fi sauri.)
 
 #### Warware Matsaloli
 
-| Alamar | Dalilin | Maganin |
+| Alamar | Dalili | Magani |
 |------|------|------|
-| Kuskuren "haɗin ya gaza" a Cline | Proxy ba ya aiki ko adireshi ba daidai ba ne | Tabbatar da proxy da `curl http://localhost:56244/health` |
-| Aya kore ba ta bayyana a ɓaure | Maɓallin API (alama) ba a saita shi ba | Danna maɓallin **⚡ Aiwatar da Saitin Cline** sake |
-| Ƙirar a ƙasan Cline ba ta canja ba | Cline ta ajiye saitin a cikin cache | Sake ɗaukar VS Code (`Ctrl+Alt+R`) |
-| Sunan ƙira marar kyau ya bayyana | Tsohuwar matsala (an gyara a v0.1.16) | Sabunta proxy zuwa v0.1.16 ko sama |
+| Kuskuren "haɗin ya gaza" a Cline | Proxy ba ya aiki ko adireshin ba daidai ba ne | Tabbatar da proxy da `curl http://localhost:56244/health` |
+| Alamar kore ba ta bayyana a ɓaure ba | Maɓallin API (alama) ba a saita ba | Sake danna maɓallin **⚡ Aiwatar da Saitin Cline** |
+| Ƙirar a ƙasan Cline ba ta canjawa ba | Cline yana adana saiti | Sake lodin VS Code (`Ctrl+Alt+R`) |
+| Ana nuna sunan ƙirar da ba daidai ba | Tsohon kuskure (an gyara a v0.1.16) | Sabunta proxy zuwa v0.1.16 ko sama |
 
 ---
 
-#### 🟣 Maɓallin Kwafi Umarnin Rarraba — Ana amfani da shi lokacin shigarwa a sabuwar na'ura
+#### 🟣 Maɓallin Kwafin Umarni na Tura — Ana amfani da shi lokacin shigarwa a sabuwar na'ura
 
-Ana amfani da shi lokacin da ake shigar da proxy na wall-vault a karon farko a sabuwar kwamfuta kuma ana haɗa shi da ɓaure. Danna maɓallin kuma cikakken rubutun shigarwa za a kwafa shi. Manna a terminal na sabuwar kwamfutar ka aiwatar — abubuwan da ke ƙasa za a yi su gaba ɗaya:
+Ana amfani da shi lokacin da ake shigar da proxy na wall-vault a karon farko a sabuwar kwamfuta kuma ana haɗa ta da ɓaure. Lokacin da ka danna maɓallin, dukkan rubutun shigarwa ana kwafa shi. Manna shi a terminal na sabuwar kwamfuta kuma ka gudanar da shi, kuma abubuwan da ke ƙasa za a magance su a lokaci ɗaya:
 
-1. Shigar da fayil ɗin wall-vault (za a tsallake idan an riga an shigar)
-2. Rajista ta atomatik ta hanyar ayyukan mai amfani na systemd
-3. Fara aiki da haɗawa da ɓaure ta atomatik
+1. Shigar da binary na wall-vault (ana tsallake idan an riga an shigar)
+2. Yi rajista da sabis na masu amfani na systemd ta atomatik
+3. Fara sabis kuma haɗa da ɓaure ta atomatik
 
-> 💡 Alamar wannan wakilin da adireshin sabar ɓaure an riga an cika su cikin rubutun, don haka za ka iya aiwatar da shi nan da nan bayan mannawa ba tare da wani gyara ba.
+> 💡 Rubutun ya riga ya ƙunshi alamar wannan wakili da adireshin sabar ɓaure, don haka za ka iya gudanar da shi kai tsaye bayan mannawa ba tare da wani gyara ba.
 
 ---
 
-### Katin Ayyuka
+### Katin Sabis
 
-Kati don kunna da kashe ko saita ayyukan AI da za ka yi amfani da su.
+Kati don kunna/kashe ko saita sabis na AI don amfani.
 
-- Maɓallan canza yanayin kunna da kashe na kowace ayyuka
-- Idan ka shigar da adireshin sabar AI na gida (Ollama, LM Studio, vLLM d.s. da ke aiki a kwamfutarka), za ta gano ƙirorin da ake samu ta atomatik.
-- **Nuni matsayin haɗin ayyukan gida**: Aya ● kusa da sunan ayyuka idan **kore** an haɗa, idan **toka** ba a haɗa ba
-- **Fitilun hanya ta atomatik na ayyukan gida** (v0.1.23+): Ayyukan gida (Ollama, LM Studio, vLLM) suna kunna da kashe ta atomatik dangane da ko za a iya haɗa su. Idan ka kunna ayyuka, cikin daƙiƙa 15 aya ● za ta zama kore kuma akwatin tabbatarwa zai kunna; idan ka kashe ayyuka, za ta kashe ta atomatik. Wannan yana aiki ta hanya ɗaya da ayyukan girgije (Google, OpenRouter d.s.) da ke kunna da kashe ta atomatik dangane da kasancewar maɓallin API.
+- Maɓallan sauya kunna/kashe ga kowace sabis
+- Idan ka shigar da adireshin sabar AI na gida (Ollama, LM Studio, vLLM da sauransu da ke gudana a kwamfutarka), ƙirar da ake samu za a gano su ta atomatik.
+- **Nunin yanayin haɗin sabis na gida**: Alamar ● kusa da sunan sabis shine **kore** idan an haɗa, **toka** idan ba a haɗa ba
+- **Hasken zirga-zirga na atomatik na sabis na gida** (v0.1.23+): Sabis na gida (Ollama, LM Studio, vLLM) ana kunna su ta atomatik lokacin da za a iya haɗawa, kuma ana kashe su ta atomatik lokacin da suka katse. Lokacin da ka kunna sabis, yana canzawa zuwa ● kore cikin daƙiƙa 15 kuma akwatin dubawa yana kunna, kuma idan ka kashe shi, ana kashe shi ta atomatik. Wannan yana aiki daidai da yadda sabis na girgije (Google, OpenRouter da sauransu) ke sauya atomatik dangane da kasancewar maɓallin API.
 
-> 💡 **Idan ayyukan gida yana aiki a wata kwamfuta**: Shigar da IP na wannan kwamfutar a cikin akwatin URL na ayyuka. Misali: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Idan ayyukan an ɗaura shi ga `127.0.0.1` maimakon `0.0.0.0`, ba za a iya isa gare shi ta IP na waje ba, don haka ka duba adireshin ɗaurin a saitin ayyukan.
+> 💡 **Idan sabis na gida yana gudana a wata kwamfuta**: Shigar da IP na wannan kwamfutar a wurin shigar URL na sabis. Misali: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Idan sabis ɗin ya ɗaure zuwa `127.0.0.1` kawai maimakon `0.0.0.0`, ba za a iya samun dama ta IP na waje ba, don haka bincika adireshin ɗaurin a saitin sabis.
 
 ### Shigar da Alamar Mai Gudanarwa
 
-Idan ka yi ƙoƙarin amfani da ayyuka masu muhimmanci kamar ƙara ko share maɓallan a dashboard, pop-up na shigar da alamar mai gudanarwa zai bayyana. Shigar da alamar da ka saita a magatakarda na setup. Da zarar ka shigar, zai kasance har sai ka rufe browser.
+Lokacin da kake ƙoƙarin amfani da fasaloli masu muhimmanci kamar ƙara ko share maɓalli a dashboard, popup na shigar da alamar mai gudanarwa zai bayyana. Shigar da alamar da ka saita a magatakarda na setup. Da zarar ka shigar da ita, tana ci gaba har sai ka rufe mai bincike.
 
-> ⚠️ **Idan tabbatarwa ta gaza fiye da sau 10 cikin minti 15, za a toshe wannan IP na ɗan lokaci.** Idan ka manta alamar, duba abin `admin_token` a fayil ɗin `wall-vault.yaml`.
+> ⚠️ **Idan tabbatarwa ta gaza fiye da sau 10 cikin minti 15, za a dakatar da wannan IP na ɗan lokaci.** Idan ka manta da alamarka, duba kashi na `admin_token` a fayil na `wall-vault.yaml`.
 
 ---
 
 ## Yanayin Rarraba (Multi-Bot)
 
-Lokacin da ake gudanar da OpenClaw a kwamfutoci da yawa a lokaci guda, wannan tsarin ne na **raba ɓaure ɗaya na maɓallan**. Yana da sauƙi domin kana buƙatar sarrafa maɓallan a wuri ɗaya kawai.
+Tsari na **raba ɓaure ɗaya na maɓalli** lokacin gudanar da OpenClaw a kwamfutoci da yawa a lokaci ɗaya. Yana da sauƙi saboda kana buƙatar sarrafa maɓalli a wuri ɗaya kawai.
 
 ### Misalin Tsari
 
 ```
-[Sabar Ɓaure na Maɓallan]
-  wall-vault vault    (ɓaure na maɓallan :56243, dashboard)
+[Sabar Ɓauren Maɓalli]
+  wall-vault vault    (ɓauren maɓalli :56243, dashboard)
 
-[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini Local]
+[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini na Gida]
   wall-vault proxy      wall-vault proxy        wall-vault proxy
   openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ daidaita SSE        ↕ daidaita SSE          ↕ daidaita SSE
+  ↕ Daidaita SSE        ↕ Daidaita SSE          ↕ Daidaita SSE
 ```
 
-Dukkan bot suna kallon sabar ɓaure a tsakiya, don haka canza ƙira ko ƙara maɓalli a ɓaure yana bayyana nan da nan a dukkan bot.
+Dukkan bots suna duban sabar ɓaure a tsakiya, don haka idan ka canza ƙirar ko ƙara maɓalli a ɓaure, ana nuna shi ga dukkan bots nan da nan.
 
-### Mataki na 1: Fara Sabar Ɓaure na Maɓallan
+### Mataki na 1: Fara Sabar Ɓauren Maɓalli
 
-Aiwatar a kwamfutar da za ta kasance sabar ɓaure:
+Gudanar a kwamfutar da za ka yi amfani da ita a matsayin sabar ɓaure:
 
 ```bash
 wall-vault vault
 ```
 
-### Mataki na 2: Rajista Kowace Bot (Abokin Ciniki)
+### Mataki na 2: Yi Rajista da Kowace Bot (Abokin Ciniki)
 
-Rajista bayanan kowace bot da za ta haɗa da sabar ɓaure tun da wuri:
+Yi rajista da bayanan kowace bot da ke haɗawa da sabar ɓaure tun farko:
 
 ```bash
 curl -X POST http://localhost:56243/admin/clients \
@@ -624,7 +634,7 @@ curl -X POST http://localhost:56243/admin/clients \
 
 ### Mataki na 3: Fara Proxy a Kowace Kwamfutar Bot
 
-Aiwatar proxy a kowace kwamfutar da ke da bot ta hanyar ƙayyade adireshin sabar ɓaure da alama:
+Gudanar da proxy a kowace kwamfutar da bot ke ciki, ka bayyana adireshin sabar ɓaure da alama:
 
 ```bash
 WV_VAULT_URL=http://192.168.x.x:56243 \
@@ -633,17 +643,17 @@ WV_VAULT_CLIENT_ID=botA \
 wall-vault proxy
 ```
 
-> 💡 Maye gurbin **`192.168.x.x`** da ainihin adireshin IP na ciki na kwamfutar sabar ɓaure. Za ka iya bincika ta hanyar saitin router ko umarnin `ip addr`.
+> 💡 Canza sashen **`192.168.x.x`** da ainihin adireshin IP na ciki na kwamfutar sabar ɓaure. Za ka iya tabbatar da shi ta saitin router ko umarni na `ip addr`.
 
 ---
 
 ## Saita Farawa ta Atomatik
 
-Idan wahalar kunna wall-vault da hannu a kowane lokacin da aka sake kunna kwamfuta, rajista shi a matsayin ayyukan tsarin. Da zarar an rajista, zai fara ta atomatik lokacin boot.
+Idan yana da wuya a kunna wall-vault da hannu kowace lokaci da ka sake farawa kwamfuta, yi rajista da shi a matsayin sabis na tsarin. Da zarar an yi rajista, zai fara ta atomatik lokacin da ake lodawa.
 
 ### Linux — systemd (yawancin Linux)
 
-systemd shine tsarin Linux don fara da sarrafa shirye-shirye ta atomatik:
+systemd tsarin ne da ke kunna da sarrafa shirye-shirye ta atomatik a Linux:
 
 ```bash
 wall-vault doctor deploy
@@ -651,7 +661,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now wall-vault
 ```
 
-Duba tarihin abubuwan:
+Duba bayanan aiki:
 
 ```bash
 journalctl --user -u wall-vault -f
@@ -659,7 +669,7 @@ journalctl --user -u wall-vault -f
 
 ### macOS — launchd
 
-Tsarin da ke kula da aiwatar da shirye-shirye ta atomatik a macOS:
+Tsarin da ke sarrafa fara shirye-shirye ta atomatik a macOS:
 
 ```bash
 wall-vault doctor deploy launchd
@@ -668,7 +678,7 @@ launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
 
 ### Windows — NSSM
 
-1. Sauko da NSSM daga [nssm.cc](https://nssm.cc/download) ka ƙara shi cikin PATH.
+1. Sauke NSSM daga [nssm.cc](https://nssm.cc/download) kuma ka ƙara shi zuwa PATH.
 2. A PowerShell na mai gudanarwa:
 
 ```powershell
@@ -679,16 +689,15 @@ wall-vault doctor deploy windows
 
 ## Doctor — Kayan Bincike
 
-Umarnin `doctor` kayan aiki ne na wall-vault da ke **bincika kansa da gyara kansa**.
+Umarni na `doctor` kayan aiki ne da ke **bincika kansa da gyara kansa** don tabbatar da cewa wall-vault an saita shi yadda ya kamata.
 
 ```bash
-wall-vault doctor check   # Bincika yanayin yanzu (karantawa kawai, babu abin da ake canzawa)
+wall-vault doctor check   # Bincika yanayin yanzu (karantawa kawai, ba ya canza komai)
 wall-vault doctor fix     # Gyara matsaloli ta atomatik
-wall-vault doctor all     # Bincike + gyara ta atomatik gaba ɗaya
+wall-vault doctor all     # Bincike + gyara ta atomatik a lokaci ɗaya
 ```
 
-> 💡 Idan wani abu ya yi kamar bai dace ba, aiwatar da `wall-vault doctor all` da fari. Yana magance matsaloli da yawa ta atomatik.
-
+> 💡 Idan wani abu ya yi kamar ba daidai ba, gudanar da `wall-vault doctor all` da farko. Yana magance matsaloli da yawa ta atomatik.
 
 ---
 
@@ -696,47 +705,47 @@ wall-vault doctor all     # Bincike + gyara ta atomatik gaba ɗaya
 
 *(v0.1.24+)*
 
-**RTK (Kayan Tanadin Token)** yana matsar fitowar umarnin sheli da wakilin AI na kodawa (Claude Code d.s.) ke aiwatarwa ta atomatik, yana rage yawan amfanin token. Misali, fitowar layi 15 na `git status` za a matsa zuwa taƙaitaccen layi 2.
+**RTK (Kayan Tanadin Token)** yana matse sakamakon umarni na shell da masu wakilci na AI na lambar (kamar Claude Code) ke gudanarwa ta atomatik don rage amfani da tokeni. Misali, sakamakon layi 15 na `git status` yana raguwa zuwa taƙaitaccen layi 2.
 
-### Asalin Amfani
+### Amfani na Asali
 
 ```bash
-# Nannade umarnin da wall-vault rtk kuma fitowa za ta tacewa ta atomatik
-wall-vault rtk git status          # Yana nuna jerin fayiloli da suka canza kawai
-wall-vault rtk git diff HEAD~1     # Layukan da suka canza + ƙaramin mahallin kawai
-wall-vault rtk git log -10         # Hash + saƙon layi ɗaya kowane shigarwa
-wall-vault rtk go test ./...       # Yana nuna gwaje-gwaje da suka gaza kawai
-wall-vault rtk ls -la              # Umarnin da ba a tallafa ba ana yanke su ta atomatik
+# Nannaɗe umarni da wall-vault rtk kuma za a tace sakamako ta atomatik
+wall-vault rtk git status          # Jerin fayiloli da aka canza kawai
+wall-vault rtk git diff HEAD~1     # Layukan da aka canza + ƙaramin mahallin
+wall-vault rtk git log -10         # Hash + saƙon layi ɗaya
+wall-vault rtk go test ./...       # Gwaje-gwaje da suka gaza kawai
+wall-vault rtk ls -la              # Umarni marasa goyon baya ana yanke su ta atomatik
 ```
 
-### Umarnin da Ake Tallafawa da Tasirin Tanadi
+### Umarni da Ake Goyon Baya da Tasirin Ragewa
 
-| Umarnin | Hanyar Tacewa | Adadin Tanadi |
+| Umarni | Hanyar Tacewa | Adadin Ragewa |
 |------|----------|--------|
-| `git status` | Taƙaitaccen fayiloli da suka canza kawai | ~87% |
-| `git diff` | Layukan da suka canza + mahallin layi 3 | ~60-94% |
+| `git status` | Taƙaitaccen fayiloli da aka canza kawai | ~87% |
+| `git diff` | Layukan da aka canza + mahallin layi 3 | ~60-94% |
 | `git log` | Hash + saƙon layi na farko | ~90% |
 | `git push/pull/fetch` | Cire ci gaba, taƙaitacce kawai | ~80% |
-| `go test` | Nuna gazawa kawai, ƙidaya nasarori | ~88-99% |
-| `go build/vet` | Nuna kuskurori kawai | ~90% |
-| Sauran umarnin duka | Layi 50 na farko + 50 na ƙarshe, matsakaicin 32KB | Yana canzawa |
+| `go test` | Nuna gazawa kawai, ƙidaya nasara | ~88-99% |
+| `go build/vet` | Nuna kurakurai kawai | ~90% |
+| Duk sauran umarni | Layi 50 na farko + 50 na ƙarshe, matsakaicin 32KB | Ya danganta |
 
-### Bututun Tacewa na Mataki 3
+### Tsarin Tacewa na Mataki 3
 
-1. **Tace tsari ta umarnin** — Yana fahimtar tsarin fitowar git, go d.s. kuma yana ciro ɓangarorin da ke da ma'ana kawai
-2. **Sarrafa bayan regex** — Cire lambobin launi na ANSI, rage layukan banza, taƙaita layukan da suka maimaitu
-3. **Wucewa + yankewa** — Umarnin da ba a tallafa ba suna riƙe layi 50 na farko da 50 na ƙarshe kawai
+1. **Tacen tsari ga kowace umarni** — Yana fahimtar tsarin sakamakon git, go da sauransu kuma yana ciro sassan da suka dace kawai
+2. **Sarrafa bayan regex** — Cire lambobin launi na ANSI, rage layukan kofe, taƙaita layukan da suka maimaita
+3. **Passthrough + yanke** — Umarni marasa goyon baya suna riƙe da layi 50 na farko/ƙarshe kawai
 
 ### Haɗawa da Claude Code
 
-Za ka iya saita ta hanyar ƙugiya `PreToolUse` na Claude Code don dukkan umarnin sheli su wuce ta RTK ta atomatik.
+Za ka iya saita dukkan umarni na shell su bi ta RTK ta atomatik ta hook na `PreToolUse` na Claude Code.
 
 ```bash
-# Shigar da ƙugiya (ana ƙara ta ta atomatik cikin settings.json na Claude Code)
+# Shigar da hook (ana ƙarawa ta atomatik zuwa Claude Code settings.json)
 wall-vault rtk hook install
 ```
 
-Ko ƙara da hannu cikin `~/.claude/settings.json`:
+Ko ƙara da hannu zuwa `~/.claude/settings.json`:
 
 ```json
 {
@@ -749,125 +758,129 @@ Ko ƙara da hannu cikin `~/.claude/settings.json`:
 }
 ```
 
-> 💡 **Adana lambar fita**: RTK yana mayar da lambar fita ta umarnin asali kamar yadda take. Idan umarnin ya gaza (exit code ≠ 0), AI ma za ta gane gazawar daidai.
+> 💡 **Kiyaye Exit code**: RTK yana mayar da lambar fitarwa na ainihin umarni kamar yadda yake. Idan umarni ya gaza (exit code ≠ 0), AI ma yana gano gazawar daidai.
 
-> 💡 **Tilasta Turanci**: RTK yana aiwatar da umarnin da `LC_ALL=C` don samar da fitowar Turanci koyaushe ba tare da la'akari da saitin harshen tsarin ba. Wannan yana tabbatar da cewa tacewa yana aiki daidai.
+> 💡 **Tilasta Turanci**: RTK yana gudanar da umarni da `LC_ALL=C` don samar da sakamakon Turanci koyaushe ba tare da la'akari da saitin harshen tsarin ba. Wannan yana tabbatar da cewa tacen yana aiki daidai.
 
 ---
 
 ## Bayani kan Masu-Canji na Yanayi
 
-Masu-canji na yanayi hanya ce ta isar da ƙimomi na saiti zuwa ga shiri. Shigar da su a tsarin `export sunan-mai-canji=ƙima` a terminal, ko sanya su a fayil ɗin ayyukan farawa ta atomatik don su yi aiki koyaushe.
+Masu-canji na yanayi hanya ce ta isar da ƙimomi na saiti zuwa shirin. Shigar a tsarin `export sunan-mai-canji=ƙima` a terminal, ko saka a fayil na sabis na farawa ta atomatik don ya kasance yana aiki koyaushe.
 
 | Mai-Canji | Bayani | Misalin Ƙima |
 |------|------|---------|
 | `WV_LANG` | Harshen dashboard | `ko`, `en`, `ja` |
 | `WV_THEME` | Jigon dashboard | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Maɓallin API na Google (da yawa da waƙafi) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | Maɓallin API na OpenRouter | `sk-or-v1-...` |
+| `WV_KEY_GOOGLE` | Maɓallin Google API (da yawa da waƙafi) | `AIza...,AIza...` |
+| `WV_KEY_OPENROUTER` | Maɓallin OpenRouter API | `sk-or-v1-...` |
 | `WV_VAULT_URL` | Adireshin sabar ɓaure a yanayin rarraba | `http://192.168.x.x:56243` |
 | `WV_VAULT_TOKEN` | Alamar tabbatarwa na abokin ciniki (bot) | `my-secret-token` |
 | `WV_ADMIN_TOKEN` | Alamar mai gudanarwa | `admin-token-here` |
 | `WV_MASTER_PASS` | Kalmar sirrin ɓoye maɓallin API | `my-password` |
-| `WV_AVATAR` | Hanyar fayil ɗin hoton avatar (dangi da `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Adireshin sabar gida na Ollama | `http://192.168.x.x:11434` |
+| `WV_AVATAR` | Hanyar fayil na hoton avatar (dangantaka daga `~/.openclaw/`) | `workspace/avatars/avatar.png` |
+| `OLLAMA_URL` | Adireshin sabar Ollama na gida | `http://192.168.x.x:11434` |
 
 ---
 
 ## Warware Matsaloli
 
-### Proxy Ba Ya Farawa
+### Lokacin da Proxy Ba Ya Farawa
 
-Mafi yawan lokaci tashar tana amfani da wani shiri.
+Sau da yawa, tashar tana amfani da wani shirin.
 
 ```bash
-ss -tlnp | grep 56244   # Duba wanene ke amfani da tasha 56244
-wall-vault proxy --port 8080   # Fara da wani lambar tasha
+ss -tlnp | grep 56244   # Duba wanene ke amfani da tashar 56244
+wall-vault proxy --port 8080   # Fara da wata lambar tashar
 ```
 
-### Kuskuren Maɓallin API (429, 402, 401, 403, 582)
+### Lokacin da Kuskuren Maɓallin API Ya Faru (429, 402, 401, 403, 582)
 
-| Lambar Kuskure | Ma'ana | Yadda Ake Magana |
+| Lambar Kuskure | Ma'ana | Yadda Ake Magancewa |
 |----------|------|----------|
-| **429** | Buƙatu da yawa (an wuce iyaka) | Jira ɗan lokaci ko ƙara wani maɓalli |
-| **402** | Ana buƙatar biyan kuɗi ko bashi ya ƙare | Ƙara kuɗi a ayyukan da abin ya shafa |
-| **401 / 403** | Maɓallin ba daidai ba ne ko babu izini | Sake tabbatar da ƙimar maɓallin ka sake rajista |
-| **582** | Cunkoson ƙofa (cooldown minti 5) | Zai buɗe ta atomatik bayan minti 5 |
+| **429** | Buƙatu da yawa (matumizi sun wuce ƙima) | Jira kaɗan ko ƙara wani maɓalli |
+| **402** | Ana buƙatar biyan kuɗi ko kuɗin ba su isa ba | Ƙara kuɗi a sabis ɗin da ya dace |
+| **401 / 403** | Maɓalli ba daidai ba ne ko babu izini | Sake tabbatar da ƙimar maɓalli kuma ka sake yin rajista |
+| **582** | Nauyin gateway (cooldown minti 5) | Ana sakewa ta atomatik bayan minti 5 |
 
 ```bash
-# Duba jerin maɓallan da aka rajista da matsayinsu
+# Duba jerin da yanayin maɓalli da aka yi rajista
 curl -H "Authorization: Bearer alamar-mai-gudanarwa" http://localhost:56243/admin/keys
 
-# Sake saita ma'aunin amfani na maɓalli
+# Sake saita ƙididdigan amfani da maɓalli
 curl -X POST -H "Authorization: Bearer alamar-mai-gudanarwa" http://localhost:56243/admin/keys/reset
 ```
 
-### Wakili Yana Nuna "Ba a Haɗa"
+### Lokacin da Wakili Ya Nuna "Ba a Haɗa Ba"
 
-"Ba a Haɗa" yana nufin aikin proxy ba ya aika sigina (heartbeat) zuwa ɓaure. **Ba yana nufin ba a ajiye saiti ba.** Proxy dole ne ta san adireshin sabar ɓaure da alama kuma ta kasance tana aiki don ta canza zuwa yanayin haɗawa.
+"Ba a haɗa ba" yana nufin tsarin proxy ba ya aika sigina (heartbeat) zuwa ɓaure. **Ba ya nufin cewa ba a adana saituna ba.** Dole ne proxy ya kasance yana aiki yana sanin adireshin sabar ɓaure da alama don yanayin haɗin ya canja.
 
 ```bash
-# Fara proxy ta hanyar ƙayyade adireshin sabar ɓaure, alama, da ID na abokin ciniki
+# Fara proxy ka bayyana adireshin sabar ɓaure, alama, da ID na abokin ciniki
 WV_VAULT_URL=http://adireshin-sabar-ɓaure:56243 \
 WV_VAULT_TOKEN=alamar-abokin-ciniki \
-WV_VAULT_CLIENT_ID=id-na-abokin-ciniki \
+WV_VAULT_CLIENT_ID=ID-na-abokin-ciniki \
 wall-vault proxy
 ```
 
-Idan haɗin ya yi nasara, zai canza zuwa 🟢 Yana Aiki a dashboard cikin kusan daƙiƙa 20.
+Idan haɗin ya yi nasara, zai canja zuwa 🟢 Yana Aiki a dashboard cikin kusan dakika 20.
 
-### Ollama Ba Ya Haɗawa
+### Lokacin da Ollama Ba Ya Haɗawa
 
-Ollama shiri ne na gudanar da AI kai tsaye a kwamfutarka. Da fari tabbatar Ollama yana aiki.
+Ollama shirin ne da ke gudanar da AI kai tsaye a kwamfutarka. Da farko tabbatar Ollama tana aiki.
 
 ```bash
-curl http://localhost:11434/api/tags   # Idan jerin ƙirori ya bayyana, yana aiki yadda ya kamata
-export OLLAMA_URL=http://192.168.x.x:11434   # Idan yana aiki a wata kwamfuta
+curl http://localhost:11434/api/tags   # Idan jerin ƙira sun bayyana, al'ada ne
+export OLLAMA_URL=http://192.168.x.x:11434   # Idan tana gudana a wata kwamfuta
 ```
 
-> ⚠️ Idan Ollama ba ya amsawa, fara Ollama da farko ta hanyar umarnin `ollama serve`.
+> ⚠️ Idan Ollama ba ta amsa ba, fara Ollama da farko da umarni na `ollama serve`.
 
-> ⚠️ **Manyan ƙirori suna da jinkirin amsawa**: Manyan ƙirori kamar `qwen3.5:35b`, `deepseek-r1` na iya ɗaukar mintuna da yawa don samar da amsa. Ko da ya yi kamar babu amsa, yana iya sarrafa shi yadda ya kamata, don haka ka jira.
+> ⚠️ **Manyan ƙira suna da jinkiri**: Manyan ƙira kamar `qwen3.5:35b`, `deepseek-r1` na iya ɗaukar mintuna da yawa don samar da amsa. Ko ya yi kamar babu amsa, yana iya kasancewa ana sarrafa al'ada ne, don haka ka jira.
 
 ---
 
-## Canje-Canjen Kwanan Nan (v0.1.16 ~ v0.1.24)
+## Sabbin Canje-canje (v0.1.16 ~ v0.1.25)
+
+### v0.1.25 (2026-04-08)
+- **Ganowa Tsarin Wakili**: Proxy yana gano yanayin rayuwa na wakili na gida (NanoClaw/OpenClaw) kuma yana nuna shi da hasken launin lemu a dashboard.
+- **Inganta Hannun Ja**: An canza don kati su kama ne kawai daga yankin hasken zirga-zirga (●) lokacin tsarawa. Wuraren shigarwa ko maɓallai ba a jan su da kuskure ba.
 
 ### v0.1.24 (2026-04-06)
-- **Ƙaramin umarnin RTK na tanadin token**: `wall-vault rtk <command>` yana tace fitowar umarnin sheli ta atomatik don rage yawan amfanin token na wakilin AI da 60-90%. Yana ɗauke da tacewa na musamman ga manyan umarnin kamar git, go, kuma umarnin da ba a tallafa ba ma ana yanke su ta atomatik. Yana haɗuwa ba tare da matsala ba ta hanyar ƙugiya `PreToolUse` na Claude Code.
+- **Ƙaramin Umarni na RTK na Tanadin Token**: `wall-vault rtk <command>` yana tace sakamakon umarni na shell ta atomatik don rage amfani da tokeni na masu wakilci na AI da 60-90%. Ya haɗa da tacen musamman don manyan umarni kamar git, go, kuma umarni marasa goyon baya ma ana yanke su ta atomatik. Yana haɗawa cikin ganuwa ta hook na `PreToolUse` na Claude Code.
 
 ### v0.1.23 (2026-04-06)
-- **Gyaran canza ƙirar Ollama**: An gyara matsalar da canza ƙirar Ollama a dashboard ɗin ɓaure bai bayyana a proxy na gaske ba. A baya, mai-canji na yanayi (`OLLAMA_MODEL`) ne kawai ake amfani da shi, amma yanzu saitin ɓaure ne ake ba fifiko.
-- **Fitilun hanya ta atomatik na ayyukan gida**: Ollama, LM Studio, da vLLM suna kunna ta atomatik idan za a iya haɗa su kuma suna kashe ta atomatik idan sun katse. Wannan yana aiki ta hanya ɗaya da musanyar ayyukan girgije ta atomatik da ke dogara ga maɓalli.
+- **Gyaran Canza Ƙirar Ollama**: Matsalar inda canza ƙirar Ollama a dashboard na ɓaure ba ta bayyana a proxy an gyara. A da can yana amfani da mai-canji na yanayi (`OLLAMA_MODEL`) kawai, amma yanzu ana ba da fifiko ga saitin ɓaure.
+- **Hasken Zirga-zirga na Atomatik na Sabis na Gida**: Ollama, LM Studio, vLLM ana kunna su ta atomatik lokacin da za a iya haɗawa, kuma ana kashe su ta atomatik lokacin da suka katse. Yana aiki daidai da sauya atomatik da ke dogara ga maɓalli na sabis na girgije.
 
 ### v0.1.22 (2026-04-05)
-- **Gyaran yankin content marar komai da ya ɓace**: Lokacin da ƙirorin tunani (gemini-3.1-pro, o1, claude thinking d.s.) suka yi amfani da iyakar max_tokens duka don tunani kuma suka kasa samar da amsa na gaske, proxy ya cire yankuna `content`/`text` na JSON na amsa ta `omitempty`, wanda ya haifar da kuskuren `Cannot read properties of undefined (reading 'trim')` a abokan ciniki na SDK na OpenAI/Anthropic. An canza shi don a haɗa yankuna koyaushe bisa ƙa'idojin API na hukuma.
+- **Gyaran Rashin Filin content mai Fanko**: Lokacin da ƙirar tunani (gemini-3.1-pro, o1, claude thinking da sauransu) suka yi amfani da iyakar max_tokens gaba ɗaya don tunani kuma suka gaza samar da ainihin amsa, proxy ya kasance yana barin filayen `content`/`text` a JSON na amsa da `omitempty`, wanda ya sa abokan cinikin OpenAI/Anthropic SDK su samu kuskure na `Cannot read properties of undefined (reading 'trim')`. An canza don haɗa filaye koyaushe bisa ga ƙayyadaddun hukumar API.
 
 ### v0.1.21 (2026-04-05)
-- **Tallafin ƙirorin Gemma 4**: Ƙirorin dangin Gemma kamar `gemma-4-31b-it`, `gemma-4-26b-a4b-it` za a iya amfani da su ta hanyar Google Gemini API.
-- **Tallafin ayyukan LM Studio / vLLM na hukuma**: A baya waɗannan ayyukan sun ɓace a cikin hanyar proxy kuma koyaushe an maye gurbinsu da Ollama. Yanzu ana tura su yadda ya kamata ta hanyar API mai jituwa da OpenAI.
-- **Gyaran nuni na ayyuka a dashboard**: Ko da fallback ya faru, dashboard koyaushe yana nuna ayyukan da mai amfani ya saita.
-- **Nuni matsayin ayyukan gida**: Matsayin haɗin ayyukan gida (Ollama, LM Studio, vLLM d.s.) ana nuna shi da launin aya ● lokacin da dashboard ke ɗaukawa.
-- **Mai-canji na yanayi na tace kayan aiki**: Yanayin isar kayan aiki (tools) za a iya saita shi da mai-canji na yanayi `WV_TOOL_FILTER=passthrough`.
+- **Goyon Bayan Ƙirar Gemma 4**: Ƙirar dangin Gemma kamar `gemma-4-31b-it`, `gemma-4-26b-a4b-it` za a iya amfani da su ta Google Gemini API.
+- **Goyon Bayan Sabis na LM Studio / vLLM na Hukuma**: A da can an tsallake waɗannan sabis a jagorar proxy kuma koyaushe ana maye gurbinsu da Ollama. Yanzu ana jagoran su yadda ya kamata ta API mai dacewa da OpenAI.
+- **Gyaran Nunin Sabis a Dashboard**: Ko fallback ya faru, dashboard koyaushe yana nuna sabis ɗin da mai amfani ya saita.
+- **Nunin Yanayin Sabis na Gida**: Yanayin haɗin sabis na gida (Ollama, LM Studio, vLLM da sauransu) ana nuna shi ta launin alamar ● lokacin da dashboard ke lodawa.
+- **Mai-Canji na Yanayi na Tacen Kayan Aiki**: Yanayin isar da kayan aiki za a iya saita shi da mai-canji na yanayi `WV_TOOL_FILTER=passthrough`.
 
 ### v0.1.20 (2026-03-28)
-- **Ƙarfafa tsaro mai zurfi**: Kariya daga XSS (wurare 41), kwatanta alama na lokaci na kullum, ƙuntatawa CORS, iyakokin girman buƙata, kariya daga bi hanya, tabbatarwa SSE, ƙarfafa iyakar gudu d.s. abubuwa 12 na tsaro da aka inganta.
+- **Ƙarfafa Tsaro na Gaba Ɗaya**: Inganta abubuwa 12 na tsaro haɗe da hana XSS (wurare 41), kwatanta alama na lokaci maras bambanci, ƙuntatawa CORS, iyakokin girman buƙata, hana bi ta hanya, tabbatarwa na SSE, ƙarfafa iyakar gudu da sauransu.
 
 ### v0.1.19 (2026-03-27)
-- **Gano Claude Code a kan layi**: Claude Code da ba ta bi ta proxy ba suma ana nuna ta a kan layi a dashboard.
+- **Ganowa Claude Code a Kan Layi**: Claude Code da ba ya bi ta proxy ma ana nuna shi a matsayin a kan layi a dashboard.
 
 ### v0.1.18 (2026-03-26)
-- **Gyaran ayyukan fallback da ya makale**: Bayan fallback zuwa Ollama saboda kuskure na ɗan lokaci, idan ayyukan asali ta dawo, tana canzawa ta koma ta atomatik.
-- **Inganta gano rashin kasancewa a kan layi**: Binciken matsayi na daƙiƙa 15 ya sa gano katsewar proxy ya zama da sauri.
+- **Gyaran Makale na Sabis na Fallback**: Bayan komawa Ollama saboda kuskure na ɗan lokaci, idan sabis na asali ya dawo, ana komawa ta atomatik.
+- **Inganta Ganowa Ba a Kan Layi Ba**: Binciken yanayi a kowane dakika 15 yana sa ganowa proxy ya tsaya ta fi sauri.
 
 ### v0.1.17 (2026-03-25)
-- **Tsara katuna ta ja-da-saki**: Za a iya jawo katuna na wakili don sake tsara tsarin su.
-- **Maɓallan aiwatar da saiti a cikin layi**: Maɓallin [⚡ Aiwatar da Saiti] yana bayyana ga wakilai marasa kasancewa a kan layi.
-- **Ƙarin irin wakilin cokacdir**.
+- **Tsara Kati ta Ja da Sauke**: Za a iya jan katin wakili don canza tsari.
+- **Maɓallin Aiwatar da Saiti na Layi**: Maɓallin [⚡ Aiwatar da Saiti] yana bayyana a masu wakilci da ba su a kan layi ba.
+- **An ƙara irin wakili na cokacdir**.
 
 ### v0.1.16 (2026-03-25)
-- **Daidaita ƙira a bangarori biyu**: Canza ƙirar Cline ko Claude Code a dashboard ɗin ɓaure yana bayyana ta atomatik.
+- **Daidaita Ƙirar ta Bangarori Biyu**: Canza ƙirar Cline ko Claude Code a dashboard na ɓaure yana haifar da bayyanar ta atomatik.
 
 ---
 
-*Don ƙarin bayani na API, duba [API.md](API.md).*
+*Don ƙarin cikakken bayani na API, duba [API.md](API.md).*

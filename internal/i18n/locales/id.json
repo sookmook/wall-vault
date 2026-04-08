@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Salin skrip pengaturan Linux systemd",
   "cfg_deploy_hint": "Tempel di terminal mesin target",
   "st_gemini_hint": "Atur GEMINI_API_BASE_URL=http://localhost:56244 dan mulai ulang",
-  "key_att": "coba"
+  "key_att": "coba",
+  "drag_reorder": "Seret untuk mengurutkan ulang",
+  "agent_dead": "⚠ Proses agen berhenti"
 }

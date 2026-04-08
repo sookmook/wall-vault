@@ -135,5 +135,7 @@
   "cfg_deploy_title": "คัดลอกสคริปต์ติดตั้ง Linux systemd",
   "cfg_deploy_hint": "วางในเทอร์มินัลของเครื่องเป้าหมาย",
   "st_gemini_hint": "ตั้งค่า GEMINI_API_BASE_URL=http://localhost:56244 และรีสตาร์ท",
-  "key_att": "พยายาม"
+  "key_att": "พยายาม",
+  "drag_reorder": "ลากเพื่อเรียงลำดับใหม่",
+  "agent_dead": "⚠ โปรเซสตัวแทนหยุดทำงาน"
 }

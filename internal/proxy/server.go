@@ -51,6 +51,7 @@ type Server struct {
 	service         string            // user-configured preferred service (from vault dashboard)
 	model           string            // user-configured preferred model (from vault dashboard)
 	claudeCodeClientID string            // vault client ID for the local claude-code agent (from syncFromVault)
+	ownAgentType       string            // this proxy's own agent_type (from syncFromVault)
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
 	serviceURLs     map[string]string // service ID → local URL from vault config
 	keyMgr          *KeyManager
@@ -345,8 +346,17 @@ func (s *Server) syncFromVault() {
 			}
 		}
 	}
+	// find own agent_type
+	ownType := ""
+	for _, c := range clients {
+		if c.ID == s.cfg.Proxy.ClientID {
+			ownType = c.AgentType
+			break
+		}
+	}
 	s.mu.Lock()
 	s.claudeCodeClientID = ccID
+	s.ownAgentType = ownType
 	s.mu.Unlock()
 
 	// sync keys

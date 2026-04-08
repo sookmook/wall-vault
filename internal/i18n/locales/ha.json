@@ -135,5 +135,7 @@
   "cfg_deploy_title": "Kwafi rubutun saitawar Linux systemd",
   "cfg_deploy_hint": "Liƙa a tashar na'urar da aka yi niyya",
   "st_gemini_hint": "Saita GEMINI_API_BASE_URL=http://localhost:56244 sannan sake fara",
-  "key_att": "ƙoƙ."
+  "key_att": "ƙoƙ.",
+  "drag_reorder": "Ja don sake tsari",
+  "agent_dead": "⚠ Tsarin wakili ya tsaya"
 }

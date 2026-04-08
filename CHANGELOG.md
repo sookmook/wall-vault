@@ -8,6 +8,20 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.25] — 2026-04-08
+
+### Added
+- **Agent process health detection**: Proxy heartbeat now detects whether the
+  local agent process (nanoclaw via `systemctl`, openclaw via `pgrep`) is alive.
+  When the agent dies while the proxy is still running, the dashboard agent card
+  shows an orange pulsing traffic light with "⚠ Agent process stopped" status.
+- **Drag handle on agent cards**: Drag-and-drop reordering now uses the traffic
+  light dot area as the grab handle, preventing accidental drags from input
+  fields and buttons.
+- **i18n keys**: Added `drag_reorder` and `agent_dead` to all 17 locales.
+
+---
+
 ## [0.1.24] — 2026-04-06
 
 ### Added

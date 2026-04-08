@@ -135,5 +135,7 @@
   "cfg_deploy_title": "نسخ سكريبت إعداد Linux systemd",
   "cfg_deploy_hint": "الصق في طرفية الجهاز المستهدف",
   "st_gemini_hint": "اضبط GEMINI_API_BASE_URL=http://localhost:56244 وأعد التشغيل",
-  "key_att": "محاولة"
+  "key_att": "محاولة",
+  "drag_reorder": "اسحب لإعادة الترتيب",
+  "agent_dead": "⚠ عملية الوكيل متوقفة"
 }

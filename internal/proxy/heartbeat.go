@@ -26,6 +26,7 @@ type heartbeatPayload struct {
 	KeyAttempts   map[string]int    `json:"key_attempts,omitempty"`   // key ID → total requests today (including rate-limited)
 	KeyCooldowns  map[string]string `json:"key_cooldowns,omitempty"`  // key ID → cooldown RFC3339
 	ActiveClients []activeClientItem `json:"active_clients,omitempty"` // recently-served non-proxy clients
+	AgentAlive    *bool             `json:"agent_alive,omitempty"`    // local agent process is running (nanoclaw/openclaw)
 }
 
 // activeClientItem: activity record for a client served through this proxy
@@ -148,6 +149,12 @@ func (s *Server) sendHeartbeat() {
 		activeClients = append(activeClients, *cc)
 	}
 
+	// detect local agent process health
+	s.mu.RLock()
+	ownAgentType := s.ownAgentType
+	s.mu.RUnlock()
+	agentAlive := detectAgentProcess(ownAgentType)
+
 	payload := heartbeatPayload{
 		ClientID:      s.cfg.Proxy.ClientID,
 		Version:       Version,
@@ -157,6 +164,7 @@ func (s *Server) sendHeartbeat() {
 		Avatar:        readLocalAvatar(s.cfg.Proxy.Avatar),
 		ActiveKeys:    activeKeys,
 		ActiveClients: activeClients,
+		AgentAlive:    agentAlive,
 		KeyUsage:      s.keyMgr.UsageSnapshot(),
 		KeyAttempts:  s.keyMgr.AttemptsSnapshot(),
 		KeyCooldowns: s.keyMgr.CooldownSnapshot(),
@@ -211,4 +219,27 @@ func detectClaudeCode(clientID string) *activeClientItem {
 		Service:  "anthropic",
 		Model:    model,
 	}
+}
+
+// detectAgentProcess checks if the local agent process matching the given
+// agent_type is alive. Returns nil if agent_type has no process to check,
+// or a *bool indicating alive/dead.
+func detectAgentProcess(agentType string) *bool {
+	alive := true
+	dead := false
+	switch agentType {
+	case "nanoclaw":
+		// systemctl --user is-active nanoclaw (exit 0 = active)
+		if err := exec.Command("systemctl", "--user", "is-active", "--quiet", "nanoclaw").Run(); err != nil {
+			return &dead
+		}
+		return &alive
+	case "openclaw":
+		if err := exec.Command("pgrep", "-f", "openclaw-gateway").Run(); err != nil {
+			return &dead
+		}
+		return &alive
+	}
+	// agent types without a detectable process (cursor, cline, etc.)
+	return nil
 }

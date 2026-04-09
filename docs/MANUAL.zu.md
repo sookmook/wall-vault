@@ -1,64 +1,64 @@
-# Umhlahlandlela Womsebenzisi we-wall-vault
-*(Last updated: 2026-04-08 — v0.1.25)*
+# Incwadi Yomuntu Esebenzisayo ye-wall-vault
+*(Last updated: 2026-04-09 — v0.1.27)*
 
 ---
 
 ## Okuqukethwe
 
 1. [Yini i-wall-vault?](#yini-i-wall-vault)
-2. [Ukufakela](#ukufakela)
-3. [Ukuqala Okokuqala (i-setup wizard)](#ukuqala-okokuqala)
-4. [Ukubhalisa Ukhiye we-API](#ukubhalisa-ukhiye-we-api)
-5. [Ukusebenzisa i-Proxy](#ukusebenzisa-i-proxy)
-6. [Idashubhodi ye-Vault](#idashubhodi-ye-vault)
-7. [Imodi Eyahlukaniswayo (Ama-Bot Amaningi)](#imodi-eyahlukaniswayo-ama-bot-amaningi)
-8. [Ukusethwa Kokuqala Ngokuzenzakalela](#ukusethwa-kokuqala-ngokuzenzakalela)
-9. [I-Doctor: Isihloli](#i-doctor-isihloli)
-10. [I-RTK Ukonga Amathokheni](#i-rtk-ukonga-amathokheni)
-11. [Izinguquko Zemvelo](#izinguquko-zemvelo)
+2. [Ukufakwa](#ukufakwa)
+3. [Ukuqala Okokuqala (umthakathi we-setup)](#ukuqala-okokuqala)
+4. [Ukubhalisa i-API Key](#ukubhalisa-i-api-key)
+5. [Indlela Yokusebenzisa i-Proxy](#indlela-yokusebenzisa-i-proxy)
+6. [I-Dashboard ye-Key Vault](#i-dashboard-ye-key-vault)
+7. [Imodi Yokusabalalisa (Multi Bot)](#imodi-yokusabalalisa-multi-bot)
+8. [Ukusetha Ukuqala Ngokuzenzakalela](#ukusetha-ukuqala-ngokuzenzakalela)
+9. [Doctor (Udokotela)](#doctor-udokotela)
+10. [RTK Ukonga Ama-token](#rtk-ukonga-ama-token)
+11. [Ireferensi Yokuguquguquka Kwemvelo](#ireferensi-yokuguquguquka-kwemvelo)
 12. [Ukuxazulula Izinkinga](#ukuxazulula-izinkinga)
 
 ---
 
 ## Yini i-wall-vault?
 
-**wall-vault = Ummeleli we-AI (Proxy) + Isikhwama Sokhiye be-API ye-OpenClaw**
+**wall-vault = Ummeleli we-AI (Proxy) + Isikhwama se-API Key se-OpenClaw**
 
-Ukuze usebenzise amasevisi e-AI, udinga **ukhiye we-API**. Ukhiye we-API unjenge **khadi lokungena ledijithali** elifakazela ukuthi "lo muntu unelungelo lokusebenzisa le sevisi". Kodwa-ke, le khadi lokungena linemkhawulo wokusebenzisa kwansuku zonke, futhi uma ungaliphathanga kahle, lingavezwa.
+Ukuze usebenzise amasevisi e-AI, udinga **i-API key**. I-API key injenge **khadi lokungena ledijithali** elifakazela ukuthi "lo muntu unelungelo lokusebenzisa le sevisi". Kodwa-ke le khadi lokungena linemkhawulo wokusetshenziswa ngosuku, futhi uma lingaphathwa kahle, kukhona ingozi yokuvezwa.
 
-i-wall-vault igcina la makhadi okungena endaweni ephephile futhi isebenza njenge **mmeleli (proxy)** phakathi kwe-OpenClaw namasevisi e-AI. Ngamazwi alula, i-OpenClaw idinga ukuxhumana ne-wall-vault kuphela, konke okunye okuyinkimbinkimbi i-wall-vault izokukusingatha.
+I-wall-vault igcina lawa makhadi okungena esikwhameni esiphephile, futhi isebenza njenge **mmeleli (proxy)** phakathi kwe-OpenClaw namasevisi e-AI. Ngokufingqiwe, i-OpenClaw idinga kuphela ukuxhumana ne-wall-vault, bese i-wall-vault ilungisa zonke ezinye izinto eziyinkimbinkimbi.
 
 Izinkinga i-wall-vault ezixazululayo:
 
-- **Ukushintshashintsha Okhiye be-API Ngokuzenzakalela**: Uma ukhiye owodwa ufinyelela umkhawulo noma uvinjwa okwesikhashana (cooldown), ishintsha ngokuthula kuya kukhiye olandelayo. I-OpenClaw iqhubeka isebenza ngaphandle kokuphazamiseka.
-- **Ukushintsha Amasevisi Ngokuzenzakalela (Fallback)**: Uma i-Google ingaphenduli, ishintshela ku-OpenRouter, nalokho kungasebenzi, ishintshela ku-Ollama/LM Studio/vLLM (i-AI yendawo) efakwe kukhompuyutha yakho. Iseshini ayiphuki. Uma isevisi yokuqala ibuya, izicelo ezilandelayo zibuyela ngokuzenzakalela (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Ukuvumelanisa Ngesikhathi Sangempela (SSE)**: Uma ushintsha imodeli kudashubhodi ye-vault, ibonakala kusikrini se-OpenClaw phakathi kwamasekhondi angu-1-3. I-SSE (Server-Sent Events) ubuchwepheshe lapho iseva isunduza izinguquko kumakhasimende ngesikhathi sangempela.
-- **Izaziso Zangempela**: Izehlakalo ezinjengokuphela kokhiye noma ukwehluleka kwesevisi ziboniswa ngokushesha ngezansi kwe-TUI (isikrini setheminali) ye-OpenClaw.
+- **Ukuzungeza kwe-API Key Ngokuzenzakalela**: Uma ukusetshenziswa kokhiye oyedwa kufinyelela umkhawulo noma kuvinjelwa isikhashana (cooldown), kushintsha ngokuthulile kuye kokhiye olandelayo. I-OpenClaw iyaqhubeka ukusebenza ngaphandle kokuphazanyiswa.
+- **Ukushintsha Kwesevisi Ngokuzenzakalela (Fallback)**: Uma i-Google ingaphenduli, kushintshela ku-OpenRouter, futhi uma nalokho kungasebenzi, kushintshela ngokuzenzakalela ku-Ollama·LM Studio·vLLM (i-AI yendawo) efakwe kukhompyutha yakho. Iseshini ayiphuki. Uma isevisi yasekuqaleni ibuyela, izicelo ezilandelayo zibuyela ngokuzenzakalela (v0.1.18+, LM Studio/vLLM: v0.1.21+).
+- **Ukuvumelana Kwesikhathi Samanje (SSE)**: Uma ushintsha imodeli ku-dashboard yesikhwama, ivela kusikrini se-OpenClaw ngaphakathi kwamasekhondi angu-1-3. I-SSE (Server-Sent Events) ingubuchwepheshe lapho iseva idudulela izinguquko kumklayenti ngesikhathi samanje.
+- **Izaziso Zesikhathi Samanje**: Izehlakalo njengokuphela kokhiye noma ukwehluleka kwesevisi zivela ngokushesha ngaphansi kwesikrini se-OpenClaw TUI (isikrini setheminali).
 
-> 💡 **I-Claude Code, i-Cursor, i-VS Code** nazo zingaxhunyaniswa, kodwa inhloso yokuqala ye-wall-vault ukusetshenziswa ne-OpenClaw.
+> 💡 **I-Claude Code, Cursor, VS Code** nazo zingaxhunyaniswa, kodwa inhloso yokuqala ye-wall-vault ukusetshenziswa ne-OpenClaw.
 
 ```
-OpenClaw (TUI isikrini setheminali)
+OpenClaw (Isikrini Setheminali ye-TUI)
         │
         ▼
-  wall-vault proxy (:56244)   ← ukuphatha okhiye, ukuqondisa, i-fallback, izehlakalo
+  wall-vault Proxy (:56244)   ← Ukuphatha okhiye, ukuqondisa, fallback, izehlakalo
         │
         ├─ Google Gemini API
         ├─ OpenRouter API (amamodeli angu-340+)
-        ├─ Ollama / LM Studio / vLLM (ikhompuyutha yakho, isiphephelo sokugcina)
+        ├─ Ollama / LM Studio / vLLM (ikhompyutha yakho, isiphephelo sokugcina)
         └─ OpenAI / Anthropic API
 ```
 
 ---
 
-## Ukufakela
+## Ukufakwa
 
 ### Linux / macOS
 
-Vula itheminali ubese unamathisela imiyalo engezansi.
+Vula itheminali uphinde unamathisele imiyalo elandelayo njengoba injalo.
 
 ```bash
-# Linux (i-PC evamile, iseva — amd64)
+# Linux (PC ejwayelekile, iseva — amd64)
 curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
   -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
 
@@ -67,8 +67,8 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
   -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
 ```
 
-- `curl -L ...` — Ilanda ifayili ku-inthanethi.
-- `chmod +x` — Yenza ifayili elandiwe "ikwazi ukusebenza". Uma udlula le sinyathelo, uzothola iphutha elithi "awunalo imvume".
+- `curl -L ...` — Ilanda ifayela ku-inthanethi.
+- `chmod +x` — Yenza ifayela elilandiwe "likwazi ukusebenza". Uma weqa lesi sinyathelo, uzothola iphutha lokuthi "imvume yenqatshiwe".
 
 ### Windows
 
@@ -80,15 +80,15 @@ Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
   -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
 
-# Engeza ku-PATH (isebenza ngemuva kokuqala kabusha i-PowerShell)
+# Engeza ku-PATH (isebenza ngemva kokuqala kabusha i-PowerShell)
 $env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
 ```
 
-> 💡 **Yini i-PATH?** Uhlu lwamafolda lapho ikhompuyutha ifuna khona imiyalo. Udinga ukungeza ku-PATH ukuze ukwazi ukuthayipha `wall-vault` bese uyisebenzisa kunoma iliphi ifolda.
+> 💡 **Yini i-PATH?** Yuhlu lwamafolda lapho ikhompyutha ifuna khona imiyalo. Udinga ukuyengeza ku-PATH ukuze ukwazi ukusebenzisa `wall-vault` kunoma yiliphi ifolda.
 
-### Ukwakha Kusuka Kumthombo Wekhodi (okwabathuthukisi)
+### Ukwakha Kusukela Kumthombo (Ngabathuthukisi)
 
-Lokhu kusebenza kuphela uma unemvelo yokuthuthukisa yolimi lwe-Go efakiwe.
+Lokhu kusebenza kuphela uma unemvelo yokuthuthukisa yolimi lwe-Go.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
@@ -97,38 +97,38 @@ make build       # bin/wall-vault (inguqulo: v0.1.25.YYYYMMDD.HHmmss)
 make install     # ~/.local/bin/wall-vault
 ```
 
-> 💡 **Inguqulo yesitembu sesikhathi sokwakha**: Uma wakha nge-`make build`, inguqulo izakhiwa ngokuzenzakalela ngefomethi ehlanganisa usuku nesikhathi njengo-`v0.1.25.20260408.022325`. Uma wakha ngokuqondile nge-`go build ./...`, inguqulo izoboniswa njengo-`"dev"` kuphela.
+> 💡 **Inguqulo Yesitembu Sesikhathi Sokwakha**: Uma wakha nge-`make build`, inguqulo ikhiqizwa ngokuzenzakalela ngefomethi ehlanganisa usuku·isikhathi njenge-`v0.1.27.20260409`. Uma wakha ngokuqondile nge-`go build ./...`, inguqulo ivela kuphela njenge-`"dev"`.
 
 ---
 
 ## Ukuqala Okokuqala
 
-### Ukusebenzisa I-Setup Wizard
+### Ukusebenzisa umthakathi we-setup
 
-Ngemuva kokufakela, qiniseka ukusebenzisa **i-wizard yokusetha** ngomyalo olandelayo. I-wizard izokubuza imibuzo ngayinye ngayinye bese ikuqondisa.
+Ngemva kokufaka, qiniseka ukusebenzisa **umthakathi wokusetha** ngomyalo ongezansi kuqala. Umthakathi uzokuhola ngokukubuza izinto ezidingekayo ngayinye ngayinye.
 
 ```bash
 wall-vault setup
 ```
 
-Izinyathelo i-wizard ezilandelayo yilezi:
+Izinyathelo umthakathi azidlulayo yilezi:
 
 ```
-1. Khetha ulimi (izilimi ezingu-10 kuhlanganisa isiZulu)
+1. Khetha ulimi (izilimi ezingu-10 okuhlanganisa isiZulu)
 2. Khetha indikimba (light / dark / gold / cherry / ocean)
-3. Imodi yokusebenza — khetha ukuthi uzosebenzisa wedwa (standalone) noma kumishini eminingi (distributed)
-4. Faka igama le-bot — igama elizoboniswa kudashubhodi
-5. Izilungiselelo zechweba — okuzenzakalelayo: proxy 56244, vault 56243 (cindezela Enter uma ungadingi ukushintsha)
+3. Imodi yokusebenza — khetha ukuthi uzosebenzisa wedwa (standalone) noma kumashini amaningi (distributed)
+4. Faka igama le-bot — igama elizovela ku-dashboard
+5. Ukusetha iphothi — okuzenzakalelayo: proxy 56244, vault 56243 (cindezela u-Enter nje uma ungadingi ukushintsha)
 6. Khetha amasevisi e-AI — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Izilungiselelo zesihlungi samathuluzi okuphepha
-8. Setha ithokheni yomphathi — iphasiwedi yokukhiya izici zokuphatha zedashubhodi. Ungakwazi futhi ukuyenza ngokuzenzakalela
-9. Setha iphasiwedi yokubhala ngekhodi ukhiye we-API — uma ufuna ukugcina okhiye ngokuphephile okwengeziwe (okungenasidingo)
-10. Indlela yokugcina ifayili yezilungiselelo
+7. Ukusetha isihlungi samathuluzi okuphepha
+8. Setha ithokheni yomphathi — iphasiwedi yokuvala izici zokuphatha ze-dashboard. Ingakhiqizwa ngokuzenzakalela
+9. Setha iphasiwedi yokubethela i-API key — uma ufuna ukugcina okhiye ngokuphepha okwengeziwe (ukukhetha)
+10. Umzila wokugcina ifayela lokusetha
 ```
 
-> ⚠️ **Qiniseka ukukhumbula ithokheni yomphathi.** Uzoyidinga kamuva uma ungeza okhiye noma ushintsha izilungiselelo kudashubhodi. Uma uyilahla, uzodinga ukuhlela ifayili yezilungiselelo ngokuqondile.
+> ⚠️ **Qiniseka uyikhumbula ithokheni yomphathi.** Uzoyidinga kamuva uma wengeza okhiye noma ushintsha izilungiselelo ku-dashboard. Uma uyilahlekelwa, uzodinga ukuhlela ngokuqondile ifayela lokusetha.
 
-Ngemuva kokuqeda i-wizard, ifayili yezilungiselelo ethi `wall-vault.yaml` izakhiwa ngokuzenzakalela.
+Uma umthakathi eseqedile, ifayela lokusetha `wall-vault.yaml` likhiqizwa ngokuzenzakalela.
 
 ### Ukusebenzisa
 
@@ -136,22 +136,22 @@ Ngemuva kokuqeda i-wizard, ifayili yezilungiselelo ethi `wall-vault.yaml` izakhi
 wall-vault start
 ```
 
-Amaseva amabili aqala ngesikhathi esisodwa:
+Amaseva amabili aqala ngesikhathi esifanayo:
 
-- **I-Proxy** (`http://localhost:56244`) — ummeleli oxhuma i-OpenClaw namasevisi e-AI
-- **Isikhwama Sokhiye** (`http://localhost:56243`) — ukuphatha ukhiye we-API nedashubhodi yewebhu
+- **I-Proxy** (`http://localhost:56244`) — Ummeleli oxhumanisa i-OpenClaw namasevisi e-AI
+- **I-Key Vault** (`http://localhost:56243`) — Ukuphatha i-API key ne-dashboard yewebhu
 
-Vula `http://localhost:56243` kubhrawuza yakho ukuze ubone idashubhodi ngokushesha.
+Vula `http://localhost:56243` kubhrawuza yakho ukuze ubone i-dashboard ngokushesha.
 
 ---
 
-## Ukubhalisa Ukhiye we-API
+## Ukubhalisa i-API Key
 
-Kunezindlela ezine zokubhalisa ukhiye we-API. **Kwabaqalayo, Indlela 1 (izinguquko zemvelo) iyatuswa**.
+Kukhona izindlela ezine zokubhalisa i-API key. **Ngabaqalayo, iNdlela 1 (okuguquguquka kwemvelo) inconywa**.
 
-### Indlela 1: Izinguquko Zemvelo (Ituswa — Elula Kakhulu)
+### Indlela 1: Okuguquguquka Kwemvelo (Kunconywa — Kulula Kakhulu)
 
-Izinguquko zemvelo **amanani asethwe ngaphambili** uhlelo oluwafundayo uma luqala. Thayipha kutheminali kanje.
+Okuguquguquka kwemvelo **amanani asethwe ngaphambili** uhlelo olufundayo uma luqala. Faka okulandelayo kutheminali.
 
 ```bash
 # Bhalisa ukhiye we-Google Gemini
@@ -160,27 +160,27 @@ export WV_KEY_GOOGLE=AIzaSy...
 # Bhalisa ukhiye we-OpenRouter
 export WV_KEY_OPENROUTER=sk-or-v1-...
 
-# Sebenzisa ngemuva kokubhalisa
+# Sebenzisa ngemva kokubhalisa
 wall-vault start
 ```
 
-Uma unokhiye abaningi, baxhume ngokhefana (,). i-wall-vault izosebenzisa okhiye ngokulandelana ngokuzenzakalela (round robin):
+Uma unokhiye abaningi, bahlanganise ngokhefana (,). I-wall-vault izobaphendukisela ngokuzenzakalela (round robin):
 
 ```bash
 export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 ```
 
-> 💡 **Icebiso**: Umyalo ka-`export` usebenza kuphela kwiseshini yetheminali yamanje. Ukuze uqhubeke ngisho ngemuva kokuqala kabusha ikhompuyutha, engeza lo mqolo kufayili ye-`~/.bashrc` noma `~/.zshrc`.
+> 💡 **Iseluleko**: Umyalo we-`export` usebenza kuphela kuseshini yamanje yetheminali. Ukuze uqhubeke ngisho nangemva kokuqala kabusha ikhompyutha, engeza lo mugqa kufayela `~/.bashrc` noma `~/.zshrc`.
 
-### Indlela 2: Idashubhodi ye-UI (Cindezela Ngemawusi)
+### Indlela 2: I-UI ye-Dashboard (Cindezela Ngemawusi)
 
-1. Vakashela `http://localhost:56243` kubhrawuza
-2. Ekhadini ye-**🔑 Okhiye be-API** phezulu, cindezela inkinobho ka-`[+ Engeza]`
-3. Faka uhlobo lwesevisi, inani lokhiye, ilebula (igama lokukhumbuza), nomkhawulo wansuku zonke, bese ugcina
+1. Vula `http://localhost:56243` kubhrawuza
+2. Cindezela inkinobho ye-`[+ Engeza]` ekhadini le-**🔑 API Key** ngaphezulu
+3. Faka uhlobo lwesevisi, inani lokhiye, ilebuli (igama lesikhumbuzo), nomkhawulo wansuku langa bese ugcina
 
-### Indlela 3: I-REST API (Yokuzenzakalela/Yemibhalo)
+### Indlela 3: I-REST API (Ngokuzenzakalela·Amaskripti)
 
-I-REST API indlela lapho izinhlelo zishintshana khona idatha nge-HTTP. Iwusizo ekubhaliseni ngokuzenzakalela ngemibhalo.
+I-REST API yindlela izinhlelo ezishintshanisa ngayo idatha nge-HTTP. Iwusizo ngokubhaliswa okuzenzakalelayo ngamaskripti.
 
 ```bash
 curl -X POST http://localhost:56243/admin/keys \
@@ -194,9 +194,9 @@ curl -X POST http://localhost:56243/admin/keys \
   }'
 ```
 
-### Indlela 4: Amafulegi e-Proxy (Yokuhlola Okwesikhashana)
+### Indlela 4: Ifulegi ye-proxy (Ukuhlola Okwesikhashana)
 
-Isetshenziselwa uma ufuna ukuhlola okwesikhashana ngaphandle kokubhalisa ngokusemthethweni. Inyamalala uma ucima uhlelo.
+Sebenzisa lokhu uma ufuna ukufaka ukhiye wesikhashana wokuhlola ngaphandle kokubhalisa okusemthethweni. Ukhiye unyamalala uma uvala uhlelo.
 
 ```bash
 wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
@@ -204,13 +204,13 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 
 ---
 
-## Ukusebenzisa i-Proxy
+## Indlela Yokusebenzisa i-Proxy
 
-### Ukusebenziswa Ne-OpenClaw (Inhloso Enkulu)
+### Ukusebenzisa ne-OpenClaw (Inhloso Enkulu)
 
-Indlela yokulungisa i-OpenClaw ukuze ixhume namasevisi e-AI nge-wall-vault.
+Nansi indlela yokusetha i-OpenClaw ukuze ixhumane namasevisi e-AI nge-wall-vault.
 
-Vula ifayili ye-`~/.openclaw/openclaw.json` bese wengeza okuqukethwe okulandelayo:
+Vula ifayela `~/.openclaw/openclaw.json` bese wengeza okuqukethwe okulandelayo:
 
 ```json5
 // ~/.openclaw/openclaw.json
@@ -219,12 +219,12 @@ Vula ifayili ye-`~/.openclaw/openclaw.json` bese wengeza okuqukethwe okulandelay
     providers: {
       "wall-vault": {
         baseUrl: "http://localhost:56244/v1",
-        apiKey: "your-agent-token",   // ithokheni ye-agent ye-vault
+        apiKey: "your-agent-token",   // ithokheni yommeleli we-vault
         api: "openai-completions",
         models: [
           { id: "wall-vault/gemini-2.5-flash" },
           { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // i-context ye-1M yamahhala
+          { id: "wall-vault/hunter-alpha" },    // 1M context yamahhala
           { id: "wall-vault/claude-opus-4-6" }
         ]
       }
@@ -233,28 +233,28 @@ Vula ifayili ye-`~/.openclaw/openclaw.json` bese wengeza okuqukethwe okulandelay
 }
 ```
 
-> 💡 **Indlela Elula Kakhulu**: Cindezela inkinobho ethi **🦞 Kopisha Izilungiselelo ze-OpenClaw** ekhadini ye-agent kudashubhodi bese isiniphethi esineithokheni nekheli esigcwalisiwe kakade sikopishelwa kubhodi lokunamathisela. Namathisela nje.
+> 💡 **Indlela Elula Kakhulu**: Cindezela inkinobho ye-**🦞 Kopisha Ukusetha kwe-OpenClaw** ekhadini lommeleli ku-dashboard bese i-snippet enethokheni nekheli esivele igcwalisiwe ikopishelwa ku-clipboard. Namathisela nje.
 
-**`wall-vault/` ngaphambi kwegama lemodeli iqondiswa kuphi?**
+**`wall-vault/` ngaphambi kwegama lemodeli iqondisaphi?**
 
-i-wall-vault inquma ngokuzenzakalela ukuthi iliphi isevisi ye-AI ezolisebenzisa ngokusekelwe egameni lemodeli:
+Ngokubheka igama lemodeli, i-wall-vault inquma ngokuzenzakalela yiliphi isevisi le-AI elizothumelela isicelo:
 
-| Ifomethi Yemodeli | Isevisi Exhunywayo |
+| Ifomethi Yemodeli | Isevisi Exhunyiwe |
 |----------|--------------|
-| `wall-vault/gemini-*` | Ukuxhuma ngokuqondile ne-Google Gemini |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | Ukuxhuma ngokuqondile ne-OpenAI |
-| `wall-vault/claude-*` | Ukuxhuma ne-Anthropic nge-OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (amathokheni e-context angusigidi elingu-1 amahhala) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | Ukuxhuma ne-OpenRouter |
-| `google/igama-lemodeli`, `openai/igama-lemodeli`, `anthropic/igama-lemodeli` njll. | Ukuxhuma ngokuqondile nesevisi efanele |
-| `custom/google/igama-lemodeli`, `custom/openai/igama-lemodeli` njll. | Ingxenye ka-`custom/` isuswa bese kuqondiswa kabusha |
-| `igama-lemodeli:cloud` | Ingxenye ye-`:cloud` isuswa bese kuxhunyaniswa ne-OpenRouter |
+| `wall-vault/gemini-*` | Google Gemini ngokuqondile |
+| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI ngokuqondile |
+| `wall-vault/claude-*` | Anthropic nge-OpenRouter |
+| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (1 miliyoni yama-token yamahhala) |
+| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
+| `google/igama-lemodeli`, `openai/igama-lemodeli`, `anthropic/igama-lemodeli` njll. | Ukuxhuma ngokuqondile nesevisi efanelekile |
+| `custom/google/igama-lemodeli`, `custom/openai/igama-lemodeli` njll. | Susa ingxenye ye-`custom/` bese uqondisa kabusha |
+| `igama-lemodeli:cloud` | Susa ingxenye ye-`:cloud` bese uxhuma ne-OpenRouter |
 
-> 💡 **Yini i-context?** Isilinganiso sengxoxo i-AI ekwazi ukuyikhumbula ngesikhathi esisodwa. 1M (amathokheni ayisigidi elingu-1) kusho ukuthi ingxoxo ende kakhulu noma amadokhumenti amade angasingathwa ngesikhathi esisodwa.
+> 💡 **Yini i-Context (umongo)?** Yinani lengxoxo i-AI engalikhumbula ngesikhathi esisodwa. 1M (miliyoni yama-token) kusho ukuthi ingakwazi ukucubungula izingxoxo noma imibhalo emide kakhulu ngesikhathi esisodwa.
 
-### Ukuxhuma Ngokuqondile Ngefomethi ye-Gemini API (ukuhambelana namathuluzi akhona)
+### Ukuxhuma Ngokuqondile Ngefomethi ye-Gemini API (ukuhambisana namathuluzi akhona)
 
-Uma unamathuluzi abekade esebenzisa i-Google Gemini API ngokuqondile, shintsha ikheli kuphela ku-wall-vault:
+Uma unamathuluzi abesebenzisa i-Google Gemini API ngokuqondile, shintsha ikheli kuphela ku-wall-vault:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:56244/google
@@ -268,34 +268,34 @@ http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 
 ### Ukusebenzisa ne-OpenAI SDK (Python)
 
-Ungaxhuma futhi i-wall-vault kukhodi ye-Python esebenzisa i-AI. Shintsha `base_url` kuphela:
+Ungaxhuma futhi i-wall-vault kukhodi ye-Python esebenzisa i-AI. Shintsha kuphela `base_url`:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:56244/v1",
-    api_key="not-needed"  # i-wall-vault iphatha okhiye be-API ngokuzenzakalela
+    api_key="not-needed"  # i-wall-vault iphatha i-API key ngokuzenzakalela
 )
 
 response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # ifomethi yomhlinzeki/imodeli
+    model="google/gemini-2.5-flash",   # faka ngefomethi ye-provider/model
     messages=[{"role": "user", "content": "Sawubona"}]
 )
 ```
 
-### Ukushintsha Imodeli Ngesikhathi Kusebenzwa
+### Ukushintsha Imodeli Ngesikhathi Sokusebenza
 
-Ukushintsha imodeli ye-AI ngesikhathi i-wall-vault isasebenza:
+Ukushintsha imodeli ye-AI ngesikhathi i-wall-vault isisebenza:
 
 ```bash
-# Shintsha imodeli ngokucela ngokuqondile ku-proxy
+# Shintsha imodeli ngokucela i-proxy ngokuqondile
 curl -X PUT http://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
-# Kumodi eyahlukaniswayo (ama-bot amaningi), shintsha kuseva ye-vault → iboniswa ngokushesha nge-SSE
-curl -X PUT http://localhost:56243/admin/clients/i-id-ye-bot \
+# Kuyi-mode yokusabalalisa (multi bot), shintsha kuseva ye-vault → ivela ngokushesha nge-SSE
+curl -X PUT http://localhost:56243/admin/clients/id-yebot-yami \
   -H "Authorization: Bearer ithokheni-yomphathi" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -310,88 +310,88 @@ curl http://localhost:56244/api/models | python3 -m json.tool
 # Buka amamodeli e-Google kuphela
 curl "http://localhost:56244/api/models?service=google"
 
-# Sesha ngegama (isib.: amamodeli afaka "claude")
+# Sesha ngegama (isibonelo: amamodeli anokuthi "claude")
 curl "http://localhost:56244/api/models?q=claude"
 ```
 
-**Isifinyezo Samamodeli Asemqoka Ngesevisi:**
+**Isifinyezo Samamodeli Amakhulu Ngesevisi:**
 
-| Isevisi | Amamodeli Asemqoka |
+| Isevisi | Amamodeli Amakhulu |
 |--------|----------|
 | Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
 | OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M i-context yamahhala, DeepSeek R1/V3, Qwen 2.5 njll.) |
-| Ollama | Ithola ngokuzenzakalela iseva yendawo efakwe kukhompuyutha yakho |
-| LM Studio | Iseva yendawo kukhompuyutha yakho (ichweba 1234) |
-| vLLM | Iseva yendawo kukhompuyutha yakho (ichweba 8000) |
+| OpenRouter | 346+ (Hunter Alpha 1M context yamahhala, DeepSeek R1/V3, Qwen 2.5 njll.) |
+| Ollama | Ithola ngokuzenzakalela iseva yendawo efakwe kukhompyutha yakho |
+| LM Studio | Iseva yendawo yekhompyutha (iphothi 1234) |
+| vLLM | Iseva yendawo yekhompyutha (iphothi 8000) |
 
 ---
 
-## Idashubhodi ye-Vault
+## I-Dashboard ye-Key Vault
 
-Vakashela `http://localhost:56243` kubhrawuza ukuze ubone idashubhodi.
+Vula `http://localhost:56243` kubhrawuza yakho ukuze ubone i-dashboard.
 
 **Isakhiwo Sesikrini:**
-- **Ibha ephezulu ehlala njalo (topbar)**: Ilogo, isikhethi solimi nendikimba, isimo sokuxhuma se-SSE
-- **Igridi yamakhadi**: Amakhadi e-agent, isevisi, nokhiye we-API abekwe njengamathayili
+- **Ibha ephezulu ehleli (topbar)**: Ilogo, isikhethi solimi·sendikimba, isimo sokuxhuma kwe-SSE
+- **I-Grid Yamakhadi**: Amakhadi ommeleli·esevisi·e-API key ahlelelwe njengezitayela
 
-### Ikhadi Lokhiye we-API
+### Ikhadi le-API Key
 
-Ikhadi elikuvumela ukuphatha okhiye be-API ababhalisiwe ngokubuka okukodwa.
+Ikhadi lokuphatha okhiye be-API ababhalisiwe ngokushesha.
 
-- Libonisa uhlu lokhiye oluhlukaniswe ngesevisi.
-- `today_usage`: Inani lamathokheni aphumelele namuhla (inani lamalethi i-AI eliwafundile nalibhale)
-- `today_attempts`: Isamba sezingcingo namuhla (ukuphumelela + ukwehluleka)
-- Inkinobho ka-`[+ Engeza]` ukubhalisa ukhiye omusha, no-`✕` ukususa ukhiye.
+- Ibonisa uhlu lokhiye oluhlukaniswe ngesevisi.
+- `today_usage`: Inani lama-token (izinhlamvu i-AI ezifundile nezibhalile) ezisetshenziswe ngempumelelo namhlanje
+- `today_attempts`: Isamba samakholi namhlanje (impumelelo + ukwehluleka)
+- Bhalisa ukhiye omusha ngenkinobho ye-`[+ Engeza]`, bese ususa ukhiye nge-`✕`.
 
-> 💡 **Yini ithokheni?** Iyunithi i-AI eyisebenzisayo ukusingatha umbhalo. Cishe ilingana negama lesiNgisi elilodwa, noma izinhlamvu ezingu-1-2 zesiKorea. Izindleko ze-API ngokuvamile zibalwa ngokusekelwe kuleli nani lamathokheni.
+> 💡 **Yini i-Token?** Iyiyunithi esetshenziswa yi-AI uma icubungula umbhalo. Cishe yigama linye lesiNgisi, noma izinhlamvu ezingu-1-2 zezinye izilimi. Izindleko ze-API ngokuvamile zibalwa ngokwaleli nani lama-token.
 
-### Ikhadi Le-Agent
+### Ikhadi Lommeleli
 
-Ikhadi elibonisa isimo sama-bot (ama-agent) axhunywene ne-proxy ye-wall-vault.
+Ikhadi elibonisa isimo sama-bot (ababili) axhunyaniswe ne-proxy ye-wall-vault.
 
-**Isimo sokuxhuma siboniswa ngezigaba ezingu-4:**
+**Isimo sokuxhuma siboniswa ngamazinga angu-4:**
 
-| Ukuboniswa | Isimo | Incazelo |
+| Isibonakaliso | Isimo | Incazelo |
 |------|------|------|
-| 🟢 | Iyasebenza | I-proxy isebenza kahle |
-| 🟡 | Ibambezelekile | Iyaphendula kodwa kancane |
-| 🔴 | Ayikho ku-inthanethi | I-proxy ayiphenduli |
-| ⚫ | Ayixhunyiwe/Ivaliwe | I-proxy ayikaze ixhume ne-vault noma ivaliwe |
+| 🟢 | Iyasebenza | I-proxy isebenza ngokujwayelekile |
+| 🟡 | Ibambezelekile | Izimpendulo ziyeza kodwa ngokucotha |
+| 🔴 | Ayikho ku-Inthanethi | I-proxy ayiphenduli |
+| ⚫ | Ayixhunywanga·Ikhutshaziwe | I-proxy ayikaze ixhumane ne-vault noma ikhutshaziwe |
 
-**Isiqondiso Sezinkinobho Ngezansi Kwekhadi Le-Agent:**
+**Umhlahlandlela wamaqhosha ngaphansi kwekhadi lommeleli:**
 
-Uma ubhalisa i-agent bese ucacisa **uhlobo lwe-agent**, izinkinobho zokushesha ezihloselwe lolo hlobo zibonakala ngokuzenzakalela.
+Uma ucacisa **uhlobo lommeleli** uma ubhalisa ummeleli, amaqhosha okulula ahambisana nalolo hlobo avela ngokuzenzakalela.
 
 ---
 
-#### 🔘 Inkinobho Yokukopisha Izilungiselelo — Yenza izilungiselelo zokuxhuma ngokuzenzakalela
+#### 🔘 Iqhosha Lokukopisha Ukusetha — Lakha ukusetha kokuxhuma ngokuzenzakalela
 
-Uma ucindezela inkinobho, isiniphethi sezilungiselelo esineithokheni yalelo agent, ikheli le-proxy, nolwazi lwemodeli esigcwalisiwe kakade sikopishelwa kubhodi lokunamathisela. Namathisela nje okuqukethwe okukopishiwe endaweni eboniswe ethebuleni elingezansi ukuze uqedele ukusetha ukuxhuma.
+Uma ucindezela iqhosha, i-snippet yokusetha enethokheni yommeleli, ikheli le-proxy, nolwazi lwemodeli esivele igcwalisiwe ikopishelwa ku-clipboard. Namathisela okukopiwe endaweni eboniswe ethebuleni elingezansi ukuze uqedele ukusetha kokuxhuma.
 
-| Inkinobho | Uhlobo Lwe-Agent | Indawo Yokunamathisela |
+| Iqhosha | Uhlobo Lommeleli | Indawo Yokunamathisela |
 |------|-------------|-------------|
-| 🦞 Kopisha Izilungiselelo ze-OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 Kopisha Izilungiselelo ze-NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 Kopisha Izilungiselelo ze-Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⌨ Kopisha Izilungiselelo ze-Cursor | `cursor` | Cursor → Settings → AI |
-| 💻 Kopisha Izilungiselelo ze-VSCode | `vscode` | `~/.continue/config.json` |
+| 🦞 Kopisha Ukusetha kwe-OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| 🦀 Kopisha Ukusetha kwe-NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+| 🟠 Kopisha Ukusetha kwe-Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⌨ Kopisha Ukusetha kwe-Cursor | `cursor` | Cursor → Settings → AI |
+| 💻 Kopisha Ukusetha kwe-VSCode | `vscode` | `~/.continue/config.json` |
 
-**Isibonelo — Uma kunguhlobo lwe-Claude Code, okulandelayo kuzokopishwa:**
+**Isibonelo — Uma uhlobo luyiClaude Code, okuqukethwe okufana nalokhu kuyakopishwa:**
 
 ```json
 // ~/.claude/settings.json
 {
   "apiProvider": "openai",
   "baseUrl": "http://192.168.0.6:56244/v1",
-  "apiKey": "ithokheni-yaleli-agent"
+  "apiKey": "ithokheni-yalo-mmeleli"
 }
 ```
 
-**Isibonelo — Uma kunguhlobo lwe-VSCode (Continue):**
+**Isibonelo — Uma uhlobo luyi-VSCode (Continue):**
 
 ```yaml
-# ~/.continue/config.yaml  ← namathisela ku-config.yaml, hhayi config.json
+# ~/.continue/config.yaml  ← Namathisela ku-config.yaml, hhayi ku-config.json
 name: My Config
 version: 0.0.1
 schema: v1
@@ -401,223 +401,223 @@ models:
     provider: openai
     model: gemini-2.5-flash
     apiBase: http://192.168.0.6:56244/v1
-    apiKey: ithokheni-yaleli-agent
+    apiKey: ithokheni-yalo-mmeleli
     roles:
       - chat
       - edit
       - apply
 ```
 
-> ⚠️ **Inguqulo entsha ye-Continue isebenzisa `config.yaml`.** Uma `config.yaml` ikhona, `config.json` izoziwa ngokuphelele. Qiniseka ukuthi unamathisela ku-`config.yaml`.
+> ⚠️ **Inguqulo yakamuva ye-Continue isebenzisa `config.yaml`.** Uma `config.yaml` ikhona, `config.json` izitshalelwa ngokuphelele. Qiniseka unamathisela ku-`config.yaml`.
 
-**Isibonelo — Uma kunguhlobo lwe-Cursor:**
+**Isibonelo — Uma uhlobo luyiCursor:**
 
 ```
 Base URL : http://192.168.0.6:56244/v1
-API Key  : ithokheni-yaleli-agent
+API Key  : ithokheni-yalo-mmeleli
 
-// Noma izinguquko zemvelo:
+// Noma okuguquguquka kwemvelo:
 OPENAI_BASE_URL=http://192.168.0.6:56244/v1
-OPENAI_API_KEY=ithokheni-yaleli-agent
+OPENAI_API_KEY=ithokheni-yalo-mmeleli
 ```
 
-> ⚠️ **Uma ukukopisha kubhodi lokunamathisela kungasebenzi**: Inqubomgomo yokuphepha yebhrawuza ingavimba ukukopisha. Uma ibhokisi lombhalo livuleka njengesivivinyeli, sebenzisa Ctrl+A ukukhetha konke bese Ctrl+C ukukopisha.
+> ⚠️ **Ukukopisha ku-clipboard akusebenzi**: Izinqubomgomo zokuphepha zebhrawuza zingavimba ukukopisha. Uma ibhokisi lombhalo livela ku-popup, khetha konke nge-Ctrl+A bese ukopisha nge-Ctrl+C.
 
 ---
 
-#### ⚡ Inkinobho Yokusebenzisa Ngokuzenzakalela — Cindezela kanye bese ukusetha kuqediwe
+#### ⚡ Iqhosha Lokusebenzisa Ngokuzenzakalela — Cindezela kanye bese ukusetha kuqediwe
 
-Uma uhlobo lwe-agent lungu-`cline`, `claude-code`, `openclaw`, noma `nanoclaw`, inkinobho ethi **⚡ Sebenzisa Izilungiselelo** ibonakala ekhadini le-agent. Uma ucindezela le nkinobho, ifayili yezilungiselelo zendawo yalelo agent ibuyekezwa ngokuzenzakalela.
+Uma uhlobo lommeleli kungu-`cline`, `claude-code`, `openclaw`, noma `nanoclaw`, iqhosha le-**⚡ Sebenzisa Ukusetha** livela ekhadini lommeleli. Uma ucindezela leli qhosha, amafayela okusetha endawo ommeleli ofanelekile abuyekezwa ngokuzenzakalela.
 
-| Inkinobho | Uhlobo Lwe-Agent | Ifayili Eliqondiswe |
+| Iqhosha | Uhlobo Lommeleli | Ifayela Eliqondiswe |
 |------|-------------|-------------|
-| ⚡ Sebenzisa Izilungiselelo ze-Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ Sebenzisa Izilungiselelo ze-Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⚡ Sebenzisa Izilungiselelo ze-OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ Sebenzisa Izilungiselelo ze-NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Sebenzisa Ukusetha kwe-Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
+| ⚡ Sebenzisa Ukusetha kwe-Claude Code | `claude-code` | `~/.claude/settings.json` |
+| ⚡ Sebenzisa Ukusetha kwe-OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
+| ⚡ Sebenzisa Ukusetha kwe-NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
 
-> ⚠️ Le nkinobho ithumela isicelo ku-**localhost:56244** (i-proxy yendawo). I-proxy kufanele ibe isebenza kule mishini ukuze isebenze.
+> ⚠️ Leli qhosha lithumela isicelo ku-**localhost:56244** (i-proxy yendawo). I-proxy kufanele isebenze kuleyo mashini ukuze isebenze.
 
 ---
 
-#### 🔀 Ukuhlelela Amakhadi Ngokudonsela Nokuwehlisa (v0.1.17, kuthuthukisiwe v0.1.25)
+#### 🔀 Ukuhlelwa Kwamakhadi Ngokudonsa Nokudedela (v0.1.17, ithuthukisiwe v0.1.25)
 
-Ungakwazi **ukudonsela** amakhadi e-agent kudashubhodi ukuwahlelela kabusha ngokulandelana okufunayo.
+Ungadonsa amakhadi ommeleli ku-dashboard ukuze uwahlelele kabusha ngendlela oyifunayo.
 
-1. Bamba indawo ye-**signesha zezimoto (●)** phezulu kwesokunxele sekhadi ngemawusi bese udonsela
-2. Wehlisela ekhadini ofuna ukuya kulo bese ukulandelana kushintsha
+1. Bamba indawo ye-**thafikhilayithi (●)** phezulu kwesokunxele sekhadi ngemawusi bese udonsa
+2. Idedele phezu kwekhadi endaweni oyifunayo bese uhlelo lushintsha
 
-> 💡 Okuqukethwe kwekhadi (izindawo zokufaka, izinkinobho njll.) akudonseleki. Ungabamba kuphela endaweni yezignesha zezimoto.
+> 💡 Umzimba wekhadi (izindawo zokufaka, amaqhosha njll.) awudonseleki. Ungabamba kuphela endaweni yethafikhilayithi.
 
-#### 🟠 Ukuthola Inqubo Ye-Agent (v0.1.25)
+#### 🟠 Ukuthola Inqubo Yommeleli (v0.1.25)
 
-Uma i-proxy isebenza kahle kodwa inqubo ye-agent yendawo (NanoClaw, OpenClaw) ife, isignesha sekhadi ishintsha ibe **nsomi (iyacwazimula)** bese umyalezo othi "Inqubo ye-agent imile" uboniswa.
+Uma i-proxy isebenza ngokujwayelekile kodwa inqubo yommeleli wendawo (NanoClaw, OpenClaw) ifile, ithafikhilayithi yekhadi ishintsha iba **nsomi (imenyezela)** bese umyalezo othi "Inqubo yommeleli imile" uvela.
 
-- 🟢 Luhlaza: I-Proxy + i-agent kusebenza kahle
-- 🟠 Nsomi (iyacwazimula): I-proxy isebenza kahle, i-agent ifile
+- 🟢 Luhlaza: I-proxy + ummeleli ngokujwayelekile
+- 🟠 Nsomi (imenyezela): I-proxy ngokujwayelekile, ummeleli ufile
 - 🔴 Bomvu: I-proxy ayikho ku-inthanethi
-3. Ukulandelana okushintshiwe **kugcinwa kuseva ngokushesha** futhi kuhlala ngisho ngemuva kokuvuselela
+3. Uhlelo olushintshiwe **lugcinwa kuseva ngokushesha** futhi luhlala ngisho ngemva kokuvuselela ikhasi
 
-> 💡 Kumadivayisi okuthinta (iselula/ithebhulethi) akukasekelwa. Sebenzisa ibhrawuza yedeskthopu.
+> 💡 Kumadivayisi okuthinta (iselula/ithebhulethi) akukasekelwa okwamanje. Sebenzisa ibhrawuza yedeskhithopu.
 
 ---
 
-#### 🔄 Ukuvumelanisa Imodeli Nhlangothi Zombili (v0.1.16)
+#### 🔄 Ukuvumelana Kwemodeli Ngezinhlangothi Ezimbili (v0.1.16)
 
-Uma ushintsha imodeli ye-agent kudashubhodi ye-vault, izilungiselelo zendawo zalelo agent zibuyekezwa ngokuzenzakalela.
+Uma ushintsha imodeli yommeleli ku-dashboard ye-vault, ukusetha kwendawo kommeleli ofanelekile kubuyekezwa ngokuzenzakalela.
 
 **Nge-Cline:**
-- Uma imodeli ishintshwa ku-vault → Isehlakalo se-SSE → I-proxy ibuyekeza ingxenye yemodeli ku-`globalState.json`
-- Izimpokophelo zokubuyekeza: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` nokhiye we-API akuthintwa
-- **Ukuvuselela i-VS Code (`Ctrl+Alt+R` noma `Ctrl+Shift+P` → `Developer: Reload Window`) kuyadingeka**
-  - Ngoba i-Cline ayifundi kabusha ifayili yezilungiselelo ngesikhathi isebenza
+- Uma ushintsha imodeli ku-vault → isehlakalo se-SSE → i-proxy ibuyekeza inkambu yemodeli ku-`globalState.json`
+- Izinkambu ezibuyekezwayo: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
+- `openAiBaseUrl` ne-API key azithintwa
+- **Kudingeka ukuvuselela kabusha i-VS Code (`Ctrl+Alt+R` noma `Ctrl+Shift+P` → `Developer: Reload Window`)**
+  - Ngoba i-Cline ayifundi kabusha ifayela lokusetha ngesikhathi isebenza
 
 **Nge-Claude Code:**
-- Uma imodeli ishintshwa ku-vault → Isehlakalo se-SSE → I-proxy ibuyekeza ingxenye ye-`model` ku-`settings.json`
-- Isesha ngokuzenzakalela izindlela ze-WSL ne-Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
+- Uma ushintsha imodeli ku-vault → isehlakalo se-SSE → i-proxy ibuyekeza inkambu ye-`model` ku-`settings.json`
+- Isesha ngokuzenzakalela izindlela zikamabili ze-WSL ne-Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
 
-**Inhlangothi Ehlehliselayo (i-agent → i-vault):**
-- Uma i-agent (Cline, Claude Code njll.) ithumela isicelo ku-proxy, i-proxy ifaka ulwazi lwesevisi/imodeli yekhasimende ku-heartbeat
-- Isevisi/imodeli esetshenziswa njengamanje iboniswa ngesikhathi sangempela ekhadini le-agent kudashubhodi ye-vault
+**Uhlangothi Olubuyayo (ummeleli → vault):**
+- Uma ummeleli (Cline, Claude Code njll.) ethumela isicelo ku-proxy, i-proxy ifaka ulwazi lwesevisi·lwemodeli yomklayenti ofanelekile ku-heartbeat
+- Isevisi/imodeli esetshenziswa manje ivela ngesikhathi samanje ekhadini lommeleli ku-dashboard ye-vault
 
-> 💡 **Okubalulekile**: I-proxy ibona i-agent ngethokheni ye-Authorization yesicelo, bese iqondisa ngokuzenzakalela kusevisi/imodeli esethwe ku-vault. Ngisho noma i-Cline noma i-Claude Code ithumela igama lemodeli elihlukile, i-proxy ibeka phezu kwayo ngezilungiselelo ze-vault.
+> 💡 **Okubalulekile**: I-proxy ihlonza ummeleli ngethokheni ye-Authorization yesicelo, futhi iqondisa ngokuzenzakalela kusevisi/imodeli esethwe ku-vault. Ngisho noma i-Cline noma i-Claude Code ithumela igama lemodeli elihlukile, i-proxy iyabaphambukisa ngokusetha kwe-vault.
 
 ---
 
-### Ukusebenzisa i-Cline ku-VS Code — Umhlahlandlela Ogcwele
+### Ukusebenzisa i-Cline ku-VS Code — Umhlahlandlela Ophelele
 
 #### Isinyathelo 1: Faka i-Cline
 
-Faka **i-Cline** (ID: `saoudrizwan.claude-dev`) kusuka emakethe yezandiso ye-VS Code.
+Faka i-**Cline** (ID: `saoudrizwan.claude-dev`) kusuka e-VS Code Extension Marketplace.
 
-#### Isinyathelo 2: Bhalisa I-Agent ku-Vault
+#### Isinyathelo 2: Bhalisa Ummeleli ku-Vault
 
-1. Vula idashubhodi ye-vault (`http://IP-ye-vault:56243`)
-2. Esigabeni sika-**Ama-Agent**, cindezela **+ Engeza**
-3. Faka okulandelayo:
+1. Vula i-dashboard ye-vault (`http://IP-ye-vault:56243`)
+2. Cindezela **+ Engeza** esigabeni saba-**Mmeleli**
+3. Faka njengokulandelayo:
 
 | Inkambu | Inani | Incazelo |
 |------|----|------|
-| ID | `i_cline_yami` | Isibonisi esiyingqayizivele (isiNgisi, ngaphandle kwezikhala) |
-| Igama | `I-Cline Yami` | Igama elizoboniswa kudashubhodi |
-| Uhlobo Lwe-Agent | `cline` | ← Kufanele ukhethe `cline` |
-| Isevisi | Khetha isevisi ozoyisebenzisa (isib.: `google`) | |
-| Imodeli | Faka imodeli ozoyisebenzisa (isib.: `gemini-2.5-flash`) | |
+| ID | `cline_yami` | Isihlonzi esiyingqayizivele (isiNgisi, ngaphandle kwezikhala) |
+| Igama | `Cline Yami` | Igama elizovela ku-dashboard |
+| Uhlobo Lommeleli | `cline` | ← Kufanele ukhethe `cline` |
+| Isevisi | Khetha isevisi (isibonelo: `google`) | |
+| Imodeli | Faka imodeli (isibonelo: `gemini-2.5-flash`) | |
 
-4. Cindezela **Gcina** bese ithokheni yenziwa ngokuzenzakalela
+4. Cindezela **Gcina** bese ithokheni ikhiqizwa ngokuzenzakalela
 
-#### Isinyathelo 3: Xhuma Ku-Cline
+#### Isinyathelo 3: Xhuma ne-Cline
 
-**Indlela A — Ukusebenzisa Ngokuzenzakalela (Ituswa)**
+**Indlela A — Ukusebenzisa Ngokuzenzakalela (Kunconywa)**
 
-1. Qiniseka ukuthi i-**proxy** ye-wall-vault iyasebenza kule mishini (`localhost:56244`)
-2. Cindezela inkinobho ethi **⚡ Sebenzisa Izilungiselelo ze-Cline** ekhadini le-agent kudashubhodi
-3. Uma isaziso esithi "Izilungiselelo zisetshenzisiwe!" sibonakala, kuphumelele
-4. Vuselela i-VS Code (`Ctrl+Alt+R`)
+1. Qiniseka ukuthi **i-proxy** ye-wall-vault iyasebenza kuleyo mashini (`localhost:56244`)
+2. Cindezela iqhosha le-**⚡ Sebenzisa Ukusetha kwe-Cline** ekhadini lommeleli ku-dashboard
+3. Uma ubona isaziso esithi "Ukusetha kusetshenziswe ngempumelelo!" kuphumelele
+4. Vuselela kabusha i-VS Code (`Ctrl+Alt+R`)
 
 **Indlela B — Ukusetha Ngesandla**
 
-Vula izilungiselelo (⚙️) kubha yaseceleni ye-Cline bese usetha:
+Vula izilungiselelo (⚙️) kubha yesokunxele ye-Cline:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://ikheli-le-proxy:56244/v1`
-  - Kule mishini efanayo: `http://localhost:56244/v1`
-  - Kumishini enye njenge-Mini server: `http://192.168.0.6:56244/v1`
-- **API Key**: Ithokheni ekhishwe ku-vault (kopisha ekhadini le-agent)
-- **Model ID**: Imodeli esethwe ku-vault (isib.: `gemini-2.5-flash`)
+  - Imashini efanayo: `http://localhost:56244/v1`
+  - Enye imashini njenge-mini server: `http://192.168.0.6:56244/v1`
+- **API Key**: Ithokheni etholwe ku-vault (kopisha ekhadini lommeleli)
+- **Model ID**: Imodeli esethwe ku-vault (isibonelo: `gemini-2.5-flash`)
 
 #### Isinyathelo 4: Qinisekisa
 
-Thumela noma imuphi umyalezo engxoxweni ye-Cline. Uma konke kulungile:
-- **Uphawu oluluhlaza (● Iyasebenza)** lubonakala ekhadini le-agent kudashubhodi ye-vault
-- Isevisi/imodeli yamanje iboniswa ekhadini (isib.: `google / gemini-2.5-flash`)
+Thumela noma yimuphi umyalezo engxoxweni ye-Cline. Uma kujwayelekile:
+- Iqhaza **eliluhlaza (● Iyasebenza)** lizovela ekhadini lommeleli elifanelekile ku-dashboard ye-vault
+- Isevisi/imodeli yamanje ivela ekhadini (isibonelo: `google / gemini-2.5-flash`)
 
 #### Ukushintsha Imodeli
 
-Uma ufuna ukushintsha imodeli ye-Cline, yishintshe ku-**dashubhodi ye-vault**:
+Uma ufuna ukushintsha imodeli ye-Cline, shintsha ku-**dashboard ye-vault**:
 
-1. Shintsha ukukhetha kwesevisi/imodeli ekhadini le-agent
+1. Shintsha isevisi/imodeli kumenyu yokudonsa yekhadi lommeleli
 2. Cindezela **Sebenzisa**
-3. Vuselela i-VS Code (`Ctrl+Alt+R`) — igama lemodeli kuphansi kwe-Cline lizobuyekezwa
-4. Imodeli entsha izosetshenziswa kusukela esiclelweni esilandelayo
+3. Vuselela kabusha i-VS Code (`Ctrl+Alt+R`) — igama lemodeli ezansi kwe-Cline lizobuyekezwa
+4. Imodeli entsha izosetshenziswa kusukela esiceli esilandelayo
 
-> 💡 Eqinisweni, i-proxy ibona isicelo se-Cline ngethokheni bese iqondisa kumodeli yezilungiselelo ze-vault. Ngisho ngaphandle kokuvuselela i-VS Code, **imodeli okusetshenziswa yona ngempela ishintsha ngokushesha** — ukuvuselela kungokokubuyekeza ukuboniswa kwemodeli ku-UI ye-Cline kuphela.
+> 💡 Eqinisweni, i-proxy ihlonza isicelo se-Cline ngethokheni bese isiqondisa kumodeli yokusetha ye-vault. Ngisho noma ungayivuseleli kabusha i-VS Code, **imodeli esetshenziswa ishintsha ngokushesha** — ukuvuselela kabusha kungokubuyekeza isiboniso semodeli ku-UI ye-Cline.
 
 #### Ukuthola Ukuphuka Kokuxhuma
 
-Uma uvala i-VS Code, ikhadi le-agent kudashubhodi ye-vault lishintsha libe phuzi (ibambezelekile) ngemuva kwamasekhondi angama-**90**, bese liba bomvu (ayikho ku-inthanethi) ngemuva kwe-**mizuzu engu-3**. (Kusukela ku-v0.1.18, ukuhlola isimo ngamasekhondi angu-15 kwenza ukuthola ukungabikhona ku-inthanethi kusheshe kakhulu.)
+Uma uvala i-VS Code, ikhadi lommeleli ku-dashboard ye-vault lizoshintsha libe phuzi (libambezelekile) ngemva cishe **kwamasekhondi angu-90**, libe bomvu (alikho ku-inthanethi) ngemva **kwemizuzu engu-3**. (Kusukela ku-v0.1.18, ukuhlolwa kwesimo njalo ngamasekhondi angu-15 kwasheshisa ukutholwa kwesimo sokungabi ku-inthanethi.)
 
 #### Ukuxazulula Izinkinga
 
-| Isimpthomu | Imbangela | Isixazululo |
+| Isibonakaliso | Imbangela | Isixazululo |
 |------|------|------|
-| Iphutha lokuthi "ukuxhuma kwehlulekile" ku-Cline | I-proxy ayisebenzi noma ikheli asilona | Qinisekisa i-proxy nge-`curl http://localhost:56244/health` |
-| Uphawu oluluhlaza alubonakali ku-vault | Ukhiye we-API (ithokheni) awusethiwe | Cindezela inkinobho ethi **⚡ Sebenzisa Izilungiselelo ze-Cline** futhi |
-| Imodeli ngezansi kwe-Cline ayishintshi | I-Cline igcina izilungiselelo kwi-cache | Vuselela i-VS Code (`Ctrl+Alt+R`) |
-| Igama lemodeli elingalungile liboniswa | Iphutha elidala (lilungiswe ku-v0.1.16) | Buyekeza i-proxy kuya ku-v0.1.16 nangaphezulu |
+| Iphutha lokuthi "Ukuxhuma kwehlulekile" ku-Cline | I-proxy ayisebenzi noma ikheli alifanele | Hlola i-proxy nge-`curl http://localhost:56244/health` |
+| Iqhaza eliluhlaza aliveli ku-vault | I-API key (ithokheni) ayisethwanga | Cindezela iqhosha le-**⚡ Sebenzisa Ukusetha kwe-Cline** futhi |
+| Imodeli ezansi kwe-Cline ayishintshi | I-Cline igcina ukusetha ku-cache | Vuselela kabusha i-VS Code (`Ctrl+Alt+R`) |
+| Igama lemodeli elingalungile livela | Iphutha lakudala (lalungiswa ku-v0.1.16) | Buyekeza i-proxy ku-v0.1.16 noma ngaphezulu |
 
 ---
 
-#### 🟣 Inkinobho Yokukopisha Umyalo Wokuthumela — Isetshenziselwa uma ufakela kumshini omusha
+#### 🟣 Iqhosha Lokukopisha Umyalo Wokusabalalisa — Lisetshenziswa uma ufaka kumashini entsha
 
-Isetshenziselwa uma ufaka i-proxy ye-wall-vault okokuqala kumshini omusha bese uyixhuma ne-vault. Uma ucindezela inkinobho, isikripthi sonke sokufakela sikopishwa. Sinamathisele kutheminali yekhompuyutha entsha bese uyisisebenzisa, bese okulandelayo kushingathwa ngesikhathi esisodwa:
+Lisetshenziswa uma ufaka i-proxy ye-wall-vault kukhompyutha entsha nokuyixhuma ne-vault okokuqala. Cindezela iqhosha bese iskripti sonke sokufaka siyakopishwa. Namathisela bese usisebenzisa kutheminali yekhompyutha entsha bese okulandelayo kusingathwa ngesikhathi esisodwa:
 
-1. Faka i-binary ye-wall-vault (iyekwa uma isifakiwe kakade)
-2. Bhalisa isevisi yomsebenzi ye-systemd ngokuzenzakalela
-3. Qala isevisi bese uxhuma ne-vault ngokuzenzakalela
+1. Faka i-binary ye-wall-vault (iyeqiwa uma isifakiwe kakade)
+2. Ukubhalisa okuzenzakalela kwesevisi ye-systemd yomsebenzisi
+3. Qala isevisi bese uxhuma ngokuzenzakalela ne-vault
 
-> 💡 Isikripthi sesivele sineithokheni yaleli agent nekheli leseva ye-vault eligcwalisiwe, ngakho ungasisebenzisa ngokuqondile ngemuva kokunamathisela ngaphandle kwezinguquko.
+> 💡 Iskripti sinayo ithokheni yalo mmeleli nekheli leseva ye-vault esivele kugcwalisiwe, ngakho ungasisebenzisa ngokushesha ngemva kokunamathisela ngaphandle kwanoma yiluphi ushintsho.
 
 ---
 
 ### Ikhadi Lesevisi
 
-Ikhadi lokuvula/lokuvala noma lokulungisa amasevisi e-AI okuwasebenzisa.
+Ikhadi lokuvula, lokuvala, noma lokusetha amasevisi e-AI azosetshenziwa.
 
-- Izishintshi zokuvula/ukuvala isevisi ngayinye
-- Uma ufaka ikheli leseva ye-AI yendawo (Ollama, LM Studio, vLLM njll. esebenza kukhompuyutha yakho), amamodeli atholakalayo azotholakala ngokuzenzakalela.
-- **Ukubonisa isimo sokuxhuma kwesevisi yendawo**: Uphawu lwe-● eceleni kwegama lesevisi lu-**luhlaza** uma ixhunyiwe, **mpunga** uma ingaxhunyiwe
-- **Izignesha zezimoto zokuzenzakalela zesevisi yendawo** (v0.1.23+): Amasevisi endawo (Ollama, LM Studio, vLLM) avulwa ngokuzenzakalela uma engaxhunyaniswa, bese avalwa ngokuzenzakalela uma enqamuka. Uma uvula isevisi, ishintsha ibe ● luhlaza phakathi kwamasekhondi angu-15 nebhokisi lokumaka livulwa, futhi uma uyicisha, ivalwa ngokuzenzakalela. Lokhu kusebenza ngendlela efanayo njengalokho amasevisi efu (Google, OpenRouter njll.) ashintsha ngokuzenzakalela ngokusekelwe ekubakhona kokhiye we-API.
+- Iswitshi yokuvula·yokuvala esevisi ngayinye
+- Uma ufaka ikheli leseva ye-AI yendawo (i-Ollama, i-LM Studio, i-vLLM njll. esebenza kukhompyutha yakho), izothola ngokuzenzakalela amamodeli atholakalayo.
+- **Isiboniso sesimo sokuxhuma sesevisi yendawo**: Iqhaza le-● eceleni kwegama lesevisi uma **liluhlaza** kuxhunyiwe, **limpunga** akuxhunyiwe
+- **Ithafikhilayithi yendawo yesevisi ngokuzenzakalela** (v0.1.23+): Amasevisi endawo (Ollama, LM Studio, vLLM) ayavulwa/ayavala ngokuzenzakalela ngokuya ngokuthi ukuxhuma kungatholakala yini. Uma uvula isevisi, ngaphakathi kwamasekhondi angu-15 ● iba luhlaza nebhokisi lokuhlola livulwa, futhi uma uvala isevisi, kuvala ngokuzenzakalela. Indlela efanayo namasevisi efu (Google, OpenRouter njll.) ashintsha ngokuzenzakalela ngokuya ngokutholakala kwe-API key.
 
-> 💡 **Uma isevisi yendawo isebenza kumshini omunye**: Faka i-IP yaleyo khompuyutha endaweni yokufaka i-URL yesevisi. Isib.: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio). Uma isevisi iboshwe ku-`127.0.0.1` kuphela hhayi ku-`0.0.0.0`, ngeke ikwazi ukufinyelelwa nge-IP yangaphandle, ngakho hlola ikheli lokuboshwa ezilungiselelweni zesevisi.
+> 💡 **Uma isevisi yendawo isebenza kukhompyutha enye**: Faka i-IP yaleyo khompyutha endaweni yokufaka i-URL yesevisi. Isibonelo: `http://192.168.0.6:11434` (Ollama), `http://192.168.0.6:1234` (LM Studio). Uma isevisi iboshwe ku-`127.0.0.1` kuphela esikhundleni sika-`0.0.0.0`, ukufinyelela nge-IP yangaphandle ngeke kusebenze, ngakho hlola ikheli lokuboshwa ezilungiselelweni zesevisi.
 
 ### Ukufaka Ithokheni Yomphathi
 
-Uma uzama ukusebenzisa izici ezibalulekile njengokungeza noma ukususa okhiye kudashubhodi, isivivinyeli sokufaka ithokheni yomphathi sizobonakala. Faka ithokheni oyisethe ku-setup wizard. Uma usuyifakile, ihlala kuze kuvale ibhrawuza.
+Uma uzama ukusebenzisa izici ezibalulekile njengokwengeza·ukususa okhiye ku-dashboard, i-popup yokufaka ithokheni yomphathi izovela. Faka ithokheni owayisetha kumthakathi we-setup. Ngemva kokufaka kanye, ihlala kuze uvale ibhrawuza.
 
-> ⚠️ **Uma ukuqinisekiswa kwehluleka ngaphezu kwesikhathi esinqu-10 phakathi kwemizuzu engu-15, leyo IP izovinjwa okwesikhashana.** Uma ukhohlwe ithokheni yakho, hlola into ethi `admin_token` kufayili ye-`wall-vault.yaml`.
+> ⚠️ **Uma ukwehluleka kokuqinisekisa kudlula izikhathi ezingu-10 ngaphakathi kwemizuzu engu-15, i-IP efanelekile ivalwa okwesikhashana.** Uma ukhohlwe ithokheni, hlola into ye-`admin_token` kufayela le-`wall-vault.yaml`.
 
 ---
 
-## Imodi Eyahlukaniswayo (Ama-Bot Amaningi)
+## Imodi Yokusabalalisa (Multi Bot)
 
-Ukusetha **kokwabelana isikhwama sokhiye esisodwa** uma usebenzisa i-OpenClaw kumakhompuyutha amaningi ngesikhathi esisodwa. Kulula ngoba udinga ukuphatha okhiye endaweni eyodwa kuphela.
+Uma usebenzisa i-OpenClaw kumakhompyutha amaningi ngesikhathi esifanayo, lokhu kuyisakhiwo lapho **isikhwama sokhiye esisodwa sabiwa**. Kulula ngoba udinga kuphatha okhiye endaweni eyodwa kuphela.
 
-### Isibonelo Sokusetha
+### Isibonelo Sesakhiwo
 
 ```
-[Iseva Yesikhwama Sokhiye]
-  wall-vault vault    (isikhwama sokhiye :56243, idashubhodi)
+[Iseva ye-Key Vault]
+  wall-vault vault    (Key Vault :56243, dashboard)
 
-[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini Wendawo]
+[WSL Alpha]           [Raspberry Pi Gamma]    [Mac Mini Yendawo]
   wall-vault proxy      wall-vault proxy        wall-vault proxy
   openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ Ukuvumelanisa SSE   ↕ Ukuvumelanisa SSE     ↕ Ukuvumelanisa SSE
+  ↕ Ukuvumelana kwe-SSE ↕ Ukuvumelana kwe-SSE  ↕ Ukuvumelana kwe-SSE
 ```
 
-Onke ama-bot abheka iseva ye-vault maphakathi, ngakho uma ushintsha imodeli noma wengeza okhiye ku-vault, kuboniswa kuwo onke ama-bot ngokushesha.
+Wonke ama-bot abheka iseva ye-vault ephakathi, ngakho uma ushintsha imodeli noma wengeza ukhiye ku-vault, kuvela kuwo wonke ama-bot ngokushesha.
 
-### Isinyathelo 1: Qala Iseva Yesikhwama Sokhiye
+### Isinyathelo 1: Qala Iseva ye-Key Vault
 
-Sebenzisa kumshini ozowusebenzisa njengeseva ye-vault:
+Sebenzisa kukhompyutha ezosetshenziselwa iseva ye-vault:
 
 ```bash
 wall-vault vault
 ```
 
-### Isinyathelo 2: Bhalisa I-Bot Ngayinye (Ikhasimende)
+### Isinyathelo 2: Bhalisa I-bot Ngayinye (Umklayenti)
 
-Bhalisa ulwazi lwe-bot ngayinye exhuma kuseva ye-vault kusengaphambili:
+Bhalisa ngaphambi kwesikhathi ulwazi lwe-bot ngayinye exhumana neseva ye-vault:
 
 ```bash
 curl -X POST http://localhost:56243/admin/clients \
@@ -632,9 +632,9 @@ curl -X POST http://localhost:56243/admin/clients \
   }'
 ```
 
-### Isinyathelo 3: Qala I-Proxy Kumshini We-Bot Ngamunye
+### Isinyathelo 3: Qala I-proxy Kukhompyutha Ye-bot Ngayinye
 
-Sebenzisa i-proxy kumshini ngamunye lapho i-bot ifakwe khona, ucacise ikheli leseva ye-vault nethokheni:
+Sebenzisa i-proxy ngokucacisa ikheli leseva ye-vault nethokheni kukhompyutha ngayinye lapho i-bot ifakwe khona:
 
 ```bash
 WV_VAULT_URL=http://192.168.x.x:56243 \
@@ -643,17 +643,17 @@ WV_VAULT_CLIENT_ID=botA \
 wall-vault proxy
 ```
 
-> 💡 Shintsha ingxenye ye-**`192.168.x.x`** nge-IP yangaphakathi yangempela yekhompuyutha yeseva ye-vault. Ungayiqinisekisa ngezilungiselelo ze-router noma umyalo we-`ip addr`.
+> 💡 Shintsha ingxenye ye-**`192.168.x.x`** ngekheli le-IP langaphakathi langempela lekhompyutha yeseva ye-vault. Ungalihlola ezilungiselelweni zerawutha noma ngomyalo we-`ip addr`.
 
 ---
 
-## Ukusethwa Kokuqala Ngokuzenzakalela
+## Ukusetha Ukuqala Ngokuzenzakalela
 
-Uma kukhathaza ukuvula i-wall-vault ngesandla njalo uma uqala kabusha ikhompuyutha, yibhalise njengesevisi yesistimu. Uma isibhaliswe, izoqala ngokuzenzakalela uma kulayishwa.
+Uma kukukhathaza ukuvula i-wall-vault ngesandla njalo uma uqala kabusha ikhompyutha, ibhalise njengesevisi yesistimu. Ngemva kokubhalisa kanye, iqala ngokuzenzakalela ngesikhathi sokuqala.
 
-### Linux — systemd (i-Linux eningi)
+### Linux — systemd (i-Linux iningi)
 
-i-systemd uhlelo oluvula nolulawula izinhlelo ngokuzenzakalela ku-Linux:
+I-systemd yisistimu eqala·ephatha izinhlelo ngokuzenzakalela ku-Linux:
 
 ```bash
 wall-vault doctor deploy
@@ -661,7 +661,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now wall-vault
 ```
 
-Hlola amalogo:
+Ukuhlola amalogi:
 
 ```bash
 journalctl --user -u wall-vault -f
@@ -669,7 +669,7 @@ journalctl --user -u wall-vault -f
 
 ### macOS — launchd
 
-Uhlelo olulawula ukuqala ngokuzenzakalela kwezinhlelo ku-macOS:
+Yisistimu ephatha ukuqala ngokuzenzakalela kwezinhlelo ku-macOS:
 
 ```bash
 wall-vault doctor deploy launchd
@@ -687,65 +687,65 @@ wall-vault doctor deploy windows
 
 ---
 
-## I-Doctor: Isihloli
+## Doctor (Udokotela)
 
-Umyalo we-`doctor` yi-**thuluzi elizihlola nelizilungisa** ukuqinisekisa ukuthi i-wall-vault isethwe ngendlela efanele.
+Umyalo we-`doctor` yithuluzi **elizihlolayo nelizilungisayo** uma i-wall-vault isethwe ngendlela efanele.
 
 ```bash
-wall-vault doctor check   # Hlola isimo samanje (ifunda kuphela, ayishintshi lutho)
+wall-vault doctor check   # Hlola isimo samanje (funda kuphela, ungashintshi lutho)
 wall-vault doctor fix     # Lungisa izinkinga ngokuzenzakalela
-wall-vault doctor all     # Ukuhlola + ukulungisa ngokuzenzakalela ngesikhathi esisodwa
+wall-vault doctor all     # Hlola + lungisa ngokuzenzakalela ngesikhathi esisodwa
 ```
 
-> 💡 Uma kukhona okubonakala kungalungile, sebenzisa `wall-vault doctor all` kuqala. Isingatha izinkinga eziningi ngokuzenzakalela.
+> 💡 Uma okuthile kubonakala kungalungile, sebenzisa `wall-vault doctor all` kuqala. Kubamba izinkinga eziningi ngokuzenzakalela.
 
 ---
 
-## I-RTK Ukonga Amathokheni
+## RTK Ukonga Ama-token
 
 *(v0.1.24+)*
 
-**I-RTK (Ithuluzi Lokonga Amathokheni)** icindezela ngokuzenzakalela imiphumela yemiyalo ye-shell esenziwa ama-agent e-AI ekhodi (njenge-Claude Code) ukunciphisa ukusetshenziswa kwamathokheni. Isibonelo, imiphumela yemigqa engu-15 ye-`git status` incishiswa ibe isifinyezo semigqa engu-2.
+**RTK (Ithuluzi Lokonga Ama-token)** licindezela ngokuzenzakalela okukhishwa yimiyalo ye-shell esetshenziswa yi-AI coding agent (njengo-Claude Code) ukuze kuncishiswe ukusetshenziwa kwama-token. Isibonelo, okukhishwa kwemigqa engu-15 kwe-`git status` kucinyezwa kube isifinyezo semigqa engu-2.
 
-### Ukusetshenziswa Okuyisisekelo
+### Ukusebenzisa Okuyisisekelo
 
 ```bash
-# Songa umyalo nge-wall-vault rtk bese imiphumela ihluziwa ngokuzenzakalela
-wall-vault rtk git status          # Uhlu lwamafayili ashintshiwe kuphela
-wall-vault rtk git diff HEAD~1     # Imigqa eshintshiwe + i-context encane
-wall-vault rtk git log -10         # I-hash + umyalezo womugqa owodwa
+# Goqela umyalo nge-wall-vault rtk bese okukhishwa kuhlungwa ngokuzenzakalela
+wall-vault rtk git status          # Uhlu lwamafayela ashintshiwe kuphela
+wall-vault rtk git diff HEAD~1     # Imigqa eshintshiwe + umongo omncane
+wall-vault rtk git log -10         # Hash + umyalezo womugqa owodwa ngamunye
 wall-vault rtk go test ./...       # Ukuhlolwa okwehlulekile kuphela
-wall-vault rtk ls -la              # Imiyalo engasekelwe isikwa ngokuzenzakalela
+wall-vault rtk ls -la              # Imiyalo engasekelwa inqanyulwa ngokuzenzakalela
 ```
 
 ### Imiyalo Esekelwayo Nomthelela Wokunciphisa
 
-| Umyalo | Indlela Yokuhluza | Izinga Lokunciphisa |
+| Umyalo | Indlela Yesihlungi | Amazinga Okunciphisa |
 |------|----------|--------|
-| `git status` | Isifinyezo samafayili ashintshiwe kuphela | ~87% |
-| `git diff` | Imigqa eshintshiwe + i-context yemigqa engu-3 | ~60-94% |
-| `git log` | I-hash + umyalezo womugqa wokuqala | ~90% |
-| `git push/pull/fetch` | Susa inqubekelaphambili, isifinyezo kuphela | ~80% |
-| `go test` | Bonisa ukwehluleka kuphela, bala ukuphumelela | ~88-99% |
+| `git status` | Isifinyezo samafayela ashintshiwe kuphela | ~87% |
+| `git diff` | Imigqa eshintshiwe + umongo wemigqa engu-3 | ~60-94% |
+| `git log` | Hash + umyalezo womugqa wokuqala | ~90% |
+| `git push/pull/fetch` | Susa inqubekela phambili, isifinyezo kuphela | ~80% |
+| `go test` | Bonisa okwehlulekile kuphela, bala okuphasiswe | ~88-99% |
 | `go build/vet` | Bonisa amaphutha kuphela | ~90% |
-| Yonke eminye imiyalo | Imigqa engu-50 yokuqala + 50 yokugcina, ubungako obukhulu 32KB | Kuyehluka |
+| Yonke eminye imiyalo | Imigqa engu-50 yokuqala + imigqa engu-50 yokugcina, okungaphezu kuka-32KB | Iyaguquguquka |
 
-### Uhlelo Lokuhluza Lwezinyathelo Ezingu-3
+### I-Pipeline Yesihlungi Yezinyathelo Ezingu-3
 
-1. **Isihlungi sesakhiwo somyalo ngamunye** — Siqonda ifomethi yemiphumela ye-git, go njll. bese sikhipha izingxenye ezinomqondo kuphela
-2. **Ukusingatha okulandela i-regex** — Susa amakhodi ombala we-ANSI, nciphisa imigqa engenalutho, hlanganisa imigqa ephindaphindiwe
-3. **Passthrough + ukusika** — Imiyalo engasekelwe igcina imigqa engu-50 yokuqala/yokugcina kuphela
+1. **Isihlungi sesakhiwo somyalo ngamunye** — Siqonda ifomethi yokukhishwa kwe-git, go njll. bese sikhipha izingxenye ezibalulekile kuphela
+2. **Ukucubungula okulandelayo kwe-regex** — Susa amakhodi ombala we-ANSI, nciphisa imigqa engenalutho, hlanganisa imigqa ephindaphindayo
+3. **Ukudlula + ukunqamula** — Imiyalo engasekelwayo igcina imigqa engu-50 yokuqala/yokugcina kuphela
 
-### Ukuxhuma Ne-Claude Code
+### Ukuxhuma ne-Claude Code
 
-Ungalungisa yonke imiyalo ye-shell ukuze idlule nge-RTK ngokuzenzakalela nge-hook ye-`PreToolUse` ye-Claude Code.
+Ungasetha i-hook ye-`PreToolUse` ye-Claude Code ukuze yonke imiyalo ye-shell idlule nge-RTK ngokuzenzakalela.
 
 ```bash
-# Faka i-hook (yengezwa ngokuzenzakalela ku-Claude Code settings.json)
+# Faka i-hook (yengezwa ngokuzenzakalela ku-settings.json ye-Claude Code)
 wall-vault rtk hook install
 ```
 
-Noma yengeza ngesandla ku-`~/.claude/settings.json`:
+Noma yengeze ngesandla ku-`~/.claude/settings.json`:
 
 ```json
 {
@@ -758,129 +758,135 @@ Noma yengeza ngesandla ku-`~/.claude/settings.json`:
 }
 ```
 
-> 💡 **Ukugcinwa kwe-Exit code**: I-RTK ibuyisa ikhodi yokuphuma yomyalo wokuqala njengoba injalo. Uma umyalo wehluleka (exit code ≠ 0), i-AI nayo ithola ukwehluleka ngokufanele.
+> 💡 **Ukugcinwa kwe-Exit code**: I-RTK ibuyisela i-exit code yomyalo woqobo njengoba injalo. Uma umyalo wehluleka (exit code ≠ 0), i-AI nayo ithola ukwehluleka ngokunembe.
 
-> 💡 **Ukuphoqa IsiNgisi**: I-RTK isebenzisa imiyalo nge-`LC_ALL=C` ukuze ikhiqize imiphumela yesiNgisi njalo ngaphandle kokucabangela izilungiselelo zolimi lwesistimu. Lokhu kuqinisekisa ukuthi isihlungi sisebenza ngokufanele.
+> 💡 **Ukuphoqwa kwesiNgisi**: I-RTK isebenzisa imiyalo nge-`LC_ALL=C` ukuze ikhiqize okukhishwa kwesiNgisi njalo ngaphandle kokukhathazeka ngezilungiselelo zolimi lwesistimu. Lokhu kuqinisekisa ukuthi isihlungi sisebenza ngokunembe.
 
 ---
 
-## Izinguquko Zemvelo
+## Ireferensi Yokuguquguquka Kwemvelo
 
-Izinguquko zemvelo yindlela yokudlulisela amanani ezilungiselelo kuhlelo. Faka ngefomethi ye-`export igama-lenguquko=inani` kutheminali, noma faka kufayili yesevisi yokuqala ngokuzenzakalela ukuze isebenze njalo.
+Okuguquguquka kwemvelo yindlela yokudlulisa amanani okusetha ohlelweni. Faka ngefomethi ye-`export igama-lokuguquguquka=inani` kutheminali, noma kufake kufayela lesevisi yokuqala ngokuzenzakalela ukuze kusebenze njalo.
 
-| Inguquko | Incazelo | Inani Lesibonelo |
+| Okuguquguquka | Incazelo | Inani Lesibonelo |
 |------|------|---------|
-| `WV_LANG` | Ulimi lwedashubhodi | `ko`, `en`, `ja` |
-| `WV_THEME` | Indikimba yedashubhodi | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Ukhiye we-Google API (abaningi ngokhefana) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | Ukhiye we-OpenRouter API | `sk-or-v1-...` |
-| `WV_VAULT_URL` | Ikheli leseva ye-vault kumodi eyahlukaniswayo | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Ithokheni yokuqinisekiswa yekhasimende (bot) | `my-secret-token` |
+| `WV_LANG` | Ulimi lwe-dashboard | `ko`, `en`, `ja` |
+| `WV_THEME` | Indikimba ye-dashboard | `light`, `dark`, `gold` |
+| `WV_KEY_GOOGLE` | I-API key ye-Google (eziningi ngokhefana) | `AIza...,AIza...` |
+| `WV_KEY_OPENROUTER` | I-API key ye-OpenRouter | `sk-or-v1-...` |
+| `WV_VAULT_URL` | Ikheli leseva ye-vault kuyi-mode yokusabalalisa | `http://192.168.x.x:56243` |
+| `WV_VAULT_TOKEN` | Ithokheni yokuqinisekisa yomklayenti (bot) | `my-secret-token` |
 | `WV_ADMIN_TOKEN` | Ithokheni yomphathi | `admin-token-here` |
-| `WV_MASTER_PASS` | Iphasiwedi yokubhala ngekhodi ukhiye we-API | `my-password` |
-| `WV_AVATAR` | Indlela yefayili yesithombe se-avatar (indlela ehlobene kusuka ku-`~/.openclaw/`) | `workspace/avatars/avatar.png` |
+| `WV_MASTER_PASS` | Iphasiwedi yokubethela i-API key | `my-password` |
+| `WV_AVATAR` | Umzila wefayela lesithombe se-avatar (umzila ohlobene kusuka ku-`~/.openclaw/`) | `workspace/avatars/avatar.png` |
 | `OLLAMA_URL` | Ikheli leseva yendawo ye-Ollama | `http://192.168.x.x:11434` |
 
 ---
 
 ## Ukuxazulula Izinkinga
 
-### Uma I-Proxy Ingaqali
+### Uma I-proxy Ingaqali
 
-Ngokuvamile, ichweba selivele lisetshenziswa uhlelo olunye.
+Ngokuvamile kungenxa yokuthi iphothi isisetshenziselwe esinye isinhlelo.
 
 ```bash
-ss -tlnp | grep 56244   # Hlola ukuthi ubani osebenzisa ichweba 56244
-wall-vault proxy --port 8080   # Qala ngenombolo yechweba ehlukile
+ss -tlnp | grep 56244   # Hlola ukuthi ubani osebenzisa iphothi 56244
+wall-vault proxy --port 8080   # Qala ngenombolo yephothi ehlukile
 ```
 
-### Uma Iphutha Lokhiye we-API Livela (429, 402, 401, 403, 582)
+### Uma Amaphutha E-API Key Enzeka (429, 402, 401, 403, 582)
 
-| Ikhodi Yephutha | Incazelo | Indlela Yokusingatha |
+| Ikhodi Yephutha | Incazelo | Isixazululo |
 |----------|------|----------|
-| **429** | Izicelo eziningi kakhulu (ukusetshenziswa kufinyelele umkhawulo) | Linda kancane noma engeza omunye ukhiye |
-| **402** | Ukukhokha kuyadingeka noma i-credit ayenele | Gcwalisa i-credit kusevisi efanele |
-| **401 / 403** | Ukhiye awulungile noma awunayo imvume | Qinisekisa inani lokhiye bese ubhalisa kabusha |
-| **582** | Umthwalo we-gateway (cooldown imizuzu engu-5) | Isuswa ngokuzenzakalela ngemuva kwemizuzu engu-5 |
+| **429** | Izicelo eziningi kakhulu (ukusetshenziswa kwedlulile) | Linda kancane noma wengeze okunye ukhiye |
+| **402** | Inkokhelo idingekile noma ikhredithi ayenele | Gcwalisa ikhredithi kusevisi efanelekile |
+| **401 / 403** | Ukhiye awulungile noma awunavumo | Hlola futhi inani lokhiye bese ubhalisa kabusha |
+| **582** | I-Gateway inemithwalo eningi (cooldown imizuzu 5) | Ixazulula ngokuzenzakalela ngemva kwemizuzu 5 |
 
 ```bash
 # Hlola uhlu nesimo sokhiye ababhalisiwe
 curl -H "Authorization: Bearer ithokheni-yomphathi" http://localhost:56243/admin/keys
 
-# Setha kabusha izibali zokusetshenziswa kokhiye
+# Setha kabusha izibali zokusetshenziwa kokhiye
 curl -X POST -H "Authorization: Bearer ithokheni-yomphathi" http://localhost:56243/admin/keys/reset
 ```
 
-### Uma I-Agent Iboniswa Njengokuthi "Ayixhunyiwe"
+### Uma Ummeleli Evela Njenge-"Ayixhunywanga"
 
-"Ayixhunyiwe" kusho ukuthi inqubo ye-proxy ayithumeli isignali (heartbeat) ku-vault. **Akusho ukuthi izilungiselelo azigciniwe.** I-proxy kufanele ibe isebenza yazi ikheli leseva ye-vault nethokheni ukuze isimo sokuxhuma sishintshe.
+"Ayixhunywanga" kusho ukuthi inqubo ye-proxy ayithumeli isignali (heartbeat) ku-vault. **Akusho ukuthi ukusetha akugcinwanga.** I-proxy idinga ukusebenza uyazi ikheli leseva ye-vault nethokheni ukuze ishintshe ibe yisimo sokuxhumana.
 
 ```bash
-# Qala i-proxy ucacise ikheli leseva ye-vault, ithokheni, ne-ID yekhasimende
+# Qala i-proxy ucacise ikheli leseva ye-vault, ithokheni, ne-ID yomklayenti
 WV_VAULT_URL=http://ikheli-leseva-ye-vault:56243 \
-WV_VAULT_TOKEN=ithokheni-yekhasimende \
-WV_VAULT_CLIENT_ID=i-ID-yekhasimende \
+WV_VAULT_TOKEN=ithokheni-yomklayenti \
+WV_VAULT_CLIENT_ID=id-yomklayenti \
 wall-vault proxy
 ```
 
-Uma ukuxhuma kuphumelela, kushintsha kube 🟢 Iyasebenza kudashubhodi phakathi kwamasekhondi angama-20.
+Uma ukuxhuma kuphumelela, kuzoshintsha kube 🟢 Iyasebenza ku-dashboard ngaphakathi cishe kwamasekhondi angu-20.
 
-### Uma I-Ollama Ingakwazi Ukuxhuma
+### Uma Ukuxhuma kwe-Ollama Kungasebenzi
 
-I-Ollama uhlelo olusebenzisa i-AI ngokuqondile kukhompuyutha yakho. Kuqala qinisekisa ukuthi i-Ollama ivuliwe.
+I-Ollama uhlelo olusebenzisa i-AI ngokuqondile kukhompyutha yakho. Okokuqala hlola ukuthi i-Ollama ivuliwe yini.
 
 ```bash
-curl http://localhost:11434/api/tags   # Uma uhlu lwamamodeli lubonakala, kujwayelekile
-export OLLAMA_URL=http://192.168.x.x:11434   # Uma isebenza kumshini omunye
+curl http://localhost:11434/api/tags   # Uma uhlu lwamamodeli luvela, kujwayelekile
+export OLLAMA_URL=http://192.168.x.x:11434   # Uma isebenza kukhompyutha enye
 ```
 
 > ⚠️ Uma i-Ollama ingaphenduli, qala i-Ollama kuqala ngomyalo we-`ollama serve`.
 
-> ⚠️ **Amamodeli amakhulu alengezela**: Amamodeli amakhulu njenge-`qwen3.5:35b`, `deepseek-r1` angathatha imizuzu eminingi ukukhiqiza impendulo. Ngisho ibonakala sengathi akukho mpendulo, ingase isethwe ngokujwayelekile, ngakho linda.
+> ⚠️ **Amamodeli amakhulu mancane**: Amamodeli amakhulu njengo-`qwen3.5:35b`, `deepseek-r1` angathatha imizuzu eminingana ukukhiqiza impendulo. Ngisho noma kubonakala sengathi ayikho impendulo, kungenzeka kucutshungulwa ngokujwayelekile, ngakho linda.
 
 ---
 
-## Izinguquko Zakamuva (v0.1.16 ~ v0.1.25)
+## Izinguquko Zakamuva (v0.1.16 ~ v0.1.27)
+
+### v0.1.27 (2026-04-09)
+- **Ukulungiswa kwegama lemodeli ye-fallback ye-Ollama**: Kulungiswe inkinga lapho igama lemodeli elinophawu lwangaphambi kwe-provider (isibonelo: `google/gemini-3.1-pro-preview`) lalithunyelwa ku-Ollama njengoba linjalo ngesikhathi se-fallback kusuka kwesinye isevisi. Manje kufakwa ngokuzenzakalela okuguquguquka kwemvelo/imodeli ezenzakalelayo.
+- **Ukuncishiswa okukhulu kwesikhathi se-cooldown**: 429 rate limit 30min→5min, 402 inkokhelo 1hr→30min, 401/403 24hr→6hr. Ukuvimbela isimo lapho bonke okhiye bese-cooldown ngesikhathi esifanayo okwenza i-proxy ime ngokuphelele.
+- **Ukuzama kabusha ngokuqinile ngesikhathi se-cooldown ephelele**: Uma bonke okhiye besezimeni se-cooldown, ukhiye ovuleka kuqala uzanywa kabusha ngokuqinile ukuze kuvinjwe ukunqatshwa kwezicelo.
+- **Ukulungiswa kokuboniswa kohlu lwesevisi**: Izimpendulo ze-`/status` zibonisa uhlu lwangempela lwesevisi oluvumelaniswe kusuka ku-vault (ukuvimbela ukungabi khona kwe-anthropic njll.).
 
 ### v0.1.25 (2026-04-08)
-- **Ukuthola Inqubo Ye-Agent**: I-proxy ithola isimo sokuphila se-agent yendawo (NanoClaw/OpenClaw) bese ibonisa ngesignesha ensomi kudashubhodi.
-- **Ukuthuthukiswa Kwesibambi Sokudonsela**: Kushintshiwe ukuze amakhadi abanjwe kuphela endaweni yezignesha zezimoto (●) ngesikhathi sokuhlelela. Izindawo zokufaka noma izinkinobho azidonseleki ngephutha.
+- **Ukuthola inqubo yommeleli**: I-proxy ithola ukuthi ummeleli wendawo (NanoClaw/OpenClaw) uphila yini futhi ibonisa ngethafikhilayithi ensomi ku-dashboard.
+- **Ukuthuthukiswa kwesibambi sokudonsa**: Kushintshiwe ukuze ubambe kuphela endaweni yethafikhilayithi (●) uma uhlela amakhadi. Akusakwazeki ukudonsa ngephutha ezindaweni zokufaka noma amaqhosha.
 
 ### v0.1.24 (2026-04-06)
-- **Umyalo Omncane we-RTK Wokonga Amathokheni**: `wall-vault rtk <command>` ihluza ngokuzenzakalela imiphumela yemiyalo ye-shell ukunciphisa ukusetshenziswa kwamathokheni ama-agent e-AI ngo-60-90%. Ifaka izihlungi ezikhethekile zemiyalo emqoka njenge-git, go, nemiyalo engasekelwe nayo isikwa ngokuzenzakalela. Ixhuma ngobuso obungabonakali nge-hook ye-`PreToolUse` ye-Claude Code.
+- **Umyalo omncane we-RTK wokonga ama-token**: `wall-vault rtk <command>` ihlunga ngokuzenzakalela okukhishwa kwemiyalo ye-shell ukuze kuncishiswe ukusetshenziwa kwama-token ye-AI agent ngo-60-90%. Iqukethe izihlungi ezikhethekile zemiyalo emikhulu njengo-git, go, futhi imiyalo engasekelwayo nayo inqunywa ngokuzenzakalela. Ixhuma ngokusobala nge-hook ye-`PreToolUse` ye-Claude Code.
 
 ### v0.1.23 (2026-04-06)
-- **Ukulungiswa Kokushintsha Imodeli Ye-Ollama**: Inkinga lapho ukushintsha imodeli ye-Ollama kudashubhodi ye-vault kungabonakali ku-proxy ilungisiwe. Ngaphambili yayisebenzisa inguquko yemvelo (`OLLAMA_MODEL`) kuphela, kodwa manje izilungiselelo ze-vault zinikwa ukubaluleka kuqala.
-- **Izignesha Zezimoto Zokuzenzakalela Zesevisi Yendawo**: Ollama, LM Studio, vLLM zivulwa ngokuzenzakalela uma zingaxhunyaniswa, bese zivalwa ngokuzenzakalela uma zinqamuka. Isebenza ngendlela efanayo nokushintsha ngokuzenzakalela okusekelwe kukhiye kwamasevisi efu.
+- **Ukulungiswa kokushintsha imodeli ye-Ollama**: Kulungiswe inkinga lapho ukushintsha imodeli ye-Ollama ku-dashboard ye-vault kwakungaveli ku-proxy. Ngaphambilini kwakusetshenziswa kuphela okuguquguquka kwemvelo (`OLLAMA_MODEL`), manje ukusetha kwe-vault kunikezwa phambili.
+- **Ithafikhilayithi yendawo yesevisi ngokuzenzakalela**: I-Ollama·LM Studio·vLLM iqalwa ngokuzenzakalela uma ukuxhuma kungatholakala, futhi icinywe ngokuzenzakalela uma iphukile. Indlela efanayo nokushintsha okuzenzakalelayo kwamasevisi efu ngokuya kokhiye.
 
 ### v0.1.22 (2026-04-05)
-- **Ukulungiswa Kokungabi Kwenkambu ye-content Engenalutho**: Uma amamodeli okucabanga (gemini-3.1-pro, o1, claude thinking njll.) esebenzisa umkhawulo wonke we-max_tokens ekucabangeni bese ehluleka ukukhiqiza impendulo yangempela, i-proxy yayishiya izinkambu ze-`content`/`text` ku-JSON yempendulo nge-`omitempty`, okubangela amakhasimende e-OpenAI/Anthropic SDK athole iphutha elithi `Cannot read properties of undefined (reading 'trim')`. Kushintshiwe ukuze kufakwe izinkambu njalo ngokulandela izimiso ze-API ezisemthethweni.
+- **Ukulungiswa kwenkambu ye-content engenalutho engazange iboniswe**: Uma amamodeli okucabanga (gemini-3.1-pro, o1, claude thinking njll.) esebenzisa umkhawulo we-max_tokens ku-reasoning futhi engakwazi ukukhiqiza impendulo yangempela, i-proxy yayisusa izinkambu ze-`content`/`text` ze-JSON yempendulo nge-`omitempty`, okwenza ama-SDK omklayenti e-OpenAI/Anthropic awe ngephutha le-`Cannot read properties of undefined (reading 'trim')`. Kushintshiwe ukuze kuhlale kufakwa izinkambu njengoba kusho izimiso ezisemthethweni ze-API.
 
 ### v0.1.21 (2026-04-05)
-- **Ukusekelwa Kwemodeli ye-Gemma 4**: Amamodeli omndeni we-Gemma anjenge-`gemma-4-31b-it`, `gemma-4-26b-a4b-it` angasetshenziswa nge-Google Gemini API.
-- **Ukusekelwa Ngokusemthethweni Kwamasevisi e-LM Studio / vLLM**: Ngaphambili la masevisi ayekweqiwa ekuqondiseni kwe-proxy futhi njalo ayeshintshwa nge-Ollama. Manje aqondiswa ngendlela efanele nge-API ehambelana ne-OpenAI.
-- **Ukulungiswa Kokuboniswa Kwesevisi Kudashubhodi**: Ngisho noma i-fallback yenzeka, idashubhodi ibonisa njalo isevisi esethwe umsebenzisi.
-- **Ukuboniswa Kwesimo Sesevisi Yendawo**: Isimo sokuxhuma samasevisi endawo (Ollama, LM Studio, vLLM njll.) siboniswa ngombala wophawu lwe-● uma idashubhodi ilayisha.
-- **Inguquko Yemvelo Yesihlungi Samathuluzi**: Imodi yokudlulisa amathuluzi ingasethwa ngokuguquka kwemvelo `WV_TOOL_FILTER=passthrough`.
+- **Ukusekelwa kwemodeli ye-Gemma 4**: Amamodeli omndeni we-Gemma njengo-`gemma-4-31b-it`, `gemma-4-26b-a4b-it` angasetshenziswa nge-Google Gemini API.
+- **Ukusekelwa okusemthethweni kwesevisi ye-LM Studio / vLLM**: Ngaphambilini la masevisi ayeshiywe ngaphandle ekuqondiseni kwe-proxy futhi njalo ayebuyiselwa ku-Ollama. Manje aqondiswa ngokujwayelekile nge-API ehambisana ne-OpenAI.
+- **Ukulungiswa kokuboniswa kwesevisi ku-dashboard**: Ngisho noma i-fallback yenzekile, i-dashboard njalo ibonisa isevisi esethwe umsebenzisi.
+- **Isiboniso sesimo sesevisi yendawo**: Isimo sokuxhuma samasevisi endawo (Ollama, LM Studio, vLLM njll.) siboniswa ngombala weqhaza le-● uma i-dashboard ilayishwa.
+- **Okuguquguquka kwemvelo kwesihlungi samathuluzi**: Imodi yokudlulisa amathuluzi (tools) ingasethwa ngokuguquguquka kwemvelo `WV_TOOL_FILTER=passthrough`.
 
 ### v0.1.20 (2026-03-28)
-- **Ukuqiniswa Kokuphepha Okubandakanyayo**: Ukuthuthukiswa kwezinto ezingu-12 zokuphepha kufaka phakathi ukuvimbela i-XSS (izindawo ezingu-41), ukuqhathanisa amathokheni esikhathi esingaguquki, izihibe ze-CORS, imikhawulo yobukhulu besicelo, ukuvimbela ukuhamba ngezikhala, ukuqinisekiswa kwe-SSE, ukuqiniswa kwesikhawuli sejubane njll.
+- **Ukuqinisa okungqalile kokuphepha**: Ukuvimbela i-XSS (izindawo ezingu-41), ukuqhathanisa ama-token ngesikhathi esilinganayo, izihibe ze-CORS, imikhawulo yobukhulu besicelo, ukuvimbela ukudlula komzila, ukuqinisekisa kwe-SSE, ukuqinisa umkhawulo wejubane, nezinto ezingu-12 zokuphepha ezithuthukisiwe.
 
 ### v0.1.19 (2026-03-27)
-- **Ukutholwa Kwe-Claude Code Ku-Inthanethi**: I-Claude Code engadluli ku-proxy nayo iboniswa njengoku-inthanethi kudashubhodi.
+- **Ukuthola i-Claude Code ku-inthanethi**: I-Claude Code engadluli nge-proxy nayo ivela njengoku-inthanethi ku-dashboard.
 
 ### v0.1.18 (2026-03-26)
-- **Ukulungiswa Kokunamathela Kwesevisi ye-Fallback**: Ngemuva kokubuyela ku-Ollama ngenxa yephutha lesikhashana, uma isevisi yokuqala ibuya, ibuyela ngokuzenzakalela.
-- **Ukuthuthukiswa Kokuthola Ukungabikhona Ku-Inthanethi**: Ukuhlola isimo ngamasekhondi angu-15 kwenza ukuthola ukumisa kwe-proxy kusheshe kakhulu.
+- **Ukulungiswa kokunamathela kwesevisi ye-fallback**: Ngemva kwe-fallback yesikhashana ku-Ollama, uma isevisi yasekuqaleni ibuyela, ibuyela ngokuzenzakalela.
+- **Ukuthuthukiswa kokuthola ukungabi ku-inthanethi**: Ukuthola i-proxy emile kusheshisiwe ngokuhlola isimo njalo ngamasekhondi angu-15.
 
 ### v0.1.17 (2026-03-25)
-- **Ukuhlelela Amakhadi Ngokudonsela Nokuwehlisa**: Amakhadi e-agent angadonselwa ukushintsha ukulandelana.
-- **Inkinobho Yokusebenzisa Izilungiselelo Ngaphakathi**: Inkinobho ka-[⚡ Sebenzisa Izilungiselelo] ibonakala kuma-agent angekho ku-inthanethi.
-- **Uhlobo lwe-agent lwe-cokacdir lungezwe**.
+- **Ukuhlelwa kwamakhadi ngokudonsa nokudedela**: Amakhadi ommeleli angadonswa ukuze kushintshe uhlelo.
+- **Iqhosha lokusebenzisa ukusetha emugqeni**: Iqhosha le-[⚡ Sebenzisa Ukusetha] livela kwabameleli abangekho ku-inthanethi.
+- **Uhlobo lommeleli we-cokacdir lungezwe**.
 
 ### v0.1.16 (2026-03-25)
-- **Ukuvumelanisa Imodeli Nhlangothi Zombili**: Ukushintsha imodeli ye-Cline noma ye-Claude Code kudashubhodi ye-vault kubangela ukuboniswa ngokuzenzakalela.
+- **Ukuvumelana kwemodeli ngezinhlangothi ezimbili**: Ukushintsha imodeli ye-Cline·Claude Code ku-dashboard ye-vault kuvela ngokuzenzakalela.
 
 ---
 
-*Ukuthola ulwazi olunzulu lwe-API, bheka [API.md](API.md).*
+*Ngolwazi olwengeziwe lwe-API, bheka [API.md](API.md).*

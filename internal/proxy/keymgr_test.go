@@ -57,7 +57,7 @@ func TestKeyManager_SkipCooldown(t *testing.T) {
 	}
 }
 
-func TestKeyManager_AllCooldown(t *testing.T) {
+func TestKeyManager_AllCooldown_ForceRetry(t *testing.T) {
 	km := NewKeyManager("", "", "test")
 	km.AddKey("google", "id1", "key-A", 0)
 	km.AddKey("google", "id2", "key-B", 0)
@@ -68,9 +68,13 @@ func TestKeyManager_AllCooldown(t *testing.T) {
 	k2, _ := km.Get("google")
 	km.RecordError(k2, 429)
 
-	_, err := km.Get("google")
-	if err == nil {
-		t.Fatal("모두 쿨다운 상태에서 오류 기대")
+	// all cooldown → should force-retry earliest key (not error)
+	k3, err := km.Get("google")
+	if err != nil {
+		t.Fatalf("전체 쿨다운 시 강제 재시도 기대, 오류: %v", err)
+	}
+	if k3 == nil {
+		t.Fatal("강제 재시도 키가 nil")
 	}
 }
 
@@ -81,9 +85,13 @@ func TestKeyManager_DailyLimit(t *testing.T) {
 	k, _ := km.Get("google")
 	km.RecordSuccess(k, 10) // 한도 도달
 
-	_, err := km.Get("google")
-	if err == nil {
-		t.Fatal("한도 초과 후 오류 기대")
+	// daily limit reached + force retry → should still return a key
+	k2, err := km.Get("google")
+	if err != nil {
+		t.Fatalf("한도 초과 시 강제 재시도 기대, 오류: %v", err)
+	}
+	if k2 == nil {
+		t.Fatal("강제 재시도 키가 nil")
 	}
 }
 

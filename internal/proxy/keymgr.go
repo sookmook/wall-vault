@@ -15,22 +15,20 @@ import (
 // ─── Cooldown Durations ───────────────────────────────────────────────────────
 
 var cooldownDurations = map[int]time.Duration{
-	429: 30 * time.Minute, // rate limit — retry later
-	402: 1 * time.Hour,    // payment required — retry in an hour
-	401: 24 * time.Hour,   // invalid key — retire for a day
-	403: 24 * time.Hour,   // forbidden — retire for a day
-	582: 5 * time.Minute,  // upstream overload / custom gateway error — short retry
-	// 400: bad request — request format error, not a key error, no cooldown
-	// 404: model not found — key not at fault, no cooldown
-	400: 0,
-	404: 0,
+	429: 5 * time.Minute,  // rate limit — short retry (prevents total lockout)
+	402: 30 * time.Minute, // payment required — moderate retry
+	401: 6 * time.Hour,    // invalid key — retire
+	403: 6 * time.Hour,    // forbidden — retire
+	582: 3 * time.Minute,  // upstream overload — very short retry
+	400: 0,                // bad request — not a key error
+	404: 0,                // model not found — not a key error
 }
 
 func cooldownFor(errCode int) time.Duration {
 	if d, ok := cooldownDurations[errCode]; ok {
 		return d
 	}
-	return 10 * time.Minute
+	return 5 * time.Minute
 }
 
 // ─── Local Key ────────────────────────────────────────────────────────────────
@@ -129,11 +127,24 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	for i := 0; i < n; i++ {
 		k := keys[(start+i)%n]
 		if k.isAvailable() {
-			km.idx[service] = (start + i) % n // stay on this key until exhausted/cooldown
+			km.idx[service] = (start + i) % n
 			return k, nil
 		}
 	}
-	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개, 모두 쿨다운/소진)", service, n)
+	// all keys on cooldown — force-retry the key whose cooldown expires soonest
+	var earliest *localKey
+	for _, k := range keys {
+		if earliest == nil || k.cooldownUntil.Before(earliest.cooldownUntil) {
+			earliest = k
+		}
+	}
+	if earliest != nil {
+		log.Printf("[key] 전체 쿨다운 — 가장 이른 키 강제 재시도: %s (%.0f초 남음)",
+			earliest.service, time.Until(earliest.cooldownUntil).Seconds())
+		earliest.cooldownUntil = time.Time{} // clear cooldown
+		return earliest, nil
+	}
+	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개)", service, n)
 }
 
 // CooldownSnapshot: return cooldownUntil per key ID for keys currently on cooldown

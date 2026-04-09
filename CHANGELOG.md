@@ -8,6 +8,30 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.27] — 2026-04-09
+
+### Fixed
+- **Ollama model name mismatch on fallback**: When dispatch falls back to
+  Ollama from another service (e.g. OpenRouter), the provider-prefixed model
+  name (e.g. `google/gemini-3.1-pro-preview`) was sent to Ollama which doesn't
+  recognize it. Now detects `/` in model name and falls back to env var or
+  default Ollama model. Same fix applied to `resolveActualModel()`.
+
+### Changed
+- **Cooldown durations shortened**: 429 rate limit reduced from 30 minutes to
+  5 minutes. 402 payment required from 1 hour to 30 minutes. 401/403 from 24
+  hours to 6 hours. Default cooldown from 10 minutes to 5 minutes. Prevents
+  total proxy lockout when all keys hit rate limits simultaneously.
+- **Force-retry on total cooldown**: When all keys for a service are on
+  cooldown, the proxy now clears the soonest-expiring key and retries instead
+  of returning an error. Eliminates the "all services failed" dead-end.
+- **Status endpoint shows actual services**: `/status` now returns
+  `allowedServices` (vault-synced list) instead of `cfg.Proxy.Services`
+  (static config), correctly showing anthropic and other dynamically enabled
+  services.
+
+---
+
 ## [0.1.26] — 2026-04-08
 
 ### Fixed

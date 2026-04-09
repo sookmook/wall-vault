@@ -480,7 +480,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	svc := s.service
 	mdl := s.model
+	svcs := s.allowedServices
 	s.mu.RUnlock()
+
+	// show vault-synced services if available, else fall back to config
+	if len(svcs) == 0 {
+		svcs = s.cfg.Proxy.Services
+	}
 
 	sseConn := s.sse != nil && s.sse.IsConnected()
 
@@ -492,7 +498,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"model":    mdl,
 		"sse":      sseConn,
 		"filter":   s.cfg.Proxy.ToolFilter,
-		"services": s.cfg.Proxy.Services,
+		"services": svcs,
 		"mode":     s.cfg.Mode,
 	})
 }
@@ -1273,8 +1279,11 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 // ─── Ollama (single concurrent request via mutex) ────────────────────────────
 
 func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
-	// use the provided model (from vault config); fall back to env var or default
-	if model == "" {
+	// Ollama uses simple model names (e.g. "gemma4:26b"), not provider-prefixed
+	// names like "google/gemini-3.1-pro-preview". When dispatch falls back to
+	// Ollama from another service, the model name may contain a slash — use
+	// env var or default instead.
+	if model == "" || strings.Contains(model, "/") {
 		model = os.Getenv("OLLAMA_MODEL")
 	}
 	if model == "" {
@@ -1524,7 +1533,7 @@ func stripControlTokens(s string) string {
 // resolveActualModel returns the model name that will actually be used for the given service.
 // Uses the vault-configured model; falls back to env var or default for Ollama.
 func (s *Server) resolveActualModel(svc, model string) string {
-	if svc == "ollama" && model == "" {
+	if svc == "ollama" && (model == "" || strings.Contains(model, "/")) {
 		if m := os.Getenv("OLLAMA_MODEL"); m != "" {
 			return m
 		}

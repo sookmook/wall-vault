@@ -8,6 +8,35 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.28] — 2026-04-11
+
+### Fixed
+- **PNG avatar upload failures in agents section**: PNG files — typically
+  much larger than JPG at the same resolution — frequently exceeded the 1 MB
+  body limit on `POST/PUT /admin/clients`, causing silent rejections.
+  Now downscaled client-side and the body limit raised specifically for
+  client CRUD.
+- **`.hpg` typo in extension switch**: Both `internal/vault/ui.go` and
+  `internal/proxy/heartbeat.go` listed `.hpg` alongside `.jpg`/`.jpeg` —
+  almost certainly a fat-fingered `.png`. Removed the non-existent extension.
+  No behavior change (the default MIME was already `image/png`), but the
+  dead case was misleading.
+
+### Changed
+- **Client-side avatar downscale** (`loadAvatarPreview` in `ui.go`): uploads
+  are now resized to at most 256×256 via a `<canvas>` before being sent as
+  a base64 data URI. PNG inputs stay PNG (transparency preserved); other
+  formats are re-encoded as JPEG quality 0.9. Invalid files trigger a
+  localized alert and clear the input. Dashboard renders avatars at 48×48
+  and 5.28 rem anyway, so the original resolution was wasted bytes.
+- **Dedicated body limit for client CRUD** (`server.go`): introduced
+  `maxAvatarBodySize = 3 << 20` (3 MB). `POST /admin/clients` and
+  `PUT /admin/clients/{id}` now use this limit instead of the generic
+  1 MB, providing headroom even without the client-side resize (e.g. for
+  direct API callers).
+
+---
+
 ## [0.1.27] — 2026-04-09
 
 ### Fixed

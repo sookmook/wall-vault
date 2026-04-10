@@ -68,7 +68,7 @@ func readLocalAvatar(avatarPath string) string {
 	}
 	mime := "image/png"
 	switch strings.ToLower(filepath.Ext(cleaned)) {
-	case ".jpg", ".jpeg", ".hpg":
+	case ".jpg", ".jpeg":
 		mime = "image/jpeg"
 	case ".webp":
 		mime = "image/webp"

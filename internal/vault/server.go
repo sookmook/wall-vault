@@ -22,8 +22,9 @@ import (
 
 // request body size limits
 const (
-	maxBodySize      = 1 << 20 // 1 MB for normal JSON endpoints
-	maxHeartbeatSize = 5 << 20 // 5 MB for heartbeat (includes base64 avatar)
+	maxBodySize       = 1 << 20 // 1 MB for normal JSON endpoints
+	maxAvatarBodySize = 3 << 20 // 3 MB for client CRUD (includes base64 avatar; client-side resized to <=256px)
+	maxHeartbeatSize  = 5 << 20 // 5 MB for heartbeat (includes base64 avatar)
 )
 
 // secureCompare performs constant-time string comparison to prevent timing attacks.
@@ -344,7 +345,7 @@ func (s *Server) handleAdminClients(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		jsonOK(w, s.store.ListClients())
 	case http.MethodPost:
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+		r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBodySize)
 		var inp ClientInput
 		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
@@ -403,7 +404,7 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonOK(w, c)
 	case http.MethodPut:
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+		r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBodySize)
 		var inp ClientUpdateInput
 		if err := json.NewDecoder(r.Body).Decode(&inp); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)

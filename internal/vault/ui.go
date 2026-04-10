@@ -1267,16 +1267,46 @@ function _clearClientForm(prefix) {
   const av=document.getElementById(prefix+'-avatar');if(av)av.value='';
   const avp=document.getElementById(prefix+'-avatar-preview');if(avp){avp.src='';avp.style.display='none';}
 }
-// 아바타 파일 → base64 data URI 변환 후 hidden input에 저장
+// 아바타 파일 → 256x256 max 리사이즈 → base64 data URI → hidden input
+// PNG 입력은 PNG 유지(투명도 보존), JPG/WEBP/GIF는 JPEG로 재인코딩
 function loadAvatarPreview(fileInput, hiddenId, previewId) {
   const file = fileInput.files[0];
   if (!file) return;
+  if (!file.type || !file.type.startsWith('image/')) {
+    alert('이미지 파일만 업로드할 수 있습니다.');
+    fileInput.value = '';
+    return;
+  }
   const reader = new FileReader();
+  reader.onerror = () => alert('파일을 읽지 못했습니다.');
   reader.onload = e => {
-    const data = e.target.result;
-    document.getElementById(hiddenId).value = data;
-    const prev = document.getElementById(previewId);
-    if (prev) { prev.src = data; prev.style.display = 'block'; }
+    const img = new Image();
+    img.onerror = () => alert('이미지를 디코딩하지 못했습니다. 손상된 파일일 수 있습니다.');
+    img.onload = () => {
+      const MAX = 256;
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+      if (w > MAX || h > MAX) {
+        const scale = MAX / Math.max(w, h);
+        w = Math.max(1, Math.round(w * scale));
+        h = Math.max(1, Math.round(h * scale));
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { alert('Canvas 2D 컨텍스트를 얻지 못했습니다.'); return; }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      const isPng = file.type === 'image/png';
+      const outMime = isPng ? 'image/png' : 'image/jpeg';
+      const data = isPng ? canvas.toDataURL(outMime) : canvas.toDataURL(outMime, 0.9);
+      document.getElementById(hiddenId).value = data;
+      const prev = document.getElementById(previewId);
+      if (prev) { prev.src = data; prev.style.display = 'block'; }
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -1907,7 +1937,7 @@ func resolveAvatarDataURI(avatarVal string) string {
 	// detect mime type from file extension
 	mime := "image/png"
 	switch strings.ToLower(filepath.Ext(cleaned)) {
-	case ".jpg", ".jpeg", ".hpg":
+	case ".jpg", ".jpeg":
 		mime = "image/jpeg"
 	case ".webp":
 		mime = "image/webp"

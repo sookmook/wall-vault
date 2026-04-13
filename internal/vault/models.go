@@ -141,8 +141,9 @@ type ServiceConfig struct {
 	Name         string `json:"name"`
 	LocalURL     string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
 	Enabled      bool   `json:"enabled"`
-	Custom       bool   `json:"custom,omitempty"`        // user-added service
-	ProxyEnabled bool   `json:"proxy_enabled,omitempty"` // enabled for proxy dispatch
+	Custom       bool   `json:"custom,omitempty"`          // user-added service
+	ProxyEnabled bool   `json:"proxy_enabled,omitempty"`   // enabled for proxy dispatch
+	DefaultModel string `json:"default_model,omitempty"`   // v0.2: most-common client model for this service
 }
 
 // IsLocal: whether this is a local server service

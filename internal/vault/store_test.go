@@ -1,6 +1,9 @@
 package vault
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -209,3 +212,102 @@ func TestStore_ProxyStatus(t *testing.T) {
 		t.Fatal("UpdatedAt이 0값")
 	}
 }
+
+// ─── Auto-Migration (v1 → v2) ────────────────────────────────────────────────
+
+func TestLoadAutoMigratesV1(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "vault.json")
+	password := "test-master"
+
+	// Legacy v1 plaintext (no schema_version).
+	v1 := []byte(`{
+		"services":[
+			{"id":"google","name":"Google","enabled":true,"proxy_enabled":true}
+		],
+		"clients":[
+			{"id":"bot-a","name":"Delta","token":"t",
+			 "default_service":"google","default_model":"gemini-3.1-pro-preview",
+			 "agent_type":"nanoclaw","enabled":true,"sort_order":1}
+		],
+		"keys":[]
+	}`)
+
+	// Write v1 plaintext directly to disk (as legacy store would have written it).
+	if err := writeEncryptedForTest(path, password, v1); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act: open the store on the legacy file.
+	store, err := openStoreForTest(path, password)
+	if err != nil {
+		t.Fatalf("open failed: %v", err)
+	}
+
+	// Assert: backup exists.
+	matches, _ := filepath.Glob(filepath.Join(tmp, "vault.json.pre-v02.*.bak"))
+	if len(matches) != 1 {
+		t.Fatalf("expected one pre-v02 backup, got %d (%v)", len(matches), matches)
+	}
+
+	// Assert: in-memory schema upgraded.
+	clients := store.ListClients()
+	if len(clients) != 1 {
+		t.Fatalf("expected 1 client after migration, got %d", len(clients))
+	}
+	if clients[0].PreferredService != "google" {
+		t.Fatalf("preferred_service=%q", clients[0].PreferredService)
+	}
+	if clients[0].ModelOverride != "gemini-3.1-pro-preview" {
+		t.Fatalf("model_override=%q", clients[0].ModelOverride)
+	}
+
+	// Assert: on-disk file is now v2 (re-open without migration should be a noop).
+	store2, err := openStoreForTest(path, password)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	_ = store2
+
+	matches2, _ := filepath.Glob(filepath.Join(tmp, "vault.json.pre-v02.*.bak"))
+	if len(matches2) != 1 { // still exactly one — no new backup on second load
+		t.Fatalf("unexpected additional backup after reopen: %v", matches2)
+	}
+}
+
+// writeEncryptedForTest writes raw plaintext JSON bytes directly to path,
+// exactly as the legacy (v0.1.x) store would have written vault.json.
+// The store does not encrypt the file itself — only individual key values
+// inside the JSON are encrypted. So "writing the encrypted file" means
+// writing the JSON blob as-is (the masterPass parameter is accepted for
+// API symmetry but the file itself is plain JSON in the current design).
+func writeEncryptedForTest(path, _ string, raw []byte) error {
+	return os.WriteFile(path, raw, 0600)
+}
+
+// openStoreForTest opens a Store against a specific vault.json path
+// (not the default dataDir layout). It uses a one-file tempdir trick:
+// create a tempdir, symlink/copy the file there, open via NewStore.
+func openStoreForTest(path, password string) (*Store, error) {
+	// Construct a storeData directly from raw JSON to validate it first,
+	// then use NewStore with the parent directory.
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	if base != "vault.json" {
+		// Re-write to a vault.json in that dir if needed.
+		dest := filepath.Join(dir, "vault.json")
+		if dest != path {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(dest, data, 0600); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return NewStore(dir, password)
+}
+
+// Ensure the test imports are used (encoding/json is used in validate helpers).
+var _ = json.Marshal

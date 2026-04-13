@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -67,6 +68,46 @@ func (s *Store) load() error {
 	if err := json.Unmarshal(data, &snap); err != nil {
 		return err
 	}
+
+	// Auto-migrate: if schema_version < CurrentSchemaVersion (or missing),
+	// back up the current on-disk file and run MigrateV1ToV2.
+	if snap.SchemaVersion < CurrentSchemaVersion {
+		ts := time.Now().UTC().Format("20060102T150405Z")
+		backupPath := s.dataFile + ".pre-v02." + ts + ".bak"
+		if readErr := func() error {
+			ct, readErr := os.ReadFile(s.dataFile)
+			if readErr != nil {
+				return readErr
+			}
+			if err := os.WriteFile(backupPath, ct, 0o600); err != nil {
+				return fmt.Errorf("migrate: cannot write backup %s: %w", backupPath, err)
+			}
+			log.Printf("[migrate] wrote backup: %s", backupPath)
+			return nil
+		}(); readErr != nil {
+			return readErr
+		}
+
+		migrated, err := MigrateV1ToV2(data)
+		if err != nil {
+			return fmt.Errorf("migrate: MigrateV1ToV2: %w", err)
+		}
+		snap = *migrated
+
+		// Populate store fields so s.save() can write the v2 envelope.
+		s.keys = snap.Keys
+		s.clients = snap.Clients
+		s.services = snap.Services
+		if snap.Settings != nil {
+			s.settings = *snap.Settings
+		}
+		if err := s.save(); err != nil {
+			return fmt.Errorf("migrate: save v2 envelope: %w", err)
+		}
+		log.Printf("[migrate] v1 → v2 complete; services=%d clients=%d",
+			len(snap.Services), len(snap.Clients))
+	}
+
 	s.keys = snap.Keys
 	s.clients = snap.Clients
 	// migrate: assign SortOrder to existing clients that don't have one

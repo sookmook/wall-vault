@@ -8,6 +8,38 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.1.29] — 2026-04-13
+
+### Fixed
+- **Anthropic `/v1/messages` dispatch drops tool_use / tool_result turns**:
+  `AnthropicToGemini` extracted text only (`ContentText()`), so Claude Code's
+  content-block messages — which often carry `tool_use` (no text) or
+  `tool_result` blocks — collapsed into empty-text Gemini parts. Every
+  dispatch backend then rejected the request:
+    * Google Gemini → HTTP 400 "contents is not specified"
+    * OpenRouter / Ollama → HTTP 400 "[] is too short - 'messages'"
+    * Anthropic fallback → "Anthropic: 변환할 메시지 없음" (0 messages after filter)
+  Fix: route Anthropic → OAI intermediate → Gemini so tool blocks become
+  proper `functionCall` / `functionResponse` parts and empty-content turns
+  are dropped cleanly (reusing the existing `anthropicToOpenAIReq` +
+  `OpenAIToGemini` path). Generation params (temperature / max_tokens)
+  still applied on top.
+- **Anthropic fallback turn with no plain text**: `doAnthropicRequest` used
+  `extractText` per turn and produced empty-content messages (which the
+  Anthropic API itself accepts but that combined with the bug above led to
+  `0 messages` when all turns were tool-only). Now JSON-serializes the raw
+  parts as fallback content for tool turns and skips genuinely empty turns
+  before the "변환할 메시지 없음" guard.
+
+### Why this only surfaced now
+OpenClaw 2026.4.10's Active Memory plugin and nanoclaw's Claude Code agent
+(via `ANTHROPIC_BASE_URL` pointing at wall-vault) both emit tool_use /
+tool_result heavy `/v1/messages` requests far more often than the earlier
+text-only chat turns, making the latent conversion bug routine instead of
+edge-case.
+
+---
+
 ## [0.1.28] — 2026-04-11
 
 ### Fixed

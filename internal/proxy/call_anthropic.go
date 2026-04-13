@@ -222,9 +222,25 @@ func (s *Server) doAnthropicRequest(apiKey, model string, req *GeminiRequest) (*
 		if role != "user" && role != "assistant" {
 			continue
 		}
+		content := extractText(turn.Parts)
+		if content == "" {
+			// Tool-call / tool-response turns carry no plain text (they live in
+			// functionCall / functionResponse parts). Serialize them so the
+			// upstream Anthropic API still receives a non-empty message body and
+			// retains the tool context. Anthropic's format expects text content
+			// per turn when not using native tool blocks, so JSON-stringifying
+			// the parts preserves intent without dropping the turn entirely.
+			if raw, err := json.Marshal(turn.Parts); err == nil && len(turn.Parts) > 0 {
+				content = string(raw)
+			}
+		}
+		if content == "" {
+			// Genuinely empty turn — skip to avoid upstream 400.
+			continue
+		}
 		ar.Messages = append(ar.Messages, antMsg{
 			Role:    role,
-			Content: extractText(turn.Parts),
+			Content: content,
 		})
 	}
 

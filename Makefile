@@ -7,8 +7,12 @@ LDFLAGS = -ldflags "-X main.version=$(VERSION) -s -w"
 
 # ─── 빌드 ────────────────────────────────────────────────────────────────────
 
+.PHONY: templ-generate
+templ-generate:
+	~/go/bin/templ generate ./internal/vault/views/...
+
 .PHONY: build
-build:
+build: templ-generate
 	~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY) .
 
 .PHONY: build-all

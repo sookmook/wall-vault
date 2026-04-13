@@ -8,6 +8,6 @@ require (
 )
 
 require (
-	github.com/a-h/templ v0.2.747 // indirect
+	github.com/a-h/templ v0.2.747 // indirect; build-time code generation tool, see Makefile templ-generate
 	golang.org/x/sys v0.42.0 // indirect
 )

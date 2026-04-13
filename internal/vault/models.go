@@ -144,6 +144,7 @@ type ServiceConfig struct {
 	Custom       bool   `json:"custom,omitempty"`          // user-added service
 	ProxyEnabled bool   `json:"proxy_enabled,omitempty"`   // enabled for proxy dispatch
 	DefaultModel string `json:"default_model,omitempty"`   // v0.2: most-common client model for this service
+	SortOrder    int    `json:"sort_order,omitempty"`      // display order preserved from v1
 }
 
 // IsLocal: whether this is a local server service

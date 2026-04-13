@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// Note: this migrator populates the legacy *ServiceConfig* shape (not the v0.2
+// canonical Service struct) because the vault store still uses ServiceConfig
+// throughout. Stage 4 of the v0.2 redesign plan replaces ServiceConfig with
+// Service and this function's return type evolves with it.
+
 // MigrateV1ToV2 converts the legacy v0.1.x decrypted vault envelope JSON
 // into a *storeData (v2). Field mapping per spec §7.2:
 //
@@ -99,6 +104,7 @@ func MigrateV1ToV2(raw []byte) (*storeData, error) {
 			Enabled:      s.Enabled,
 			ProxyEnabled: s.ProxyEnabled,
 			DefaultModel: pickModel(s.ID),
+			SortOrder:    s.SortOrder,
 		})
 	}
 

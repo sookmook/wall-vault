@@ -320,36 +320,35 @@ func GeminiToOllama(model string, req *GeminiRequest) *OllamaRequest {
 
 // ─── Anthropic → Gemini ───────────────────────────────────────────────────────
 
+// AnthropicToGemini converts an Anthropic /v1/messages request into a GeminiRequest
+// while preserving tool_use / tool_result content blocks. Naive text-only extraction
+// (the previous implementation) collapsed tool blocks to empty-text parts, which
+// upstream Google Gemini / OpenRouter / Anthropic / Ollama then rejected as
+// "contents is not specified" or "messages is too short".
+//
+// We route through the OpenAI-intermediate representation because
+// anthropicToOpenAIReq already handles content-block arrays, tool_use → tool_calls,
+// and tool_result → role=tool mapping correctly; OpenAIToGemini then rebuilds a
+// Gemini-native structure with functionCall / functionResponse parts.
 func AnthropicToGemini(req *AnthropicRequest) *GeminiRequest {
-	gemini := &GeminiRequest{}
+	// Build rich OAI representation (preserves tool_use / tool_result blocks).
+	oai := anthropicToOpenAIReq(req, req.Model)
+	// Convert to Gemini form — OpenAIToGemini drops empty-content messages that
+	// would cause "contents is not specified" and materializes functionCall /
+	// functionResponse parts for tool turns.
+	gemini := OpenAIToGemini(oai)
 
-	if sys := req.SystemText(); sys != "" {
-		gemini.SystemInstruction = &GeminiContent{
-			Parts: []GeminiPart{{Text: sys}},
-		}
-	}
-
-	for _, msg := range req.Messages {
-		role := msg.Role
-		if role == "assistant" {
-			role = "model"
-		}
-		text := msg.ContentText()
-		gemini.Contents = append(gemini.Contents, GeminiContent{
-			Role:  role,
-			Parts: []GeminiPart{{Text: text}},
-		})
-	}
-
+	// Carry generation params the OAI intermediate may have dropped.
 	if req.Temperature != nil || req.MaxTokens > 0 {
-		cfg := &GenerationConfig{}
+		if gemini.GenerationConfig == nil {
+			gemini.GenerationConfig = &GenerationConfig{}
+		}
 		if req.Temperature != nil {
-			cfg.Temperature = req.Temperature
+			gemini.GenerationConfig.Temperature = req.Temperature
 		}
 		if req.MaxTokens > 0 {
-			cfg.MaxOutputTokens = &req.MaxTokens
+			gemini.GenerationConfig.MaxOutputTokens = &req.MaxTokens
 		}
-		gemini.GenerationConfig = cfg
 	}
 
 	return gemini

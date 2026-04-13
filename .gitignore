@@ -57,3 +57,4 @@ Makefile.local
 CLAUDE.md
 .claude/
 scripts/
+.superpowers/

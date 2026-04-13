@@ -205,6 +205,11 @@ type ConfigChangeEvent struct {
 
 // ─── Store Snapshot ───────────────────────────────────────────────────────────
 
+// CurrentSchemaVersion is the version stamped onto every persisted vault.json.
+// Task 6 migration code references this same constant when deciding whether
+// an existing file needs upgrading.
+const CurrentSchemaVersion = 2
+
 type storeData struct {
 	SchemaVersion int              `json:"schema_version"`
 	Keys          []*APIKey        `json:"keys"`

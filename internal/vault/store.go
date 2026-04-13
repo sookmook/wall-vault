@@ -240,7 +240,7 @@ func (s *Store) save() error {
 		Services: s.services,
 		Settings: &settings,
 	}
-	snap.SchemaVersion = 2
+	snap.SchemaVersion = CurrentSchemaVersion
 	data, err := json.MarshalIndent(snap, "", "  ")
 	if err != nil {
 		return err

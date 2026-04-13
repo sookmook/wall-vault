@@ -206,11 +206,12 @@ type ConfigChangeEvent struct {
 // ─── Store Snapshot ───────────────────────────────────────────────────────────
 
 type storeData struct {
-	Keys     []*APIKey        `json:"keys"`
-	Clients  []*Client        `json:"clients"`
-	Proxies  []*ProxyStatus   `json:"proxies"`
-	Services []*ServiceConfig `json:"services,omitempty"`
-	Settings *StoreSettings   `json:"settings,omitempty"`
+	SchemaVersion int              `json:"schema_version"`
+	Keys          []*APIKey        `json:"keys"`
+	Clients       []*Client        `json:"clients"`
+	Proxies       []*ProxyStatus   `json:"proxies"`
+	Services      []*ServiceConfig `json:"services,omitempty"`
+	Settings      *StoreSettings   `json:"settings,omitempty"`
 }
 
 // StoreSettings: UI settings persisted in vault.json (theme, language)

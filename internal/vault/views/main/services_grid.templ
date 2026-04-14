@@ -1,0 +1,17 @@
+package mainview
+
+import (
+	"fmt"
+	"github.com/sookmook/wall-vault/internal/vault"
+)
+
+templ ServicesGrid(services []*vault.ServiceConfig) {
+	<section>
+		<h3>Services · { fmt.Sprint(len(services)) }</h3>
+		<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+			for _, s := range services {
+				@ServiceCard(s)
+			}
+		</div>
+	</section>
+}

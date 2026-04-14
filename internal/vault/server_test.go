@@ -614,3 +614,31 @@ func TestHXServicesGridRendersGoogle(t *testing.T) {
 	}
 }
 
+func TestDashboardHomeContainsServicesAndAgents(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+	if err := srv.store.UpsertService(&ServiceConfig{ID: "google", Name: "Google", Enabled: true, ProxyEnabled: true}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	enabled := true
+	if _, err := srv.store.AddClient(ClientInput{ID: "bot-a", Name: "Delta", Token: "t", DefaultService: "google", Enabled: &enabled}); err != nil {
+		t.Fatalf("AddClient: %v", err)
+	}
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	body := w.Body.String()
+	for _, want := range []string{"Google", "Delta", "htmx.org"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing %q — got first 500 chars: %s", want, truncate(body, 500))
+		}
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) > n {
+		return s[:n] + "..."
+	}
+	return s
+}
+

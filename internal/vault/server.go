@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
@@ -14,10 +15,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/sookmook/wall-vault/internal/config"
 	"github.com/sookmook/wall-vault/internal/middleware"
 	"github.com/sookmook/wall-vault/internal/models"
-	"github.com/sookmook/wall-vault/internal/theme"
+	layouts "github.com/sookmook/wall-vault/internal/vault/views/layouts"
+	mainview "github.com/sookmook/wall-vault/internal/vault/views/main"
+	sidebar "github.com/sookmook/wall-vault/internal/vault/views/sidebar"
+	slideover "github.com/sookmook/wall-vault/internal/vault/views/slideover"
 )
 
 // request body size limits
@@ -1125,17 +1130,42 @@ func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {
 // ─── Dashboard UI ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	// Only handle exactly "/" — fall through elsewhere.
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	t := theme.Get(s.cfg.Theme)
+
+	themeName := s.store.GetSettings().Theme
+	if themeName == "" {
+		themeName = s.cfg.Theme
+	}
+	if themeName == "" {
+		themeName = "light"
+	}
+	services := s.store.ListServices()
+	clients := s.store.ListClients()
+
+	inner := layouts.Shell(
+		sidebar.Sidebar(toSidebarServices(services), toSidebarClients(clients)),
+		renderHome(toMainServices(services), toMainClients(clients)),
+		slideover.Empty(),
+	)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
-	fmt.Fprint(w, buildDashboard(s, t))
+	layouts.Base(themeName, inner).Render(r.Context(), w) //nolint:errcheck
 }
+
+// renderHome stacks ServicesGrid + AgentsGrid as the main pane body.
+func renderHome(services []*mainview.ServiceVM, clients []*mainview.ClientVM) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		if err := mainview.ServicesGrid(services).Render(ctx, w); err != nil {
+			return err
+		}
+		return mainview.AgentsGrid(clients).Render(ctx, w)
+	})
+}
+
 
 // ─── Util ─────────────────────────────────────────────────────────────────────
 

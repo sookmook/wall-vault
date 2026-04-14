@@ -149,6 +149,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/services/", s.adminAuth(s.handleAdminServicesID))
 	mux.HandleFunc("/admin/models", s.adminAuth(s.handleAdminModels))
 
+	// HTMX fragments
+	s.RegisterHXRoutes(mux)
+
 	// logo
 	mux.HandleFunc("/logo", s.handleLogo)
 

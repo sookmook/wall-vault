@@ -577,3 +577,15 @@ func TestAdminPutClient_ModelOverrideAllowedWhenWhitelistEmpty(t *testing.T) {
 		t.Fatalf("got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestHXSidebarNotImplementedStub(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest("GET", "/hx/sidebar", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusNotImplemented {
+		t.Fatalf("got %d, want 501", w.Code)
+	}
+}

@@ -14,6 +14,10 @@ WAIT_DEAD = for i in $$(seq 1 10); do pgrep -f "$(1)" > /dev/null 2>&1 || break;
 deploy-mini: build-darwin-arm64
 	@echo "▶ [mini] uploading binary..."
 	scp bin/$(BINARY)-darwin-arm64 $(MINI_HOST):~/.openclaw/$(BINARY).new
+	@echo "▶ [mini] pre-v0.2 vault.json backup confirmation..."
+	@ssh $(MINI_HOST) 'ls -la ~/.wall-vault/data/vault.json 2>/dev/null || echo "(vault.json not found — migration will create new)"'
+	@read -p "Continue with v0.2 deploy to mini? Migration will auto-backup to vault.json.pre-v02.{ts}.bak. [y/N] " confirm; \
+	  if [ "$$confirm" != "y" ]; then echo "aborted"; exit 1; fi
 	@echo "▶ [mini] killing old process..."
 	ssh $(MINI_HOST) '\
 	  launchctl unload ~/Library/LaunchAgents/com.wall-vault.vault.plist 2>/dev/null || true; \
@@ -45,6 +49,10 @@ deploy-mini: build-darwin-arm64
 deploy-bot-c: build-linux-arm64
 	@echo "▶ [bot-c] uploading binary..."
 	scp bin/$(BINARY)-linux-arm64 $(RASPI_HOST):~/.openclaw/$(BINARY).new
+	@echo "▶ [bot-c] pre-v0.2 vault.json backup confirmation..."
+	@ssh $(RASPI_HOST) 'ls -la ~/.wall-vault/data/vault.json 2>/dev/null || echo "(vault.json not found — migration will create new)"'
+	@read -p "Continue with v0.2 deploy to bot-c? Migration will auto-backup to vault.json.pre-v02.{ts}.bak. [y/N] " confirm; \
+	  if [ "$$confirm" != "y" ]; then echo "aborted"; exit 1; fi
 	@echo "▶ [bot-c] killing old process..."
 	ssh $(RASPI_HOST) '\
 	  systemctl --user stop wall-vault-proxy 2>/dev/null || true; \
@@ -70,6 +78,10 @@ deploy-bot-c: build-linux-arm64
 
 .PHONY: deploy-local
 deploy-local: build
+	@echo "▶ [local] pre-v0.2 vault.json backup confirmation..."
+	@ls -la ~/.wall-vault/data/vault.json 2>/dev/null || echo "(vault.json not found — migration will create new)"
+	@read -p "Continue with v0.2 deploy to local? Migration will auto-backup to vault.json.pre-v02.{ts}.bak. [y/N] " confirm; \
+	  if [ "$$confirm" != "y" ]; then echo "aborted"; exit 1; fi
 	@echo "▶ [local] killing old process..."
 	systemctl --user stop wall-vault-proxy 2>/dev/null || true
 	@pkill -x "wall-vault" 2>/dev/null || true

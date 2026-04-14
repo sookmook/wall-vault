@@ -1,0 +1,16 @@
+package slideover
+
+templ Frame(title string, body templ.Component) {
+	<aside id="slideover" data-open="true" hx-swap-oob="true">
+		<div style="display:flex;justify-content:space-between;align-items:center">
+			<b>✏︎ { title }</b>
+			<button hx-get="/hx/slideover/close" hx-target="#slideover" hx-swap="outerHTML">✕</button>
+		</div>
+		<hr/>
+		@body
+	</aside>
+}
+
+templ Empty() {
+	<aside id="slideover" hx-swap-oob="true"></aside>
+}

@@ -1,0 +1,22 @@
+package slideover
+
+import (
+	"fmt"
+	"strings"
+	"github.com/sookmook/wall-vault/internal/vault"
+)
+
+templ ServiceEdit(s *vault.ServiceConfig) {
+	<form hx-put={"/admin/services/" + s.ID} hx-ext="json-enc" hx-swap="none">
+		<label>Name <input name="name" value={s.Name}/></label>
+		<label>Default Model <input name="default_model" value={s.DefaultModel}/></label>
+		<label>Local URL <input name="local_url" value={s.LocalURL}/></label>
+		<label>Fallback Order <input name="sort_order" type="number" value={fmt.Sprint(s.SortOrder)}/></label>
+		<label>Allowed Models <textarea name="allowed_models" placeholder="one per line">{ strings.Join(s.AllowedModels, "\n") }</textarea></label>
+		<label>
+			<input type="checkbox" name="proxy_enabled" checked?={s.ProxyEnabled}/>
+			Proxy Enabled
+		</label>
+		<button type="submit">Save</button>
+	</form>
+}

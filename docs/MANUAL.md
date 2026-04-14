@@ -20,6 +20,16 @@
 
 ---
 
+## v0.2 업그레이드 안내
+
+- `Service` 에 `default_model` 과 `allowed_models` 가 생겼습니다. 서비스별 기본 모델은 이제 서비스 카드에서 직접 설정합니다.
+- `Client.default_service` / `default_model` 은 각각 `preferred_service` / `model_override` 로 이름과 의미가 바뀌었습니다. override가 비어 있으면 서비스의 기본 모델이 사용됩니다.
+- 첫 v0.2 기동 시 기존 `vault.json` 이 자동 변환되고, 변환 직전 상태는 `vault.json.pre-v02.{타임스탬프}.bak` 로 보존됩니다.
+- 대시보드는 좌측 사이드바·중앙 카드 그리드·우측 편집 슬라이드오버의 세 영역으로 바뀌었습니다.
+- admin API 경로는 동일하지만 요청/응답 body 스키마가 변경되어 구 CLI 스크립트는 업데이트가 필요합니다.
+
+---
+
 ## wall-vault란?
 
 **wall-vault = 오픈클로(OpenClaw)를 위한 AI 대리인(프록시) + API 키 금고**

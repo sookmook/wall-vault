@@ -1,0 +1,17 @@
+package layouts
+
+templ Base(theme string, inner templ.Component) {
+	<!DOCTYPE html>
+	<html lang="ko" data-theme={theme}>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width,initial-scale=1"/>
+			<title>wall-vault</title>
+			<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+			@Theme()
+		</head>
+		<body>
+			@inner
+		</body>
+	</html>
+}

@@ -137,14 +137,15 @@ func (s *Service) IsLocal() bool {
 // ServiceConfig: legacy alias retained for store.go / server.go / ui.go until Stage 2 migration.
 // TODO (v0.2 Stage 2): replace all ServiceConfig references with Service and remove this struct.
 type ServiceConfig struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	LocalURL     string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
-	Enabled      bool   `json:"enabled"`
-	Custom       bool   `json:"custom,omitempty"`          // user-added service
-	ProxyEnabled bool   `json:"proxy_enabled,omitempty"`   // enabled for proxy dispatch
-	DefaultModel string `json:"default_model,omitempty"`   // v0.2: most-common client model for this service
-	SortOrder    int    `json:"sort_order,omitempty"`      // display order preserved from v1
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	LocalURL      string   `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
+	Enabled       bool     `json:"enabled"`
+	Custom        bool     `json:"custom,omitempty"`          // user-added service
+	ProxyEnabled  bool     `json:"proxy_enabled,omitempty"`   // enabled for proxy dispatch
+	DefaultModel  string   `json:"default_model,omitempty"`   // v0.2: most-common client model for this service
+	AllowedModels []string `json:"allowed_models,omitempty"`  // v0.2: whitelist of models for this service
+	SortOrder     int      `json:"sort_order,omitempty"`      // display order preserved from v1
 }
 
 // IsLocal: whether this is a local server service

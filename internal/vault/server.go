@@ -894,6 +894,23 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 		if v, ok := fields["proxy_enabled"].(bool); ok {
 			inp.ProxyEnabled = v
 		}
+		if v, ok := fields["default_model"].(string); ok {
+			inp.DefaultModel = v
+		}
+		if v, ok := fields["allowed_models"]; ok {
+			switch val := v.(type) {
+			case []interface{}:
+				models := make([]string, 0, len(val))
+				for _, m := range val {
+					if s, ok := m.(string); ok {
+						models = append(models, s)
+					}
+				}
+				inp.AllowedModels = models
+			case nil:
+				inp.AllowedModels = nil
+			}
+		}
 		if err := s.store.UpsertService(&inp); err != nil {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return

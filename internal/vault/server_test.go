@@ -429,6 +429,41 @@ func TestVaultResetUsage(t *testing.T) {
 	}
 }
 
+// ─── Admin Service default_model + allowed_models ────────────────────────────
+
+func TestAdminPutServiceDefaultModel(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	// seed google service before PUT
+	err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", Enabled: true, ProxyEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("seed google service: %v", err)
+	}
+
+	body := `{"default_model":"gemini-3.1-pro-preview","allowed_models":["gemini-3.1-pro-preview","gemini-3.1-flash-lite-preview"]}`
+	req := httptest.NewRequest("PUT", "/admin/services/google", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s", w.Code, w.Body.String())
+	}
+
+	got := srv.store.GetService("google")
+	if got == nil {
+		t.Fatalf("google service not found after update")
+	}
+	if got.DefaultModel != "gemini-3.1-pro-preview" {
+		t.Fatalf("default_model = %q", got.DefaultModel)
+	}
+	if len(got.AllowedModels) != 2 {
+		t.Fatalf("allowed_models = %v", got.AllowedModels)
+	}
+}
+
 // ─── Dashboard UI ─────────────────────────────────────────────────────────────
 
 func TestVaultDashboard(t *testing.T) {

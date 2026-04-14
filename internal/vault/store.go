@@ -648,6 +648,11 @@ func (s *Store) UpsertService(inp *ServiceConfig) error {
 			sv.LocalURL = inp.LocalURL
 			sv.Enabled = inp.Enabled
 			sv.ProxyEnabled = inp.ProxyEnabled
+			sv.DefaultModel = inp.DefaultModel
+			sv.AllowedModels = inp.AllowedModels
+			if inp.SortOrder != 0 {
+				sv.SortOrder = inp.SortOrder
+			}
 			return s.save()
 		}
 	}

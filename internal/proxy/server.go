@@ -1054,12 +1054,11 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 			continue
 		}
 		if err == nil {
-			actualMdl := s.resolveActualModel(svc, model)
 			if svc != service {
-				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, actualMdl)
+				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, model)
 				s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
 					"service": svc,
-					"model":   actualMdl,
+					"model":   model,
 				})
 			}
 			return resp, nil
@@ -1279,19 +1278,10 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 // ─── Ollama (single concurrent request via mutex) ────────────────────────────
 
 func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
-	// Ollama uses simple model names (e.g. "gemma4:26b"), not provider-prefixed
-	// names like "google/gemini-3.1-pro-preview". When dispatch falls back to
-	// Ollama from another service, the model name may contain a slash — use
-	// env var or default instead.
-	if model == "" || strings.Contains(model, "/") {
-		model = os.Getenv("OLLAMA_MODEL")
-	}
-	if model == "" {
-		model = os.Getenv("WV_OLLAMA_MODEL")
-	}
-	if model == "" {
-		model = "qwen3.5:35b"
-	}
+	// v0.2: Ollama name-mismatch heuristic removed.
+	// dispatch_v2.go's dispatchWith() now uses each service's default_model,
+	// so a Gemini/Claude model id can never reach the Ollama endpoint
+	// structurally. See ResolveModel + dispatchWith.
 	ollamaURL := s.ollamaURL()
 
 	s.ollamaMu.Lock()
@@ -1530,21 +1520,6 @@ func stripControlTokens(s string) string {
 
 // onFallback: called when dispatch succeeds on a service other than the requested one.
 // Updates s.service/s.model so the next heartbeat, vault UI, and openclaw TUI reflect reality.
-// resolveActualModel returns the model name that will actually be used for the given service.
-// Uses the vault-configured model; falls back to env var or default for Ollama.
-func (s *Server) resolveActualModel(svc, model string) string {
-	if svc == "ollama" && (model == "" || strings.Contains(model, "/")) {
-		if m := os.Getenv("OLLAMA_MODEL"); m != "" {
-			return m
-		}
-		if m := os.Getenv("WV_OLLAMA_MODEL"); m != "" {
-			return m
-		}
-		return "qwen3.5:35b"
-	}
-	return model
-}
-
 func extractModelFromPath(path string) string {
 	prefix := "/google/v1beta/models/"
 	if !strings.HasPrefix(path, prefix) {

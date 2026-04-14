@@ -3,10 +3,9 @@ package slideover
 import (
 	"fmt"
 	"strings"
-	"github.com/sookmook/wall-vault/internal/vault"
 )
 
-templ ServiceEdit(s *vault.ServiceConfig) {
+templ ServiceEdit(s *ServiceVM) {
 	<form hx-put={"/admin/services/" + s.ID} hx-ext="json-enc" hx-swap="none">
 		<label>Name <input name="name" value={s.Name}/></label>
 		<label>Default Model <input name="default_model" value={s.DefaultModel}/></label>

@@ -1,11 +1,8 @@
 package mainview
 
-import (
-	"fmt"
-	"github.com/sookmook/wall-vault/internal/vault"
-)
+import "fmt"
 
-templ AgentsGrid(clients []*vault.Client) {
+templ AgentsGrid(clients []*ClientVM) {
 	<section>
 		<h3>Agents · { fmt.Sprint(len(clients)) }</h3>
 		<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">

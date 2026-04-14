@@ -578,14 +578,39 @@ func TestAdminPutClient_ModelOverrideAllowedWhenWhitelistEmpty(t *testing.T) {
 	}
 }
 
-func TestHXSidebarNotImplementedStub(t *testing.T) {
+func TestHXSidebarRendersOK(t *testing.T) {
 	srv, cleanup := newTestVaultServer(t)
 	defer cleanup()
 
 	req := httptest.NewRequest("GET", "/hx/sidebar", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusNotImplemented {
-		t.Fatalf("got %d, want 501", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "wall-vault") {
+		t.Fatalf("body missing sidebar brand: %s", w.Body.String())
 	}
 }
+
+func TestHXServicesGridRendersGoogle(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google Gemini",
+		DefaultModel: "gemini-3.1-pro-preview",
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	req := httptest.NewRequest("GET", "/hx/services/grid", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "Google Gemini") {
+		t.Fatalf("body missing service name: %s", w.Body.String())
+	}
+}
+

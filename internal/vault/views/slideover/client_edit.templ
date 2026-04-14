@@ -1,8 +1,6 @@
 package slideover
 
-import "github.com/sookmook/wall-vault/internal/vault"
-
-templ ClientEdit(c *vault.Client, services []*vault.ServiceConfig) {
+templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 	<form hx-put={"/admin/clients/" + c.ID} hx-ext="json-enc" hx-swap="none">
 		<label>Name <input name="name" value={c.Name}/></label>
 		<label>Agent Type <input name="agent_type" value={c.AgentType}/></label>

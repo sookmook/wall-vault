@@ -1,11 +1,8 @@
 package mainview
 
-import (
-	"fmt"
-	"github.com/sookmook/wall-vault/internal/vault"
-)
+import "fmt"
 
-templ ServiceCard(s *vault.ServiceConfig) {
+templ ServiceCard(s *ServiceVM) {
 	<div class="card" hx-get={"/hx/services/" + s.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
 		<div style="display:flex;justify-content:space-between">
 			<b>{ s.Name }</b>

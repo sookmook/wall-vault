@@ -8,9 +8,7 @@ package sidebar
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/sookmook/wall-vault/internal/vault"
-
-func Sidebar(services []*vault.ServiceConfig, clients []*vault.Client) templ.Component {
+func Sidebar(services []*ServiceVM, clients []*ClientVM) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -40,7 +38,7 @@ func Sidebar(services []*vault.ServiceConfig, clients []*vault.Client) templ.Com
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("/hx/services/" + s.ID + "/edit")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 10, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 8, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -53,7 +51,7 @@ func Sidebar(services []*vault.ServiceConfig, clients []*vault.Client) templ.Com
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(s.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 10, Col: 107}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 8, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -76,7 +74,7 @@ func Sidebar(services []*vault.ServiceConfig, clients []*vault.Client) templ.Com
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs("/hx/clients/" + c.ID + "/edit")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 14, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 12, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -89,7 +87,7 @@ func Sidebar(services []*vault.ServiceConfig, clients []*vault.Client) templ.Com
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 14, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/sidebar/sidebar.templ`, Line: 12, Col: 107}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {

@@ -1,8 +1,6 @@
 package mainview
 
-import "github.com/sookmook/wall-vault/internal/vault"
-
-templ AgentCard(c *vault.Client) {
+templ AgentCard(c *ClientVM) {
 	<div class="card" hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
 		<div style="display:flex;justify-content:space-between">
 			<b>🤖 { c.Name }</b>

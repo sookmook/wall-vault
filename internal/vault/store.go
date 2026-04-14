@@ -580,6 +580,14 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 			if inp.Token != nil && *inp.Token != "" {
 				c.Token = *inp.Token
 			}
+			// PreferredService (v0.2 canonical): nil = no change, empty value ignored
+			if inp.PreferredService != nil && *inp.PreferredService != "" {
+				c.PreferredService = *inp.PreferredService
+			}
+			// ModelOverride (v0.2 canonical): nil = no change, "" allowed (reverts to service default)
+			if inp.ModelOverride != nil {
+				c.ModelOverride = *inp.ModelOverride
+			}
 			// DefaultService: nil = no change, value present = update (empty value ignored — service-less state is invalid)
 			if inp.DefaultService != nil && *inp.DefaultService != "" {
 				c.DefaultService = *inp.DefaultService

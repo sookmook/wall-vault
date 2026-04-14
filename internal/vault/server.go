@@ -410,16 +410,57 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "invalid body", http.StatusBadRequest)
 			return
 		}
+		// Validate model_override against the target service's AllowedModels whitelist.
+		// mirrors proxy.ResolveModel whitelist check — see spec §4.2
+		if inp.ModelOverride != nil && *inp.ModelOverride != "" {
+			// resolve target service: prefer request's preferred_service, then legacy default_service,
+			// then fall back to the existing client's PreferredService / DefaultService.
+			targetService := ""
+			if inp.PreferredService != nil && *inp.PreferredService != "" {
+				targetService = *inp.PreferredService
+			} else if inp.DefaultService != nil && *inp.DefaultService != "" {
+				targetService = *inp.DefaultService
+			} else if existing := s.store.GetClient(id); existing != nil {
+				if existing.PreferredService != "" {
+					targetService = existing.PreferredService
+				} else {
+					targetService = existing.DefaultService
+				}
+			}
+			if targetService != "" {
+				if sv := s.store.GetService(targetService); sv != nil && len(sv.AllowedModels) > 0 {
+					allowed := false
+					for _, m := range sv.AllowedModels {
+						if m == *inp.ModelOverride {
+							allowed = true
+							break
+						}
+					}
+					if !allowed {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusUnprocessableEntity)
+						fmt.Fprintf(w, `{"error":"model_override %q not in allowed_models of service %q"}`,
+							*inp.ModelOverride, targetService)
+						return
+					}
+				}
+			}
+		}
 		if err := s.store.UpdateClient(id, inp); err != nil {
 			jsonError(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		// SSE broadcast (include agent_type so proxies can decide which local agent to update)
+		// Prefer v0.2 canonical fields (preferred_service / model_override), fall back to legacy.
 		svc, mdl, agentType := "", "", ""
-		if inp.DefaultService != nil {
+		if inp.PreferredService != nil {
+			svc = *inp.PreferredService
+		} else if inp.DefaultService != nil {
 			svc = *inp.DefaultService
 		}
-		if inp.DefaultModel != nil {
+		if inp.ModelOverride != nil {
+			mdl = *inp.ModelOverride
+		} else if inp.DefaultModel != nil {
 			mdl = *inp.DefaultModel
 		}
 		if c := s.store.GetClient(id); c != nil {

@@ -485,3 +485,95 @@ func TestVaultDashboard(t *testing.T) {
 		t.Error("대시보드 HTML에 wall-vault 없음")
 	}
 }
+
+// ─── Admin clients PUT model_override whitelist validation ───────────────────
+
+// addTestClient: helper to seed a client via POST /admin/clients
+func addTestClient(t *testing.T, srv *Server, id, name, token, service string) {
+	t.Helper()
+	body := fmt.Sprintf(`{"id":%q,"name":%q,"token":%q,"default_service":%q}`, id, name, token, service)
+	req := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("addTestClient: POST /admin/clients got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminPutClient_ModelOverrideWhitelistViolation(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	// google restricted to one model
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
+		AllowedModels: []string{"gemini-3.1-pro-preview"},
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	// pre-seed an existing client so the PUT targets a real record
+	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+
+	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
+		strings.NewReader(`{"preferred_service":"google","model_override":"gemini-2.5-flash-lite"}`))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 422 {
+		t.Fatalf("got %d: %s (expected 422 for model_override whitelist violation)", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminPutClient_ModelOverrideValid(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
+		AllowedModels: []string{"gemini-3.1-pro-preview", "gemini-3.1-flash-lite-preview"},
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+
+	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
+		strings.NewReader(`{"model_override":"gemini-3.1-flash-lite-preview"}`))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s", w.Code, w.Body.String())
+	}
+
+	c := srv.store.GetClient("bot-a")
+	if c == nil || c.ModelOverride != "gemini-3.1-flash-lite-preview" {
+		t.Fatalf("model_override not persisted: %+v", c)
+	}
+}
+
+func TestAdminPutClient_ModelOverrideAllowedWhenWhitelistEmpty(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
+		// AllowedModels intentionally empty -> unrestricted
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+
+	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
+		strings.NewReader(`{"model_override":"any-model-name"}`))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s", w.Code, w.Body.String())
+	}
+}

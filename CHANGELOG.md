@@ -8,6 +8,42 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.0] — 2026-04-TBD
+
+### BREAKING CHANGES
+
+- **Service-Model Registry**: `Service` now owns `default_model` and the
+  optional `allowed_models` whitelist. `Client.default_service` renamed
+  to `preferred_service`; `Client.default_model` renamed to
+  `model_override` (optional). Each fallback step in dispatch applies
+  the destination service's own default model, eliminating the entire
+  class of "model not found in Ollama" cascades.
+- **Admin API bodies**: request/response schemas for `/admin/services*`
+  and `/admin/clients*` changed to match the new data model. Paths stay
+  the same. Old CLI or curl scripts using `default_service` /
+  `default_model` on clients will break — update to `preferred_service`
+  and `model_override`.
+- **Dashboard UI**: legacy server-rendered `ui.go` is gone. New
+  one-screen hybrid layout (sidebar / card grid / slideover detail) is
+  built with Go `templ` + HTMX. HTMX fragment endpoints live under
+  `/hx/*`.
+
+### Migration
+
+- First v0.2 startup auto-migrates the encrypted `vault.json`:
+  majority-vote per service gets the new `default_model`, ties broken
+  by the client with the lowest `sort_order`. A forced backup copy
+  `vault.json.pre-v02.{ISO-UTC}.bak` is written before any rewrite.
+
+### Internals
+
+- `dispatch()` rewritten to resolve model per service via `ResolveModel`.
+  Ollama name-mismatch heuristic (v0.1.27) removed.
+- `templ` v0.2.747 pinned; `templ generate` runs as part of `make build`.
+  Generated `*_templ.go` files are committed.
+
+---
+
 ## [0.1.29] — 2026-04-13
 
 ### Fixed

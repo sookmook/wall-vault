@@ -1,0 +1,17 @@
+package mainview
+
+import (
+	"fmt"
+	"github.com/sookmook/wall-vault/internal/vault"
+)
+
+templ AgentsGrid(clients []*vault.Client) {
+	<section>
+		<h3>Agents · { fmt.Sprint(len(clients)) }</h3>
+		<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+			for _, c := range clients {
+				@AgentCard(c)
+			}
+		</div>
+	</section>
+}

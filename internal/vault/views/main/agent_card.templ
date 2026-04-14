@@ -1,0 +1,18 @@
+package mainview
+
+import "github.com/sookmook/wall-vault/internal/vault"
+
+templ AgentCard(c *vault.Client) {
+	<div class="card" hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
+		<div style="display:flex;justify-content:space-between">
+			<b>🤖 { c.Name }</b>
+			<small style="color:var(--muted)">{ c.AgentType }</small>
+		</div>
+		<div style="font-size:.85em;color:var(--muted);margin-top:4px">
+			→ { c.PreferredService }
+			if c.ModelOverride != "" {
+				· override: { c.ModelOverride }
+			}
+		</div>
+	</div>
+}

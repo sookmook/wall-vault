@@ -1,0 +1,13 @@
+package layouts
+
+templ Shell(sidebar, main, slideover templ.Component) {
+	<div class="shell">
+		<nav>@sidebar</nav>
+		<main id="main">@main</main>
+		<aside id="slideover" hx-swap-oob="true">@slideover</aside>
+	</div>
+}
+
+templ EmptySlideover() {
+	<!-- intentionally empty; aside has no data-open -->
+}

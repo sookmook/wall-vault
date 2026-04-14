@@ -1,0 +1,19 @@
+package sidebar
+
+import "github.com/sookmook/wall-vault/internal/vault"
+
+templ Sidebar(services []*vault.ServiceConfig, clients []*vault.Client) {
+	<div class="sidebar">
+		<div class="brand"><b>🔐 wall-vault</b> <small>v0.2.0</small></div>
+		<div class="section-label">SERVICES</div>
+		for _, s := range services {
+			<a href="#" hx-get={"/hx/services/" + s.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">{s.Name}</a>
+		}
+		<div class="section-label">AGENTS</div>
+		for _, c := range clients {
+			<a href="#" hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">{c.Name}</a>
+		}
+		<div class="section-label">KEYS · MONITOR</div>
+		<a href="#" hx-get="/hx/keys/list" hx-target="#main">Keys</a>
+	</div>
+}

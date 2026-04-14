@@ -20,6 +20,16 @@
 
 ---
 
+## v0.2 Upgrade Notes
+
+- `Service` gained `default_model` and `allowed_models`. The per-service default model is now set directly on the service card.
+- `Client.default_service` / `default_model` have been renamed and reinterpreted as `preferred_service` / `model_override`. If the override is empty, the service's default model is used.
+- On the first v0.2 startup, the existing `vault.json` is auto-migrated, and the pre-migration state is preserved as `vault.json.pre-v02.{timestamp}.bak`.
+- The dashboard has been restructured into three zones: a left sidebar, a center card grid, and a right-side edit slideover.
+- Admin API paths are unchanged, but request/response body schemas have been updated — old CLI scripts will need to be updated accordingly.
+
+---
+
 ## What is wall-vault?
 
 **wall-vault = AI Proxy + API Key Vault for OpenClaw**

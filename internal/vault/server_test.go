@@ -429,6 +429,41 @@ func TestVaultResetUsage(t *testing.T) {
 	}
 }
 
+// ─── Admin Service default_model + allowed_models ────────────────────────────
+
+func TestAdminPutServiceDefaultModel(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	// seed google service before PUT
+	err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", Enabled: true, ProxyEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("seed google service: %v", err)
+	}
+
+	body := `{"default_model":"gemini-3.1-pro-preview","allowed_models":["gemini-3.1-pro-preview","gemini-3.1-flash-lite-preview"]}`
+	req := httptest.NewRequest("PUT", "/admin/services/google", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s", w.Code, w.Body.String())
+	}
+
+	got := srv.store.GetService("google")
+	if got == nil {
+		t.Fatalf("google service not found after update")
+	}
+	if got.DefaultModel != "gemini-3.1-pro-preview" {
+		t.Fatalf("default_model = %q", got.DefaultModel)
+	}
+	if len(got.AllowedModels) != 2 {
+		t.Fatalf("allowed_models = %v", got.AllowedModels)
+	}
+}
+
 // ─── Dashboard UI ─────────────────────────────────────────────────────────────
 
 func TestVaultDashboard(t *testing.T) {
@@ -450,3 +485,160 @@ func TestVaultDashboard(t *testing.T) {
 		t.Error("대시보드 HTML에 wall-vault 없음")
 	}
 }
+
+// ─── Admin clients PUT model_override whitelist validation ───────────────────
+
+// addTestClient: helper to seed a client via POST /admin/clients
+func addTestClient(t *testing.T, srv *Server, id, name, token, service string) {
+	t.Helper()
+	body := fmt.Sprintf(`{"id":%q,"name":%q,"token":%q,"default_service":%q}`, id, name, token, service)
+	req := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("addTestClient: POST /admin/clients got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminPutClient_ModelOverrideWhitelistViolation(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	// google restricted to one model
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
+		AllowedModels: []string{"gemini-3.1-pro-preview"},
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	// pre-seed an existing client so the PUT targets a real record
+	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+
+	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
+		strings.NewReader(`{"preferred_service":"google","model_override":"gemini-2.5-flash-lite"}`))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 422 {
+		t.Fatalf("got %d: %s (expected 422 for model_override whitelist violation)", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminPutClient_ModelOverrideValid(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
+		AllowedModels: []string{"gemini-3.1-pro-preview", "gemini-3.1-flash-lite-preview"},
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+
+	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
+		strings.NewReader(`{"model_override":"gemini-3.1-flash-lite-preview"}`))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s", w.Code, w.Body.String())
+	}
+
+	c := srv.store.GetClient("bot-a")
+	if c == nil || c.ModelOverride != "gemini-3.1-flash-lite-preview" {
+		t.Fatalf("model_override not persisted: %+v", c)
+	}
+}
+
+func TestAdminPutClient_ModelOverrideAllowedWhenWhitelistEmpty(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
+		// AllowedModels intentionally empty -> unrestricted
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+
+	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
+		strings.NewReader(`{"model_override":"any-model-name"}`))
+	req.Header.Set("Authorization", "Bearer test-admin")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHXSidebarRendersOK(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest("GET", "/hx/sidebar", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "wall-vault") {
+		t.Fatalf("body missing sidebar brand: %s", w.Body.String())
+	}
+}
+
+func TestHXServicesGridRendersGoogle(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+	if err := srv.store.UpsertService(&ServiceConfig{
+		ID: "google", Name: "Google Gemini",
+		DefaultModel: "gemini-3.1-pro-preview",
+		Enabled: true, ProxyEnabled: true,
+	}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	req := httptest.NewRequest("GET", "/hx/services/grid", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "Google Gemini") {
+		t.Fatalf("body missing service name: %s", w.Body.String())
+	}
+}
+
+func TestDashboardHomeContainsServicesAndAgents(t *testing.T) {
+	srv, cleanup := newTestVaultServer(t)
+	defer cleanup()
+	if err := srv.store.UpsertService(&ServiceConfig{ID: "google", Name: "Google", Enabled: true, ProxyEnabled: true}); err != nil {
+		t.Fatalf("UpsertService: %v", err)
+	}
+	enabled := true
+	if _, err := srv.store.AddClient(ClientInput{ID: "bot-a", Name: "Delta", Token: "t", DefaultService: "google", Enabled: &enabled}); err != nil {
+		t.Fatalf("AddClient: %v", err)
+	}
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	body := w.Body.String()
+	for _, want := range []string{"Google", "Delta", "htmx.org"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing %q — got first 500 chars: %s", want, truncate(body, 500))
+		}
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) > n {
+		return s[:n] + "..."
+	}
+	return s
+}
+

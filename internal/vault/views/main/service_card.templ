@@ -1,0 +1,17 @@
+package mainview
+
+import "fmt"
+
+templ ServiceCard(s *ServiceVM) {
+	<div class="card" hx-get={"/hx/services/" + s.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
+		<div style="display:flex;justify-content:space-between">
+			<b>{ s.Name }</b>
+			if s.ProxyEnabled {
+				<span class="badge">proxy</span>
+			}
+		</div>
+		<div style="font-size:.85em;color:var(--muted);margin-top:4px">
+			{ s.DefaultModel } · #{ fmt.Sprint(s.SortOrder) }
+		</div>
+	</div>
+}

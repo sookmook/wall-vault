@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
@@ -14,10 +15,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/sookmook/wall-vault/internal/config"
 	"github.com/sookmook/wall-vault/internal/middleware"
 	"github.com/sookmook/wall-vault/internal/models"
-	"github.com/sookmook/wall-vault/internal/theme"
+	layouts "github.com/sookmook/wall-vault/internal/vault/views/layouts"
+	mainview "github.com/sookmook/wall-vault/internal/vault/views/main"
+	sidebar "github.com/sookmook/wall-vault/internal/vault/views/sidebar"
+	slideover "github.com/sookmook/wall-vault/internal/vault/views/slideover"
 )
 
 // request body size limits
@@ -148,6 +153,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/services", s.adminAuth(s.handleAdminServices))
 	mux.HandleFunc("/admin/services/", s.adminAuth(s.handleAdminServicesID))
 	mux.HandleFunc("/admin/models", s.adminAuth(s.handleAdminModels))
+
+	// HTMX fragments
+	s.RegisterHXRoutes(mux)
 
 	// logo
 	mux.HandleFunc("/logo", s.handleLogo)
@@ -410,16 +418,57 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "invalid body", http.StatusBadRequest)
 			return
 		}
+		// Validate model_override against the target service's AllowedModels whitelist.
+		// mirrors proxy.ResolveModel whitelist check — see spec §4.2
+		if inp.ModelOverride != nil && *inp.ModelOverride != "" {
+			// resolve target service: prefer request's preferred_service, then legacy default_service,
+			// then fall back to the existing client's PreferredService / DefaultService.
+			targetService := ""
+			if inp.PreferredService != nil && *inp.PreferredService != "" {
+				targetService = *inp.PreferredService
+			} else if inp.DefaultService != nil && *inp.DefaultService != "" {
+				targetService = *inp.DefaultService
+			} else if existing := s.store.GetClient(id); existing != nil {
+				if existing.PreferredService != "" {
+					targetService = existing.PreferredService
+				} else {
+					targetService = existing.DefaultService
+				}
+			}
+			if targetService != "" {
+				if sv := s.store.GetService(targetService); sv != nil && len(sv.AllowedModels) > 0 {
+					allowed := false
+					for _, m := range sv.AllowedModels {
+						if m == *inp.ModelOverride {
+							allowed = true
+							break
+						}
+					}
+					if !allowed {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusUnprocessableEntity)
+						fmt.Fprintf(w, `{"error":"model_override %q not in allowed_models of service %q"}`,
+							*inp.ModelOverride, targetService)
+						return
+					}
+				}
+			}
+		}
 		if err := s.store.UpdateClient(id, inp); err != nil {
 			jsonError(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		// SSE broadcast (include agent_type so proxies can decide which local agent to update)
+		// Prefer v0.2 canonical fields (preferred_service / model_override), fall back to legacy.
 		svc, mdl, agentType := "", "", ""
-		if inp.DefaultService != nil {
+		if inp.PreferredService != nil {
+			svc = *inp.PreferredService
+		} else if inp.DefaultService != nil {
 			svc = *inp.DefaultService
 		}
-		if inp.DefaultModel != nil {
+		if inp.ModelOverride != nil {
+			mdl = *inp.ModelOverride
+		} else if inp.DefaultModel != nil {
 			mdl = *inp.DefaultModel
 		}
 		if c := s.store.GetClient(id); c != nil {
@@ -894,6 +943,23 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 		if v, ok := fields["proxy_enabled"].(bool); ok {
 			inp.ProxyEnabled = v
 		}
+		if v, ok := fields["default_model"].(string); ok {
+			inp.DefaultModel = v
+		}
+		if v, ok := fields["allowed_models"]; ok {
+			switch val := v.(type) {
+			case []interface{}:
+				models := make([]string, 0, len(val))
+				for _, m := range val {
+					if s, ok := m.(string); ok {
+						models = append(models, s)
+					}
+				}
+				inp.AllowedModels = models
+			case nil:
+				inp.AllowedModels = nil
+			}
+		}
 		if err := s.store.UpsertService(&inp); err != nil {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1064,17 +1130,42 @@ func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {
 // ─── Dashboard UI ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	// Only handle exactly "/" — fall through elsewhere.
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	t := theme.Get(s.cfg.Theme)
+
+	themeName := s.store.GetSettings().Theme
+	if themeName == "" {
+		themeName = s.cfg.Theme
+	}
+	if themeName == "" {
+		themeName = "light"
+	}
+	services := s.store.ListServices()
+	clients := s.store.ListClients()
+
+	inner := layouts.Shell(
+		sidebar.Sidebar(toSidebarServices(services), toSidebarClients(clients)),
+		renderHome(toMainServices(services), toMainClients(clients)),
+		slideover.Empty(),
+	)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
-	fmt.Fprint(w, buildDashboard(s, t))
+	layouts.Base(themeName, inner).Render(r.Context(), w) //nolint:errcheck
 }
+
+// renderHome stacks ServicesGrid + AgentsGrid as the main pane body.
+func renderHome(services []*mainview.ServiceVM, clients []*mainview.ClientVM) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		if err := mainview.ServicesGrid(services).Render(ctx, w); err != nil {
+			return err
+		}
+		return mainview.AgentsGrid(clients).Render(ctx, w)
+	})
+}
+
 
 // ─── Util ─────────────────────────────────────────────────────────────────────
 

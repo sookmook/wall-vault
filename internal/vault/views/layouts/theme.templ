@@ -1,0 +1,23 @@
+package layouts
+
+templ Theme() {
+	<style>
+		:root { --bg:#fff; --fg:#1a1a1a; --accent:#d64545; --border:#e3e3e3; --muted:#666; }
+		[data-theme="dark"]   { --bg:#121212; --fg:#e8e8e8; --accent:#ff6b6b; --border:#2a2a2a; --muted:#999; }
+		[data-theme="cherry"] { --bg:#fff1f1; --fg:#3a0a0a; --accent:#c53030; --border:#f0c9c9; --muted:#8a3e3e; }
+		[data-theme="ocean"]  { --bg:#e8f4ff; --fg:#0c1a2b; --accent:#1e6fb8; --border:#b5d6f1; --muted:#45678a; }
+		[data-theme="gold"]   { --bg:#fff8e6; --fg:#3a2a00; --accent:#b87f00; --border:#e8d99d; --muted:#8a6d24; }
+		[data-theme="autumn"] { --bg:#fff3e0; --fg:#2a1a0a; --accent:#c45618; --border:#f0cfa0; --muted:#8a5a2e; }
+		[data-theme="winter"] { --bg:#e6f2ff; --fg:#0a1a3a; --accent:#2a4f9c; --border:#b5c9e8; --muted:#4a6a9a; }
+		html, body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,Segoe UI,Roboto,sans-serif; }
+		.shell { display:grid; grid-template-columns:22% 1fr 28%; min-height:100vh; }
+		.shell > nav  { border-right:1px solid var(--border); padding:12px; }
+		.shell > main { padding:16px; overflow:auto; }
+		.shell > aside{ border-left:2px solid var(--accent); padding:12px; background:rgba(0,0,0,.02); display:none; }
+		.shell > aside[data-open]{ display:block; }
+		@media (max-width:900px){ .shell{ grid-template-columns:1fr; } .shell>aside[data-open]{ position:fixed; inset:0; z-index:10; background:var(--bg);} }
+		.card { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin:6px 0; cursor:pointer; }
+		.card:hover{ border-color:var(--accent); }
+		.badge { font-size:.75em; padding:1px 6px; border-radius:4px; background:var(--accent); color:#fff; }
+	</style>
+}

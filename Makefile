@@ -1,32 +1,36 @@
 BINARY = wall-vault
 MODULE = github.com/sookmook/wall-vault
-BASE_VERSION = v0.1.29
+BASE_VERSION = v0.2.0
 VERSION := $(BASE_VERSION).$(shell date +%Y%m%d.%H%M%S)
 
 LDFLAGS = -ldflags "-X main.version=$(VERSION) -s -w"
 
 # ─── 빌드 ────────────────────────────────────────────────────────────────────
 
+.PHONY: templ-generate
+templ-generate:
+	~/go/bin/templ generate ./internal/vault/views/...
+
 .PHONY: build
-build:
+build: templ-generate
 	~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY) .
 
 .PHONY: build-all
-build-all: build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64
+build-all: templ-generate build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64
 
-build-linux-amd64:
+build-linux-amd64: templ-generate
 	GOOS=linux GOARCH=amd64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-linux-amd64 .
 
-build-linux-arm64:
+build-linux-arm64: templ-generate
 	GOOS=linux GOARCH=arm64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-linux-arm64 .
 
-build-darwin-amd64:
+build-darwin-amd64: templ-generate
 	GOOS=darwin GOARCH=amd64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-darwin-amd64 .
 
-build-darwin-arm64:
+build-darwin-arm64: templ-generate
 	GOOS=darwin GOARCH=arm64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-darwin-arm64 .
 
-build-windows-amd64:
+build-windows-amd64: templ-generate
 	GOOS=windows GOARCH=amd64 ~/go/bin/go build $(LDFLAGS) -o bin/$(BINARY)-windows-amd64.exe .
 
 # ─── 실행 ────────────────────────────────────────────────────────────────────

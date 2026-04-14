@@ -43,22 +43,30 @@ func (k *APIKey) IsAvailable() bool {
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 
+// Client: proxy client record stored in vault.
+// NOTE (v0.2): external references in store.go / server.go / proxy/*.go migrate in subsequent tasks. Keeping models self-consistent here.
+// PreferredService / ModelOverride are the v0.2 canonical field names.
+// DefaultService / DefaultModel are retained for backward compatibility until Stage 2 migration removes them.
+// TODO (v0.2 Stage 2): remove DefaultService, DefaultModel, Description after migrating all callers.
 type Client struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	Token           string    `json:"token"`
-	DefaultService  string    `json:"default_service"`
-	DefaultModel    string    `json:"default_model"`
-	AllowedServices []string  `json:"allowed_services"`
-	// extended fields
-	AgentType   string   `json:"agent_type,omitempty"`   // openclaw | claude-code | cursor | custom
-	WorkDir     string   `json:"work_dir,omitempty"`     // working directory
-	Description string   `json:"description,omitempty"`  // description
-	IPWhitelist []string `json:"ip_whitelist,omitempty"` // allowed IP list (empty array = allow all)
-	Avatar      string   `json:"avatar,omitempty"`       // data URI (data:image/...) OR relative path under ~/.openclaw/ (e.g. "workspace/avatar.png")
-	Enabled     bool     `json:"enabled"`                // enabled status
-	SortOrder   int      `json:"sort_order"`             // dashboard card order (lower = first)
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Token            string    `json:"token"`
+	PreferredService string    `json:"preferred_service"`           // v0.2 canonical
+	ModelOverride    string    `json:"model_override,omitempty"`    // v0.2 canonical
+	AllowedServices  []string  `json:"allowed_services,omitempty"`
+	// v0.2 extended fields
+	AgentType   string   `json:"agent_type,omitempty"`
+	WorkDir     string   `json:"work_dir,omitempty"`
+	IPWhitelist []string `json:"ip_whitelist,omitempty"`
+	Avatar      string   `json:"avatar,omitempty"`
+	Enabled     bool     `json:"enabled"`
+	SortOrder   int      `json:"sort_order"`
 	CreatedAt   time.Time `json:"created_at"`
+	// TODO (v0.2 Stage 2): remove legacy fields below after migrating store.go / server.go / ui.go / proxy/server.go
+	DefaultService  string `json:"default_service,omitempty"`  // legacy — use PreferredService
+	DefaultModel    string `json:"default_model,omitempty"`    // legacy — use ModelOverride
+	Description     string `json:"description,omitempty"`      // legacy — drop in Stage 2
 }
 
 // ClientInput: client add DTO
@@ -78,32 +86,66 @@ type ClientInput struct {
 }
 
 // ClientUpdateInput: client update DTO
-// All fields are pointers/slices — nil/omitted = no change, value present = update
+// All fields are pointers/slices — nil/omitted = no change, value present = update.
+// NOTE (v0.2): PreferredService / ModelOverride are the canonical v0.2 field names.
+// DefaultService / DefaultModel are retained for backward compat until Stage 2 migration.
+// TODO (v0.2 Stage 2): remove DefaultService, DefaultModel, Description after migrating all callers.
 type ClientUpdateInput struct {
-	NewID           *string  `json:"new_id"`
-	Name            *string  `json:"name"`
-	Token           *string  `json:"token"`
-	DefaultService  *string  `json:"default_service"`
-	DefaultModel    *string  `json:"default_model"`
-	AllowedServices []string `json:"allowed_services"`
-	AgentType       *string  `json:"agent_type"`
-	WorkDir         *string  `json:"work_dir"`
-	Description     *string  `json:"description"`
-	IPWhitelist     []string `json:"ip_whitelist"`
-	Avatar          *string  `json:"avatar"`
-	Enabled         *bool    `json:"enabled"`
+	NewID            *string  `json:"new_id"`
+	Name             *string  `json:"name"`
+	Token            *string  `json:"token"`
+	PreferredService *string  `json:"preferred_service"`        // v0.2 canonical
+	ModelOverride    *string  `json:"model_override"`           // v0.2 canonical
+	AllowedServices  []string `json:"allowed_services"`
+	AgentType        *string  `json:"agent_type"`
+	WorkDir          *string  `json:"work_dir"`
+	IPWhitelist      []string `json:"ip_whitelist"`
+	Avatar           *string  `json:"avatar"`
+	Enabled          *bool    `json:"enabled"`
+	// TODO (v0.2 Stage 2): remove legacy fields below after migrating store.go / server.go
+	DefaultService  *string  `json:"default_service"`  // legacy — use PreferredService
+	DefaultModel    *string  `json:"default_model"`    // legacy — use ModelOverride
+	Description     *string  `json:"description"`      // legacy — drop in Stage 2
 }
 
-// ─── Service Config ───────────────────────────────────────────────────────────
+// ─── Service (v0.2) ───────────────────────────────────────────────────────────
 
-// ServiceConfig: per-service runtime settings (local URL, enabled status)
+// Service: per-service config including model defaults and allowed model list.
+// NOTE (v0.2): external references in store.go / server.go / proxy/*.go migrate in subsequent tasks. Keeping models self-consistent here.
+type Service struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	DefaultModel  string   `json:"default_model"`
+	LocalURL      string   `json:"local_url,omitempty"`
+	Enabled       bool     `json:"enabled"`
+	ProxyEnabled  bool     `json:"proxy_enabled"`
+	SortOrder     int      `json:"sort_order"`
+	AllowedModels []string `json:"allowed_models,omitempty"`
+}
+
+// IsLocal: whether this is a local server service
+func (s *Service) IsLocal() bool {
+	switch s.ID {
+	case "ollama", "lmstudio", "vllm":
+		return true
+	}
+	return s.LocalURL != ""
+}
+
+// ─── Service Config (legacy — migrate to Service in subsequent tasks) ─────────
+
+// ServiceConfig: legacy alias retained for store.go / server.go / ui.go until Stage 2 migration.
+// TODO (v0.2 Stage 2): replace all ServiceConfig references with Service and remove this struct.
 type ServiceConfig struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	LocalURL     string `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
-	Enabled      bool   `json:"enabled"`
-	Custom       bool   `json:"custom,omitempty"`       // user-added service
-	ProxyEnabled bool   `json:"proxy_enabled,omitempty"` // 오픈클로 프록시에서 이 서비스 사용
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	LocalURL      string   `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
+	Enabled       bool     `json:"enabled"`
+	Custom        bool     `json:"custom,omitempty"`          // user-added service
+	ProxyEnabled  bool     `json:"proxy_enabled,omitempty"`   // enabled for proxy dispatch
+	DefaultModel  string   `json:"default_model,omitempty"`   // v0.2: most-common client model for this service
+	AllowedModels []string `json:"allowed_models,omitempty"`  // v0.2: whitelist of models for this service
+	SortOrder     int      `json:"sort_order,omitempty"`      // display order preserved from v1
 }
 
 // IsLocal: whether this is a local server service
@@ -166,12 +208,18 @@ type ConfigChangeEvent struct {
 
 // ─── Store Snapshot ───────────────────────────────────────────────────────────
 
+// CurrentSchemaVersion is the version stamped onto every persisted vault.json.
+// Task 6 migration code references this same constant when deciding whether
+// an existing file needs upgrading.
+const CurrentSchemaVersion = 2
+
 type storeData struct {
-	Keys     []*APIKey        `json:"keys"`
-	Clients  []*Client        `json:"clients"`
-	Proxies  []*ProxyStatus   `json:"proxies"`
-	Services []*ServiceConfig `json:"services,omitempty"`
-	Settings *StoreSettings   `json:"settings,omitempty"`
+	SchemaVersion int              `json:"schema_version"`
+	Keys          []*APIKey        `json:"keys"`
+	Clients       []*Client        `json:"clients"`
+	Proxies       []*ProxyStatus   `json:"proxies"`
+	Services      []*ServiceConfig `json:"services,omitempty"`
+	Settings      *StoreSettings   `json:"settings,omitempty"`
 }
 
 // StoreSettings: UI settings persisted in vault.json (theme, language)

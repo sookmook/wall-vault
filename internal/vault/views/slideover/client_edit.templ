@@ -1,0 +1,21 @@
+package slideover
+
+templ ClientEdit(c *ClientVM, services []*ServiceVM) {
+	<form hx-put={"/admin/clients/" + c.ID} hx-ext="json-enc" hx-swap="none">
+		<label>Name <input name="name" value={c.Name}/></label>
+		<label>Agent Type <input name="agent_type" value={c.AgentType}/></label>
+		<label>Preferred Service
+			<select name="preferred_service">
+				for _, s := range services {
+					<option value={s.ID} selected?={s.ID == c.PreferredService}>{ s.Name }</option>
+				}
+			</select>
+		</label>
+		<label>Model Override <input name="model_override" value={c.ModelOverride} placeholder="empty → use service default"/></label>
+		<label>
+			<input type="checkbox" name="enabled" checked?={c.Enabled}/>
+			Enabled
+		</label>
+		<button type="submit">Save</button>
+	</form>
+}

@@ -51,6 +51,16 @@ OpenClaw (écran terminal TUI)
 
 ---
 
+## Notes de mise à niveau v0.2
+
+- `Service` a acquis `default_model` et `allowed_models`. Le modèle par défaut pour chaque service est maintenant défini directement sur la fiche de service.
+- `Client.default_service` / `default_model` ont été renommés et réinterprétés comme `preferred_service` / `model_override`. Si l'override est vide, le modèle par défaut du service est utilisé.
+- Au premier démarrage en v0.2, le fichier `vault.json` existant est auto-migré, et l'état pré-migration est préservé sous `vault.json.pre-v02.{timestamp}.bak`.
+- Le tableau de bord a été restructuré en trois zones : une barre latérale gauche, une grille de cartes centrales, et un volet d'édition latéral droit.
+- Les chemins de l'API Admin sont inchangés, mais les schémas de corps de requête/réponse ont été mis à jour — les anciens scripts CLI devront être mis à jour en conséquence.
+
+---
+
 ## Installation
 
 ### Linux / macOS

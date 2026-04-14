@@ -20,6 +20,16 @@
 
 ---
 
+## v0.2 升级说明
+
+- `Service` 新增了 `default_model` 和 `allowed_models` 字段。服务级别的默认模型现在直接在服务卡片上设置。
+- `Client.default_service` / `default_model` 已重命名并重新解释为 `preferred_service` / `model_override`。如果 override 为空，则使用服务的默认模型。
+- 首次启动 v0.2 时，现有的 `vault.json` 会自动迁移，迁移前的状态保存为 `vault.json.pre-v02.{时间戳}.bak`。
+- 仪表盘已重构为三个区域：左侧边栏、中央卡片网格和右侧编辑滑动面板。
+- Admin API 路径保持不变，但请求/响应正文架构已更新——旧版 CLI 脚本需要相应更新。
+
+---
+
 ## 什么是 wall-vault？
 
 **wall-vault = OpenClaw 专用的 AI 代理（proxy） + API 密钥金库**

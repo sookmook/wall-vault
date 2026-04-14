@@ -20,6 +20,16 @@
 
 ---
 
+## Amanothi Wokuthuthukiswa kwe-v0.2
+
+- `Service` ilwandle izakala `default_model` kanye `allowed_models`. Imodeli yokuzenzakalela nge-sevisi uya-sethiwa ngokuqondile ekhadini lesevisi.
+- `Client.default_service` / `default_model` kubiyiselwe igama futhi kuhunyushwa njengo-`preferred_service` / `model_override`. Uma i-override ishiyile, imodeli yokuzenzakalela yesevisi iyasetshenziswa.
+- Ku-startup kuqala kwe-v0.2, i-`vault.json` yesisikhathi sehogo iqondwe ngokuzenzakalela, futhi isimo esikuqaleni kesikhathi senqobo sigodiwe njengo-`vault.json.pre-v02.{timestamp}.bak`.
+- I-dashboard ibukelwe kabusha ngezona (izinzuzo ezintathu): kibhoda esekunxele, umugadi wekhadi emidlweni, kanye no-edit slideover okunxele.
+- Izindawo ze-API zeMlamali azishintshiwe, kodwa izisekelo zomsiga wokucekeleza/impendulo zibuyele nge-update — isikripti sase-CLI esidala sidinga ukubuyela nge-update.
+
+---
+
 ## Yini i-wall-vault?
 
 **wall-vault = Ummeleli we-AI (Proxy) + Isikhwama se-API Key se-OpenClaw**

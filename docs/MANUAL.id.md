@@ -20,6 +20,16 @@
 
 ---
 
+## Catatan Peningkatan v0.2
+
+- `Service` mendapatkan `default_model` dan `allowed_models`. Model default per-layanan kini diatur langsung pada kartu layanan.
+- `Client.default_service` / `default_model` telah diubah nama dan diinterpretasi ulang menjadi `preferred_service` / `model_override`. Jika override kosong, model default dari layanan digunakan.
+- Saat startup v0.2 pertama kali, `vault.json` yang ada secara otomatis dimigrasikan, dan keadaan pre-migrasi disimpan sebagai `vault.json.pre-v02.{timestamp}.bak`.
+- Dashboard telah distruktur ulang menjadi tiga zona: bilah samping kiri, grid kartu pusat, dan panel edit geser di sisi kanan.
+- Jalur Admin API tidak berubah, tetapi skema badan permintaan/respons telah diperbarui — skrip CLI lama akan perlu diperbarui sesuai kebutuhan.
+
+---
+
 ## Apa itu wall-vault?
 
 **wall-vault = Proxy AI + Brankas API Key untuk OpenClaw**

@@ -840,6 +840,16 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan tana gudana a wani kwamfuta
 
 ---
 
+## Bayanin haɓaka v0.2
+
+- `Service` ya karɓa `default_model` da `allowed_models`. Zaɓin model na musamman na kowane sabis yanzu ana saita shi kai tsaye akan katunan sabis.
+- `Client.default_service` / `default_model` an sake sata sunansu kuma an sake tafsira su a matsayin `preferred_service` / `model_override`. Idan override bai cika ba, model na musamman na sabis aka yi amfani da shi.
+- A farko na buguwar v0.2, jerin `vault.json` da ke akwai ya bugi ta atomatik, kuma halin da jiya aka sani ana ajiya shi a matsayin `vault.json.pre-v02.{timestamp}.bak`.
+- An sake tsara dashboard zuwa yankunan uku: sidebar na hayin hagu, grid na kartuna na tsakiya, da slideover na gyarawa na hayin dama.
+- Hanyoyin Admin API ba su canja ba, amma tsarin bukatu/amsoshin jini suka sauya — tsohuwan tsingiyoyin CLI za su bukatar sabuntawa daidai.
+
+---
+
 ## Sauye-sauye na Kwanan Nan (v0.1.16 ~ v0.1.27)
 
 ### v0.1.27 (2026-04-09)

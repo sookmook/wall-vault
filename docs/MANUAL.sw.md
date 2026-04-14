@@ -840,6 +840,16 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Ikiwa inaendesha kwenye kompyuta 
 
 ---
 
+## Maelezo ya Uboreshaji wa v0.2
+
+- `Service` ilipokea `default_model` na `allowed_models`. Modeli chaguomsingi inayolingana na huduma sasa imewekwa moja kwa moja kwenye kadi ya huduma.
+- `Client.default_service` / `default_model` zimebadilishwa jina na kubadilishwa maana kuwa `preferred_service` / `model_override`. Ikiwa kizuizi kipo tupu, modeli chaguomsingi ya huduma itatumika.
+- Wakati wa kuanzisha v0.2 kwa mara ya kwanza, faili ya `vault.json` iliyopo inabadilishwa kiotomatiki, na hali kabla ya ubadilishaji inahifadhwa kama `vault.json.pre-v02.{timestamp}.bak`.
+- Dashibodi imebadilishwa kuwa maeneo matatu: upau wa upande wa kushoto, taifa la kadi katikati, na sehemu ya kuhariri upande wa kulia.
+- Njia za Admin API hazibadilishwi, lakini vigezo vya ombi/jibu vimebadilishwa — hati za CLI za zamani zitahitaji kusasishwa ipasavyo.
+
+---
+
 ## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.27)
 
 ### v0.1.27 (2026-04-09)

@@ -840,6 +840,16 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Si se ejecuta en otra computadora
 
 ---
 
+## Notas de actualización de v0.2
+
+- `Service` ahora cuenta con `default_model` y `allowed_models`. El modelo predeterminado por servicio se establece ahora directamente en la tarjeta de servicio.
+- `Client.default_service` / `default_model` han sido renombrados y reinterpretados como `preferred_service` / `model_override`. Si el override está vacío, se utiliza el modelo predeterminado del servicio.
+- En el primer inicio de v0.2, el archivo `vault.json` existente se migra automáticamente, y el estado anterior a la migración se preserva como `vault.json.pre-v02.{timestamp}.bak`.
+- El panel ha sido reestructurado en tres zonas: una barra lateral izquierda, una cuadrícula de tarjetas central, y un panel deslizable de edición en el lado derecho.
+- Las rutas de la API Admin no han cambiado, pero los esquemas de los cuerpos de solicitud/respuesta se han actualizado — los scripts CLI antiguos deberán actualizarse en consecuencia.
+
+---
+
 ## Cambios Recientes (v0.1.16 ~ v0.1.27)
 
 ### v0.1.27 (2026-04-09)

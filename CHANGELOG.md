@@ -8,6 +8,105 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.1] — 2026-04-16
+
+Post-RC1 polish round: dashboard becomes substantially more capable, and the
+proxy gains multimodal pass-through so OpenAI-format clients (e.g. EconoWorld)
+can stream audio / video / image / arbitrary file blobs straight to Gemini
+without the proxy stripping them.
+
+### Added — Proxy
+
+- **Multimodal pass-through (OpenAI → Gemini `inlineData`)**:
+  `OpenAIToGemini` now recognises six content part types — `text`,
+  `input_audio`, `input_video`, `input_image`, `input_file`, and
+  `image_url` (data URI). Each maps to a `GeminiPart` with a `BlobData`
+  carrying `{mimeType, data}`. Audio/video/image format-to-mime helpers
+  cover wav/mp3/ogg/flac/webm/m4a, mp4/mov/webm/mkv/avi, and
+  jpg/png/gif/webp/heic respectively. Body limit `maxAIBodySize=50 MB`
+  is unchanged. External http(s) URLs in `image_url` remain unsupported
+  in this round (data URI only).
+- **EconoWorld agent type** (`agentType: "econoworld"`) for
+  `POST /agent/apply`: writes wall-vault settings into the project's
+  `analyzer/ai_config.json` (`provider` flipped to `openai_compatible`,
+  base URL / api_key / model populated). Other provider sections are
+  preserved (partial merge). `workDir` accepts a comma-separated list of
+  candidate paths and picks the first whose `analyzer/` directory
+  exists; Windows drive paths are converted to WSL mounts.
+
+### Added — Dashboard
+
+- **Header bar**: logo image, Korean title, version stamp, theme switcher
+  (7 themes), language switcher (17 locales auto-discovered).
+- **Footer**: GitHub / sookmook.org / email links + live uptime ticker
+  reading `data-wv-started` and refreshing every second.
+- **Service / agent / key cards** redesigned: chips, status dots
+  (active / cooldown / off / online / ready), avatar previews, key usage
+  progress bars (rendered via `[data-pct]` JS hydration to side-step
+  templ's strict `style={…}` parser).
+- **Drag-and-drop reorder** for agent cards via native HTML5 DnD with a
+  dedicated `⋮⋮` handle so plain card clicks still open the slideover.
+  PUTs `/admin/clients/reorder` on drop.
+- **Keys grid UI** (replacing the "Keys list UI coming in a later round."
+  placeholder): 11 keys render as compact cards with status dots,
+  per-service usage / limit, attempt counter, cooldown remaining label,
+  and progress bar when limit is set.
+- **Per-theme animation layer** ported from v0.1: cherry petals
+  (per-petal zigzag keyframes), ocean (3 wave bands + drifting clouds +
+  rising bubbles + sparkles), gold (32 ✦✧⋆ twinkle/drift), autumn
+  (28 leaves with per-leaf rotation), winter (snowman/tree/snowflake +
+  20 falling flakes). Layer sits at `z-index:0`, `.shell` lifted to
+  `z-index:1` so the effect plays between background and cards.
+- **Slideover form polish**: 4-section layout (Basic / AI Routing /
+  Access / Appearance) for client edit + create; 3-section (Basic /
+  Routing / Advanced) for service edit. Each field gets a labelled
+  `<small class="hint">` tip. Service edit drops the `local_url` input
+  for cloud services and presents `default_model` as a `<select>` with
+  `<optgroup>` separating Free / Paid (filled async via
+  `/admin/models?service=…`).
+- **Avatar upload**: file input + live 64px preview, client-side
+  Canvas-resize to ≤256px, embedded as data URI in the JSON body.
+- **Native fetch form submit**: forms carry `data-wv-submit="<URL>"` /
+  `data-wv-method="POST|PUT"`; a delegated `submit` listener serialises
+  FormData to JSON, attaches `Authorization: Bearer <admin_token>`, and
+  reloads on success / alerts on failure. All HTMX requests gain the
+  same auth header via `htmx:configRequest`.
+
+### Changed
+
+- `ClientInput.IPWhitelist` and `…AllowedServices` use a new
+  `StringOrList` JSON type that accepts both arrays and comma-separated
+  strings — single-line dashboard inputs are normalised on the server
+  side.
+- Sidebar Keys link is now an in-page anchor (`#keys`) since the keys
+  grid renders inline below Services and Agents.
+- Sidebar widened to 260px and section headers separated by a divider
+  for readability.
+- Card grids set to fixed 2 columns (single column under 900px).
+
+### Fixed
+
+- v0.2 migration `MigrateV1ToV2` previously reused the legacy `keys`
+  field name in `api_keys`, leading to all encrypted API keys being
+  dropped on upgrade. Migrator now reads `keys` correctly; affected
+  installs can manually merge from `vault.json.pre-v02.*.bak`.
+- Service `enabled` flag was being toggled off during migration in some
+  vault states, causing dispatch to fall through to Ollama with the
+  wrong model. Re-enabling via `PUT /admin/services/{id}` is the
+  manual fix for already-migrated installs.
+
+### Internal
+
+- `i18n` locales: 40 form-label / section / placeholder / hint keys
+  added to ko + en. Other 15 locales backfilled with the en value to
+  satisfy `TestAllLanguagesHaveAllKeys`.
+- Convert tests: 8 new unit tests exercise text-only regression,
+  `input_audio`, `input_video`, image data URI, video data URI via
+  `image_url`, explicit `input_video`, `audioFormatToMime`, and
+  `parseDataURI`.
+
+---
+
 ## [0.2.0] — 2026-04-TBD
 
 ### BREAKING CHANGES

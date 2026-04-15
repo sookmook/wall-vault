@@ -1,6 +1,50 @@
 package vault
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
+
+// StringOrList accepts either a JSON array of strings or a single
+// comma-delimited string and normalises it to []string. Used for form fields
+// where the dashboard submits one text input but CLI/API clients submit arrays.
+type StringOrList []string
+
+func (s *StringOrList) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*s = nil
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var arr []string
+		if err := json.Unmarshal(data, &arr); err != nil {
+			return err
+		}
+		out := make([]string, 0, len(arr))
+		for _, v := range arr {
+			if v = strings.TrimSpace(v); v != "" {
+				out = append(out, v)
+			}
+		}
+		*s = out
+		return nil
+	}
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	parts := strings.Split(str, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	*s = out
+	return nil
+}
 
 // ─── API Key ──────────────────────────────────────────────────────────────────
 
@@ -71,18 +115,18 @@ type Client struct {
 
 // ClientInput: client add DTO
 type ClientInput struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Token           string   `json:"token"`
-	DefaultService  string   `json:"default_service"`
-	DefaultModel    string   `json:"default_model"`
-	AllowedServices []string `json:"allowed_services"`
-	AgentType       string   `json:"agent_type"`
-	WorkDir         string   `json:"work_dir"`
-	Description     string   `json:"description"`
-	IPWhitelist     []string `json:"ip_whitelist"`
-	Avatar          string   `json:"avatar,omitempty"`
-	Enabled         *bool    `json:"enabled"` // nil = default true
+	ID              string       `json:"id"`
+	Name            string       `json:"name"`
+	Token           string       `json:"token"`
+	DefaultService  string       `json:"default_service"`
+	DefaultModel    string       `json:"default_model"`
+	AllowedServices StringOrList `json:"allowed_services"`
+	AgentType       string       `json:"agent_type"`
+	WorkDir         string       `json:"work_dir"`
+	Description     string       `json:"description"`
+	IPWhitelist     StringOrList `json:"ip_whitelist"`
+	Avatar          string       `json:"avatar,omitempty"`
+	Enabled         *bool        `json:"enabled"` // nil = default true
 }
 
 // ClientUpdateInput: client update DTO
@@ -96,10 +140,10 @@ type ClientUpdateInput struct {
 	Token            *string  `json:"token"`
 	PreferredService *string  `json:"preferred_service"`        // v0.2 canonical
 	ModelOverride    *string  `json:"model_override"`           // v0.2 canonical
-	AllowedServices  []string `json:"allowed_services"`
-	AgentType        *string  `json:"agent_type"`
-	WorkDir          *string  `json:"work_dir"`
-	IPWhitelist      []string `json:"ip_whitelist"`
+	AllowedServices  StringOrList `json:"allowed_services"`
+	AgentType        *string      `json:"agent_type"`
+	WorkDir          *string      `json:"work_dir"`
+	IPWhitelist      StringOrList `json:"ip_whitelist"`
 	Avatar           *string  `json:"avatar"`
 	Enabled          *bool    `json:"enabled"`
 	// TODO (v0.2 Stage 2): remove legacy fields below after migrating store.go / server.go

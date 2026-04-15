@@ -1,10 +1,12 @@
 package layouts
 
-templ Shell(sidebar, main, slideover templ.Component) {
+templ Shell(header, sidebar, main, slideover, footer templ.Component) {
 	<div class="shell">
-		<nav>@sidebar</nav>
-		<main id="main">@main</main>
-		<aside id="slideover" hx-swap-oob="true">@slideover</aside>
+		@header
+		<nav class="shell-nav">@sidebar</nav>
+		<main id="main" class="shell-main">@main</main>
+		<aside id="slideover" class="shell-aside" hx-swap-oob="true">@slideover</aside>
+		@footer
 	</div>
 }
 

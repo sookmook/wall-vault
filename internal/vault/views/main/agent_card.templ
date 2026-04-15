@@ -1,16 +1,43 @@
 package mainview
 
 templ AgentCard(c *ClientVM) {
-	<div class="card" hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
-		<div style="display:flex;justify-content:space-between">
-			<b>🤖 { c.Name }</b>
-			<small style="color:var(--muted)">{ c.AgentType }</small>
-		</div>
-		<div style="font-size:.85em;color:var(--muted);margin-top:4px">
-			→ { c.PreferredService }
-			if c.ModelOverride != "" {
-				· override: { c.ModelOverride }
+	<div class="card" data-wv-id={c.ID} hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
+		<div class="card-head">
+			<span class="drag-handle" title="드래그하여 순서 변경" draggable="true">⋮⋮</span>
+			if c.Avatar != "" {
+				<img src={ c.Avatar } alt={ c.Name } class="avatar"/>
+			} else {
+				<div class="avatar-fallback">🤖</div>
 			}
+			<div style="flex:1;min-width:0">
+				<div class="card-row">
+					<span class="card-title">{ c.Name }</span>
+					<span class="chip">{ c.AgentType }</span>
+				</div>
+				<div class="card-meta">
+					<span class={ "dot " + agentDotClass(c.Enabled, c.Online) }></span>
+					<span>→ { c.PreferredService }</span>
+					if c.RemoteModel != "" {
+						<span class="chip chip-accent">{ c.RemoteModel }</span>
+					} else if c.ModelOverride != "" {
+						<span class="chip">{ c.ModelOverride }</span>
+					}
+				</div>
+				if c.LastHeartbeat != "" {
+					<div class="card-meta"><span style="font-size:.88em">⏱ { c.LastHeartbeat }</span></div>
+				}
+			</div>
 		</div>
 	</div>
+}
+
+func agentDotClass(enabled, online bool) string {
+	switch {
+	case enabled && online:
+		return "dot-ok"
+	case enabled:
+		return "dot-warn"
+	default:
+		return "dot-off"
+	}
 }

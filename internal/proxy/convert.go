@@ -135,6 +135,17 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 			continue
 		}
 
+		// Multi-part content (text + audio + image + video) — convert each part
+		// into the appropriate GeminiPart (Text or InlineData) so Gemini can
+		// process multimodal inputs end-to-end.
+		if len(msg.RawContent) > 0 {
+			parts := openaiPartsToGemini(msg.RawContent)
+			if len(parts) > 0 {
+				gemini.Contents = append(gemini.Contents, GeminiContent{Role: role, Parts: parts})
+				continue
+			}
+		}
+
 		// Skip empty text parts — Gemini rejects parts with no data.
 		if msg.Content == "" {
 			continue
@@ -215,6 +226,89 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 	}
 
 	return gemini
+}
+
+// openaiPartsToGemini maps OpenAI's multi-part content array to Gemini parts.
+// Recognised types:
+//   - "text"         → GeminiPart{Text}
+//   - "input_audio"  → GeminiPart{InlineData} (audio/<format>)
+//   - "input_video"  → GeminiPart{InlineData} (video/<format>)
+//   - "input_image"  → GeminiPart{InlineData} (image/<format>)
+//   - "input_file"   → GeminiPart{InlineData} (mime taken verbatim)
+//   - "image_url"    → GeminiPart{InlineData} when url is a data: URI
+//                      (mime is whatever the URI declares — image/png, video/mp4, …)
+//
+// External http(s) URLs in image_url are intentionally skipped this round —
+// fetch + size limits + caching require their own design.
+func openaiPartsToGemini(raw json.RawMessage) []GeminiPart {
+	var arr []map[string]interface{}
+	if err := json.Unmarshal(raw, &arr); err != nil {
+		return nil
+	}
+	out := make([]GeminiPart, 0, len(arr))
+	for _, p := range arr {
+		t, _ := p["type"].(string)
+		switch t {
+		case "text":
+			if s, ok := p["text"].(string); ok && s != "" {
+				out = append(out, GeminiPart{Text: s})
+			}
+		case "input_audio":
+			if a, ok := p["input_audio"].(map[string]interface{}); ok {
+				data, _ := a["data"].(string)
+				format, _ := a["format"].(string)
+				if data != "" {
+					out = append(out, GeminiPart{
+						InlineData: &BlobData{MimeType: audioFormatToMime(format), Data: data},
+					})
+				}
+			}
+		case "input_video":
+			if v, ok := p["input_video"].(map[string]interface{}); ok {
+				data, _ := v["data"].(string)
+				format, _ := v["format"].(string)
+				if data != "" {
+					out = append(out, GeminiPart{
+						InlineData: &BlobData{MimeType: videoFormatToMime(format), Data: data},
+					})
+				}
+			}
+		case "input_image":
+			if im, ok := p["input_image"].(map[string]interface{}); ok {
+				data, _ := im["data"].(string)
+				format, _ := im["format"].(string)
+				if data != "" {
+					out = append(out, GeminiPart{
+						InlineData: &BlobData{MimeType: imageFormatToMime(format), Data: data},
+					})
+				}
+			}
+		case "input_file":
+			if f, ok := p["input_file"].(map[string]interface{}); ok {
+				data, _ := f["data"].(string)
+				mime, _ := f["mime"].(string)
+				if mime == "" {
+					mime, _ = f["mime_type"].(string)
+				}
+				if data != "" && mime != "" {
+					out = append(out, GeminiPart{
+						InlineData: &BlobData{MimeType: mime, Data: data},
+					})
+				}
+			}
+		case "image_url":
+			if iu, ok := p["image_url"].(map[string]interface{}); ok {
+				url, _ := iu["url"].(string)
+				if mime, data, ok := parseDataURI(url); ok && data != "" {
+					out = append(out, GeminiPart{
+						InlineData: &BlobData{MimeType: mime, Data: data},
+					})
+				}
+				// External http(s) URL — skip in this round.
+			}
+		}
+	}
+	return out
 }
 
 // stripGeminiUnsupported recursively removes JSON Schema fields that Gemini's

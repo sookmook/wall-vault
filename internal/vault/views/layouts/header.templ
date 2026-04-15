@@ -1,0 +1,60 @@
+package layouts
+
+// LangOption represents a selectable locale in the header dropdown.
+type LangOption struct {
+	Code  string
+	Label string
+}
+
+// HeaderVM carries every value the topbar needs to render.
+type HeaderVM struct {
+	Title       string
+	Subtitle    string
+	Version     string
+	CurrentTheme string
+	CurrentLang  string
+	Langs        []LangOption
+}
+
+var themeOptions = []struct {
+	Code  string
+	Label string
+}{
+	{"light", "☀️ Light"},
+	{"dark", "🌙 Dark"},
+	{"cherry", "🌸 Cherry"},
+	{"ocean", "🌊 Ocean"},
+	{"gold", "🥇 Gold"},
+	{"autumn", "🍁 Autumn"},
+	{"winter", "❄️ Winter"},
+}
+
+templ Header(vm *HeaderVM) {
+	<header class="topbar">
+		<div class="topbar-brand">
+			<img src="/logo" alt="logo" class="topbar-logo"/>
+			<div class="topbar-titles">
+				<h1>{ vm.Title }</h1>
+				<small>{ vm.Subtitle } · { vm.Version }</small>
+			</div>
+		</div>
+		<div class="topbar-switchers">
+			<label class="switcher">
+				<span class="switcher-icon">🎨</span>
+				<select id="theme-select" onchange="wvSetTheme(this.value)">
+					for _, t := range themeOptions {
+						<option value={ t.Code } selected?={ t.Code == vm.CurrentTheme }>{ t.Label }</option>
+					}
+				</select>
+			</label>
+			<label class="switcher">
+				<span class="switcher-icon">🌐</span>
+				<select id="lang-select" onchange="wvSetLang(this.value)">
+					for _, l := range vm.Langs {
+						<option value={ l.Code } selected?={ l.Code == vm.CurrentLang }>{ l.Label }</option>
+					}
+				</select>
+			</label>
+		</div>
+	</header>
+}

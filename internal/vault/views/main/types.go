@@ -12,6 +12,10 @@ type ServiceVM struct {
 	ProxyEnabled  bool
 	SortOrder     int
 	AllowedModels []string
+
+	KeyCount   int
+	TodayUsage int
+	DailyLimit int // 0 = unlimited
 }
 
 // ClientVM is the view model for a client/agent card in the dashboard.
@@ -23,4 +27,26 @@ type ClientVM struct {
 	PreferredService string
 	ModelOverride    string
 	Enabled          bool
+	Avatar           string
+
+	Online        bool
+	RemoteModel   string
+	LastHeartbeat string // human-readable "3분 전" / "just now"
+}
+
+// KeyVM is the view model for an API-key card in the dashboard.
+// Sensitive material (encrypted_key) is never exposed to the template; the
+// dashboard only sees the short ID prefix, label, service, today usage, and
+// derived state ("active" | "cooldown" | "exhausted").
+type KeyVM struct {
+	ID         string
+	IDShort    string
+	Service    string
+	Label      string
+	TodayUsage int
+	TodayAttempts int
+	DailyLimit int    // 0 = unlimited
+	UsagePct   int    // 0..100, 0 when DailyLimit==0
+	Status     string // "active" | "cooldown" | "exhausted"
+	Cooldown   string // remaining cooldown e.g. "12m left", empty when none
 }

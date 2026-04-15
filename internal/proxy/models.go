@@ -36,9 +36,18 @@ type GeminiContent struct {
 }
 
 type GeminiPart struct {
-	Text         string      `json:"text,omitempty"`
-	FunctionCall interface{} `json:"functionCall,omitempty"`
+	Text             string      `json:"text,omitempty"`
+	InlineData       *BlobData   `json:"inlineData,omitempty"`
+	FunctionCall     interface{} `json:"functionCall,omitempty"`
 	FunctionResponse interface{} `json:"functionResponse,omitempty"`
+}
+
+// BlobData carries inline binary content (audio / image) for Gemini multimodal
+// requests. Data is base64-encoded; MimeType is the IANA media type
+// (e.g. "audio/wav", "image/png").
+type BlobData struct {
+	MimeType string `json:"mimeType"`
+	Data     string `json:"data"`
 }
 
 type GenerationConfig struct {
@@ -95,8 +104,12 @@ type OpenAIRequest struct {
 }
 
 type OpenAIMessage struct {
-	Role       string          `json:"role"`
-	Content    string          `json:"content,omitempty"`
+	Role    string `json:"role"`
+	Content string `json:"content,omitempty"`
+	// RawContent preserves the original parts array (text + input_audio +
+	// image_url) when the client sent content in OpenAI's multi-part form.
+	// Not serialized — only used inbound for OpenAIToGemini multimodal mapping.
+	RawContent json.RawMessage `json:"-"`
 	ToolCalls  json.RawMessage `json:"tool_calls,omitempty"`
 	ToolCallID string          `json:"tool_call_id,omitempty"`
 	Name       string          `json:"name,omitempty"`
@@ -144,10 +157,113 @@ func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
 	}
 	m.Role = raw.Role
 	m.Content = rawContentToString(raw.Content)
+	// Preserve the original raw payload only when it's the multi-part array
+	// form — that's the only case OpenAIToGemini needs for inlineData mapping.
+	if isJSONArray(raw.Content) {
+		m.RawContent = raw.Content
+	}
 	m.ToolCalls = raw.ToolCalls
 	m.ToolCallID = raw.ToolCallID
 	m.Name = raw.Name
 	return nil
+}
+
+// isJSONArray reports whether the first non-whitespace byte of raw is '['.
+func isJSONArray(raw json.RawMessage) bool {
+	for _, b := range raw {
+		if b == ' ' || b == '\t' || b == '\n' || b == '\r' {
+			continue
+		}
+		return b == '['
+	}
+	return false
+}
+
+// audioFormatToMime maps OpenAI input_audio.format values to IANA mime types.
+// Unknown formats fall through as "audio/<format>" so callers can still try.
+func audioFormatToMime(format string) string {
+	f := strings.ToLower(strings.TrimSpace(format))
+	switch f {
+	case "wav":
+		return "audio/wav"
+	case "mp3":
+		return "audio/mpeg"
+	case "ogg":
+		return "audio/ogg"
+	case "flac":
+		return "audio/flac"
+	case "webm":
+		return "audio/webm"
+	case "m4a", "mp4":
+		return "audio/mp4"
+	case "":
+		return "audio/wav"
+	}
+	if strings.HasPrefix(f, "audio/") {
+		return f
+	}
+	return "audio/" + f
+}
+
+// videoFormatToMime maps short video format names to IANA mime types. Used by
+// the input_video multimodal part. Unknown formats fall through as "video/<f>".
+func videoFormatToMime(format string) string {
+	f := strings.ToLower(strings.TrimSpace(format))
+	switch f {
+	case "mp4", "m4v":
+		return "video/mp4"
+	case "mov", "qt":
+		return "video/quicktime"
+	case "webm":
+		return "video/webm"
+	case "mkv":
+		return "video/x-matroska"
+	case "avi":
+		return "video/x-msvideo"
+	case "":
+		return "video/mp4"
+	}
+	if strings.HasPrefix(f, "video/") {
+		return f
+	}
+	return "video/" + f
+}
+
+// imageFormatToMime maps short image format names to IANA mime types.
+func imageFormatToMime(format string) string {
+	f := strings.ToLower(strings.TrimSpace(format))
+	switch f {
+	case "jpg", "jpeg":
+		return "image/jpeg"
+	case "png":
+		return "image/png"
+	case "gif":
+		return "image/gif"
+	case "webp":
+		return "image/webp"
+	case "heic":
+		return "image/heic"
+	case "":
+		return "image/png"
+	}
+	if strings.HasPrefix(f, "image/") {
+		return f
+	}
+	return "image/" + f
+}
+
+// parseDataURI splits a "data:<mime>;base64,<data>" URI into (mime, data, true).
+// Returns (empty, empty, false) for non-data or non-base64 URIs.
+func parseDataURI(uri string) (mime, data string, ok bool) {
+	if !strings.HasPrefix(uri, "data:") {
+		return "", "", false
+	}
+	rest := uri[5:]
+	semi := strings.Index(rest, ";base64,")
+	if semi < 0 {
+		return "", "", false
+	}
+	return rest[:semi], rest[semi+len(";base64,"):], true
 }
 
 // rawContentToString converts OpenAI content (string or parts array) to plain text.

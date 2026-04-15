@@ -1,0 +1,24 @@
+package mainview
+
+import (
+	"fmt"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
+
+templ KeysGrid(keys []*KeyVM) {
+	<section id="keys">
+		<div class="section-head">
+			<h3>{ i18n.T("keys") } · { fmt.Sprint(len(keys)) }</h3>
+		</div>
+		if len(keys) == 0 {
+			<div class="empty-hint">{ i18n.T("no_keys") }</div>
+		} else {
+			<div class="grid-cards">
+				for _, k := range keys {
+					@KeyCard(k)
+				}
+			</div>
+		}
+	</section>
+}

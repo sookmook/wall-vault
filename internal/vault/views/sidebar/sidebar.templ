@@ -1,17 +1,25 @@
 package sidebar
 
+import "github.com/sookmook/wall-vault/internal/i18n"
+
 templ Sidebar(services []*ServiceVM, clients []*ClientVM) {
 	<div class="sidebar">
-		<div class="brand"><b>🔐 wall-vault</b> <small>v0.2.0</small></div>
-		<div class="section-label">SERVICES</div>
+		<div class="section-label">{ i18n.T("services") }</div>
 		for _, s := range services {
 			<a href="#" hx-get={"/hx/services/" + s.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">{ s.Name }</a>
 		}
-		<div class="section-label">AGENTS</div>
+		<div class="section-label">{ i18n.T("agents") }</div>
 		for _, c := range clients {
-			<a href="#" hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">{ c.Name }</a>
+			<a href="#" hx-get={"/hx/clients/" + c.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
+				if c.Avatar != "" {
+					<img src={ c.Avatar } alt={ c.Name } class="sidebar-avatar"/>
+				} else {
+					<span class="sidebar-avatar-fallback">🤖</span>
+				}
+				<span>{ c.Name }</span>
+			</a>
 		}
-		<div class="section-label">KEYS · MONITOR</div>
-		<a href="#" hx-get="/hx/keys/list" hx-target="#main">Keys</a>
+		<div class="section-label">{ i18n.T("keys") }</div>
+		<a href="#keys">{ i18n.T("keys") }</a>
 	</div>
 }

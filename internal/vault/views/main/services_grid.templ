@@ -1,11 +1,17 @@
 package mainview
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
 
 templ ServicesGrid(services []*ServiceVM) {
 	<section>
-		<h3>Services · { fmt.Sprint(len(services)) }</h3>
-		<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+		<div class="section-head">
+			<h3>{ i18n.T("services") } · { fmt.Sprint(len(services)) }</h3>
+		</div>
+		<div class="grid-cards">
 			for _, s := range services {
 				@ServiceCard(s)
 			}

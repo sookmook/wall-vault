@@ -17,6 +17,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/i18n"
 	"github.com/sookmook/wall-vault/internal/middleware"
 	"github.com/sookmook/wall-vault/internal/models"
 	layouts "github.com/sookmook/wall-vault/internal/vault/views/layouts"
@@ -801,13 +802,19 @@ func (s *Server) handleAdminLang(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	valid := map[string]bool{"ko": true, "en": true, "zh": true, "es": true,
-		"hi": true, "ar": true, "pt": true, "fr": true, "de": true, "ja": true}
-	if !valid[body.Lang] {
+	valid := false
+	for _, code := range i18n.Supported {
+		if body.Lang == code {
+			valid = true
+			break
+		}
+	}
+	if !valid {
 		jsonError(w, "unknown lang", http.StatusBadRequest)
 		return
 	}
 	s.cfg.Lang = body.Lang
+	i18n.SetLang(body.Lang)
 	_ = s.store.SetLang(body.Lang)
 	if s.cfgPath != "" {
 		_ = config.Save(s.cfg, s.cfgPath)
@@ -1136,33 +1143,61 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	themeName := s.store.GetSettings().Theme
+	settings := s.store.GetSettings()
+	themeName := settings.Theme
 	if themeName == "" {
 		themeName = s.cfg.Theme
 	}
 	if themeName == "" {
 		themeName = "light"
 	}
+	langCode := settings.Lang
+	if langCode == "" {
+		langCode = s.cfg.Lang
+	}
+	if langCode == "" {
+		langCode = i18n.Lang()
+	}
+	i18n.SetLang(langCode)
+
 	services := s.store.ListServices()
 	clients := s.store.ListClients()
 
+	langs := make([]layouts.LangOption, 0, len(i18n.Supported))
+	for _, code := range i18n.Supported {
+		langs = append(langs, layouts.LangOption{Code: code, Label: i18n.LangLabel(code)})
+	}
+	headerVM := &layouts.HeaderVM{
+		Title:        i18n.T("title"),
+		Subtitle:     "wall-vault",
+		Version:      Version,
+		CurrentTheme: themeName,
+		CurrentLang:  langCode,
+		Langs:        langs,
+	}
+
 	inner := layouts.Shell(
+		layouts.Header(headerVM),
 		sidebar.Sidebar(toSidebarServices(services), toSidebarClients(clients)),
-		renderHome(toMainServices(services), toMainClients(clients)),
+		renderHome(s.toMainServices(services), s.toMainClients(clients), s.toMainKeys(s.store.ListKeys())),
 		slideover.Empty(),
+		layouts.Footer(&layouts.FooterVM{Version: Version, StartedAt: s.startedAt.Unix()}),
 	)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	layouts.Base(themeName, inner).Render(r.Context(), w) //nolint:errcheck
+	layouts.Base(themeName, langCode, i18n.T("title"), s.cfg.Vault.AdminToken, inner).Render(r.Context(), w) //nolint:errcheck
 }
 
-// renderHome stacks ServicesGrid + AgentsGrid as the main pane body.
-func renderHome(services []*mainview.ServiceVM, clients []*mainview.ClientVM) templ.Component {
+// renderHome stacks ServicesGrid + AgentsGrid + KeysGrid as the main pane body.
+func renderHome(services []*mainview.ServiceVM, clients []*mainview.ClientVM, keys []*mainview.KeyVM) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		if err := mainview.ServicesGrid(services).Render(ctx, w); err != nil {
 			return err
 		}
-		return mainview.AgentsGrid(clients).Render(ctx, w)
+		if err := mainview.AgentsGrid(clients).Render(ctx, w); err != nil {
+			return err
+		}
+		return mainview.KeysGrid(keys).Render(ctx, w)
 	})
 }
 

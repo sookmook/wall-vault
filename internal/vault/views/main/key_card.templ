@@ -1,0 +1,45 @@
+package mainview
+
+import "fmt"
+
+templ KeyCard(k *KeyVM) {
+	<div class="card key-card" data-wv-id={k.ID}>
+		<div class="card-head">
+			<span class={ "dot " + keyDotClass(k.Status) } title={k.Status}></span>
+			<span class="card-title">{ k.Service }</span>
+			if k.Label != "" {
+				<span class="chip">{ k.Label }</span>
+			}
+		</div>
+		<div class="card-meta">
+			<span class="chip" title="ID">🔑 { k.IDShort }</span>
+			if k.DailyLimit > 0 {
+				<span class="chip" title="usage / limit">📊 { fmt.Sprint(k.TodayUsage) } / { fmt.Sprint(k.DailyLimit) }</span>
+			} else if k.TodayUsage > 0 {
+				<span class="chip" title="today tokens">📊 { fmt.Sprint(k.TodayUsage) }</span>
+			}
+			if k.TodayAttempts > k.TodayUsage {
+				<span class="chip" title="attempts">↻ { fmt.Sprint(k.TodayAttempts) }</span>
+			}
+			if k.Cooldown != "" {
+				<span class="chip chip-warn" title="cooldown">⏳ { k.Cooldown }</span>
+			}
+		</div>
+		if k.DailyLimit > 0 {
+			<div class="progress">
+				<span data-pct={ fmt.Sprint(k.UsagePct) }></span>
+			</div>
+		}
+	</div>
+}
+
+func keyDotClass(status string) string {
+	switch status {
+	case "cooldown":
+		return "dot-warn"
+	case "exhausted":
+		return "dot-off"
+	default:
+		return "dot-ok"
+	}
+}

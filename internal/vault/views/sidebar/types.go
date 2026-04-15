@@ -8,6 +8,7 @@ type ServiceVM struct {
 
 // ClientVM is the sidebar view model for a client entry.
 type ClientVM struct {
-	ID   string
-	Name string
+	ID     string
+	Name   string
+	Avatar string
 }

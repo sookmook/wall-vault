@@ -2,20 +2,37 @@ package slideover
 
 import "github.com/sookmook/wall-vault/internal/i18n"
 
-templ ClientEdit(c *ClientVM, services []*ServiceVM) {
-	<form data-wv-submit={"/admin/clients/" + c.ID} data-wv-method="PUT" class="wv-form">
+// AgentType options shown in the create dropdown.
+// Free text is still allowed; the list just makes typical choices one-click.
+var agentTypeOptions = []string{
+	"openclaw",
+	"nanoclaw",
+	"claude-code",
+	"cline",
+	"cursor",
+	"cokacdir",
+	"gemini-cli",
+	"econoworld",
+}
+
+templ ClientCreate(services []*ServiceVM) {
+	<form data-wv-submit="/admin/clients" data-wv-method="POST" class="wv-form">
 		<div class="wv-form-section">
 			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
 			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_id") }</span>
+				<input name="id" required placeholder={ i18n.T("ph_id_example") }/>
+			</label>
+			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_name") }</span>
-				<input name="name" value={c.Name}/>
+				<input name="name" required placeholder={ i18n.T("ph_name_example") }/>
 			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_agent_type") }</span>
 				<select name="agent_type">
 					<option value=""></option>
 					for _, t := range agentTypeOptions {
-						<option value={ t } selected?={ t == c.AgentType }>{ t }</option>
+						<option value={ t }>{ t }</option>
 					}
 				</select>
 			</label>
@@ -25,15 +42,16 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 			<div class="wv-form-section-title">{ i18n.T("sec_routing") }</div>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_preferred_service") }</span>
-				<select name="preferred_service">
+				<select name="default_service">
+					<option value=""></option>
 					for _, s := range services {
-						<option value={s.ID} selected?={s.ID == c.PreferredService}>{ s.Name }</option>
+						<option value={ s.ID }>{ s.Name }</option>
 					}
 				</select>
 			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_model_override") }</span>
-				<input name="model_override" value={c.ModelOverride} placeholder={ i18n.T("ph_model_default") }/>
+				<input name="default_model" placeholder={ i18n.T("ph_model_default") }/>
 			</label>
 		</div>
 
@@ -41,17 +59,17 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 			<div class="wv-form-section-title">{ i18n.T("sec_access") }</div>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_work_dir") }</span>
-				<input name="work_dir" value={c.WorkDir} placeholder={ i18n.T("ph_workdir") }/>
+				<input name="work_dir" placeholder={ i18n.T("ph_workdir") }/>
 				<small class="hint">{ i18n.T("hint_workdir_multi") }</small>
 			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_ip_whitelist") }</span>
-				<input name="ip_whitelist" value={c.IPWhitelist} placeholder={ i18n.T("ph_ip_csv") }/>
+				<input name="ip_whitelist" placeholder={ i18n.T("ph_ip_csv") }/>
 				<small class="hint">{ i18n.T("hint_ip_open") }</small>
 			</label>
-			<label class="wv-field wv-field-inline">
-				<input type="checkbox" name="enabled" checked?={c.Enabled}/>
-				<span>{ i18n.T("f_enabled") }</span>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_token") }</span>
+				<input name="token" placeholder={ i18n.T("ph_token_auto") }/>
 			</label>
 		</div>
 
@@ -60,11 +78,7 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_avatar") }</span>
 				<div class="avatar-row">
-					if c.Avatar != "" {
-						<img src={c.Avatar} alt={c.Name} class="avatar-preview" data-wv-avatar-preview/>
-					} else {
-						<div class="avatar-preview avatar-preview-empty" data-wv-avatar-preview>🤖</div>
-					}
+					<div class="avatar-preview avatar-preview-empty" data-wv-avatar-preview>🤖</div>
 					<input type="file" name="avatar" accept="image/*" data-wv-avatar-input/>
 				</div>
 				<small class="hint">{ i18n.T("hint_avatar") }</small>
@@ -72,7 +86,7 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 		</div>
 
 		<div class="wv-form-actions">
-			<button type="submit">{ i18n.T("act_save") }</button>
+			<button type="submit">{ i18n.T("act_add") }</button>
 		</div>
 	</form>
 }

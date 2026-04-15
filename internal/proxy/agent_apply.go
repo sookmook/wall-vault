@@ -42,6 +42,7 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 		AgentType string `json:"agentType"`
 		BaseURL   string `json:"baseUrl"`
 		Model     string `json:"model"`
+		WorkDir   string `json:"workDir"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "invalid JSON body", http.StatusBadRequest)
@@ -70,6 +71,8 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 		path, err = applyClaudeCodeConfig(body.BaseURL, body.Model, token)
 	case "openclaw", "nanoclaw":
 		path, err = applyOpenClawConfig(body.BaseURL, body.Model, token)
+	case "econoworld":
+		path, err = applyEconoWorldConfig(body.BaseURL, body.Model, token, body.WorkDir)
 	default:
 		jsonError(w, "unsupported agentType: "+body.AgentType, http.StatusBadRequest)
 		return
@@ -425,6 +428,96 @@ func (s *Server) isValidAgentToken(token string) bool {
 		return true
 	}
 	return false
+}
+
+// ── EconoWorld ────────────────────────────────────────────────────────────────
+
+// applyEconoWorldConfig writes wall-vault proxy settings into EconoWorld's
+// analyzer/ai_config.json. The existing multi-provider structure is preserved;
+// we flip `provider` to "openai_compatible" and populate that section with the
+// wall-vault base URL, the caller's token, and the requested model.
+//
+// workDir accepts a comma-separated list of candidate project roots and picks
+// the first one whose analyzer/ directory already exists on this host. Paths
+// may be either POSIX (/mnt/e/...) or Windows style (E:\Work\...); Windows
+// drive paths are converted to their WSL mount equivalents. When none of the
+// candidates exist the first listed candidate (or the hard-coded default) is
+// used so the resulting error clearly points at the missing directory.
+func applyEconoWorldConfig(baseURL, model, token, workDir string) (string, error) {
+	dir := resolveEconoWorldDir(workDir)
+	path := filepath.Join(dir, "analyzer", "ai_config.json")
+
+	cfg := map[string]interface{}{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &cfg)
+	}
+
+	cfg["provider"] = "openai_compatible"
+	compat, _ := cfg["openai_compatible"].(map[string]interface{})
+	if compat == nil {
+		compat = map[string]interface{}{}
+		cfg["openai_compatible"] = compat
+	}
+	compat["base_url"] = baseURL
+	compat["api_key"] = token
+	if model != "" {
+		compat["model"] = model
+	}
+	if _, ok := compat["max_tokens"]; !ok {
+		compat["max_tokens"] = 4096
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", fmt.Errorf("failed to create analyzer directory: %w", err)
+	}
+	if err := writeJSON(path, cfg); err != nil {
+		return "", fmt.Errorf("failed to write ai_config.json: %w", err)
+	}
+	return path, nil
+}
+
+// resolveEconoWorldDir returns the first candidate POSIX directory whose
+// analyzer/ subdirectory exists on the host. workDir may be a comma-separated
+// list; each item is trimmed and Windows drive paths are converted to WSL
+// mount paths. If none of the candidates have an analyzer/ directory, the
+// first candidate (or the hard-coded default) is returned so downstream file
+// operations produce an obviously targeted error message.
+func resolveEconoWorldDir(workDir string) string {
+	candidates := splitEconoWorldDirs(workDir)
+	if len(candidates) == 0 {
+		return "/mnt/e/Work/Dev/EconoWorld"
+	}
+	for _, c := range candidates {
+		if info, err := os.Stat(filepath.Join(c, "analyzer")); err == nil && info.IsDir() {
+			return c
+		}
+	}
+	return candidates[0]
+}
+
+// splitEconoWorldDirs parses a comma-delimited workDir string into a slice of
+// normalised candidate directories (Windows drive paths rewritten to
+// /mnt/<drive>/...). Empty segments are dropped.
+func splitEconoWorldDirs(workDir string) []string {
+	workDir = strings.TrimSpace(workDir)
+	if workDir == "" {
+		return nil
+	}
+	parts := strings.Split(workDir, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if len(p) >= 2 && p[1] == ':' {
+			if wsl := windowsPathToWSL(p); wsl != "" {
+				p = wsl
+			}
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────

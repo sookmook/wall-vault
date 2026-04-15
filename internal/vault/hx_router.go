@@ -1,8 +1,10 @@
 package vault
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	mainview "github.com/sookmook/wall-vault/internal/vault/views/main"
 	sidebar "github.com/sookmook/wall-vault/internal/vault/views/sidebar"
@@ -33,55 +35,171 @@ func toSidebarServices(svcs []*ServiceConfig) []*sidebar.ServiceVM {
 func toSidebarClients(clients []*Client) []*sidebar.ClientVM {
 	out := make([]*sidebar.ClientVM, len(clients))
 	for i, c := range clients {
-		out[i] = &sidebar.ClientVM{ID: c.ID, Name: c.Name}
+		out[i] = &sidebar.ClientVM{ID: c.ID, Name: c.Name, Avatar: c.Avatar}
 	}
 	return out
 }
 
-// toMainServices converts vault ServiceConfig slice to main-view service VMs.
-func toMainServices(svcs []*ServiceConfig) []*mainview.ServiceVM {
+// toMainServices converts vault ServiceConfig slice to main-view service VMs,
+// enriching each entry with live per-service key counts and aggregate usage.
+func (s *Server) toMainServices(svcs []*ServiceConfig) []*mainview.ServiceVM {
+	keys := s.store.ListKeys()
+	counts := map[string]int{}
+	usage := map[string]int{}
+	limits := map[string]int{}
+	for _, k := range keys {
+		counts[k.Service]++
+		usage[k.Service] += k.TodayUsage
+		if k.DailyLimit > 0 {
+			limits[k.Service] += k.DailyLimit
+		}
+	}
 	out := make([]*mainview.ServiceVM, len(svcs))
-	for i, s := range svcs {
+	for i, sv := range svcs {
 		out[i] = &mainview.ServiceVM{
-			ID:            s.ID,
-			Name:          s.Name,
-			DefaultModel:  s.DefaultModel,
-			LocalURL:      s.LocalURL,
-			Enabled:       s.Enabled,
-			ProxyEnabled:  s.ProxyEnabled,
-			SortOrder:     s.SortOrder,
-			AllowedModels: s.AllowedModels,
+			ID:            sv.ID,
+			Name:          sv.Name,
+			DefaultModel:  sv.DefaultModel,
+			LocalURL:      sv.LocalURL,
+			Enabled:       sv.Enabled,
+			ProxyEnabled:  sv.ProxyEnabled,
+			SortOrder:     sv.SortOrder,
+			AllowedModels: sv.AllowedModels,
+			KeyCount:      counts[sv.ID],
+			TodayUsage:    usage[sv.ID],
+			DailyLimit:    limits[sv.ID],
 		}
 	}
 	return out
 }
 
-// toMainClients converts vault Client slice to main-view agent VMs.
-func toMainClients(clients []*Client) []*mainview.ClientVM {
+// toMainClients converts vault Client slice to main-view agent VMs,
+// folding in live proxy heartbeat state (online flag, current model, age).
+func (s *Server) toMainClients(clients []*Client) []*mainview.ClientVM {
+	proxies := s.store.ListProxies()
+	byID := make(map[string]*ProxyStatus, len(proxies))
+	for _, p := range proxies {
+		byID[p.ClientID] = p
+	}
 	out := make([]*mainview.ClientVM, len(clients))
+	now := time.Now()
 	for i, c := range clients {
-		out[i] = &mainview.ClientVM{
+		vm := &mainview.ClientVM{
 			ID:               c.ID,
 			Name:             c.Name,
 			AgentType:        c.AgentType,
 			PreferredService: c.PreferredService,
 			ModelOverride:    c.ModelOverride,
 			Enabled:          c.Enabled,
+			Avatar:           c.Avatar,
 		}
+		if p := byID[c.ID]; p != nil {
+			vm.Online = !p.UpdatedAt.IsZero() && now.Sub(p.UpdatedAt) < 90*time.Second
+			vm.RemoteModel = p.Model
+			if !p.UpdatedAt.IsZero() {
+				vm.LastHeartbeat = relativeTime(now.Sub(p.UpdatedAt))
+			}
+		}
+		out[i] = vm
 	}
 	return out
 }
 
-// toSlideoverService converts a vault ServiceConfig to a slideover ServiceVM.
-func toSlideoverService(s *ServiceConfig) *slideover.ServiceVM {
+// toMainKeys converts vault APIKey slice to dashboard KeyVM slice. Sensitive
+// material (encrypted_key) is dropped. Cooldown text is computed from
+// CooldownUntil, status from IsAvailable / IsExhausted / IsOnCooldown.
+func (s *Server) toMainKeys(keys []*APIKey) []*mainview.KeyVM {
+	now := time.Now()
+	out := make([]*mainview.KeyVM, len(keys))
+	for i, k := range keys {
+		short := k.ID
+		if len(short) > 10 {
+			short = short[:10]
+		}
+		vm := &mainview.KeyVM{
+			ID:            k.ID,
+			IDShort:       short,
+			Service:       k.Service,
+			Label:         k.Label,
+			TodayUsage:    k.TodayUsage,
+			TodayAttempts: k.TodayAttempts,
+			DailyLimit:    k.DailyLimit,
+			UsagePct:      k.UsagePct(),
+		}
+		switch {
+		case k.IsExhausted():
+			vm.Status = "exhausted"
+		case k.IsOnCooldown():
+			vm.Status = "cooldown"
+			vm.Cooldown = remainingLabel(k.CooldownUntil.Sub(now))
+		default:
+			vm.Status = "active"
+		}
+		out[i] = vm
+	}
+	return out
+}
+
+// remainingLabel formats a positive Duration as "Nd Nh", "Nh Nm", "Nm Ns", or "Ns left".
+func remainingLabel(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	secs := int(d.Seconds())
+	switch {
+	case secs >= 86400:
+		return fmt.Sprintf("%dd %dh left", secs/86400, (secs%86400)/3600)
+	case secs >= 3600:
+		return fmt.Sprintf("%dh %dm left", secs/3600, (secs%3600)/60)
+	case secs >= 60:
+		return fmt.Sprintf("%dm %ds left", secs/60, secs%60)
+	default:
+		return fmt.Sprintf("%ds left", secs)
+	}
+}
+
+// relativeTime formats a Duration as a short Korean/unit-agnostic label
+// (e.g. "3s ago", "12m ago"). Kept ASCII so it renders consistently across locales.
+func relativeTime(d time.Duration) string {
+	secs := int(d.Seconds())
+	if secs < 2 {
+		return "just now"
+	}
+	if secs < 60 {
+		return fmt.Sprintf("%ds ago", secs)
+	}
+	if mins := secs / 60; mins < 60 {
+		return fmt.Sprintf("%dm ago", mins)
+	}
+	if hrs := secs / 3600; hrs < 24 {
+		return fmt.Sprintf("%dh ago", hrs)
+	}
+	return fmt.Sprintf("%dd ago", secs/86400)
+}
+
+// toSlideoverService converts a vault ServiceConfig to a slideover ServiceVM,
+// enriching the VM with live model options pulled from the shared registry so
+// the edit form can render a default_model dropdown.
+func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
+	var modelNames []string
+	if s.registry != nil {
+		for _, m := range s.registry.All(sv.ID) {
+			if m.ID != "" {
+				modelNames = append(modelNames, m.ID)
+			}
+		}
+	}
 	return &slideover.ServiceVM{
-		ID:            s.ID,
-		Name:          s.Name,
-		DefaultModel:  s.DefaultModel,
-		LocalURL:      s.LocalURL,
-		ProxyEnabled:  s.ProxyEnabled,
-		SortOrder:     s.SortOrder,
-		AllowedModels: s.AllowedModels,
+		ID:            sv.ID,
+		Name:          sv.Name,
+		DefaultModel:  sv.DefaultModel,
+		LocalURL:      sv.LocalURL,
+		Enabled:       sv.Enabled,
+		ProxyEnabled:  sv.ProxyEnabled,
+		SortOrder:     sv.SortOrder,
+		AllowedModels: sv.AllowedModels,
+		IsLocal:       sv.IsLocal(),
+		Models:        modelNames,
 	}
 }
 
@@ -94,6 +212,9 @@ func toSlideoverClient(c *Client) *slideover.ClientVM {
 		PreferredService: c.PreferredService,
 		ModelOverride:    c.ModelOverride,
 		Enabled:          c.Enabled,
+		WorkDir:          c.WorkDir,
+		IPWhitelist:      strings.Join(c.IPWhitelist, ", "),
+		Avatar:           c.Avatar,
 	}
 }
 
@@ -104,17 +225,15 @@ func (s *Server) hxSidebar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) hxServicesGrid(w http.ResponseWriter, r *http.Request) {
-	mainview.ServicesGrid(toMainServices(s.store.ListServices())).Render(r.Context(), w) //nolint:errcheck
+	mainview.ServicesGrid(s.toMainServices(s.store.ListServices())).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (s *Server) hxAgentsGrid(w http.ResponseWriter, r *http.Request) {
-	mainview.AgentsGrid(toMainClients(s.store.ListClients())).Render(r.Context(), w) //nolint:errcheck
+	mainview.AgentsGrid(s.toMainClients(s.store.ListClients())).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (s *Server) hxKeysList(w http.ResponseWriter, r *http.Request) {
-	// Placeholder: keys list UI lands in a later round; for now show a note.
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<p>Keys list UI coming in a later round.</p>`)) //nolint:errcheck
+	mainview.KeysGrid(s.toMainKeys(s.store.ListKeys())).Render(r.Context(), w) //nolint:errcheck
 }
 
 // hxServiceSubroute matches /hx/services/{id}/edit — renders slideover frame around ServiceEdit.
@@ -130,13 +249,28 @@ func (s *Server) hxServiceSubroute(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	slideover.Frame(svc.Name, slideover.ServiceEdit(toSlideoverService(svc))).Render(r.Context(), w) //nolint:errcheck
+	slideover.Frame(svc.Name, slideover.ServiceEdit(s.toSlideoverService(svc))).Render(r.Context(), w) //nolint:errcheck
 }
 
-// hxClientSubroute matches /hx/clients/{id}/edit — renders slideover frame around ClientEdit.
+// hxClientSubroute matches both:
+//   /hx/clients/new        → blank create form
+//   /hx/clients/{id}/edit  → edit form for a specific client
+// Both render inside the slideover frame so the layout stays consistent.
 func (s *Server) hxClientSubroute(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/hx/clients/")
-	id = strings.TrimSuffix(id, "/edit")
+	path := strings.TrimPrefix(r.URL.Path, "/hx/clients/")
+
+	// build service VMs reused by both create and edit
+	svcVMs := make([]*slideover.ServiceVM, 0)
+	for _, svc := range s.store.ListServices() {
+		svcVMs = append(svcVMs, s.toSlideoverService(svc))
+	}
+
+	if path == "new" {
+		slideover.Frame("새 에이전트", slideover.ClientCreate(svcVMs)).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+
+	id := strings.TrimSuffix(path, "/edit")
 	if id == "" {
 		http.NotFound(w, r)
 		return
@@ -145,11 +279,6 @@ func (s *Server) hxClientSubroute(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		http.NotFound(w, r)
 		return
-	}
-	// build service VMs for the select dropdown
-	svcVMs := make([]*slideover.ServiceVM, 0)
-	for _, svc := range s.store.ListServices() {
-		svcVMs = append(svcVMs, toSlideoverService(svc))
 	}
 	slideover.Frame(c.Name, slideover.ClientEdit(toSlideoverClient(c), svcVMs)).Render(r.Context(), w) //nolint:errcheck
 }

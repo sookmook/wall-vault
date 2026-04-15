@@ -1,14 +1,534 @@
 package layouts
 
-templ Base(theme string, inner templ.Component) {
+templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 	<!DOCTYPE html>
-	<html lang="ko" data-theme={theme}>
+	<html lang={ lang } data-theme={ theme }>
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width,initial-scale=1"/>
-			<title>wall-vault</title>
+			<meta name="wv-admin-token" content={ adminToken }/>
+			<title>{ title }</title>
+			<link rel="icon" href="/logo"/>
 			<script src="https://unpkg.com/htmx.org@1.9.12"></script>
 			@Theme()
+			<script>
+				(function(){
+					var m = document.querySelector('meta[name=wv-admin-token]');
+					window.WV_ADMIN_TOKEN = m ? m.content : '';
+				})();
+				document.addEventListener('htmx:configRequest', function(evt){
+					if (window.WV_ADMIN_TOKEN) {
+						evt.detail.headers['Authorization'] = 'Bearer ' + window.WV_ADMIN_TOKEN;
+					}
+				});
+				// After any HTMX swap, hydrate select[data-wv-models=X] with options
+				// grouped into Free / Paid. Local services (ollama/lmstudio/vllm) are
+				// treated as Free. Runs idempotently — safe to re-invoke on swaps.
+				var WV_LOCAL_SERVICES = {ollama:1, lmstudio:1, vllm:1};
+				function wvHydrateModels(root){
+					var selects = (root || document).querySelectorAll('select[data-wv-models]');
+					selects.forEach(function(sel){
+						var svc = sel.getAttribute('data-wv-models');
+						if (!svc) return;
+						var current = sel.getAttribute('data-wv-current') || sel.value || '';
+						fetch('/admin/models?service=' + encodeURIComponent(svc), {
+							headers: {'Authorization': 'Bearer ' + (window.WV_ADMIN_TOKEN || '')}
+						}).then(function(r){ return r.ok ? r.json() : null; })
+						  .then(function(d){
+							if (!d || !Array.isArray(d.models)) return;
+							var isLocal = !!WV_LOCAL_SERVICES[svc];
+							var free = [], paid = [];
+							d.models.forEach(function(m){
+								if (!m || !m.id) return;
+								if (isLocal || m.free === true) { free.push(m); } else { paid.push(m); }
+							});
+							sel.innerHTML = '';
+							if (current && !d.models.some(function(m){ return m.id === current; })) {
+								var hdr = document.createElement('option');
+								hdr.value = current;
+								hdr.textContent = current + '  (사용자 지정)';
+								hdr.selected = true;
+								sel.appendChild(hdr);
+							}
+							function addGroup(label, list){
+								if (!list.length) return;
+								var g = document.createElement('optgroup');
+								g.label = label;
+								list.forEach(function(m){
+									var o = document.createElement('option');
+									o.value = m.id;
+									o.textContent = (m.name && m.name !== m.id) ? (m.id + ' · ' + m.name) : m.id;
+									if (m.id === current) o.selected = true;
+									g.appendChild(o);
+								});
+								sel.appendChild(g);
+							}
+							addGroup('무료 / Free', free);
+							addGroup('유료 / Paid', paid);
+						  }).catch(function(){});
+					});
+				}
+				document.addEventListener('htmx:afterSwap', function(evt){ wvHydrateModels(evt.target); });
+				document.addEventListener('DOMContentLoaded', function(){ wvHydrateModels(document); });
+
+				// Hydrate any [data-pct] element by writing inline width:N% — works around
+				// templ's strict style-attribute parser.
+				function wvHydrateProgress(root){
+					(root || document).querySelectorAll('[data-pct]').forEach(function(el){
+						var p = parseInt(el.getAttribute('data-pct'), 10);
+						if (isNaN(p)) return;
+						if (p < 0) p = 0; if (p > 100) p = 100;
+						el.style.width = p + '%';
+					});
+				}
+				document.addEventListener('htmx:afterSwap', function(evt){ wvHydrateProgress(evt.target); });
+				document.addEventListener('DOMContentLoaded', function(){ wvHydrateProgress(document); });
+
+				// Drag-and-drop reorder: any [data-wv-reorder=KIND] grid whose direct
+				// children carry [data-wv-id=ID] becomes sortable. Drag handles
+				// (.drag-handle inside cards) own the dragstart so plain clicks still
+				// open the slideover via htmx.
+				var WV_REORDER_ENDPOINTS = {
+					agents:   '/admin/clients/reorder'
+				};
+				function wvInitReorder(root){
+					var grids = (root || document).querySelectorAll('[data-wv-reorder]');
+					grids.forEach(function(grid){
+						if (grid.dataset.wvReorderInit === '1') return;
+						grid.dataset.wvReorderInit = '1';
+						grid.addEventListener('dragstart', function(evt){
+							var handle = evt.target.closest('.drag-handle');
+							if (!handle) { evt.preventDefault(); return; }
+							var card = handle.closest('[data-wv-id]');
+							if (!card) return;
+							evt.dataTransfer.effectAllowed = 'move';
+							evt.dataTransfer.setData('text/plain', card.dataset.wvId);
+							card.classList.add('dragging');
+							grid._wvDragId = card.dataset.wvId;
+						});
+						grid.addEventListener('dragend', function(){
+							grid.querySelectorAll('.dragging,.drop-target').forEach(function(el){
+								el.classList.remove('dragging');
+								el.classList.remove('drop-target');
+							});
+							grid._wvDragId = null;
+						});
+						grid.addEventListener('dragover', function(evt){
+							if (!grid._wvDragId) return;
+							evt.preventDefault();
+							evt.dataTransfer.dropEffect = 'move';
+							var target = evt.target.closest('[data-wv-id]');
+							grid.querySelectorAll('.drop-target').forEach(function(el){ el.classList.remove('drop-target'); });
+							if (target && target.dataset.wvId !== grid._wvDragId) {
+								target.classList.add('drop-target');
+							}
+						});
+						grid.addEventListener('drop', function(evt){
+							evt.preventDefault();
+							var draggedId = grid._wvDragId || evt.dataTransfer.getData('text/plain');
+							if (!draggedId) return;
+							var target = evt.target.closest('[data-wv-id]');
+							var dragged = grid.querySelector('[data-wv-id="' + draggedId + '"]');
+							if (!dragged) return;
+							if (target && target !== dragged) {
+								var rect = target.getBoundingClientRect();
+								var after = (evt.clientY - rect.top) > (rect.height / 2);
+								if (after) { target.parentNode.insertBefore(dragged, target.nextSibling); }
+								else       { target.parentNode.insertBefore(dragged, target); }
+							}
+							var endpoint = WV_REORDER_ENDPOINTS[grid.dataset.wvReorder];
+							if (!endpoint) return;
+							var ids = Array.prototype.slice.call(grid.querySelectorAll('[data-wv-id]')).map(function(el){ return el.dataset.wvId; });
+							fetch(endpoint, {
+								method: 'PUT',
+								headers: {
+									'Content-Type':'application/json',
+									'Authorization':'Bearer ' + (window.WV_ADMIN_TOKEN || '')
+								},
+								body: JSON.stringify({order: ids})
+							}).then(function(r){
+								if (!r.ok) {
+									r.text().then(function(t){ alert('순서 저장 실패: ' + t); });
+								}
+							}).catch(function(e){ alert('순서 저장 실패: ' + e); });
+						});
+					});
+				}
+				document.addEventListener('htmx:afterSwap', function(evt){ wvInitReorder(evt.target); });
+				document.addEventListener('DOMContentLoaded', function(){ wvInitReorder(document); });
+				// Delegated form submit: any <form data-wv-submit="URL" data-wv-method="POST|PUT">
+				// is intercepted, serialised to JSON, and sent with admin auth.
+				document.addEventListener('submit', function(evt){
+					var form = evt.target;
+					if (!form || !form.dataset) return;
+					var url = form.dataset.wvSubmit;
+					var method = form.dataset.wvMethod || 'POST';
+					if (!url) return;
+					evt.preventDefault();
+					wvSubmit(form, url, method);
+				}, true);
+				// Resize an image File via canvas to a square data URI (max side 256px).
+				// Returns a Promise<string>.
+				function wvResizeImage(file, max){
+					max = max || 256;
+					return new Promise(function(resolve, reject){
+						var fr = new FileReader();
+						fr.onload = function(){
+							var img = new Image();
+							img.onload = function(){
+								var w = img.width, h = img.height, scale = Math.min(1, max / Math.max(w, h));
+								var cw = Math.round(w * scale), ch = Math.round(h * scale);
+								var canvas = document.createElement('canvas');
+								canvas.width = cw; canvas.height = ch;
+								canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+								try { resolve(canvas.toDataURL('image/jpeg', 0.85)); }
+								catch(e){ reject(e); }
+							};
+							img.onerror = reject;
+							img.src = fr.result;
+						};
+						fr.onerror = reject;
+						fr.readAsDataURL(file);
+					});
+				}
+
+				// Live preview: when an avatar input changes, swap its sibling preview src.
+				document.addEventListener('change', function(evt){
+					var input = evt.target;
+					if (!input || !input.matches || !input.matches('input[data-wv-avatar-input]')) return;
+					var file = input.files && input.files[0];
+					if (!file) return;
+					wvResizeImage(file, 256).then(function(uri){
+						var preview = input.parentElement && input.parentElement.querySelector('[data-wv-avatar-preview]');
+						if (!preview) return;
+						if (preview.tagName === 'IMG') {
+							preview.src = uri;
+						} else {
+							var img = document.createElement('img');
+							img.src = uri;
+							img.alt = '아바타 미리보기';
+							img.className = 'avatar-preview';
+							img.setAttribute('data-wv-avatar-preview', '');
+							preview.parentElement.replaceChild(img, preview);
+						}
+					}).catch(function(){});
+				});
+
+				// wvSubmit: collect a form's fields, POST/PUT as JSON with admin auth,
+				// reload on success, alert on failure. Image inputs are canvas-resized
+				// to ≤256px and embedded as data URIs in the JSON body.
+				window.wvSubmit = function(form, url, method){
+					var fd = new FormData(form);
+					var body = {};
+					fd.forEach(function(v, k){
+						if (v instanceof File) return; // handled below
+						if (v === '') return;
+						if (body[k] === undefined) { body[k] = v; return; }
+						if (Array.isArray(body[k])) { body[k].push(v); return; }
+						body[k] = [body[k], v];
+					});
+					// Checkbox quirk: FormData omits unchecked checkboxes entirely.
+					// Make every named checkbox explicit so server sees true/false.
+					form.querySelectorAll('input[type=checkbox][name]').forEach(function(c){
+						body[c.name] = c.checked;
+					});
+					// Image inputs → resized data URIs.
+					var imageInputs = Array.prototype.slice.call(form.querySelectorAll('input[type=file][accept*=image]'));
+					var pending = imageInputs.map(function(input){
+						var f = input.files && input.files[0];
+						if (!f) return Promise.resolve();
+						return wvResizeImage(f, 256).then(function(uri){ body[input.name] = uri; });
+					});
+					Promise.all(pending).then(function(){
+						return fetch(url, {
+							method: method,
+							headers: {
+								'Content-Type': 'application/json',
+								'Authorization': 'Bearer ' + (window.WV_ADMIN_TOKEN || '')
+							},
+							body: JSON.stringify(body)
+						});
+					}).then(function(r){
+						if (!r) return;
+						if (r.ok) { window.location.reload(); return; }
+						return r.text().then(function(t){ alert('실패: ' + t); });
+					}).catch(function(e){ alert('실패: ' + e); });
+					return false;
+				};
+				// Per-theme animation layer ported from v0.1: cherry / ocean / gold /
+				// autumn / winter each have their own particle composition. Layer sits
+				// at z-index:0 (above body background, below .shell which is z-index:1).
+				var wvFxElems = [];
+				function wvClearFx(){
+					wvFxElems.forEach(function(e){ if (e && e.remove) e.remove(); });
+					wvFxElems = [];
+					var layer = document.getElementById('wv-petals');
+					if (layer) layer.innerHTML = '';
+				}
+				function wvFxLayer(){
+					var layer = document.getElementById('wv-petals');
+					if (!layer) {
+						layer = document.createElement('div');
+						layer.id = 'wv-petals';
+						document.documentElement.appendChild(layer);
+					}
+					return layer;
+				}
+				function wvCherryFx(){
+					var layer = wvFxLayer();
+					var N = 30;
+					var style = document.createElement('style');
+					var css = '';
+					for (var i = 0; i < N; i++) {
+						var steps = 8;
+						var amp = 55 + Math.random() * 85;
+						var kf = '@keyframes wvpzz' + i + '{';
+						for (var s = 0; s <= steps; s++) {
+							var pct = (s / steps * 100).toFixed(0);
+							var y = (s / steps * 110).toFixed(1);
+							var x = ((s % 2 === 0) ? 1 : -1) * amp * (0.55 + Math.random() * 0.45);
+							var rz = (s * (780 / steps)).toFixed(0);
+							var ry = (s % 2 === 0 ? 35 : -35);
+							var op = (s === 0 || s === steps) ? 0 : (s === 1 ? 0.75 : 0.88);
+							kf += pct + '%{transform:translate(' + x.toFixed(0) + 'px,' + y + 'vh) rotateZ(' + rz + 'deg) rotateY(' + ry + 'deg);opacity:' + op + '}';
+						}
+						kf += '}';
+						css += kf;
+					}
+					style.textContent = css;
+					document.head.appendChild(style);
+					wvFxElems.push(style);
+					for (var j = 0; j < N; j++) {
+						var p = document.createElement('div');
+						p.className = 'cherry-petal';
+						var sz = 9 + Math.random() * 14;
+						var dur = 38 + Math.random() * 22;
+						var startY = Math.random() * 100;
+						var br = Math.random() > 0.5 ? '50% 0 50% 0' : '0 50% 0 50%';
+						p.style.cssText =
+							'left:' + Math.random() * 108 + 'vw;' +
+							'width:' + sz + 'px;height:' + (sz * 1.4).toFixed(0) + 'px;' +
+							'border-radius:' + br + ';' +
+							'animation:wvpzz' + j + ' ' + dur + 's linear -' + (dur * startY / 100).toFixed(1) + 's infinite;';
+						layer.appendChild(p);
+						wvFxElems.push(p);
+					}
+				}
+				function wvOceanFx(){
+					var layer = wvFxLayer();
+					var wc = document.createElement('div');
+					wc.className = 'ocean-fx';
+					[
+						['rgba(0,152,216,.28)', 78, 32, 'wave1'],
+						['rgba(0,120,190,.20)', 56, 48, 'wave2'],
+						['rgba(32,184,248,.14)', 40, 22, 'wave1']
+					].forEach(function(spec, i){
+						var w = document.createElement('div');
+						w.className = 'ocean-wave';
+						w.style.cssText = 'bottom:' + (i * 20) + 'px;background:' + spec[0] + ';height:' + spec[1] + 'px;animation:' + spec[3] + ' ' + spec[2] + 's linear infinite;';
+						wc.appendChild(w);
+					});
+					layer.appendChild(wc);
+					wvFxElems.push(wc);
+					['☁','⛅','🌤','☁','🌥','☁'].forEach(function(e, i){
+						var c = document.createElement('div');
+						c.className = 'ocean-cloud';
+						var dd = 80 + i * 22;
+						var bd = 12 + Math.random() * 10;
+						c.textContent = e;
+						c.style.cssText =
+							'top:' + (1 + i * 7) + 'vh;' +
+							'font-size:' + (2.2 + Math.random() * 2.8) + 'rem;' +
+							'animation:cloud-drift ' + dd + 's linear -' + (Math.random() * dd).toFixed(0) + 's infinite,' +
+									 'cloud-bob ' + bd + 's ease-in-out -' + (Math.random() * bd).toFixed(1) + 's infinite;' +
+							'opacity:.9;';
+						layer.appendChild(c);
+						wvFxElems.push(c);
+					});
+					for (var i = 0; i < 10; i++) {
+						var b = document.createElement('div');
+						b.className = 'ocean-bubble';
+						var sz = 5 + Math.random() * 12;
+						var dur = 32 + Math.random() * 22;
+						b.style.cssText =
+							'left:' + Math.random() * 100 + 'vw;' +
+							'bottom:' + Math.random() * 20 + 'vh;' +
+							'width:' + sz + 'px;height:' + sz + 'px;' +
+							'animation:bubble-rise ' + dur + 's ease-in-out -' + (Math.random() * dur).toFixed(1) + 's infinite;';
+						layer.appendChild(b);
+						wvFxElems.push(b);
+					}
+					for (var i = 0; i < 10; i++) {
+						var s = document.createElement('div');
+						s.className = 'ocean-sparkle';
+						s.style.cssText =
+							'left:' + Math.random() * 100 + 'vw;bottom:' + (5 + Math.random() * 50) + 'vh;' +
+							'animation-duration:' + (4 + Math.random() * 5) + 's;' +
+							'animation-delay:-' + Math.random() * 8 + 's;';
+						layer.appendChild(s);
+						wvFxElems.push(s);
+					}
+				}
+				function wvGoldFx(){
+					var layer = wvFxLayer();
+					var chars = ['✦','✧','⋆','✶','★','✦','✧','⋆','✦'];
+					for (var i = 0; i < 32; i++) {
+						var g = document.createElement('div');
+						g.className = 'gold-spark';
+						var sz = 10 + Math.random() * 22;
+						var td = 6 + Math.random() * 10;
+						var dd = 20 + Math.random() * 20;
+						g.textContent = chars[Math.floor(Math.random() * chars.length)];
+						g.style.cssText =
+							'left:' + Math.random() * 100 + 'vw;top:' + Math.random() * 100 + 'vh;' +
+							'font-size:' + sz + 'px;' +
+							'animation:gold-twinkle ' + td + 's ease-in-out -' + (Math.random() * td).toFixed(1) + 's infinite,' +
+									 'gold-drift ' + dd + 's ease-in-out -' + (Math.random() * dd).toFixed(1) + 's infinite;';
+						layer.appendChild(g);
+						wvFxElems.push(g);
+					}
+				}
+				function wvAutumnFx(){
+					var layer = wvFxLayer();
+					var leaves = ['🍂','🍂','🍁','🍂','🍂'];
+					var N = 28;
+					var style = document.createElement('style');
+					var css = '';
+					for (var i = 0; i < N; i++) {
+						var amp = 40 + Math.random() * 70;
+						var steps = 7;
+						var kf = '@keyframes wvaleaf' + i + '{';
+						for (var s = 0; s <= steps; s++) {
+							var pct = (s / steps * 100).toFixed(0);
+							var y = (s / steps * 110).toFixed(1);
+							var x = ((s % 2 === 0) ? 1 : -1) * amp * (0.5 + Math.random() * 0.5);
+							var rz = (s * (540 / steps)).toFixed(0);
+							var op = (s === 0 || s === steps) ? 0 : 0.85;
+							kf += pct + '%{transform:translate(' + x.toFixed(0) + 'px,' + y + 'vh) rotate(' + rz + 'deg);opacity:' + op + '}';
+						}
+						kf += '}';
+						css += kf;
+					}
+					style.textContent = css;
+					document.head.appendChild(style);
+					wvFxElems.push(style);
+					for (var j = 0; j < N; j++) {
+						var l = document.createElement('div');
+						l.className = 'autumn-leaf';
+						var dur = 32 + Math.random() * 20;
+						var startY = Math.random() * 100;
+						l.textContent = leaves[Math.floor(Math.random() * leaves.length)];
+						l.style.cssText =
+							'left:' + Math.random() * 108 + 'vw;' +
+							'font-size:' + (14 + Math.random() * 12) + 'px;' +
+							'animation:wvaleaf' + j + ' ' + dur + 's linear -' + (dur * startY / 100).toFixed(1) + 's infinite;';
+						layer.appendChild(l);
+						wvFxElems.push(l);
+					}
+				}
+				function wvWinterFx(){
+					var layer = wvFxLayer();
+					var chars = ['☃️','🎄','❄️','⛄','🎄','☃️','❄️'];
+					chars.forEach(function(ch, i){
+						var c = document.createElement('div');
+						c.className = 'winter-char';
+						var sz = 1.8 + Math.random() * 2.2;
+						var top = 5 + i * 12;
+						var dd = 60 + i * 18;
+						var bd = 4 + Math.random() * 5;
+						var sd = -(Math.random() * dd).toFixed(1);
+						c.textContent = ch;
+						c.style.cssText =
+							'top:' + top + 'vh;' +
+							'font-size:' + sz + 'rem;' +
+							'animation:winter-drift ' + dd + 's linear ' + sd + 's infinite,' +
+									 'winter-bob ' + bd + 's ease-in-out -' + (Math.random() * bd).toFixed(1) + 's infinite;';
+						layer.appendChild(c);
+						wvFxElems.push(c);
+					});
+					for (var i = 0; i < 6; i++) {
+						var s = document.createElement('div');
+						s.className = 'winter-char';
+						s.textContent = '❄';
+						var sz = 0.9 + Math.random() * 1.2;
+						var top = 10 + i * 14;
+						var spd = 3 + Math.random() * 4;
+						s.style.cssText =
+							'top:' + top + 'vh;left:' + (5 + i * 16) + 'vw;' +
+							'font-size:' + sz + 'rem;color:rgba(140,190,255,.7);' +
+							'animation:winter-spin ' + spd + 's linear infinite;';
+						layer.appendChild(s);
+						wvFxElems.push(s);
+					}
+					for (var i = 0; i < 20; i++) {
+						var f = document.createElement('div');
+						f.className = 'snowflake';
+						f.textContent = '❅';
+						var dur = 8 + Math.random() * 12;
+						f.style.cssText =
+							'left:' + Math.random() * 100 + 'vw;' +
+							'font-size:' + (10 + Math.random() * 10) + 'px;' +
+							'animation:snowfall ' + dur + 's linear -' + (Math.random() * dur).toFixed(1) + 's infinite;';
+						layer.appendChild(f);
+						wvFxElems.push(f);
+					}
+				}
+				function wvApplyThemeFx(theme){
+					try {
+						wvClearFx();
+						switch (theme) {
+							case 'cherry': wvCherryFx(); break;
+							case 'ocean':  wvOceanFx();  break;
+							case 'gold':   wvGoldFx();   break;
+							case 'autumn': wvAutumnFx(); break;
+							case 'winter': wvWinterFx(); break;
+						}
+					} catch (e) { console.error('[wv-fx] failed:', e); }
+				}
+				if (document.readyState === 'loading') {
+					document.addEventListener('DOMContentLoaded', function(){ wvApplyThemeFx(document.documentElement.dataset.theme); });
+				} else {
+					wvApplyThemeFx(document.documentElement.dataset.theme);
+				}
+				function wvSetTheme(v){
+					document.documentElement.dataset.theme = v;
+					wvApplyThemeFx(v);
+					fetch('/admin/theme',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+window.WV_ADMIN_TOKEN},body:JSON.stringify({theme:v})}).catch(function(){});
+				}
+				function wvSetLang(v){
+					fetch('/admin/lang',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+window.WV_ADMIN_TOKEN},body:JSON.stringify({lang:v})}).then(function(){location.reload();}).catch(function(){location.reload();});
+				}
+				// Footer uptime ticker — reads server start epoch from data-wv-started.
+				function wvFormatUptime(secs){
+					if (secs < 0) secs = 0;
+					var d = Math.floor(secs / 86400);
+					var h = Math.floor((secs % 86400) / 3600);
+					var m = Math.floor((secs % 3600) / 60);
+					var s = secs % 60;
+					var parts = [];
+					if (d) parts.push(d + 'd');
+					if (h || d) parts.push(h + 'h');
+					if (m || h || d) parts.push(m + 'm');
+					parts.push(s + 's');
+					return parts.join(' ');
+				}
+				function wvTickUptime(){
+					var el = document.getElementById('wv-uptime');
+					if (!el) return;
+					var holder = document.querySelector('[data-wv-started]');
+					if (!holder) return;
+					var started = parseInt(holder.getAttribute('data-wv-started'), 10);
+					if (!started) return;
+					var now = Math.floor(Date.now() / 1000);
+					el.textContent = wvFormatUptime(now - started);
+				}
+				if (document.readyState === 'loading') {
+					document.addEventListener('DOMContentLoaded', wvTickUptime);
+				} else {
+					wvTickUptime();
+				}
+				setInterval(wvTickUptime, 1000);
+			</script>
 		</head>
 		<body>
 			@inner

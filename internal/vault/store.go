@@ -547,11 +547,11 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 		Token:           inp.Token,
 		DefaultService:  inp.DefaultService,
 		DefaultModel:    inp.DefaultModel,
-		AllowedServices: inp.AllowedServices,
+		AllowedServices: []string(inp.AllowedServices),
 		AgentType:       inp.AgentType,
 		WorkDir:         inp.WorkDir,
 		Description:     inp.Description,
-		IPWhitelist:     inp.IPWhitelist,
+		IPWhitelist:     []string(inp.IPWhitelist),
 		Enabled:         enabled,
 		SortOrder:       maxOrder + 1,
 		CreatedAt:       time.Now(),
@@ -597,7 +597,7 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 				c.DefaultModel = *inp.DefaultModel
 			}
 			if inp.AllowedServices != nil {
-				c.AllowedServices = inp.AllowedServices
+				c.AllowedServices = []string(inp.AllowedServices)
 			}
 			if inp.AgentType != nil {
 				c.AgentType = *inp.AgentType
@@ -609,7 +609,7 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 				c.Description = *inp.Description
 			}
 			if inp.IPWhitelist != nil {
-				c.IPWhitelist = inp.IPWhitelist
+				c.IPWhitelist = []string(inp.IPWhitelist)
 			}
 			if inp.Avatar != nil {
 				c.Avatar = *inp.Avatar

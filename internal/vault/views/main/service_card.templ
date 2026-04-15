@@ -4,14 +4,46 @@ import "fmt"
 
 templ ServiceCard(s *ServiceVM) {
 	<div class="card" hx-get={"/hx/services/" + s.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
-		<div style="display:flex;justify-content:space-between">
-			<b>{ s.Name }</b>
+		<div class="card-head">
+			<span class={ "dot " + dotClass(s.Enabled, s.ProxyEnabled) }></span>
+			<span class="card-title">{ s.Name }</span>
 			if s.ProxyEnabled {
-				<span class="badge">proxy</span>
+				<span class="chip chip-accent">proxy</span>
 			}
 		</div>
-		<div style="font-size:.85em;color:var(--muted);margin-top:4px">
-			{ s.DefaultModel } · #{ fmt.Sprint(s.SortOrder) }
+		<div class="card-meta">
+			if s.DefaultModel != "" {
+				<span title="default model">🧠 { s.DefaultModel }</span>
+			} else {
+				<span style="color:var(--off)">no default model</span>
+			}
+		</div>
+		<div class="card-meta">
+			<span class="chip">🔑 { fmt.Sprint(s.KeyCount) }</span>
+			if s.TodayUsage > 0 {
+				<span class="chip" title="today tokens">📊 { formatUsage(s.TodayUsage, s.DailyLimit) }</span>
+			}
+			if s.LocalURL != "" {
+				<span class="chip" title={ s.LocalURL }>🏠 local</span>
+			}
 		</div>
 	</div>
+}
+
+func dotClass(enabled, proxyEnabled bool) string {
+	switch {
+	case enabled && proxyEnabled:
+		return "dot-ok"
+	case enabled:
+		return "dot-warn"
+	default:
+		return "dot-off"
+	}
+}
+
+func formatUsage(used, limit int) string {
+	if limit > 0 {
+		return fmt.Sprintf("%d / %d", used, limit)
+	}
+	return fmt.Sprint(used)
 }

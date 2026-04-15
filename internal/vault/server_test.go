@@ -588,8 +588,10 @@ func TestHXSidebarRendersOK(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("got %d, want 200", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "wall-vault") {
-		t.Fatalf("body missing sidebar brand: %s", w.Body.String())
+	body := w.Body.String()
+	// Section labels are i18n-driven; just ensure the structural class rendered.
+	if strings.Count(body, `class="section-label"`) < 3 {
+		t.Fatalf("body missing sidebar sections: %s", body)
 	}
 }
 

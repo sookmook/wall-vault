@@ -54,6 +54,7 @@ type Server struct {
 	ownAgentType       string            // this proxy's own agent_type (from syncFromVault)
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
 	serviceURLs     map[string]string // service ID → local URL from vault config
+	serviceDefaults map[string]string // service ID → default_model from vault config
 	keyMgr          *KeyManager
 	filter          *ToolFilter
 	sse             *SSEClient
@@ -390,25 +391,31 @@ func (s *Server) syncAllowedServices() error {
 		return fmt.Errorf("서비스 목록 조회 실패: HTTP %d", resp.StatusCode)
 	}
 	var svcs []struct {
-		ID       string `json:"id"`
-		LocalURL string `json:"local_url"`
+		ID           string `json:"id"`
+		LocalURL     string `json:"local_url"`
+		DefaultModel string `json:"default_model"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&svcs); err != nil {
 		return err
 	}
 	ids := make([]string, 0, len(svcs))
 	urls := make(map[string]string, len(svcs))
+	defaults := make(map[string]string, len(svcs))
 	for _, sv := range svcs {
 		ids = append(ids, sv.ID)
 		if sv.LocalURL != "" {
 			urls[sv.ID] = sv.LocalURL
 		}
+		if sv.DefaultModel != "" {
+			defaults[sv.ID] = sv.DefaultModel
+		}
 	}
 	s.mu.Lock()
 	s.allowedServices = ids
 	s.serviceURLs = urls
+	s.serviceDefaults = defaults
 	s.mu.Unlock()
-	log.Printf("[sync] 프록시 서비스 목록: %v (urls: %v)", ids, urls)
+	log.Printf("[sync] 프록시 서비스 목록: %v (urls: %v, defaults: %v)", ids, urls, defaults)
 	return nil
 }
 
@@ -1009,6 +1016,7 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	s.mu.RLock()
 	allowedServices := s.allowedServices
+	serviceDefaults := s.serviceDefaults
 	s.mu.RUnlock()
 
 	var lastErr error
@@ -1035,35 +1043,46 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 	}
 
 	for _, svc := range tryOrder {
+		// Primary respects the caller's requested model; fallback swaps in the
+		// target service's default_model when available so Anthropic doesn't
+		// receive "gemini-2.5-flash" etc. If the target has no default_model,
+		// the original is tried (better to log a 404 than silently skip).
+		targetModel := model
+		if svc != service {
+			if dm := serviceDefaults[svc]; dm != "" {
+				targetModel = dm
+			}
+		}
+
 		var resp *GeminiResponse
 		var err error
 		switch svc {
 		case "google":
-			resp, err = s.callGoogle(model, req)
+			resp, err = s.callGoogle(targetModel, req)
 		case "openrouter":
-			resp, err = s.callOpenRouter(model, req)
+			resp, err = s.callOpenRouter(targetModel, req)
 		case "ollama":
-			resp, err = s.callOllama(model, req)
+			resp, err = s.callOllama(targetModel, req)
 		case "openai":
-			resp, err = s.callOpenAI(model, req)
+			resp, err = s.callOpenAI(targetModel, req)
 		case "anthropic":
-			resp, err = s.callAnthropic(model, req)
+			resp, err = s.callAnthropic(targetModel, req)
 		case "lmstudio", "vllm":
-			resp, err = s.callLocalService(svc, model, req)
+			resp, err = s.callLocalService(svc, targetModel, req)
 		default:
 			continue
 		}
 		if err == nil {
 			if svc != service {
-				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, model)
+				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, targetModel)
 				s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
 					"service": svc,
-					"model":   model,
+					"model":   targetModel,
 				})
 			}
 			return resp, nil
 		}
-		log.Printf("[proxy] %s failed → fallback: %v", svc, err)
+		log.Printf("[proxy] %s (%s) failed → fallback: %v", svc, targetModel, err)
 		lastErr = err
 	}
 	if lastErr != nil {

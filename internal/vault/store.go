@@ -686,8 +686,9 @@ func (s *Store) ListProxyEnabledServices() []string {
 
 // ProxyService: ID + local URL for proxy routing
 type ProxyService struct {
-	ID       string `json:"id"`
-	LocalURL string `json:"local_url,omitempty"`
+	ID           string `json:"id"`
+	LocalURL     string `json:"local_url,omitempty"`
+	DefaultModel string `json:"default_model,omitempty"`
 }
 
 // ListProxyEnabledServicesInfo: returns proxy-enabled services with their local URLs
@@ -697,7 +698,7 @@ func (s *Store) ListProxyEnabledServicesInfo() []ProxyService {
 	var result []ProxyService
 	for _, sv := range s.services {
 		if sv.ProxyEnabled {
-			result = append(result, ProxyService{ID: sv.ID, LocalURL: sv.LocalURL})
+			result = append(result, ProxyService{ID: sv.ID, LocalURL: sv.LocalURL, DefaultModel: sv.DefaultModel})
 		}
 	}
 	return result

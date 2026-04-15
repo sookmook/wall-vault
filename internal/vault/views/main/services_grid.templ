@@ -10,8 +10,9 @@ templ ServicesGrid(services []*ServiceVM) {
 	<section>
 		<div class="section-head">
 			<h3>{ i18n.T("services") } · { fmt.Sprint(len(services)) }</h3>
+			<button class="btn-add" hx-get="/hx/services/new" hx-target="#slideover" hx-swap="outerHTML">{ i18n.T("add") }</button>
 		</div>
-		<div class="grid-cards">
+		<div class="grid-cards" data-wv-reorder="services">
 			for _, s := range services {
 				@ServiceCard(s)
 			}

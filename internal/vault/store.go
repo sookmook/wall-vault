@@ -772,6 +772,36 @@ func (s *Store) ReorderClients(order []string) error {
 	return s.save()
 }
 
+// ReorderServices applies a new ordering to s.services based on the provided
+// id slice. Services missing from `order` keep their existing relative order
+// after the named ones. Mirrors ReorderClients exactly so the dashboard can
+// drag-sort service cards.
+func (s *Store) ReorderServices(order []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	byID := make(map[string]*ServiceConfig, len(s.services))
+	for _, sv := range s.services {
+		byID[sv.ID] = sv
+	}
+	seen := make(map[string]bool, len(order))
+	reordered := make([]*ServiceConfig, 0, len(s.services))
+	for i, id := range order {
+		if sv, ok := byID[id]; ok && !seen[id] {
+			sv.SortOrder = i + 1
+			reordered = append(reordered, sv)
+			seen[id] = true
+		}
+	}
+	for _, sv := range s.services {
+		if !seen[sv.ID] {
+			sv.SortOrder = len(reordered) + 1
+			reordered = append(reordered, sv)
+		}
+	}
+	s.services = reordered
+	return s.save()
+}
+
 // ─── Proxy Status ─────────────────────────────────────────────────────────────
 
 func (s *Store) UpdateProxyStatus(ps *ProxyStatus) {

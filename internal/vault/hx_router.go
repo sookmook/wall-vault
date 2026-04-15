@@ -17,9 +17,10 @@ func (s *Server) RegisterHXRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/hx/services/grid", s.hxServicesGrid)
 	mux.HandleFunc("/hx/agents/grid", s.hxAgentsGrid)
 	mux.HandleFunc("/hx/keys/list", s.hxKeysList)
-	// /hx/services/{id}/edit and /hx/clients/{id}/edit use sub-routing
+	// /hx/{services|clients|keys}/(new|{id}/edit) use sub-routing
 	mux.HandleFunc("/hx/services/", s.hxServiceSubroute)
 	mux.HandleFunc("/hx/clients/", s.hxClientSubroute)
+	mux.HandleFunc("/hx/keys/", s.hxKeySubroute)
 }
 
 // toSidebarServices converts vault ServiceConfig slice to sidebar view models.
@@ -236,10 +237,16 @@ func (s *Server) hxKeysList(w http.ResponseWriter, r *http.Request) {
 	mainview.KeysGrid(s.toMainKeys(s.store.ListKeys())).Render(r.Context(), w) //nolint:errcheck
 }
 
-// hxServiceSubroute matches /hx/services/{id}/edit — renders slideover frame around ServiceEdit.
+// hxServiceSubroute handles two routes:
+//   /hx/services/new        → blank create form
+//   /hx/services/{id}/edit  → edit form for a specific service
 func (s *Server) hxServiceSubroute(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/hx/services/")
-	id = strings.TrimSuffix(id, "/edit")
+	path := strings.TrimPrefix(r.URL.Path, "/hx/services/")
+	if path == "new" {
+		slideover.Frame("새 서비스", slideover.ServiceCreate()).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	id := strings.TrimSuffix(path, "/edit")
 	if id == "" {
 		http.NotFound(w, r)
 		return
@@ -250,6 +257,22 @@ func (s *Server) hxServiceSubroute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slideover.Frame(svc.Name, slideover.ServiceEdit(s.toSlideoverService(svc))).Render(r.Context(), w) //nolint:errcheck
+}
+
+// hxKeySubroute handles /hx/keys/new → blank key create form.
+func (s *Server) hxKeySubroute(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/hx/keys/")
+	if path != "new" {
+		http.NotFound(w, r)
+		return
+	}
+	svcVMs := make([]*slideover.ServiceVM, 0)
+	for _, svc := range s.store.ListServices() {
+		if svc.Enabled {
+			svcVMs = append(svcVMs, s.toSlideoverService(svc))
+		}
+	}
+	slideover.Frame("새 API 키", slideover.KeyCreate(&slideover.KeyCreateVM{Services: svcVMs})).Render(r.Context(), w) //nolint:errcheck
 }
 
 // hxClientSubroute matches both:
@@ -267,6 +290,10 @@ func (s *Server) hxClientSubroute(w http.ResponseWriter, r *http.Request) {
 
 	if path == "new" {
 		slideover.Frame("새 에이전트", slideover.ClientCreate(svcVMs)).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	if path == "" || path == "/" {
+		http.NotFound(w, r)
 		return
 	}
 

@@ -1,5 +1,5 @@
 # wall-vault Benutzerhandbuch
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,18 @@
 - Beim ersten v0.2-Start wird die vorhandene `vault.json` automatisch migriert, und der Zustand vor der Migration wird als `vault.json.pre-v02.{timestamp}.bak` gespeichert.
 - Das Dashboard wurde in drei Zonen umstrukturiert: eine linke Seitenleiste, ein zentrales Kartengitter und ein rechtseitiger Edit-Slideover.
 - Admin-API-Pfade sind unverändert, aber die Request-/Response-Body-Schemas wurden aktualisiert – alte CLI-Skripte müssen entsprechend aktualisiert werden.
+
+---
+
+## v0.2.1 Neue Funktionen
+
+- **Multimodaler Pass-Through (OpenAI → Gemini)**: `/v1/chat/completions` akzeptiert jetzt sechs Content-Part-Typen zusätzlich zu `text` — `input_audio`, `input_video`, `input_image`, `input_file` und `image_url` (Data-URIs sowie externe http(s)-URLs ≤ 5 MB). Der Proxy konvertiert jeden davon in Geminis `inlineData`. OpenAI-kompatible Clients wie EconoWorld können Audio-/Bild-/Video-Blobs direkt streamen.
+- **EconoWorld-Agententyp**: `POST /agent/apply` mit `agentType: "econoworld"` schreibt die wall-vault-Einstellungen in die `analyzer/ai_config.json` des Projekts. `workDir` akzeptiert eine kommagetrennte Liste von Kandidatenpfaden und konvertiert Windows-Laufwerkspfade in WSL-Mount-Pfade.
+- **Dashboard-Schlüsselraster + CRUD**: 11 Schlüssel werden als kompakte Karten mit + Hinzufügen / ✕ Löschen-Slideover dargestellt.
+- **Dienst-Hinzufügen + Drag-and-Drop-Sortierung**: Das Dienste-Raster erhält eine +-Schaltfläche zum Hinzufügen sowie einen Ziehgriff (`⋮⋮`).
+- **Kopfzeile / Fußzeile / Theme-Animationen / Sprachumschalter** wiederhergestellt. Die 7 Themes (cherry/dark/light/ocean/gold/autumn/winter) spielen ihren Partikeleffekt auf einer Ebene hinter den Karten, aber über dem Hintergrund ab.
+- **Slideover-Schließen-UX**: Ein Klick außerhalb oder Esc schließt den Slideover.
+- **SSE-Statusanzeige** in der Fußzeile (grün = verbunden, orange = erneut verbindend, grau = getrennt).
 
 ---
 

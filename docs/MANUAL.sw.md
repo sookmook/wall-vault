@@ -1,5 +1,5 @@
 # Mwongozo wa Mtumiaji wa wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -847,6 +847,18 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Ikiwa inaendesha kwenye kompyuta 
 - Wakati wa kuanzisha v0.2 kwa mara ya kwanza, faili ya `vault.json` iliyopo inabadilishwa kiotomatiki, na hali kabla ya ubadilishaji inahifadhwa kama `vault.json.pre-v02.{timestamp}.bak`.
 - Dashibodi imebadilishwa kuwa maeneo matatu: upau wa upande wa kushoto, taifa la kadi katikati, na sehemu ya kuhariri upande wa kulia.
 - Njia za Admin API hazibadilishwi, lakini vigezo vya ombi/jibu vimebadilishwa — hati za CLI za zamani zitahitaji kusasishwa ipasavyo.
+
+---
+
+## Vipengele Vipya vya v0.2.1
+
+- **Upitishaji wa Multimodal (OpenAI → Gemini)**: `/v1/chat/completions` sasa inakubali aina sita za sehemu za maudhui zaidi ya `text` — `input_audio`, `input_video`, `input_image`, `input_file`, na `image_url` (data URIs pamoja na URL za nje za http(s) ≤ 5 MB). Proxy hubadilisha kila moja kuwa `inlineData` ya Gemini. Wateja wanaoendana na OpenAI kama EconoWorld wanaweza kutiririsha blobs za sauti / picha / video moja kwa moja.
+- **Aina ya wakala ya EconoWorld**: `POST /agent/apply` ikiwa na `agentType: "econoworld"` inaandika mipangilio ya wall-vault ndani ya `analyzer/ai_config.json` ya mradi. `workDir` inakubali orodha ya njia wagombea zilizotenganishwa kwa koma na kubadilisha njia za kiendeshi cha Windows kuwa njia za mlimo wa WSL.
+- **Gridi ya funguo + CRUD ya dashibodi**: funguo 11 zinaonyeshwa kama kadi zilizokusanywa zikiwa na slideover ya + ongeza / ✕ futa.
+- **Kuongeza huduma + kupanga upya kwa kuburuta-na-kuacha**: gridi ya huduma inapata kitufe cha + ongeza pamoja na kishiko cha kuburuta (`⋮⋮`).
+- **Kichwa / chini / uhuishaji wa mandhari / kibadilishi cha lugha** vimerejeshwa. Mandhari 7 (cherry/dark/light/ocean/gold/autumn/winter) huchezesha athari yao ya chembe kwenye safu nyuma ya kadi lakini juu ya mandharinyuma.
+- **Uzoefu wa kufunga slideover**: kubofya nje au Esc kunafunga slideover.
+- **Kiashiria cha hali cha SSE** chini ya ukurasa (kijani = imeunganishwa, chungwa = inaunganisha upya, kijivu = imekatika).
 
 ---
 

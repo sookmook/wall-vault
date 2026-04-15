@@ -1,0 +1,40 @@
+package slideover
+
+import "github.com/sookmook/wall-vault/internal/i18n"
+
+// KeyCreateVM lists the services the user can attach the new key to.
+type KeyCreateVM struct {
+	Services []*ServiceVM
+}
+
+templ KeyCreate(vm *KeyCreateVM) {
+	<form data-wv-submit="/admin/keys" data-wv-method="POST" class="wv-form">
+		<div class="wv-form-section">
+			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("lbl_defsvc") }</span>
+				<select name="service" required>
+					for _, s := range vm.Services {
+						<option value={ s.ID }>{ s.Name }</option>
+					}
+				</select>
+			</label>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("lbl_apikey") }</span>
+				<input name="key" required placeholder="sk-..."/>
+			</label>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("lbl_lbl") }</span>
+				<input name="label" placeholder="my-key-1"/>
+			</label>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("lbl_limit") }</span>
+				<input name="daily_limit" type="number" min="0" value="0"/>
+			</label>
+		</div>
+		<div class="wv-form-actions">
+			<button type="button" class="btn-secondary" data-wv-dismiss>{ i18n.T("act_cancel") }</button>
+			<button type="submit">{ i18n.T("act_add") }</button>
+		</div>
+	</form>
+}

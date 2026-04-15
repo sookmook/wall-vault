@@ -1,5 +1,5 @@
 # wall-vault 사용자 매뉴얼
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,16 @@
 - 첫 v0.2 기동 시 기존 `vault.json` 이 자동 변환되고, 변환 직전 상태는 `vault.json.pre-v02.{타임스탬프}.bak` 로 보존됩니다.
 - 대시보드는 좌측 사이드바·중앙 카드 그리드·우측 편집 슬라이드오버의 세 영역으로 바뀌었습니다.
 - admin API 경로는 동일하지만 요청/응답 body 스키마가 변경되어 구 CLI 스크립트는 업데이트가 필요합니다.
+
+## v0.2.1 추가 기능
+
+- **멀티모달 패스쓰루 (OpenAI → Gemini)**: `/v1/chat/completions` 가 `text` 외에 `input_audio`·`input_video`·`input_image`·`input_file`·`image_url`(data URI 및 외부 http(s) URL ≤ 5MB) 6가지 part 타입을 받아 Gemini의 `inlineData` 로 전달합니다. EconoWorld 같은 OpenAI 호환 클라이언트가 음성·이미지·동영상을 그대로 보낼 수 있습니다.
+- **EconoWorld 에이전트 타입**: `POST /agent/apply` 의 `agentType: "econoworld"` 가 프로젝트의 `analyzer/ai_config.json` 을 자동으로 갱신합니다. `workDir` 은 콤마 구분 다중 경로 + Windows→WSL 자동 변환 지원.
+- **대시보드 키 그리드 + CRUD**: 11개 키를 카드형으로 보여주고 + 추가 / ✕ 삭제 슬라이드오버 제공.
+- **서비스 추가 + 드래그 정렬**: 서비스 그리드에도 + 추가 버튼과 드래그 핸들(`⋮⋮`) 추가.
+- **헤더 / 푸터 / 테마 애니메이션 / 다국어 셀렉터** 복구. 7테마(cherry/dark/light/ocean/gold/autumn/winter) 별 입자 효과는 카드 뒤·배경 앞 레이어에서 펼쳐집니다.
+- **슬라이드오버 닫기 UX**: 외부 영역 클릭 또는 Esc.
+- **SSE 상태 표시기**: 푸터에 연결 점등(녹색=연결, 주황=재연결, 회색=끊김).
 
 ---
 

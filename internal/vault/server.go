@@ -152,6 +152,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/heartbeat", s.adminAuth(s.handleHeartbeat)) // admin also allowed
 	mux.HandleFunc("/admin/proxies", s.adminAuth(s.handleAdminProxies))
 	mux.HandleFunc("/admin/services", s.adminAuth(s.handleAdminServices))
+	mux.HandleFunc("/admin/services/reorder", s.adminAuth(s.handleAdminServicesReorder))
 	mux.HandleFunc("/admin/services/", s.adminAuth(s.handleAdminServicesID))
 	mux.HandleFunc("/admin/models", s.adminAuth(s.handleAdminModels))
 
@@ -395,6 +396,36 @@ func (s *Server) handleAdminClientsReorder(w http.ResponseWriter, r *http.Reques
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// handleAdminServicesReorder mirrors the clients reorder endpoint for service
+// cards. Body: {"order":["openrouter","google",…]}.
+func (s *Server) handleAdminServicesReorder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	var body struct {
+		Order []string `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if len(body.Order) == 0 {
+		jsonError(w, "order list required", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.ReorderServices(body.Order); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
+		"action":         "reordered",
+		"proxy_services": s.store.ListProxyEnabledServices(),
+	}})
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 

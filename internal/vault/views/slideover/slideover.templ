@@ -2,9 +2,9 @@ package slideover
 
 templ Frame(title string, body templ.Component) {
 	<aside id="slideover" data-open="true" hx-swap-oob="true">
-		<div style="display:flex;justify-content:space-between;align-items:center">
+		<div class="slideover-head">
 			<b>✏︎ { title }</b>
-			<button hx-get="/hx/slideover/close" hx-target="#slideover" hx-swap="outerHTML">✕</button>
+			<button type="button" class="slideover-close" data-wv-dismiss title="닫기 (Esc)">✕</button>
 		</div>
 		<hr/>
 		@body

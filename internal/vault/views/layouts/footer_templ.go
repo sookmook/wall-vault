@@ -62,7 +62,7 @@ func Footer(vm *FooterVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span> <span class=\"sep\">·</span> <a href=\"https://github.com/sookmook/wall-vault\" target=\"_blank\" rel=\"noopener\">github.com/sookmook/wall-vault</a> <span class=\"sep\">·</span> <a href=\"https://sookmook.org/\" target=\"_blank\" rel=\"noopener\">sookmook.org</a> <span class=\"sep\">·</span> <a href=\"mailto:sookmook@gmail.com\">sookmook@gmail.com</a> <span class=\"sep\">·</span> <span>⏱ <span id=\"wv-uptime\">…</span></span></footer>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span> <span class=\"sep\">·</span> <a href=\"https://github.com/sookmook/wall-vault\" target=\"_blank\" rel=\"noopener\">github.com/sookmook/wall-vault</a> <span class=\"sep\">·</span> <a href=\"https://sookmook.org/\" target=\"_blank\" rel=\"noopener\">sookmook.org</a> <span class=\"sep\">·</span> <a href=\"mailto:sookmook@gmail.com\">sookmook@gmail.com</a> <span class=\"sep\">·</span> <span>⏱ <span id=\"wv-uptime\">…</span></span> <span class=\"sep\">·</span> <span><span id=\"wv-sse-dot\" class=\"dot dot-off\" title=\"SSE\"></span> SSE</span></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

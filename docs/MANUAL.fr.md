@@ -1,5 +1,5 @@
 # Manuel Utilisateur wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -58,6 +58,18 @@ OpenClaw (écran terminal TUI)
 - Au premier démarrage en v0.2, le fichier `vault.json` existant est auto-migré, et l'état pré-migration est préservé sous `vault.json.pre-v02.{timestamp}.bak`.
 - Le tableau de bord a été restructuré en trois zones : une barre latérale gauche, une grille de cartes centrales, et un volet d'édition latéral droit.
 - Les chemins de l'API Admin sont inchangés, mais les schémas de corps de requête/réponse ont été mis à jour — les anciens scripts CLI devront être mis à jour en conséquence.
+
+---
+
+## Nouveautés de la v0.2.1
+
+- **Passerelle multimodale (OpenAI → Gemini)** : `/v1/chat/completions` accepte désormais six types de parties de contenu en plus de `text` — `input_audio`, `input_video`, `input_image`, `input_file` et `image_url` (URI de données et URL http(s) externes ≤ 5 Mo). Le proxy convertit chacune d'elles en `inlineData` de Gemini. Les clients compatibles OpenAI tels qu'EconoWorld peuvent diffuser directement des blobs audio / image / vidéo.
+- **Type d'agent EconoWorld** : `POST /agent/apply` avec `agentType: "econoworld"` écrit les paramètres wall-vault dans le fichier `analyzer/ai_config.json` du projet. `workDir` accepte une liste de chemins candidats séparés par des virgules et convertit les chemins de lecteur Windows en chemins de montage WSL.
+- **Grille de clés + CRUD du tableau de bord** : 11 clés s'affichent sous forme de cartes compactes avec un volet latéral + ajouter / ✕ supprimer.
+- **Ajout de service + réorganisation par glisser-déposer** : la grille des services gagne un bouton + ajouter et une poignée de glissement (`⋮⋮`).
+- **En-tête / pied de page / animations de thème / sélecteur de langue** restaurés. Les 7 thèmes (cherry/dark/light/ocean/gold/autumn/winter) jouent leur effet de particules sur une couche derrière les cartes mais au-dessus de l'arrière-plan.
+- **UX de fermeture du volet latéral** : un clic à l'extérieur ou la touche Esc ferme le volet latéral.
+- **Indicateur d'état SSE** dans le pied de page (vert = connecté, orange = reconnexion, gris = déconnecté).
 
 ---
 

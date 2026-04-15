@@ -10,6 +10,7 @@ templ KeysGrid(keys []*KeyVM) {
 	<section id="keys">
 		<div class="section-head">
 			<h3>{ i18n.T("keys") } · { fmt.Sprint(len(keys)) }</h3>
+			<button class="btn-add" hx-get="/hx/keys/new" hx-target="#slideover" hx-swap="outerHTML">{ i18n.T("add") }</button>
 		</div>
 		if len(keys) == 0 {
 			<div class="empty-hint">{ i18n.T("no_keys") }</div>

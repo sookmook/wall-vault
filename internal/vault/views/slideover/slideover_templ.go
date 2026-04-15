@@ -26,7 +26,7 @@ func Frame(title string, body templ.Component) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<aside id=\"slideover\" data-open=\"true\" hx-swap-oob=\"true\"><div style=\"display:flex;justify-content:space-between;align-items:center\"><b>✏︎ ")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<aside id=\"slideover\" data-open=\"true\" hx-swap-oob=\"true\"><div class=\"slideover-head\"><b>✏︎ ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -39,7 +39,7 @@ func Frame(title string, body templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</b> <button hx-get=\"/hx/slideover/close\" hx-target=\"#slideover\" hx-swap=\"outerHTML\">✕</button></div><hr>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</b> <button type=\"button\" class=\"slideover-close\" data-wv-dismiss title=\"닫기 (Esc)\">✕</button></div><hr>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,5 +1,5 @@
 # Incwadi Yomuntu Esebenzisayo ye-wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,18 @@
 - Ku-startup kuqala kwe-v0.2, i-`vault.json` yesisikhathi sehogo iqondwe ngokuzenzakalela, futhi isimo esikuqaleni kesikhathi senqobo sigodiwe njengo-`vault.json.pre-v02.{timestamp}.bak`.
 - I-dashboard ibukelwe kabusha ngezona (izinzuzo ezintathu): kibhoda esekunxele, umugadi wekhadi emidlweni, kanye no-edit slideover okunxele.
 - Izindawo ze-API zeMlamali azishintshiwe, kodwa izisekelo zomsiga wokucekeleza/impendulo zibuyele nge-update — isikripti sase-CLI esidala sidinga ukubuyela nge-update.
+
+---
+
+## Izici Ezintsha ze-v0.2.1
+
+- **Ukudluliselwa kwe-Multimodal (OpenAI → Gemini)**: `/v1/chat/completions` manje yamukela izinhlobo eziyisithupha zengxenye yokuqukethwe ngaphezu kuka-`text` — `input_audio`, `input_video`, `input_image`, `input_file`, kanye `image_url` (ama-data URI namaURL angaphandle we-http(s) ≤ 5 MB). I-proxy iguqula ngalunye kube i-`inlineData` ye-Gemini. Amakhasimende avumelana ne-OpenAI anjenge-EconoWorld angadlulisa ama-blob omsindo / isithombe / ividiyo ngqo.
+- **Uhlobo lomenzeli we-EconoWorld**: `POST /agent/apply` ene-`agentType: "econoworld"` ibhala izilungiselelo ze-wall-vault ku-`analyzer/ai_config.json` yephrojekthi. I-`workDir` iyamukela uhla olwahlukaniswe ngokhefana lwezindlela zokhetho futhi iguqule izindlela ze-drive ze-Windows zibe izindlela zokumounta ze-WSL.
+- **Igridi yezikhiye ze-Dashboard + CRUD**: izikhiye ezingu-11 zikhiqizwa njengamakhadi afingqiwe ane-slideover ye-+ add / ✕ delete.
+- **Ukungezwa kwesevisi + ukuhleleka kabusha ngokudonsa-nokulahla**: igridi yesevisi ithola inkinobho ye-+ add kanye nesibambo sokudonsa (`⋮⋮`).
+- **Isihloko / isihlathi / ukuhamba kwezihloko / isishintshi solimi** kubuyiselwe. Izihloko eziyisi-7 (cherry/dark/light/ocean/gold/autumn/winter) zidlala umthelela wazo wezinhlayiya kusendlalelo ngemuva kwamakhadi kodwa ngenhla kwesizinda.
+- **I-UX yokuchitha i-Slideover**: ukuchofoza ngaphandle noma u-Esc kuvala i-slideover.
+- **Isikhombi sesimo se-SSE** esihlathini (okuluhlaza okwesibhakabhaka = kuxhunyiwe, i-orange = kuxhumeka kabusha, okugreyi = akuxhumekile).
 
 ---
 

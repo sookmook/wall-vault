@@ -1,5 +1,5 @@
 # wall-vault User Manual
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,16 @@
 - On the first v0.2 startup, the existing `vault.json` is auto-migrated, and the pre-migration state is preserved as `vault.json.pre-v02.{timestamp}.bak`.
 - The dashboard has been restructured into three zones: a left sidebar, a center card grid, and a right-side edit slideover.
 - Admin API paths are unchanged, but request/response body schemas have been updated — old CLI scripts will need to be updated accordingly.
+
+## v0.2.1 New Features
+
+- **Multimodal pass-through (OpenAI → Gemini)**: `/v1/chat/completions` now accepts six content part types in addition to `text` — `input_audio`, `input_video`, `input_image`, `input_file`, and `image_url` (data URIs and external http(s) URLs ≤ 5 MB). The proxy converts each to Gemini's `inlineData`. OpenAI-compatible clients like EconoWorld can stream audio / image / video blobs directly.
+- **EconoWorld agent type**: `POST /agent/apply` with `agentType: "econoworld"` writes wall-vault settings into the project's `analyzer/ai_config.json`. `workDir` accepts a comma-separated list of candidate paths and converts Windows drive paths to WSL mount paths.
+- **Dashboard keys grid + CRUD**: 11 keys render as compact cards with + add / ✕ delete slideover.
+- **Service add + drag-and-drop reorder**: services grid gains a + add button and a drag handle (`⋮⋮`).
+- **Header / footer / theme animations / language switcher** restored. The 7 themes (cherry/dark/light/ocean/gold/autumn/winter) play their particle effect on a layer behind cards but above the background.
+- **Slideover dismiss UX**: outside click or Esc closes the slideover.
+- **SSE status indicator** in the footer (green = connected, orange = reconnecting, grey = disconnected).
 
 ---
 

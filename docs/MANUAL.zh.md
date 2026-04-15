@@ -1,5 +1,5 @@
 # wall-vault 用户手册
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,18 @@
 - 首次启动 v0.2 时，现有的 `vault.json` 会自动迁移，迁移前的状态保存为 `vault.json.pre-v02.{时间戳}.bak`。
 - 仪表盘已重构为三个区域：左侧边栏、中央卡片网格和右侧编辑滑动面板。
 - Admin API 路径保持不变，但请求/响应正文架构已更新——旧版 CLI 脚本需要相应更新。
+
+---
+
+## v0.2.1 新功能
+
+- **多模态透传（OpenAI → Gemini）**：`/v1/chat/completions` 除了 `text` 之外，现在还支持六种内容片段类型——`input_audio`、`input_video`、`input_image`、`input_file` 以及 `image_url`（支持 data URI 以及 ≤ 5 MB 的外部 http(s) URL）。代理会将每一种类型转换为 Gemini 的 `inlineData`。像 EconoWorld 这样的 OpenAI 兼容客户端可以直接流式传输音频 / 图像 / 视频二进制数据。
+- **EconoWorld 代理类型**：使用 `agentType: "econoworld"` 调用 `POST /agent/apply` 会将 wall-vault 设置写入项目的 `analyzer/ai_config.json`。`workDir` 接受以逗号分隔的候选路径列表，并会把 Windows 盘符路径转换为 WSL 挂载路径。
+- **仪表盘密钥网格 + CRUD**：11 把密钥以紧凑卡片形式呈现，配有 + 添加 / ✕ 删除滑动面板。
+- **服务添加 + 拖拽重新排序**：服务网格新增了 + 添加按钮以及拖拽手柄（`⋮⋮`）。
+- **页眉 / 页脚 / 主题动画 / 语言切换器**全部恢复。7 种主题（cherry/dark/light/ocean/gold/autumn/winter）的粒子特效在卡片下方、背景上方的图层播放。
+- **滑动面板关闭体验**：点击外部区域或按 `Esc` 即可关闭滑动面板。
+- **页脚 `SSE` 状态指示灯**（绿色 = 已连接，橙色 = 重连中，灰色 = 已断开）。
 
 ---
 

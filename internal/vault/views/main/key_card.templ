@@ -10,6 +10,7 @@ templ KeyCard(k *KeyVM) {
 			if k.Label != "" {
 				<span class="chip">{ k.Label }</span>
 			}
+			<button type="button" class="card-del" title="삭제" data-wv-delete={"/admin/keys/" + k.ID}>✕</button>
 		</div>
 		<div class="card-meta">
 			<span class="chip" title="ID">🔑 { k.IDShort }</span>

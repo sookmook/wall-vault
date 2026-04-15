@@ -1,5 +1,5 @@
 # Panduan Pengguna wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,18 @@
 - Saat startup v0.2 pertama kali, `vault.json` yang ada secara otomatis dimigrasikan, dan keadaan pre-migrasi disimpan sebagai `vault.json.pre-v02.{timestamp}.bak`.
 - Dashboard telah distruktur ulang menjadi tiga zona: bilah samping kiri, grid kartu pusat, dan panel edit geser di sisi kanan.
 - Jalur Admin API tidak berubah, tetapi skema badan permintaan/respons telah diperbarui — skrip CLI lama akan perlu diperbarui sesuai kebutuhan.
+
+---
+
+## Fitur Baru v0.2.1
+
+- **Pass-through multimoda (OpenAI → Gemini)**: `/v1/chat/completions` kini menerima enam jenis bagian konten selain `text` — `input_audio`, `input_video`, `input_image`, `input_file`, dan `image_url` (data URI dan URL http(s) eksternal ≤ 5 MB). Proxy mengonversi masing-masing menjadi `inlineData` Gemini. Klien yang kompatibel dengan OpenAI seperti EconoWorld dapat melakukan streaming blob audio / gambar / video secara langsung.
+- **Jenis agen EconoWorld**: `POST /agent/apply` dengan `agentType: "econoworld"` menulis pengaturan wall-vault ke dalam `analyzer/ai_config.json` proyek. `workDir` menerima daftar jalur kandidat yang dipisahkan koma dan mengonversi jalur drive Windows menjadi jalur mount WSL.
+- **Grid kunci dashboard + CRUD**: 11 kunci dirender sebagai kartu ringkas dengan slideover + tambah / ✕ hapus.
+- **Penambahan layanan + penyusunan ulang seret-dan-lepas**: grid layanan mendapatkan tombol + tambah dan pegangan seret (`⋮⋮`).
+- **Header / footer / animasi tema / pengalih bahasa** dipulihkan. Ketujuh tema (cherry/dark/light/ocean/gold/autumn/winter) memainkan efek partikelnya pada lapisan di belakang kartu namun di atas latar belakang.
+- **UX penutupan slideover**: klik di luar atau Esc menutup slideover.
+- **Indikator status SSE** di footer (hijau = terhubung, oranye = menyambung ulang, abu-abu = terputus).
 
 ---
 

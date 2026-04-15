@@ -89,7 +89,8 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 				// (.drag-handle inside cards) own the dragstart so plain clicks still
 				// open the slideover via htmx.
 				var WV_REORDER_ENDPOINTS = {
-					agents:   '/admin/clients/reorder'
+					agents:   '/admin/clients/reorder',
+					services: '/admin/services/reorder'
 				};
 				function wvInitReorder(root){
 					var grids = (root || document).querySelectorAll('[data-wv-reorder]');
@@ -498,6 +499,66 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 				function wvSetLang(v){
 					fetch('/admin/lang',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+window.WV_ADMIN_TOKEN},body:JSON.stringify({lang:v})}).then(function(){location.reload();}).catch(function(){location.reload();});
 				}
+				// Delegated DELETE button — any [data-wv-delete="/path"] sends DELETE.
+				document.addEventListener('click', function(evt){
+					var btn = evt.target.closest('[data-wv-delete]');
+					if (!btn) return;
+					evt.preventDefault();
+					evt.stopPropagation();
+					if (!confirm('정말 삭제하시겠습니까?')) return;
+					fetch(btn.getAttribute('data-wv-delete'), {
+						method: 'DELETE',
+						headers: {'Authorization': 'Bearer ' + (window.WV_ADMIN_TOKEN || '')}
+					}).then(function(r){
+						if (r.ok) { window.location.reload(); return; }
+						r.text().then(function(t){ alert('삭제 실패: ' + t); });
+					}).catch(function(e){ alert('삭제 실패: ' + e); });
+				}, true);
+
+				// Slideover dismiss — outside click, Esc, or any [data-wv-dismiss] button.
+				function wvCloseSlideover(){
+					var aside = document.getElementById('slideover');
+					if (aside) aside.removeAttribute('data-open');
+				}
+				document.addEventListener('click', function(evt){
+					var btn = evt.target.closest('[data-wv-dismiss]');
+					if (!btn) return;
+					evt.preventDefault();
+					evt.stopPropagation();
+					wvCloseSlideover();
+				}, true);
+				document.addEventListener('click', function(evt){
+					var aside = document.getElementById('slideover');
+					if (!aside || !aside.hasAttribute('data-open')) return;
+					if (aside.contains(evt.target)) return;
+					if (evt.target.closest('[hx-target="#slideover"], .card, .btn-add, .drag-handle')) return;
+					wvCloseSlideover();
+				}, true);
+				document.addEventListener('keydown', function(evt){
+					if (evt.key === 'Escape') wvCloseSlideover();
+				});
+
+				// SSE status indicator — subscribe to /api/events and reflect connection
+				// state into a #wv-sse-dot element in the footer.
+				(function(){
+					if (!window.EventSource) return;
+					function setSSEState(state){
+						var el = document.getElementById('wv-sse-dot');
+						if (!el) return;
+						el.className = 'dot ' + ({ok:'dot-ok', warn:'dot-warn', off:'dot-off'}[state] || 'dot-off');
+						el.title = ({ok:'SSE: 연결됨', warn:'SSE: 재연결 중', off:'SSE: 끊김'}[state] || 'SSE');
+					}
+					var url = '/api/events';
+					if (window.WV_ADMIN_TOKEN) url += '?token=' + encodeURIComponent(window.WV_ADMIN_TOKEN);
+					try {
+						var es = new EventSource(url);
+						es.onopen    = function(){ setSSEState('ok'); };
+						es.onerror   = function(){ setSSEState('warn'); };
+						es.onmessage = function(){ setSSEState('ok'); };
+						setTimeout(function(){ setSSEState(es.readyState === 1 ? 'ok' : 'warn'); }, 600);
+					} catch (e) { setSSEState('off'); }
+				})();
+
 				// Footer uptime ticker — reads server start epoch from data-wv-started.
 				function wvFormatUptime(secs){
 					if (secs < 0) secs = 0;

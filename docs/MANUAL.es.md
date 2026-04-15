@@ -1,5 +1,5 @@
 # Manual de Usuario de wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -847,6 +847,18 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Si se ejecuta en otra computadora
 - En el primer inicio de v0.2, el archivo `vault.json` existente se migra automáticamente, y el estado anterior a la migración se preserva como `vault.json.pre-v02.{timestamp}.bak`.
 - El panel ha sido reestructurado en tres zonas: una barra lateral izquierda, una cuadrícula de tarjetas central, y un panel deslizable de edición en el lado derecho.
 - Las rutas de la API Admin no han cambiado, pero los esquemas de los cuerpos de solicitud/respuesta se han actualizado — los scripts CLI antiguos deberán actualizarse en consecuencia.
+
+---
+
+## Novedades de v0.2.1
+
+- **Paso multimodal (OpenAI → Gemini)**: `/v1/chat/completions` ahora acepta seis tipos de partes de contenido además de `text` — `input_audio`, `input_video`, `input_image`, `input_file` e `image_url` (URIs de datos y URLs externas http(s) de hasta 5 MB). El proxy convierte cada una al formato `inlineData` de Gemini. Clientes compatibles con OpenAI como EconoWorld pueden transmitir directamente blobs de audio, imagen y vídeo.
+- **Tipo de agente EconoWorld**: `POST /agent/apply` con `agentType: "econoworld"` escribe la configuración de wall-vault en el archivo `analyzer/ai_config.json` del proyecto. `workDir` acepta una lista separada por comas de rutas candidatas y convierte las rutas de unidad de Windows a rutas de montaje WSL.
+- **Cuadrícula de claves en el panel + CRUD**: Las 11 claves se representan como tarjetas compactas con panel deslizable para + añadir / ✕ eliminar.
+- **Añadir servicio + reordenar por arrastrar y soltar**: La cuadrícula de servicios incorpora un botón de + añadir y un asa de arrastre (`⋮⋮`).
+- **Encabezado / pie de página / animaciones de tema / selector de idioma** restaurados. Los 7 temas (cherry/dark/light/ocean/gold/autumn/winter) reproducen su efecto de partículas en una capa detrás de las tarjetas pero delante del fondo.
+- **UX de cierre del panel deslizable**: Un clic fuera o la tecla Esc cierra el panel deslizable.
+- **Indicador de estado SSE** en el pie de página (verde = conectado, naranja = reconectando, gris = desconectado).
 
 ---
 

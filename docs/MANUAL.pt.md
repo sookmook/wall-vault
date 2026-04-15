@@ -1,5 +1,5 @@
 # Manual do Usuário wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -27,6 +27,18 @@
 - Na primeira inicialização da v0.2, o `vault.json` existente é migrado automaticamente, e o estado anterior à migração é preservado como `vault.json.pre-v02.{timestamp}.bak`.
 - O dashboard foi reestruturado em três zonas: uma barra lateral esquerda, uma grade de cartões no centro e um painel de edição deslizável no lado direito.
 - Os caminhos da Admin API permanecem inalterados, mas os esquemas do corpo da solicitação/resposta foram atualizados — scripts CLI antigos precisarão ser atualizados de acordo.
+
+---
+
+## Novos recursos da v0.2.1
+
+- **Pass-through multimodal (OpenAI → Gemini)**: `/v1/chat/completions` agora aceita seis tipos de partes de conteúdo além de `text` — `input_audio`, `input_video`, `input_image`, `input_file` e `image_url` (data URIs e URLs http(s) externas ≤ 5 MB). O proxy converte cada um para `inlineData` do Gemini. Clientes compatíveis com OpenAI, como o EconoWorld, podem transmitir blobs de áudio / imagem / vídeo diretamente.
+- **Tipo de agente EconoWorld**: `POST /agent/apply` com `agentType: "econoworld"` grava as configurações do wall-vault em `analyzer/ai_config.json` do projeto. `workDir` aceita uma lista separada por vírgulas de caminhos candidatos e converte caminhos de unidade do Windows em caminhos de montagem do WSL.
+- **Grade de chaves + CRUD no dashboard**: 11 chaves são renderizadas como cartões compactos com slideover de + adicionar / ✕ excluir.
+- **Adicionar serviço + reordenação por arrastar e soltar**: a grade de serviços ganha um botão + adicionar e uma alça de arrastar (`⋮⋮`).
+- **Cabeçalho / rodapé / animações de tema / seletor de idioma** restaurados. Os 7 temas (cherry/dark/light/ocean/gold/autumn/winter) exibem seu efeito de partículas em uma camada atrás dos cartões, mas acima do fundo.
+- **UX de dispensa do slideover**: clique fora ou Esc fecha o slideover.
+- **Indicador de status SSE** no rodapé (verde = conectado, laranja = reconectando, cinza = desconectado).
 
 ---
 

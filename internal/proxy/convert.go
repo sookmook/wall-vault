@@ -1,8 +1,12 @@
 package proxy
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -303,12 +307,52 @@ func openaiPartsToGemini(raw json.RawMessage) []GeminiPart {
 					out = append(out, GeminiPart{
 						InlineData: &BlobData{MimeType: mime, Data: data},
 					})
+				} else if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+					if mime, data, ok := fetchAsBase64(url, 5<<20); ok {
+						out = append(out, GeminiPart{
+							InlineData: &BlobData{MimeType: mime, Data: data},
+						})
+					}
 				}
-				// External http(s) URL — skip in this round.
 			}
 		}
 	}
 	return out
+}
+
+// fetchAsBase64 downloads an http(s) URL up to maxBytes and returns
+// (mimeType, base64Body, true). Bodies larger than maxBytes, non-2xx
+// responses, and network errors all return ok=false. Used by
+// openaiPartsToGemini for image_url entries that point to external URLs.
+func fetchAsBase64(url string, maxBytes int64) (mime, data string, ok bool) {
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		log.Printf("[multimodal] fetch failed: %s: %v", url, err)
+		return "", "", false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("[multimodal] fetch %s: HTTP %d", url, resp.StatusCode)
+		return "", "", false
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		log.Printf("[multimodal] read %s: %v", url, err)
+		return "", "", false
+	}
+	if int64(len(body)) > maxBytes {
+		log.Printf("[multimodal] %s exceeds %d bytes", url, maxBytes)
+		return "", "", false
+	}
+	mime = resp.Header.Get("Content-Type")
+	if i := strings.Index(mime, ";"); i >= 0 {
+		mime = strings.TrimSpace(mime[:i])
+	}
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	return mime, base64.StdEncoding.EncodeToString(body), true
 }
 
 // stripGeminiUnsupported recursively removes JSON Schema fields that Gemini's

@@ -1,5 +1,5 @@
 # Jagorar Amfani na wall-vault
-*(Last updated: 2026-04-09 — v0.1.27)*
+*(Last updated: 2026-04-16 — v0.2.1)*
 
 ---
 
@@ -847,6 +847,18 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan tana gudana a wani kwamfuta
 - A farko na buguwar v0.2, jerin `vault.json` da ke akwai ya bugi ta atomatik, kuma halin da jiya aka sani ana ajiya shi a matsayin `vault.json.pre-v02.{timestamp}.bak`.
 - An sake tsara dashboard zuwa yankunan uku: sidebar na hayin hagu, grid na kartuna na tsakiya, da slideover na gyarawa na hayin dama.
 - Hanyoyin Admin API ba su canja ba, amma tsarin bukatu/amsoshin jini suka sauya — tsohuwan tsingiyoyin CLI za su bukatar sabuntawa daidai.
+
+---
+
+## Sabbin Abubuwan v0.2.1
+
+- **Tura abubuwa da yawa na mutumedia kai tsaye (OpenAI → Gemini)**: `/v1/chat/completions` yanzu yana karɓar nau'ikan sassan abun ciki guda shida baya ga `text` — `input_audio`, `input_video`, `input_image`, `input_file`, da `image_url` (data URIs da kuma URLs na http(s) na waje ≤ 5 MB). Proxy tana mayar da kowanne zuwa `inlineData` na Gemini. Abokan ciniki masu jituwa da OpenAI kamar EconoWorld suna iya turawa blobs na sauti / hoto / bidiyo kai tsaye.
+- **Nau'in agent na EconoWorld**: `POST /agent/apply` tare da `agentType: "econoworld"` yana rubuta saitunan wall-vault a cikin `analyzer/ai_config.json` na aikin. `workDir` yana karɓar jerin hanyoyi masu yuwuwa da aka raba da waƙafi kuma yana mayar da hanyoyin drive na Windows zuwa hanyoyin dauka na WSL.
+- **Grid na keys na dashboard + CRUD**: keys 11 ana nuna su a matsayin kartuna masu ƙarami tare da slideover na + ƙara / ✕ share.
+- **Ƙara sabis + sake tsara ta hanyar ja-da-zube**: grid na sabis ya samu maballin + ƙara da riƙo na ja (`⋮⋮`).
+- **Header / footer / motsi na jigo / canza harshe** an mayar da su. Jigogi 7 (cherry/dark/light/ocean/gold/autumn/winter) suna kunna sakamakon barbashi a kan Layer a bayan kartuna amma sama da bango.
+- **UX na kore slideover**: danna waje ko Esc yana rufe slideover.
+- **Mai nuna halin SSE** a cikin footer (kore = an haɗa, orange = ana sake haɗawa, launin toka = an cire haɗi).
 
 ---
 

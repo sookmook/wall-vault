@@ -1043,6 +1043,17 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 	}
 
 	for _, svc := range tryOrder {
+		// Fast-skip cloud services whose keys are all on cooldown or exhausted
+		// — prevents the dispatch chain from spending seconds on forced retries
+		// that will re-hit 429/402 and extend the cooldown. Local services
+		// (ollama/lmstudio/vllm) carry no keys and are always tried.
+		needsKey := svc != "ollama" && svc != "lmstudio" && svc != "vllm"
+		if needsKey && !s.keyMgr.CanServe(svc) {
+			log.Printf("[proxy] %s skip: 전체 쿨다운 또는 등록된 키 없음", svc)
+			lastErr = fmt.Errorf("서비스 '%s' 전체 쿨다운", svc)
+			continue
+		}
+
 		// Primary respects the caller's requested model; fallback swaps in the
 		// target service's default_model when available so Anthropic doesn't
 		// receive "gemini-2.5-flash" etc. If the target has no default_model,

@@ -147,6 +147,21 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개)", service, n)
 }
 
+// CanServe returns true when the service has at least one key that is not
+// on cooldown and not exhausted. Used by dispatch to fast-skip fully-cooled
+// cloud services instead of waiting for Get() to force-retry and collect a
+// fresh 429/402.
+func (km *KeyManager) CanServe(service string) bool {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	for _, k := range km.keys[service] {
+		if k.isAvailable() {
+			return true
+		}
+	}
+	return false
+}
+
 // CooldownSnapshot: return cooldownUntil per key ID for keys currently on cooldown
 func (km *KeyManager) CooldownSnapshot() map[string]string {
 	km.mu.Lock()

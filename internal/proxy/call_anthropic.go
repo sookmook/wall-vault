@@ -131,10 +131,23 @@ func (s *Server) callAnthropic(model string, req *GeminiRequest) (*GeminiRespons
 			continue
 		}
 		if resp.StatusCode == http.StatusBadRequest {
-			// 400: request error (wrong model name, unsupported params) —
-			// not a key fault; skip without cooldown so dispatch falls through.
+			// 400: request error. Anthropic returns 400 (not 402) for billing
+			// failures ("credit balance is too low"). Detect that specific case
+			// and cool this key down as if it were 402 so subsequent dispatches
+			// fast-skip Anthropic. Other 400s (schema / model) pass through
+			// without cooldown so a dashboard edit can fix them immediately.
+			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			return nil, fmt.Errorf("Anthropic 오류: HTTP %d", resp.StatusCode)
+			msg := string(body)
+			log.Printf("[anthropic] 400 body: %s", msg)
+			lowMsg := strings.ToLower(msg)
+			if strings.Contains(lowMsg, "credit balance") ||
+				strings.Contains(lowMsg, "billing") ||
+				strings.Contains(lowMsg, "plans & billing") {
+				s.keyMgr.RecordError(key, http.StatusPaymentRequired)
+				return nil, fmt.Errorf("Anthropic: 계정 크레딧 부족 — 쿨다운 설정 (%s)", strings.TrimSpace(msg))
+			}
+			return nil, fmt.Errorf("Anthropic 오류: HTTP 400 (%s)", strings.TrimSpace(msg))
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()

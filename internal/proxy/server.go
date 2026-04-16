@@ -504,14 +504,35 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	svc := s.service
 	mdl := s.model
 	svcs := s.allowedServices
-	// "active model" semantics: if the client has no explicit model_override,
-	// surface the vault-synced default_model for the currently-selected
-	// service. Consumers polling /status (e.g. EconoWorld analyzer) need the
-	// model that will actually be sent upstream, not the raw override.
-	if mdl == "" && s.serviceDefaults != nil {
-		mdl = s.serviceDefaults[svc]
-	}
+	defaults := s.serviceDefaults
 	s.mu.RUnlock()
+
+	clientID := s.cfg.Proxy.ClientID
+
+	// Token-aware: if the caller presents a Bearer token for a known client,
+	// return THAT client's config instead of the proxy's own. This lets
+	// observability consumers (e.g. EconoWorld analyzer whose token maps to
+	// the econoworld client, not bot-b) see the routing that will be
+	// applied to their own requests. Unauthenticated callers keep the
+	// previous behaviour — proxy's own client config.
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		tok := strings.TrimPrefix(auth, "Bearer ")
+		if tok != "" && tok != s.cfg.Proxy.VaultToken {
+			if entry := s.lookupTokenConfig(tok); entry != nil {
+				clientID = entry.clientID
+				svc = entry.service
+				mdl = entry.model
+			}
+		}
+	}
+
+	// "active model" semantics: if the resolved client has no explicit
+	// model_override, surface the vault-synced default_model for the
+	// selected service. Consumers need the model dispatch will apply,
+	// not an empty string.
+	if mdl == "" && defaults != nil {
+		mdl = defaults[svc]
+	}
 
 	// show vault-synced services if available, else fall back to config
 	if len(svcs) == 0 {
@@ -523,7 +544,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]interface{}{
 		"status":   "ok",
 		"version":  Version,
-		"client":   s.cfg.Proxy.ClientID,
+		"client":   clientID,
 		"service":  svc,
 		"model":    mdl,
 		"sse":      sseConn,

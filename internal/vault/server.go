@@ -297,10 +297,23 @@ func (s *Server) handleTokenConfig(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "token not found", http.StatusNotFound)
 		return
 	}
+	// Prefer v0.2 canonical fields (preferred_service / model_override) over
+	// legacy (default_service / default_model) so observability consumers
+	// (/status polling, etc.) see the routing actually used by dispatch.
+	// The JSON field names stay "default_*" for back-compat with existing
+	// proxy clients that still decode those names.
+	svc := c.DefaultService
+	if c.PreferredService != "" {
+		svc = c.PreferredService
+	}
+	mdl := c.DefaultModel
+	if c.ModelOverride != "" {
+		mdl = c.ModelOverride
+	}
 	jsonOK(w, map[string]string{
 		"id":              c.ID,
-		"default_service": c.DefaultService,
-		"default_model":   c.DefaultModel,
+		"default_service": svc,
+		"default_model":   mdl,
 	})
 }
 

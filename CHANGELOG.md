@@ -8,6 +8,36 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.12] — 2026-04-17
+
+### Fixed
+
+- **`/status` is now token-aware** — previously it always returned the
+  proxy's own client config (e.g. bot-b), so Echo/EconoWorld polling
+  /status from bot-b's proxy saw bot-b's model (`gemini-3.1-flash-lite-preview`)
+  instead of econoworld's model (`google/gemini-3.1-pro-preview`).
+  Echo's model badge reported the wrong value even though
+  `ai_config.json` was correct. With a Bearer token header, `/status`
+  now looks up the caller's client config via `lookupTokenConfig`
+  and returns that client's `client/service/model` instead. Without
+  a token it still returns the proxy's own config (backward
+  compatible).
+- **`/api/token/config` prefers v0.2 canonical fields** — the vault
+  endpoint now returns `preferred_service` / `model_override` when
+  set, falling back to legacy `default_service` / `default_model`.
+  JSON field names stay `default_*` for wire-format back-compat.
+  Without this, the `model_override` a user sets via the dashboard
+  wouldn't propagate to token-lookup consumers.
+
+### Notes for consumers
+
+- EconoWorld analyzer (or any external poller that wants per-client
+  status): include `Authorization: Bearer <your-token>` on `/status`
+  GETs. The response will reflect your client's routing, not the
+  proxy's own.
+
+---
+
 ## [0.2.11] — 2026-04-17
 
 ### Fixed

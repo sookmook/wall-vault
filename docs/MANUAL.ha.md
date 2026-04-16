@@ -1,5 +1,5 @@
 # Jagorar Amfani na wall-vault
-*(Last updated: 2026-04-16 — v0.2.1)*
+*(Last updated: 2026-04-16 — v0.2.2)*
 
 ---
 
@@ -859,6 +859,21 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan tana gudana a wani kwamfuta
 - **Header / footer / motsi na jigo / canza harshe** an mayar da su. Jigogi 7 (cherry/dark/light/ocean/gold/autumn/winter) suna kunna sakamakon barbashi a kan Layer a bayan kartuna amma sama da bango.
 - **UX na kore slideover**: danna waje ko Esc yana rufe slideover.
 - **Mai nuna halin SSE** a cikin footer (kore = an haɗa, orange = ana sake haɗawa, launin toka = an cire haɗi).
+
+---
+
+## v0.2.2 Stability & UX Improvements
+
+- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
+- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
+- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
+- **Service edit default_model dropdown polish**:
+  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
+  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
+  - `✕ Clear` empties the default in place.
+  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
+- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
+- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
 
 ---
 

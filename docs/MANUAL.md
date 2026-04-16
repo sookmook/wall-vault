@@ -1,5 +1,5 @@
 # wall-vault 사용자 매뉴얼
-*(Last updated: 2026-04-16 — v0.2.1)*
+*(Last updated: 2026-04-16 — v0.2.2)*
 
 ---
 
@@ -37,6 +37,19 @@
 - **헤더 / 푸터 / 테마 애니메이션 / 다국어 셀렉터** 복구. 7테마(cherry/dark/light/ocean/gold/autumn/winter) 별 입자 효과는 카드 뒤·배경 앞 레이어에서 펼쳐집니다.
 - **슬라이드오버 닫기 UX**: 외부 영역 클릭 또는 Esc.
 - **SSE 상태 표시기**: 푸터에 연결 점등(녹색=연결, 주황=재연결, 회색=끊김).
+
+## v0.2.2 안정화 및 UX 개선
+
+- **Dispatch 빠른 skip**: 쿨다운·소진 상태인 클라우드 서비스는 강제 재시도하지 않고 즉시 다음 fallback으로 이동. 요청당 ~15초 지연이 ~1.5초로 단축.
+- **Fallback 모델 자동 교체**: 각 fallback 단계가 해당 서비스의 `default_model`을 적용. 이전엔 Google에 요청한 `gemini-2.5-flash`가 Anthropic/Ollama에도 그대로 전달돼 400/404 발생.
+- **Anthropic 잔액 부족 처리**: Anthropic이 크레딧 소진 시 HTTP 400으로 "credit balance" 메시지를 반환하는데, 이를 402(결제 필요)급으로 취급해 30분 쿨다운 자동 설정.
+- **서비스 편집 기본 모델 드롭다운 개선**:
+  - 서버가 처음부터 해당 서비스의 전체 모델 목록(Google 15개·OpenRouter 345개 등)을 렌더에 포함 → 드롭다운 열자마자 선택 가능.
+  - `↓ 허용으로` 버튼: 현재 기본 모델을 허용 목록(allowed_models)으로 이동하고 기본을 비움.
+  - `✕ 지움` 버튼: 기본 모델을 바로 지움.
+  - `직접 입력` details: 네트워크 문제 등으로 드롭다운이 막혀도 모델 ID 직접 입력하여 저장 가능.
+- **에이전트 편집·생성 모델 오버라이드 드롭다운**: free text가 아닌 선호 서비스의 `default_model` + `allowed_models` 조합 중에서 선택. 선호 서비스 변경 시 모델 선택지도 즉시 재구성.
+- **ClientInput v0.2 필드**: POST `/admin/clients`가 `preferred_service`·`model_override`(v0.2 정식)를 먼저 수용하고, `default_service`·`default_model`(v0.1 호환)은 폴백.
 
 ---
 

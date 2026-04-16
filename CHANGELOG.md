@@ -10,8 +10,8 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ## [0.2.2] — 2026-04-16
 
-Audit-driven polish: dispatch reliability improvements, ClientInput v0.2
-field migration, and documentation refresh.
+Audit-driven polish: dispatch reliability, model-selection UX, ClientInput
+v0.2 field migration, and documentation refresh.
 
 ### Fixed
 
@@ -24,11 +24,41 @@ field migration, and documentation refresh.
   target service's `default_model` (synced from vault via the new
   `ProxyService.DefaultModel` field). Previously fallback sent the
   caller's original model name to every service (e.g. `gemini-2.5-flash`
-  to Anthropic → 400).
+  to Anthropic → 400, then Ollama → 404).
 - **Anthropic 400 "credit balance" → cooldown**: Anthropic returns HTTP
   400 (not 402) when the account balance is depleted. Detect
   "credit balance" / "billing" in the 400 body and promote to 402-level
   30 min cooldown so subsequent dispatches fast-skip.
+- **Service edit default_model dropdown — server-render full list**:
+  previously the `<select>` shipped with only the current value, relying
+  on a second `/admin/models` round-trip to populate. Cold cache / OOB
+  swap edge cases left the dropdown with a single option, effectively
+  locking the user out of changing models. New `Server.ensureRegistry()`
+  refreshes the registry before rendering the slideover, so the HTML
+  now arrives with every available model pre-populated (Google 15,
+  OpenRouter 345, Anthropic 6, etc.).
+- **OOB swap hydration**: htmx doesn't fire `htmx:afterSwap` on
+  OOB-swapped nodes. All four hydrate helpers (`wvHydrateModels`,
+  `wvInitModelOverride`, `wvInitReorder`, `wvHydrateProgress`) now also
+  listen on `htmx:oobAfterSwap` + `htmx:afterOnLoad`. Model refresh,
+  drag handles, and progress bars re-initialise on slideover open.
+
+### Added
+
+- **Service edit — default_model swap UX**:
+  - `↓ 허용으로` / `↓ Move to Allowed` button demotes the current
+    default_model into the `allowed_models` textarea on click
+  - `✕ 지움` / `✕ Clear` button empties the default_model in place
+  - Collapsible `직접 입력` / `Custom input` details block as a
+    fallback when the dropdown can't be populated (offline / registry
+    failure). Submit-time override logic swaps the custom value into
+    the serialised JSON.
+- **Agent edit/create — model_override dropdown**: `<input>` replaced
+  by a `<select>` populated from `ClientVM.ServiceModelMap`
+  (`service → [default_model, ...allowed_models]`). Changing
+  preferred_service auto-repopulates the override select. Free-text
+  values kept via auto-added "(현재 값)" option so legacy records
+  stay round-trippable.
 
 ### Changed
 
@@ -38,12 +68,14 @@ field migration, and documentation refresh.
   `EffectiveService()` / `EffectiveModel()` helpers unify the two.
 - Ollama `default_model` configurable via dashboard; previously
   hard-coded in dispatch.
+- `toSlideoverClient` becomes a `Server` method so it can fan out into
+  `store.ListServices()` when assembling `ServiceModelMap`.
 
 ### Internal
 
-- CLAUDE.md refreshed: views/ architecture, multimodal pass-through
-  documentation, EconoWorld agent type, dispatch fast-skip / fallback
-  model swap mechanics, CanServe predicate.
+- CLAUDE.md refreshed: views/ architecture, multimodal pass-through,
+  EconoWorld agent type, dispatch fast-skip / fallback model swap,
+  CanServe predicate.
 - Full codebase audit: no critical bugs; dispatch_v2.go remains test-only
   harness (design decision); 5 TODOs for Stage 2 legacy field removal
   tracked.

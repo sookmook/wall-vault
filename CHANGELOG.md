@@ -8,6 +8,30 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.8] — 2026-04-16
+
+Defensive cleanup to stop OpenClaw's config validator from crashing
+the gateway on a corrupt `custom.models` entry left over from older
+proxy writes.
+
+### Fixed
+
+- **`agent_apply.go` sanitizes `models.providers.custom.models` on
+  every write**: any entry with an empty `id` is dropped before the
+  current update runs. A stale `{"id":""}` entry (from a pre-guard
+  version of this function, or an external editor) would otherwise
+  trip OpenClaw's zod validator with
+  `models.providers.custom.models.1.id: Too small: expected string to
+  have >=1 characters` and push the gateway into a SIGTERM crash
+  loop. Observed on mini after the v0.2.7 deploy wave — `openclaw.json`
+  had a bare `{"id":""}` at index 1 that prevented the Telegram bot
+  from ever starting.
+- No behavior change for a clean config; the only side effect is
+  that a previously-bad entry gets silently removed the next time
+  the proxy pushes any client config.
+
+---
+
 ## [0.2.7] — 2026-04-16
 
 Stop trapping admins when a client's `model_override` is stale.

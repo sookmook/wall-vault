@@ -331,6 +331,24 @@ func applyOpenClawConfig(baseURL, model, token string) (string, error) {
 	custom["api"] = "openai-completions"
 	custom["authHeader"] = false
 
+	// Sanitize any previously-written entries with an empty id. A pre-guard
+	// version of this function, or an external writer, could have left a
+	// `{"id": ""}` entry in the list — OpenClaw's config validator rejects
+	// the whole file in that state and crash-loops. Filter every call.
+	if models, ok := custom["models"].([]interface{}); ok {
+		filtered := make([]interface{}, 0, len(models))
+		for _, m := range models {
+			mm, ok := m.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if id, _ := mm["id"].(string); id != "" {
+				filtered = append(filtered, m)
+			}
+		}
+		custom["models"] = filtered
+	}
+
 	// Ensure model entry exists
 	if model != "" {
 		models, _ := custom["models"].([]interface{})

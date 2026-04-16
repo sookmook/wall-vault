@@ -542,19 +542,21 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 		}
 	}
 	c := &Client{
-		ID:              inp.ID,
-		Name:            inp.Name,
-		Token:           inp.Token,
-		DefaultService:  inp.DefaultService,
-		DefaultModel:    inp.DefaultModel,
-		AllowedServices: []string(inp.AllowedServices),
-		AgentType:       inp.AgentType,
-		WorkDir:         inp.WorkDir,
-		Description:     inp.Description,
-		IPWhitelist:     []string(inp.IPWhitelist),
-		Enabled:         enabled,
-		SortOrder:       maxOrder + 1,
-		CreatedAt:       time.Now(),
+		ID:               inp.ID,
+		Name:             inp.Name,
+		Token:            inp.Token,
+		PreferredService: inp.EffectiveService(),
+		ModelOverride:    inp.EffectiveModel(),
+		DefaultService:   inp.EffectiveService(),
+		DefaultModel:     inp.EffectiveModel(),
+		AllowedServices:  []string(inp.AllowedServices),
+		AgentType:        inp.AgentType,
+		WorkDir:          inp.WorkDir,
+		Description:      inp.Description,
+		IPWhitelist:      []string(inp.IPWhitelist),
+		Enabled:          enabled,
+		SortOrder:        maxOrder + 1,
+		CreatedAt:        time.Now(),
 	}
 	s.clients = append(s.clients, c)
 	return c, s.save()

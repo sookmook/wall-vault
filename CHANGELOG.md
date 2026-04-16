@@ -8,6 +8,48 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.2] — 2026-04-16
+
+Audit-driven polish: dispatch reliability improvements, ClientInput v0.2
+field migration, and documentation refresh.
+
+### Fixed
+
+- **Dispatch fast-skip for cooled services**: `KeyManager.CanServe(svc)`
+  predicate lets dispatch bypass cloud services whose keys are all on
+  cooldown/exhausted, eliminating the forced-retry loops that caused
+  ~15 s caller timeouts. Local services (ollama/lmstudio/vllm) are
+  always tried.
+- **Dispatch fallback model swap**: each fallback step now applies the
+  target service's `default_model` (synced from vault via the new
+  `ProxyService.DefaultModel` field). Previously fallback sent the
+  caller's original model name to every service (e.g. `gemini-2.5-flash`
+  to Anthropic → 400).
+- **Anthropic 400 "credit balance" → cooldown**: Anthropic returns HTTP
+  400 (not 402) when the account balance is depleted. Detect
+  "credit balance" / "billing" in the 400 body and promote to 402-level
+  30 min cooldown so subsequent dispatches fast-skip.
+
+### Changed
+
+- `ClientInput` (POST /admin/clients) now accepts v0.2 canonical fields
+  `preferred_service` / `model_override` alongside legacy
+  `default_service` / `default_model`. V0.2 takes precedence.
+  `EffectiveService()` / `EffectiveModel()` helpers unify the two.
+- Ollama `default_model` configurable via dashboard; previously
+  hard-coded in dispatch.
+
+### Internal
+
+- CLAUDE.md refreshed: views/ architecture, multimodal pass-through
+  documentation, EconoWorld agent type, dispatch fast-skip / fallback
+  model swap mechanics, CanServe predicate.
+- Full codebase audit: no critical bugs; dispatch_v2.go remains test-only
+  harness (design decision); 5 TODOs for Stage 2 legacy field removal
+  tracked.
+
+---
+
 ## [0.2.1] — 2026-04-16
 
 Post-RC1 polish round: dashboard becomes substantially more capable, and the

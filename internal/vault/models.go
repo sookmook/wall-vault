@@ -113,20 +113,39 @@ type Client struct {
 	Description     string `json:"description,omitempty"`      // legacy — drop in Stage 2
 }
 
-// ClientInput: client add DTO
+// ClientInput: client add DTO. Accepts both v0.1 (default_service / default_model)
+// and v0.2 (preferred_service / model_override) field names — v0.2 takes precedence.
 type ClientInput struct {
-	ID              string       `json:"id"`
-	Name            string       `json:"name"`
-	Token           string       `json:"token"`
-	DefaultService  string       `json:"default_service"`
-	DefaultModel    string       `json:"default_model"`
-	AllowedServices StringOrList `json:"allowed_services"`
-	AgentType       string       `json:"agent_type"`
-	WorkDir         string       `json:"work_dir"`
-	Description     string       `json:"description"`
-	IPWhitelist     StringOrList `json:"ip_whitelist"`
-	Avatar          string       `json:"avatar,omitempty"`
-	Enabled         *bool        `json:"enabled"` // nil = default true
+	ID               string       `json:"id"`
+	Name             string       `json:"name"`
+	Token            string       `json:"token"`
+	PreferredService string       `json:"preferred_service"` // v0.2 canonical
+	ModelOverride    string       `json:"model_override"`    // v0.2 canonical
+	DefaultService   string       `json:"default_service"`   // v0.1 compat — used when preferred_service is empty
+	DefaultModel     string       `json:"default_model"`     // v0.1 compat — used when model_override is empty
+	AllowedServices  StringOrList `json:"allowed_services"`
+	AgentType        string       `json:"agent_type"`
+	WorkDir          string       `json:"work_dir"`
+	Description      string       `json:"description"`
+	IPWhitelist      StringOrList `json:"ip_whitelist"`
+	Avatar           string       `json:"avatar,omitempty"`
+	Enabled          *bool        `json:"enabled"` // nil = default true
+}
+
+// EffectiveService returns the canonical preferred service, falling back to legacy.
+func (inp *ClientInput) EffectiveService() string {
+	if inp.PreferredService != "" {
+		return inp.PreferredService
+	}
+	return inp.DefaultService
+}
+
+// EffectiveModel returns the canonical model override, falling back to legacy.
+func (inp *ClientInput) EffectiveModel() string {
+	if inp.ModelOverride != "" {
+		return inp.ModelOverride
+	}
+	return inp.DefaultModel
 }
 
 // ClientUpdateInput: client update DTO

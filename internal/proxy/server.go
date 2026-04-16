@@ -128,6 +128,8 @@ func NewServer(cfg *config.Config) *Server {
 				go updateClineModel(mdl)
 			case "claude-code":
 				go updateClaudeCodeModel(mdl)
+			case "econoworld":
+				go updateEconoWorldModel(mdl)
 			}
 		}, func() {
 			// Flush token cache so vault model changes take effect immediately

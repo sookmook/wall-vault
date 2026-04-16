@@ -8,6 +8,38 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.10] — 2026-04-17
+
+### Fixed
+
+- **EconoWorld model changes no longer lost on the SSE path**: when a
+  user changed the `econoworld` client's `model_override` in the vault
+  dashboard, the proxy received the `config_change` event but
+  silently dropped it because `server.go`'s `onAnyConfig` switch only
+  handled `cline` and `claude-code`. `ai_config.json` kept the old
+  bootstrap model until someone triggered another `POST /agent/apply`.
+  The switch now has a `case "econoworld": go updateEconoWorldModel(mdl)`
+  branch that rewrites only `openai_compatible.model` in the local
+  `ai_config.json`, preserving `base_url`/`api_key`/`max_tokens` from
+  the prior bootstrap.
+
+### Internal
+
+- `updateEconoWorldModel(model string)` + `updateEconoWorldModelAt(path, model string)`
+  added to `agent_apply.go`. The `At` variant is file-path-parameterised
+  so it can be unit-tested; both short-circuit on an empty model
+  (vault clears shouldn't clobber bootstrap), silent-skip on missing
+  `ai_config.json` (proxies on hosts without EconoWorld installed),
+  and leave files alone when they're missing the `openai_compatible`
+  section (bootstrap responsibility).
+- 4 new tests in `agent_apply_test.go`:
+  - `TestUpdateEconoWorldModelAt_UpdatesModelField`
+  - `TestUpdateEconoWorldModelAt_MissingFileIsSilent`
+  - `TestUpdateEconoWorldModelAt_NoOpenAICompatSectionIsSilent`
+  - `TestUpdateEconoWorldModel_EmptyModelIsNoop`
+
+---
+
 ## [0.2.9] — 2026-04-17
 
 Surface the **active model** in `GET /status` so polling consumers

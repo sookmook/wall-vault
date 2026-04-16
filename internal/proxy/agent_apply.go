@@ -3,7 +3,10 @@ package proxy
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -492,6 +495,49 @@ func applyEconoWorldConfig(baseURL, model, token, workDir string) (string, error
 		return "", fmt.Errorf("failed to write ai_config.json: %w", err)
 	}
 	return path, nil
+}
+
+// updateEconoWorldModel is the SSE-driven counterpart to applyEconoWorldConfig:
+// when a vault config_change event arrives for an econoworld client, we only
+// need to refresh the `openai_compatible.model` field in the local
+// ai_config.json. base_url / api_key / max_tokens stay as last bootstrapped.
+// Hosts without EconoWorld installed silently skip (no ai_config.json to open).
+func updateEconoWorldModel(model string) {
+	if model == "" {
+		return
+	}
+	dir := resolveEconoWorldDir("")
+	path := filepath.Join(dir, "analyzer", "ai_config.json")
+	if err := updateEconoWorldModelAt(path, model); err != nil {
+		log.Printf("[econoworld] updateModel failed: %v", err)
+	}
+}
+
+// updateEconoWorldModelAt is the file-path-taking core of updateEconoWorldModel,
+// split out so it can be unit-tested against a temp directory.
+func updateEconoWorldModelAt(path, model string) error {
+	if model == "" {
+		return nil // empty model means "cleared by vault" — keep bootstrap intact
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil // host doesn't have EconoWorld — silent skip
+		}
+		return err
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	compat, _ := cfg["openai_compatible"].(map[string]interface{})
+	if compat == nil {
+		// ai_config.json exists but hasn't been bootstrapped with the
+		// openai_compatible section yet — leave it to the next /agent/apply.
+		return nil
+	}
+	compat["model"] = model
+	return writeJSON(path, cfg)
 }
 
 // resolveEconoWorldDir returns the first candidate POSIX directory whose

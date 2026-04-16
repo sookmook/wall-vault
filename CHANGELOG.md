@@ -8,6 +8,32 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.4] — 2026-04-16
+
+Scope correction for the agent `model_override` dropdown: drop the
+registry catalog that v0.2.3 added, restore admin curation via
+`allowed_models` only.
+
+### Changed
+
+- **Remove 카탈로그 optgroup from agent model_override**: the
+  auto-populated provider-registry list introduced in v0.2.3 is gone.
+  The dropdown now shows only the `기본` (service default_model) and
+  `허용 목록` (admin-curated allowed_models) groups, filtered by the
+  current preferred_service. Admins who want more choices add them via
+  the service edit page's `allowed_models` textarea, keeping the
+  agent-facing list curated rather than dumping the entire provider
+  catalog into every agent form.
+
+### Internal
+
+- `ServiceModelGroup` drops the `Catalog` field.
+- `toSlideoverClient` no longer calls `ensureRegistry()` or
+  `registry.All()` — only default + allowed_models are plumbed through.
+- `wvInitModelOverride` renders two optgroups instead of three.
+
+---
+
 ## [0.2.3] — 2026-04-14
 
 UX fix: agent `model_override` dropdown now surfaces the full service model

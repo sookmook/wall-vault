@@ -130,9 +130,9 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 				}, true);
 
 				// Populate model_override select from the form's data-wv-service-models
-				// JSON map. Each service entry has shape {default, allowed[], catalog[]};
-				// the three groups render as separate <optgroup>s (기본 / 허용 목록 / 카탈로그).
-				// Triggered once on hydrate and on preferred_service change.
+				// JSON map. Each service entry has shape {default, allowed[]}; the two
+				// groups render as separate <optgroup>s (기본 / 허용 목록). Triggered once
+				// on hydrate and on preferred_service change.
 				function wvInitModelOverride(root){
 					(root || document).querySelectorAll('form[data-wv-service-models]').forEach(function(form){
 						var svcSel = form.querySelector('select[data-wv-service-select]');
@@ -166,7 +166,6 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 							var defs = grp.default ? [grp.default] : [];
 							appendGroup('기본', defs, current, state);
 							appendGroup('허용 목록', grp.allowed || [], current, state);
-							appendGroup('카탈로그', grp.catalog || [], current, state);
 							if (current && !state.hasCurrent) {
 								var hdr = document.createElement('option');
 								hdr.value = current; hdr.textContent = current + ' (현재 값)';

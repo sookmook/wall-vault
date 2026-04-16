@@ -14,12 +14,12 @@ type ServiceVM struct {
 	Models        []string // live-queried model options for the default_model datalist
 }
 
-// ServiceModelGroup groups a service's candidate models into three buckets so
-// the model_override <select> can render them as separate <optgroup>s.
+// ServiceModelGroup groups a service's candidate models into the default and
+// admin-curated allowed list so the model_override <select> can render them
+// as two separate <optgroup>s.
 type ServiceModelGroup struct {
 	Default string   `json:"default,omitempty"` // service default_model
 	Allowed []string `json:"allowed,omitempty"` // admin-curated allowed_models minus the default
-	Catalog []string `json:"catalog,omitempty"` // registry-discovered models minus default+allowed
 }
 
 // ClientVM is the view model for the client edit form.

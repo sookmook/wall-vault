@@ -210,38 +210,18 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 // toSlideoverClient converts a vault Client to a slideover ClientVM,
 // folding in the service→candidate-models map so the edit form's
 // model_override dropdown can repopulate when preferred_service changes.
-// Models are split into three groups — default, allowed_models, and the
-// registry-discovered catalog — so the <select> can render them under
-// separate <optgroup>s. Deduplication keeps the priority order intact
-// (default → allowed → catalog); any model appearing in an earlier group
-// is dropped from later groups.
+// Models are split into default_model and the admin-curated allowed_models
+// so the <select> can render them as separate <optgroup>s. Allowed entries
+// that match the default are dropped from the allowed list to avoid dupes.
 func (s *Server) toSlideoverClient(c *Client) *slideover.ClientVM {
-	s.ensureRegistry()
 	svcMap := make(map[string]slideover.ServiceModelGroup)
 	for _, sv := range s.store.ListServices() {
-		seen := map[string]bool{}
-		mark := func(id string) bool {
-			if id == "" || seen[id] {
-				return false
-			}
-			seen[id] = true
-			return true
-		}
-		grp := slideover.ServiceModelGroup{}
-		if mark(sv.DefaultModel) {
-			grp.Default = sv.DefaultModel
-		}
+		grp := slideover.ServiceModelGroup{Default: sv.DefaultModel}
 		for _, m := range sv.AllowedModels {
-			if mark(m) {
-				grp.Allowed = append(grp.Allowed, m)
+			if m == "" || m == sv.DefaultModel {
+				continue
 			}
-		}
-		if s.registry != nil {
-			for _, m := range s.registry.All(sv.ID) {
-				if mark(m.ID) {
-					grp.Catalog = append(grp.Catalog, m.ID)
-				}
-			}
+			grp.Allowed = append(grp.Allowed, m)
 		}
 		svcMap[sv.ID] = grp
 	}

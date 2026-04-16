@@ -8,6 +8,25 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.13] — 2026-04-17
+
+### Fixed
+
+- **Agent edit `preferred_service` change no longer leaves stale
+  `model_override` options** — when the initial hydrate helper didn't
+  run in time on an OOB slideover swap (race already documented in
+  v0.2.5), the per-select `change` listener was never bound either.
+  Result: switching the service dropdown from, say, openrouter to
+  ollama kept the 6 openrouter options visible in the model_override
+  dropdown. The JS now uses **document-level event delegation** for
+  the change event — no per-form binding needed, so the timing of
+  the hydrate pass is irrelevant. Shared rebuild logic is extracted
+  into `wvRebuildModelOverride(form)`; the old `wvInitModelOverride`
+  stays as a back-compat initial hydrate but only needs to run once
+  per form lifetime.
+
+---
+
 ## [0.2.12] — 2026-04-17
 
 ### Fixed

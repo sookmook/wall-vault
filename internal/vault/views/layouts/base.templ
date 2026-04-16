@@ -175,56 +175,60 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 					}
 				}, true);
 
-				// Populate model_override select from the form's data-wv-service-models
+				// Rebuild the model_override <select> from the form's data-wv-service-models
 				// JSON map. Each service entry has shape {default, allowed[]}; the two
-				// groups render as separate <optgroup>s (기본 / 허용 목록). Triggered once
-				// on hydrate and on preferred_service change.
+				// groups render as separate <optgroup>s (기본 / 허용 목록).
+				function wvRebuildModelOverride(form){
+					var svcSel = form.querySelector('select[data-wv-service-select]');
+					var modSel = form.querySelector('select[data-wv-model-override]');
+					if (!svcSel || !modSel) return;
+					var map = {};
+					try { map = JSON.parse(form.getAttribute('data-wv-service-models') || '{}'); } catch (e) {}
+					var svc = svcSel.value;
+					// Preserve the user's in-progress selection against re-hydration.
+					var current = modSel.value || modSel.getAttribute('data-wv-current') || '';
+					var grp = map[svc] || {};
+					modSel.innerHTML = '';
+					var blank = document.createElement('option');
+					blank.value = ''; blank.textContent = '(서비스 기본 사용)';
+					modSel.appendChild(blank);
+					var state = { hasCurrent: false };
+					function appendGroup(label, ids){
+						if (!ids || ids.length === 0) return;
+						var og = document.createElement('optgroup');
+						og.label = label;
+						ids.forEach(function(m){
+							if (!m) return;
+							var o = document.createElement('option');
+							o.value = m; o.textContent = m;
+							if (m === current) { o.selected = true; state.hasCurrent = true; }
+							og.appendChild(o);
+						});
+						if (og.children.length > 0) modSel.appendChild(og);
+					}
+					var defs = grp.default ? [grp.default] : [];
+					appendGroup('기본', defs);
+					appendGroup('허용 목록', grp.allowed || []);
+					if (current && !state.hasCurrent) {
+						var hdr = document.createElement('option');
+						hdr.value = current; hdr.textContent = current + ' (⚠ 현재 값 · 저장 시 초기화)';
+						hdr.selected = true;
+						modSel.insertBefore(hdr, modSel.firstChild.nextSibling);
+					}
+				}
+				// Event delegation: any change on a [data-wv-service-select] inside a
+				// form[data-wv-service-models] triggers a rebuild. This avoids per-form
+				// binding which could be missed if the hydrate helpers don't run after
+				// an OOB slideover swap.
+				document.addEventListener('change', function(evt){
+					if (!evt.target.matches || !evt.target.matches('select[data-wv-service-select]')) return;
+					var form = evt.target.closest('form[data-wv-service-models]');
+					if (form) wvRebuildModelOverride(form);
+				});
+				// Hydrate helper kept for back-compat — runs on various HTMX events so
+				// any pre-existing hidden/cached form still gets its initial rebuild.
 				function wvInitModelOverride(root){
-					(root || document).querySelectorAll('form[data-wv-service-models]').forEach(function(form){
-						var svcSel = form.querySelector('select[data-wv-service-select]');
-						var modSel = form.querySelector('select[data-wv-model-override]');
-						if (!svcSel || !modSel) return;
-						var map = {};
-						try { map = JSON.parse(form.getAttribute('data-wv-service-models') || '{}'); } catch (e) {}
-						function appendGroup(label, ids, current, state){
-							if (!ids || ids.length === 0) return;
-							var og = document.createElement('optgroup');
-							og.label = label;
-							ids.forEach(function(m){
-								if (!m) return;
-								var o = document.createElement('option');
-								o.value = m; o.textContent = m;
-								if (m === current) { o.selected = true; state.hasCurrent = true; }
-								og.appendChild(o);
-							});
-							if (og.children.length > 0) modSel.appendChild(og);
-						}
-						function rebuild(){
-							var svc = svcSel.value;
-							// Preserve the user's in-progress selection against re-hydration.
-							var current = modSel.value || modSel.getAttribute('data-wv-current') || '';
-							var grp = map[svc] || {};
-							modSel.innerHTML = '';
-							var blank = document.createElement('option');
-							blank.value = ''; blank.textContent = '(서비스 기본 사용)';
-							modSel.appendChild(blank);
-							var state = { hasCurrent: false };
-							var defs = grp.default ? [grp.default] : [];
-							appendGroup('기본', defs, current, state);
-							appendGroup('허용 목록', grp.allowed || [], current, state);
-							if (current && !state.hasCurrent) {
-								var hdr = document.createElement('option');
-								hdr.value = current; hdr.textContent = current + ' (현재 값)';
-								hdr.selected = true;
-								modSel.insertBefore(hdr, modSel.firstChild.nextSibling);
-							}
-						}
-						if (svcSel.dataset.wvOverrideBound !== '1') {
-							svcSel.addEventListener('change', rebuild);
-							svcSel.dataset.wvOverrideBound = '1';
-						}
-						rebuild();
-					});
+					(root || document).querySelectorAll('form[data-wv-service-models]').forEach(wvRebuildModelOverride);
 				}
 				document.addEventListener('htmx:afterSwap',    function(evt){ wvInitModelOverride(evt.target); });
 				document.addEventListener('htmx:oobAfterSwap', function(evt){ wvInitModelOverride(evt.detail ? evt.detail.target : document); });

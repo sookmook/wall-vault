@@ -6,8 +6,10 @@ import (
 	"github.com/sookmook/wall-vault/internal/i18n"
 )
 
-// serviceModelJSON marshals the ServiceModelMap for safe inline JSON embedding.
-func serviceModelJSON(m map[string][]string) string {
+// serviceModelJSON marshals the grouped ServiceModelMap for safe inline JSON
+// embedding. The wvInitModelOverride JS reads it back out and builds three
+// <optgroup>s per service (기본 / 허용 목록 / 카탈로그).
+func serviceModelJSON(m map[string]ServiceModelGroup) string {
 	if m == nil {
 		return "{}"
 	}

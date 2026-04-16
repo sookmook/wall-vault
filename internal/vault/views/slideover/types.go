@@ -14,6 +14,14 @@ type ServiceVM struct {
 	Models        []string // live-queried model options for the default_model datalist
 }
 
+// ServiceModelGroup groups a service's candidate models into three buckets so
+// the model_override <select> can render them as separate <optgroup>s.
+type ServiceModelGroup struct {
+	Default string   `json:"default,omitempty"` // service default_model
+	Allowed []string `json:"allowed,omitempty"` // admin-curated allowed_models minus the default
+	Catalog []string `json:"catalog,omitempty"` // registry-discovered models minus default+allowed
+}
+
 // ClientVM is the view model for the client edit form.
 type ClientVM struct {
 	ID               string
@@ -25,8 +33,8 @@ type ClientVM struct {
 	WorkDir          string
 	IPWhitelist      string // comma-joined for single-line form input
 	Avatar           string // current avatar data URI (preview only)
-	// ServiceModelMap is service-ID → candidate models (default_model first,
-	// then allowed_models). Serialized to JSON and embedded in the page so the
-	// model_override <select> can repopulate when the preferred_service changes.
-	ServiceModelMap map[string][]string
+	// ServiceModelMap is service-ID → grouped candidate models. Serialized to
+	// JSON and embedded in the page so the model_override <select> can
+	// repopulate (as <optgroup>s) when the preferred_service changes.
+	ServiceModelMap map[string]ServiceModelGroup
 }

@@ -17,7 +17,7 @@ var agentTypeOptions = []string{
 	"econoworld",
 }
 
-templ ClientCreate(services []*ServiceVM, serviceModels map[string][]string) {
+templ ClientCreate(services []*ServiceVM, serviceModels map[string]ServiceModelGroup) {
 	<form data-wv-submit="/admin/clients" data-wv-method="POST" class="wv-form"
 		data-wv-service-models={ serviceModelJSON(serviceModels) }>
 		<div class="wv-form-section">

@@ -130,7 +130,9 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 				}, true);
 
 				// Populate model_override select from the form's data-wv-service-models
-				// JSON map. Triggered once on hydrate and on preferred_service change.
+				// JSON map. Each service entry has shape {default, allowed[], catalog[]};
+				// the three groups render as separate <optgroup>s (기본 / 허용 목록 / 카탈로그).
+				// Triggered once on hydrate and on preferred_service change.
 				function wvInitModelOverride(root){
 					(root || document).querySelectorAll('form[data-wv-service-models]').forEach(function(form){
 						var svcSel = form.querySelector('select[data-wv-service-select]');
@@ -138,23 +140,34 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						if (!svcSel || !modSel) return;
 						var map = {};
 						try { map = JSON.parse(form.getAttribute('data-wv-service-models') || '{}'); } catch (e) {}
+						function appendGroup(label, ids, current, state){
+							if (!ids || ids.length === 0) return;
+							var og = document.createElement('optgroup');
+							og.label = label;
+							ids.forEach(function(m){
+								if (!m) return;
+								var o = document.createElement('option');
+								o.value = m; o.textContent = m;
+								if (m === current) { o.selected = true; state.hasCurrent = true; }
+								og.appendChild(o);
+							});
+							if (og.children.length > 0) modSel.appendChild(og);
+						}
 						function rebuild(){
 							var svc = svcSel.value;
 							// Preserve the user's in-progress selection against re-hydration.
 							var current = modSel.value || modSel.getAttribute('data-wv-current') || '';
-							var opts = (map[svc] || []);
+							var grp = map[svc] || {};
 							modSel.innerHTML = '';
 							var blank = document.createElement('option');
 							blank.value = ''; blank.textContent = '(서비스 기본 사용)';
 							modSel.appendChild(blank);
-							var hasCurrent = false;
-							opts.forEach(function(m){
-								var o = document.createElement('option');
-								o.value = m; o.textContent = m;
-								if (m === current) { o.selected = true; hasCurrent = true; }
-								modSel.appendChild(o);
-							});
-							if (current && !hasCurrent) {
+							var state = { hasCurrent: false };
+							var defs = grp.default ? [grp.default] : [];
+							appendGroup('기본', defs, current, state);
+							appendGroup('허용 목록', grp.allowed || [], current, state);
+							appendGroup('카탈로그', grp.catalog || [], current, state);
+							if (current && !state.hasCurrent) {
 								var hdr = document.createElement('option');
 								hdr.value = current; hdr.textContent = current + ' (현재 값)';
 								hdr.selected = true;

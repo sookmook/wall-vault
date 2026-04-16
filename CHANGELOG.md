@@ -8,6 +8,41 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.3] — 2026-04-14
+
+UX fix: agent `model_override` dropdown now surfaces the full service model
+catalog instead of just the one `default_model`.
+
+### Fixed
+
+- **Empty agent model dropdown**: the agent edit slideover's
+  `model_override` `<select>` was previously fed only
+  `default_model + allowed_models` from the vault. In most deployments
+  `allowed_models` is empty, so the dropdown collapsed to a single
+  (default) option — indistinguishable from "not working" for users.
+  Now `toSlideoverClient` also pulls `s.registry.All(svc)`, so every
+  model known to the provider (Google 15, OpenRouter 345, etc.) is
+  available. Service edit already behaved this way; agent edit now
+  matches.
+
+### Changed
+
+- `ClientVM.ServiceModelMap` is now
+  `map[string]ServiceModelGroup` where `ServiceModelGroup` splits models
+  into `{default, allowed[], catalog[]}`. `wvInitModelOverride` renders
+  the three buckets as separate `<optgroup>`s (`기본` / `허용 목록` /
+  `카탈로그`) so users can tell admin-curated choices from registry
+  overflow. Dedup preserves priority (default → allowed → catalog).
+
+### Internal
+
+- `toSlideoverClient` now calls `ensureRegistry()` before building the
+  map — same cold-cache path as service edit.
+- `serviceModelJSON(map[string]ServiceModelGroup) string` replaces the
+  old flat-list marshaller; `ClientCreate` signature updated to match.
+
+---
+
 ## [0.2.2] — 2026-04-16
 
 Audit-driven polish: dispatch reliability, model-selection UX, ClientInput

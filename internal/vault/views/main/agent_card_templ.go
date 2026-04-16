@@ -158,15 +158,15 @@ func AgentCard(c *ClientVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if c.RemoteModel != "" {
+		if c.ModelOverride != "" {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<span class=\"chip chip-accent\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var11 string
-			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(c.RemoteModel)
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(c.ModelOverride)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/main/agent_card.templ`, Line: 21, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/main/agent_card.templ`, Line: 21, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -176,15 +176,15 @@ func AgentCard(c *ClientVM) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else if c.ModelOverride != "" {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<span class=\"chip\">")
+		} else if c.RemoteModel != "" {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<span class=\"chip chip-accent\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var12 string
-			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(c.ModelOverride)
+			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(c.RemoteModel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/main/agent_card.templ`, Line: 23, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/main/agent_card.templ`, Line: 23, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {

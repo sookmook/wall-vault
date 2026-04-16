@@ -17,10 +17,10 @@ templ AgentCard(c *ClientVM) {
 				<div class="card-meta">
 					<span class={ "dot " + agentDotClass(c.Enabled, c.Online) }></span>
 					<span>→ { c.PreferredService }</span>
-					if c.RemoteModel != "" {
+					if c.ModelOverride != "" {
+						<span class="chip chip-accent">{ c.ModelOverride }</span>
+					} else if c.RemoteModel != "" {
 						<span class="chip chip-accent">{ c.RemoteModel }</span>
-					} else if c.ModelOverride != "" {
-						<span class="chip">{ c.ModelOverride }</span>
 					}
 				</div>
 				if c.LastHeartbeat != "" {

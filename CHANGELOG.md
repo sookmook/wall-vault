@@ -8,6 +8,31 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.14] — 2026-04-17
+
+### Fixed
+
+- **Agent card reflects saved `model_override` immediately after
+  save** — the card previously showed `RemoteModel` (the proxy's
+  last-reported model via heartbeat) with priority, so right after
+  a dashboard save the card kept displaying the old value for up
+  to the next heartbeat cycle (~20 s). Priority is now
+  `ModelOverride` → `RemoteModel`, so the just-saved configured
+  model appears instantly on reload. `RemoteModel` still shows when
+  there is no explicit override (e.g. the agent is on the service
+  default).
+
+### Changed
+
+- **Unified model chip color on agent cards** — both paths
+  (`ModelOverride` and `RemoteModel`) now render as
+  `chip chip-accent`. Previously only one was `chip-accent` and the
+  other plain `chip`, which made some cards' model text a different
+  color than others for no user-facing reason. `agent_type` chip
+  stays plain to preserve the information-tier distinction.
+
+---
+
 ## [0.2.13] — 2026-04-17
 
 ### Fixed

@@ -180,8 +180,11 @@ func relativeTime(d time.Duration) string {
 
 // toSlideoverService converts a vault ServiceConfig to a slideover ServiceVM,
 // enriching the VM with live model options pulled from the shared registry so
-// the edit form can render a default_model dropdown.
+// the edit form can render a default_model dropdown. Ensures the registry is
+// populated first — the dashboard shouldn't rely on a separate /admin/models
+// round-trip just to see model choices in the initial HTML.
 func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
+	s.ensureRegistry()
 	var modelNames []string
 	if s.registry != nil {
 		for _, m := range s.registry.All(sv.ID) {

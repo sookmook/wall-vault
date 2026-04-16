@@ -68,8 +68,14 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						  }).catch(function(){});
 					});
 				}
-				document.addEventListener('htmx:afterSwap', function(evt){ wvHydrateModels(evt.target); });
-				document.addEventListener('DOMContentLoaded', function(){ wvHydrateModels(document); });
+				// htmx fires afterSwap on the swap target, NOT on OOB-swapped nodes.
+				// Slideover comes in via hx-swap-oob="true" so we also listen on
+				// oobAfterSwap (htmx ≥1.9) and afterOnLoad (safety net) and run
+				// hydrate on the whole document so OOB additions are covered.
+				document.addEventListener('htmx:afterSwap',    function(evt){ wvHydrateModels(evt.target); });
+				document.addEventListener('htmx:oobAfterSwap', function(evt){ wvHydrateModels(evt.detail ? evt.detail.target : document); });
+				document.addEventListener('htmx:afterOnLoad',  function(){ wvHydrateModels(document); });
+				document.addEventListener('DOMContentLoaded',  function(){ wvHydrateModels(document); });
 
 				// Service-edit: "↓ 허용으로" moves current default_model into the
 				// allowed_models textarea and clears the default select.
@@ -158,8 +164,10 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						rebuild();
 					});
 				}
-				document.addEventListener('htmx:afterSwap', function(evt){ wvInitModelOverride(evt.target); });
-				document.addEventListener('DOMContentLoaded', function(){ wvInitModelOverride(document); });
+				document.addEventListener('htmx:afterSwap',    function(evt){ wvInitModelOverride(evt.target); });
+				document.addEventListener('htmx:oobAfterSwap', function(evt){ wvInitModelOverride(evt.detail ? evt.detail.target : document); });
+				document.addEventListener('htmx:afterOnLoad',  function(){ wvInitModelOverride(document); });
+				document.addEventListener('DOMContentLoaded',  function(){ wvInitModelOverride(document); });
 
 				// Hydrate any [data-pct] element by writing inline width:N% — works around
 				// templ's strict style-attribute parser.
@@ -171,8 +179,10 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						el.style.width = p + '%';
 					});
 				}
-				document.addEventListener('htmx:afterSwap', function(evt){ wvHydrateProgress(evt.target); });
-				document.addEventListener('DOMContentLoaded', function(){ wvHydrateProgress(document); });
+				document.addEventListener('htmx:afterSwap',    function(evt){ wvHydrateProgress(evt.target); });
+				document.addEventListener('htmx:oobAfterSwap', function(evt){ wvHydrateProgress(evt.detail ? evt.detail.target : document); });
+				document.addEventListener('htmx:afterOnLoad',  function(){ wvHydrateProgress(document); });
+				document.addEventListener('DOMContentLoaded',  function(){ wvHydrateProgress(document); });
 
 				// Drag-and-drop reorder: any [data-wv-reorder=KIND] grid whose direct
 				// children carry [data-wv-id=ID] becomes sortable. Drag handles
@@ -245,8 +255,10 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						});
 					});
 				}
-				document.addEventListener('htmx:afterSwap', function(evt){ wvInitReorder(evt.target); });
-				document.addEventListener('DOMContentLoaded', function(){ wvInitReorder(document); });
+				document.addEventListener('htmx:afterSwap',    function(evt){ wvInitReorder(evt.target); });
+				document.addEventListener('htmx:oobAfterSwap', function(evt){ wvInitReorder(evt.detail ? evt.detail.target : document); });
+				document.addEventListener('htmx:afterOnLoad',  function(){ wvInitReorder(document); });
+				document.addEventListener('DOMContentLoaded',  function(){ wvInitReorder(document); });
 				// Delegated form submit: any <form data-wv-submit="URL" data-wv-method="POST|PUT">
 				// is intercepted, serialised to JSON, and sent with admin auth.
 				document.addEventListener('submit', function(evt){

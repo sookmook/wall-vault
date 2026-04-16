@@ -1030,30 +1030,36 @@ func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 	}
 	svcFilter := r.URL.Query().Get("service")
 
-	if s.registry.NeedsRefresh() {
-		svcs := s.store.ListServices()
-		svcIDs := make([]string, 0, len(svcs))
-		for _, sv := range svcs {
-			if sv.Enabled {
-				svcIDs = append(svcIDs, sv.ID)
-			}
-		}
-		// look up OpenRouter key
-		var orKey string
-		keys := s.store.ListKeys()
-		for _, k := range keys {
-			if k.Service == "openrouter" && k.IsAvailable() {
-				if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
-					orKey = plain
-					break
-				}
-			}
-		}
-		_ = s.registry.Refresh(svcIDs, s.store.ServiceURLMap(), orKey)
-	}
-
+	s.ensureRegistry()
 	result := s.registry.All(svcFilter)
 	jsonOK(w, map[string]interface{}{"models": result, "count": len(result)})
+}
+
+// ensureRegistry refreshes the in-memory model registry from each enabled
+// service when the cached data is missing or stale. Idempotent and cheap
+// after the first successful refresh (TTL gated). Safe to call from any
+// read handler that wants model choices guaranteed available.
+func (s *Server) ensureRegistry() {
+	if s.registry == nil || !s.registry.NeedsRefresh() {
+		return
+	}
+	svcs := s.store.ListServices()
+	svcIDs := make([]string, 0, len(svcs))
+	for _, sv := range svcs {
+		if sv.Enabled {
+			svcIDs = append(svcIDs, sv.ID)
+		}
+	}
+	var orKey string
+	for _, k := range s.store.ListKeys() {
+		if k.Service == "openrouter" && k.IsAvailable() {
+			if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
+				orKey = plain
+				break
+			}
+		}
+	}
+	_ = s.registry.Refresh(svcIDs, s.store.ServiceURLMap(), orKey)
 }
 
 // ─── Periodic Status Broadcast ────────────────────────────────────────────────

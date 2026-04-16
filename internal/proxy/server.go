@@ -119,17 +119,31 @@ func NewServer(cfg *config.Config) *Server {
 				go updateOpenClawJSON(newSvc, newMdl)
 			}
 		}, func(clientID, agentType, svc, mdl string) {
-			// Foreign client model changed in vault — update local agent config if applicable
-			if mdl == "" {
-				return
-			}
+			// Foreign client model changed in vault — update local agent config if applicable.
 			switch agentType {
 			case "cline":
-				go updateClineModel(mdl)
+				if mdl != "" {
+					go updateClineModel(mdl)
+				}
 			case "claude-code":
-				go updateClaudeCodeModel(mdl)
+				if mdl != "" {
+					go updateClaudeCodeModel(mdl)
+				}
 			case "econoworld":
-				go updateEconoWorldModel(mdl)
+				// When mdl is empty (vault soft-cleared a stale override on a service
+				// switch, or user explicitly picked "(서비스 기본 사용)"), fall back to
+				// the new service's default_model so ai_config.json stays consistent
+				// with what /status surfaces. Without this, ai_config.json keeps the
+				// previous override and drifts from the proxy's actual routing.
+				effective := mdl
+				if effective == "" && svc != "" {
+					s.mu.RLock()
+					effective = s.serviceDefaults[svc]
+					s.mu.RUnlock()
+				}
+				if effective != "" {
+					go updateEconoWorldModel(effective)
+				}
 			}
 		}, func() {
 			// Flush token cache so vault model changes take effect immediately

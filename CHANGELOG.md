@@ -8,6 +8,27 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.11] — 2026-04-17
+
+### Fixed
+
+- **EconoWorld `ai_config.json` now follows service defaults after a
+  soft-cleared `model_override`**: v0.2.10 wired the SSE path, but
+  `updateEconoWorldModel` short-circuits on an empty model — which is
+  exactly the state vault arrives at via v0.2.7's soft-clear when
+  the user switches `preferred_service` and the old override is no
+  longer in the new service's `allowed_models`. Net effect: vault
+  recorded the change, `/status.model` updated (via v0.2.9's
+  `serviceDefaults` fallback), but `ai_config.json` kept the stale
+  override and drifted from the proxy's actual routing. The SSE
+  handler's `case "econoworld"` now does the same fallback —
+  `effective := mdl; if effective == "" && svc != "" { effective =
+  s.serviceDefaults[svc] }` — before calling
+  `updateEconoWorldModel`. `cline` and `claude-code` keep their
+  existing empty-model short-circuit.
+
+---
+
 ## [0.2.10] — 2026-04-17
 
 ### Fixed

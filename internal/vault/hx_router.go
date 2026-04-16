@@ -204,8 +204,23 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 	}
 }
 
-// toSlideoverClient converts a vault Client to a slideover ClientVM.
-func toSlideoverClient(c *Client) *slideover.ClientVM {
+// toSlideoverClient converts a vault Client to a slideover ClientVM,
+// folding in the service→candidate-models map so the edit form's
+// model_override dropdown can repopulate when preferred_service changes.
+func (s *Server) toSlideoverClient(c *Client) *slideover.ClientVM {
+	svcMap := make(map[string][]string)
+	for _, sv := range s.store.ListServices() {
+		var models []string
+		if sv.DefaultModel != "" {
+			models = append(models, sv.DefaultModel)
+		}
+		for _, m := range sv.AllowedModels {
+			if m != "" && m != sv.DefaultModel {
+				models = append(models, m)
+			}
+		}
+		svcMap[sv.ID] = models
+	}
 	return &slideover.ClientVM{
 		ID:               c.ID,
 		Name:             c.Name,
@@ -216,7 +231,14 @@ func toSlideoverClient(c *Client) *slideover.ClientVM {
 		WorkDir:          c.WorkDir,
 		IPWhitelist:      strings.Join(c.IPWhitelist, ", "),
 		Avatar:           c.Avatar,
+		ServiceModelMap:  svcMap,
 	}
+}
+
+// emptyClientVM builds a ClientVM used by the create form — carries only the
+// ServiceModelMap so the model_override dropdown is pre-populated.
+func (s *Server) emptyClientVM() *slideover.ClientVM {
+	return s.toSlideoverClient(&Client{})
 }
 
 func (s *Server) hxSidebar(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +311,7 @@ func (s *Server) hxClientSubroute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if path == "new" {
-		slideover.Frame("새 에이전트", slideover.ClientCreate(svcVMs)).Render(r.Context(), w) //nolint:errcheck
+		slideover.Frame("새 에이전트", slideover.ClientCreate(svcVMs, s.emptyClientVM().ServiceModelMap)).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
 	if path == "" || path == "/" {
@@ -307,5 +329,5 @@ func (s *Server) hxClientSubroute(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	slideover.Frame(c.Name, slideover.ClientEdit(toSlideoverClient(c), svcVMs)).Render(r.Context(), w) //nolint:errcheck
+	slideover.Frame(c.Name, slideover.ClientEdit(s.toSlideoverClient(c), svcVMs)).Render(r.Context(), w) //nolint:errcheck
 }

@@ -1,6 +1,8 @@
 package slideover
 
-import "github.com/sookmook/wall-vault/internal/i18n"
+import (
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
 
 // AgentType options shown in the create dropdown.
 // Free text is still allowed; the list just makes typical choices one-click.
@@ -15,8 +17,9 @@ var agentTypeOptions = []string{
 	"econoworld",
 }
 
-templ ClientCreate(services []*ServiceVM) {
-	<form data-wv-submit="/admin/clients" data-wv-method="POST" class="wv-form">
+templ ClientCreate(services []*ServiceVM, serviceModels map[string][]string) {
+	<form data-wv-submit="/admin/clients" data-wv-method="POST" class="wv-form"
+		data-wv-service-models={ serviceModelJSON(serviceModels) }>
 		<div class="wv-form-section">
 			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
 			<label class="wv-field">
@@ -42,7 +45,7 @@ templ ClientCreate(services []*ServiceVM) {
 			<div class="wv-form-section-title">{ i18n.T("sec_routing") }</div>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_preferred_service") }</span>
-				<select name="default_service">
+				<select name="default_service" data-wv-service-select>
 					<option value=""></option>
 					for _, s := range services {
 						<option value={ s.ID }>{ s.Name }</option>
@@ -51,7 +54,10 @@ templ ClientCreate(services []*ServiceVM) {
 			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_model_override") }</span>
-				<input name="default_model" placeholder={ i18n.T("ph_model_default") }/>
+				<select name="default_model" data-wv-model-override data-wv-current="">
+					<option value="">(서비스 기본 사용)</option>
+				</select>
+				<small class="hint">{ i18n.T("ph_model_default") }</small>
 			</label>
 		</div>
 

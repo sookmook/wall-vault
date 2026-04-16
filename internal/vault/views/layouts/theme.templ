@@ -126,6 +126,15 @@ templ Theme() {
 		form button.btn-secondary { background:transparent; color:var(--muted); border:1px solid var(--border); font-weight:500; }
 		form button.btn-secondary:hover { background:var(--muted-bg); color:var(--fg); filter:none; }
 		form .hint { display:block; margin-top:4px; color:var(--muted); font-size:11px; line-height:1.4; }
+		form .wv-field-group { display:flex; gap:6px; align-items:stretch; }
+		form .wv-field-group > select { flex:1; min-width:0; }
+		form .btn-mini { padding:6px 10px; border:1px solid var(--border); background:var(--bg); color:var(--muted); font-size:11.5px; border-radius:5px; cursor:pointer; white-space:nowrap; font-weight:500; }
+		form .btn-mini:hover { border-color:var(--accent); color:var(--accent); }
+		form .btn-mini.btn-danger:hover { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+		form .wv-custom-model { margin-top:6px; font-size:12px; }
+		form .wv-custom-model summary { cursor:pointer; color:var(--muted); padding:3px 0; user-select:none; }
+		form .wv-custom-model summary:hover { color:var(--accent); }
+		form .wv-custom-model[open] summary { color:var(--fg); }
 		form .avatar-row { display:flex; align-items:center; gap:12px; margin-top:4px; }
 		form .avatar-row input[type=file] { flex:1; padding:4px; font-size:11.5px; }
 		form .avatar-preview { width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid var(--border); flex-shrink:0; background:var(--muted-bg); }

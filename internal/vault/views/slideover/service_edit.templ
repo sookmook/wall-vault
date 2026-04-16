@@ -28,23 +28,33 @@ templ ServiceEdit(s *ServiceVM) {
 			<div class="wv-form-section-title">{ i18n.T("sec_routing") }</div>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_default_model") }</span>
-				<select name="default_model" data-wv-models={s.ID} data-wv-current={s.DefaultModel}>
-					if s.DefaultModel != "" {
-						<option value={s.DefaultModel} selected>{ s.DefaultModel }</option>
-					} else {
-						<option value="" selected>{ i18n.T("ph_model_select") }</option>
-					}
-					for _, m := range s.Models {
-						if m != s.DefaultModel {
-							<option value={ m }>{ m }</option>
+				<div class="wv-field-group">
+					<select name="default_model" data-wv-models={s.ID} data-wv-current={s.DefaultModel}>
+						if s.DefaultModel != "" {
+							<option value={s.DefaultModel} selected>{ s.DefaultModel }</option>
+						} else {
+							<option value="" selected>{ i18n.T("ph_model_select") }</option>
 						}
+						for _, m := range s.Models {
+							if m != s.DefaultModel {
+								<option value={ m }>{ m }</option>
+							}
+						}
+					</select>
+					if s.DefaultModel != "" {
+						<button type="button" class="btn-mini" data-wv-demote-default title="현재 기본 모델을 허용 목록 끝에 추가하고 기본을 비움">↓ 허용으로</button>
+						<button type="button" class="btn-mini btn-danger" data-wv-clear-default title="기본 모델 지움">✕ 지움</button>
 					}
-				</select>
+				</div>
 				<small class="hint">{ i18n.T("hint_default_model") }</small>
+				<details class="wv-custom-model">
+					<summary>직접 입력 (드롭다운에 원하는 모델이 없을 때)</summary>
+					<input name="default_model_custom" placeholder="모델 ID 직접 입력 (저장 시 기본 모델로 적용)"/>
+				</details>
 			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_allowed_models") }</span>
-				<textarea name="allowed_models" placeholder="claude-sonnet-4-5&#10;claude-opus-4-5">{ strings.Join(s.AllowedModels, "\n") }</textarea>
+				<textarea name="allowed_models" data-wv-allowed-models placeholder="claude-sonnet-4-5&#10;claude-opus-4-5">{ strings.Join(s.AllowedModels, "\n") }</textarea>
 				<small class="hint">{ i18n.T("hint_allowed_models") }</small>
 			</label>
 		</div>

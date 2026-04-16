@@ -71,6 +71,96 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 				document.addEventListener('htmx:afterSwap', function(evt){ wvHydrateModels(evt.target); });
 				document.addEventListener('DOMContentLoaded', function(){ wvHydrateModels(document); });
 
+				// Service-edit: "↓ 허용으로" moves current default_model into the
+				// allowed_models textarea and clears the default select.
+				// "✕ 지움" just clears default_model. Both are local-only until save.
+				document.addEventListener('click', function(evt){
+					var demote = evt.target.closest('[data-wv-demote-default]');
+					var clear  = evt.target.closest('[data-wv-clear-default]');
+					if (!demote && !clear) return;
+					var form = (demote || clear).closest('form'); if (!form) return;
+					var sel = form.querySelector('select[name=default_model]'); if (!sel) return;
+					var cur = sel.value;
+					if (demote && cur) {
+						var ta = form.querySelector('textarea[data-wv-allowed-models]');
+						if (ta) {
+							var lines = ta.value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+							if (lines.indexOf(cur) < 0) { lines.push(cur); ta.value = lines.join('\n'); }
+						}
+					}
+					// reset select to the blank placeholder option, or create one
+					var blank = sel.querySelector('option[value=""]');
+					if (!blank) {
+						blank = document.createElement('option');
+						blank.value = ''; blank.textContent = '(선택되지 않음)';
+						sel.insertBefore(blank, sel.firstChild);
+					}
+					blank.selected = true;
+					sel.value = '';
+					sel.setAttribute('data-wv-current', '');
+				}, true);
+
+				// If the service-edit form has a filled "직접 입력" field at submit time,
+				// override default_model with that value before wvSubmit serialises.
+				document.addEventListener('submit', function(evt){
+					var form = evt.target;
+					if (!form || !form.dataset || !form.dataset.wvSubmit) return;
+					var custom = form.querySelector('input[name=default_model_custom]');
+					if (custom && custom.value.trim() !== '') {
+						var sel = form.querySelector('select[name=default_model]');
+						if (sel) {
+							var v = custom.value.trim();
+							var opt = document.createElement('option');
+							opt.value = v; opt.textContent = v; opt.selected = true;
+							sel.appendChild(opt);
+							sel.value = v;
+						}
+						// prevent the custom input from being serialised as its own field
+						custom.name = '_ignored_default_model_custom';
+					}
+				}, true);
+
+				// Populate model_override select from the form's data-wv-service-models
+				// JSON map. Triggered once on hydrate and on preferred_service change.
+				function wvInitModelOverride(root){
+					(root || document).querySelectorAll('form[data-wv-service-models]').forEach(function(form){
+						var svcSel = form.querySelector('select[data-wv-service-select]');
+						var modSel = form.querySelector('select[data-wv-model-override]');
+						if (!svcSel || !modSel) return;
+						var map = {};
+						try { map = JSON.parse(form.getAttribute('data-wv-service-models') || '{}'); } catch (e) {}
+						function rebuild(){
+							var svc = svcSel.value;
+							var current = modSel.getAttribute('data-wv-current') || modSel.value || '';
+							var opts = (map[svc] || []);
+							modSel.innerHTML = '';
+							var blank = document.createElement('option');
+							blank.value = ''; blank.textContent = '(서비스 기본 사용)';
+							modSel.appendChild(blank);
+							var hasCurrent = false;
+							opts.forEach(function(m){
+								var o = document.createElement('option');
+								o.value = m; o.textContent = m;
+								if (m === current) { o.selected = true; hasCurrent = true; }
+								modSel.appendChild(o);
+							});
+							if (current && !hasCurrent) {
+								var hdr = document.createElement('option');
+								hdr.value = current; hdr.textContent = current + ' (현재 값)';
+								hdr.selected = true;
+								modSel.insertBefore(hdr, modSel.firstChild.nextSibling);
+							}
+						}
+						if (svcSel.dataset.wvOverrideBound !== '1') {
+							svcSel.addEventListener('change', rebuild);
+							svcSel.dataset.wvOverrideBound = '1';
+						}
+						rebuild();
+					});
+				}
+				document.addEventListener('htmx:afterSwap', function(evt){ wvInitModelOverride(evt.target); });
+				document.addEventListener('DOMContentLoaded', function(){ wvInitModelOverride(document); });
+
 				// Hydrate any [data-pct] element by writing inline width:N% — works around
 				// templ's strict style-attribute parser.
 				function wvHydrateProgress(root){

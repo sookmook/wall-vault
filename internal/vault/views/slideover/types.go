@@ -25,4 +25,8 @@ type ClientVM struct {
 	WorkDir          string
 	IPWhitelist      string // comma-joined for single-line form input
 	Avatar           string // current avatar data URI (preview only)
+	// ServiceModelMap is service-ID → candidate models (default_model first,
+	// then allowed_models). Serialized to JSON and embedded in the page so the
+	// model_override <select> can repopulate when the preferred_service changes.
+	ServiceModelMap map[string][]string
 }

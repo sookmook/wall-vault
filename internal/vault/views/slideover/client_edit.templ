@@ -1,9 +1,23 @@
 package slideover
 
-import "github.com/sookmook/wall-vault/internal/i18n"
+import (
+	"encoding/json"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
+
+// serviceModelJSON marshals the ServiceModelMap for safe inline JSON embedding.
+func serviceModelJSON(m map[string][]string) string {
+	if m == nil {
+		return "{}"
+	}
+	b, _ := json.Marshal(m)
+	return string(b)
+}
 
 templ ClientEdit(c *ClientVM, services []*ServiceVM) {
-	<form data-wv-submit={"/admin/clients/" + c.ID} data-wv-method="PUT" class="wv-form">
+	<form data-wv-submit={"/admin/clients/" + c.ID} data-wv-method="PUT" class="wv-form"
+		data-wv-service-models={ serviceModelJSON(c.ServiceModelMap) }>
 		<div class="wv-form-section">
 			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
 			<label class="wv-field">
@@ -25,7 +39,7 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 			<div class="wv-form-section-title">{ i18n.T("sec_routing") }</div>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_preferred_service") }</span>
-				<select name="preferred_service">
+				<select name="preferred_service" data-wv-service-select>
 					for _, s := range services {
 						<option value={s.ID} selected?={s.ID == c.PreferredService}>{ s.Name }</option>
 					}
@@ -33,7 +47,13 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_model_override") }</span>
-				<input name="model_override" value={c.ModelOverride} placeholder={ i18n.T("ph_model_default") }/>
+				<select name="model_override" data-wv-model-override data-wv-current={c.ModelOverride}>
+					<option value="">(서비스 기본 사용)</option>
+					if c.ModelOverride != "" {
+						<option value={c.ModelOverride} selected>{ c.ModelOverride }</option>
+					}
+				</select>
+				<small class="hint">{ i18n.T("ph_model_default") }</small>
 			</label>
 		</div>
 

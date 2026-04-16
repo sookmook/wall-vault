@@ -30,7 +30,10 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 					selects.forEach(function(sel){
 						var svc = sel.getAttribute('data-wv-models');
 						if (!svc) return;
-						var current = sel.getAttribute('data-wv-current') || sel.value || '';
+						// Prefer the user's current selection so that async hydration
+						// (which replaces innerHTML) does not clobber a value the
+						// user just picked. Fall back to the server-rendered default.
+						var current = sel.value || sel.getAttribute('data-wv-current') || '';
 						fetch('/admin/models?service=' + encodeURIComponent(svc), {
 							headers: {'Authorization': 'Bearer ' + (window.WV_ADMIN_TOKEN || '')}
 						}).then(function(r){ return r.ok ? r.json() : null; })
@@ -137,7 +140,8 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						try { map = JSON.parse(form.getAttribute('data-wv-service-models') || '{}'); } catch (e) {}
 						function rebuild(){
 							var svc = svcSel.value;
-							var current = modSel.getAttribute('data-wv-current') || modSel.value || '';
+							// Preserve the user's in-progress selection against re-hydration.
+							var current = modSel.value || modSel.getAttribute('data-wv-current') || '';
 							var opts = (map[svc] || []);
 							modSel.innerHTML = '';
 							var blank = document.createElement('option');
@@ -325,7 +329,9 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 					var body = {};
 					fd.forEach(function(v, k){
 						if (v instanceof File) return; // handled below
-						if (v === '') return;
+						// Do NOT drop empty strings — an explicit "" is how the
+						// dashboard clears a field (model_override → "use service
+						// default", ip_whitelist → "allow all", work_dir → reset).
 						if (body[k] === undefined) { body[k] = v; return; }
 						if (Array.isArray(body[k])) { body[k].push(v); return; }
 						body[k] = [body[k], v];

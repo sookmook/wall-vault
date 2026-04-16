@@ -994,6 +994,19 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				inp.AllowedModels = models
+			case string:
+				// Dashboard textarea submits "model1\nmodel2\n..." as a plain
+				// string. Split on newline/comma and trim, dropping empties.
+				lines := strings.FieldsFunc(val, func(r rune) bool {
+					return r == '\n' || r == '\r' || r == ','
+				})
+				models := make([]string, 0, len(lines))
+				for _, line := range lines {
+					if t := strings.TrimSpace(line); t != "" {
+						models = append(models, t)
+					}
+				}
+				inp.AllowedModels = models
 			case nil:
 				inp.AllowedModels = nil
 			}

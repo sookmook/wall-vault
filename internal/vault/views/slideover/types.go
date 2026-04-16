@@ -37,4 +37,26 @@ type ClientVM struct {
 	// JSON and embedded in the page so the model_override <select> can
 	// repopulate (as <optgroup>s) when the preferred_service changes.
 	ServiceModelMap map[string]ServiceModelGroup
+	// CurrentGroup is the pre-resolved group for PreferredService so the
+	// initial <select> can be fully server-rendered with optgroups — the
+	// JS hydrator only needs to kick in when preferred_service changes.
+	CurrentGroup ServiceModelGroup
+}
+
+// OverrideInCurrentGroup reports whether ModelOverride already appears in
+// either the default or the allowed list of CurrentGroup. Templates use
+// this to decide whether to render a separate "(현재 값)" header option.
+func (c *ClientVM) OverrideInCurrentGroup() bool {
+	if c.ModelOverride == "" {
+		return false
+	}
+	if c.ModelOverride == c.CurrentGroup.Default {
+		return true
+	}
+	for _, m := range c.CurrentGroup.Allowed {
+		if m == c.ModelOverride {
+			return true
+		}
+	}
+	return false
 }

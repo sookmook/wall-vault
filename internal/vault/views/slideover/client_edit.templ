@@ -51,8 +51,20 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				<span class="wv-field-label">{ i18n.T("f_model_override") }</span>
 				<select name="model_override" data-wv-model-override data-wv-current={c.ModelOverride}>
 					<option value="">(서비스 기본 사용)</option>
-					if c.ModelOverride != "" {
-						<option value={c.ModelOverride} selected>{ c.ModelOverride }</option>
+					if c.ModelOverride != "" && !c.OverrideInCurrentGroup() {
+						<option value={c.ModelOverride} selected>{ c.ModelOverride + " (현재 값)" }</option>
+					}
+					if c.CurrentGroup.Default != "" {
+						<optgroup label="기본">
+							<option value={c.CurrentGroup.Default} selected?={c.CurrentGroup.Default == c.ModelOverride}>{ c.CurrentGroup.Default }</option>
+						</optgroup>
+					}
+					if len(c.CurrentGroup.Allowed) > 0 {
+						<optgroup label="허용 목록">
+							for _, m := range c.CurrentGroup.Allowed {
+								<option value={m} selected?={m == c.ModelOverride}>{ m }</option>
+							}
+						</optgroup>
 					}
 				</select>
 				<small class="hint">{ i18n.T("ph_model_default") }</small>

@@ -8,6 +8,35 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.5] — 2026-04-16
+
+Server-render the agent model_override dropdown so users see the full
+list (기본 + 허용 목록) immediately, without depending on a JS hydrate
+that sometimes doesn't run in time after an HTMX OOB slideover swap.
+
+### Fixed
+
+- **Dropdown showing only 1 model after opening the edit slideover**:
+  the initial `<select>` used to ship with just a blank option plus the
+  current `model_override` value, relying on `wvInitModelOverride` to
+  fill in the optgroups on `htmx:afterSwap` / `htmx:oobAfterSwap`. When
+  the swap used OOB semantics the hydrator occasionally never applied
+  to the new form — the user then saw only one model, making the
+  feature look broken. `ClientEdit` now renders `<optgroup>기본</optgroup>`
+  and `<optgroup>허용 목록</optgroup>` server-side from
+  `ClientVM.CurrentGroup`, so the full list is present before any JS
+  runs. The existing JS still updates the list when `preferred_service`
+  changes.
+
+### Internal
+
+- `ClientVM` gains `CurrentGroup ServiceModelGroup` (pre-resolved
+  group for `PreferredService`) and an `OverrideInCurrentGroup()`
+  helper that suppresses duplicate "(현재 값)" rendering when the
+  saved value already appears in the default/allowed list.
+
+---
+
 ## [0.2.4] — 2026-04-16
 
 Scope correction for the agent `model_override` dropdown: drop the

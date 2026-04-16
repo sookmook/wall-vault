@@ -236,6 +236,7 @@ func (s *Server) toSlideoverClient(c *Client) *slideover.ClientVM {
 		IPWhitelist:      strings.Join(c.IPWhitelist, ", "),
 		Avatar:           c.Avatar,
 		ServiceModelMap:  svcMap,
+		CurrentGroup:     svcMap[c.PreferredService],
 	}
 }
 

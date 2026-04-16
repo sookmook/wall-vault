@@ -56,6 +56,26 @@ templ ServiceEdit(s *ServiceVM) {
 				<span class="wv-field-label">{ i18n.T("f_allowed_models") }</span>
 				<textarea name="allowed_models" data-wv-allowed-models placeholder="claude-sonnet-4-5&#10;claude-opus-4-5">{ strings.Join(s.AllowedModels, "\n") }</textarea>
 				<small class="hint">{ i18n.T("hint_allowed_models") }</small>
+				if len(s.CatalogUnused) > 0 {
+					<details class="wv-catalog-picker">
+						<summary>{ fmt.Sprintf("카탈로그에서 추가 (%d개)", len(s.CatalogUnused)) }</summary>
+						<div class="wv-catalog-filter">
+							<input type="search" data-wv-catalog-filter placeholder="모델 ID 필터… (타이핑하면 숨김)"/>
+						</div>
+						<div class="wv-catalog-list">
+							for _, m := range s.CatalogUnused {
+								<label class="wv-catalog-item">
+									<input type="checkbox" value={m} data-wv-catalog-item/>
+									<span>{ m }</span>
+								</label>
+							}
+						</div>
+						<div class="wv-catalog-actions">
+							<button type="button" class="btn-mini" data-wv-add-catalog>선택 항목 허용 목록에 추가</button>
+							<button type="button" class="btn-mini" data-wv-catalog-clear>체크 해제</button>
+						</div>
+					</details>
+				}
 			</label>
 		</div>
 

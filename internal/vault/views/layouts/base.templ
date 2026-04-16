@@ -109,6 +109,52 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 					sel.setAttribute('data-wv-current', '');
 				}, true);
 
+				// Service-edit catalog picker: "선택 항목 허용 목록에 추가" appends every
+				// checked catalog item to the allowed_models textarea (skipping dupes),
+				// hides the newly-added rows, and unchecks them. "체크 해제" just clears.
+				document.addEventListener('click', function(evt){
+					var addBtn = evt.target.closest('[data-wv-add-catalog]');
+					var clearBtn = evt.target.closest('[data-wv-catalog-clear]');
+					if (!addBtn && !clearBtn) return;
+					var picker = (addBtn || clearBtn).closest('.wv-catalog-picker'); if (!picker) return;
+					if (clearBtn) {
+						picker.querySelectorAll('input[data-wv-catalog-item]:checked').forEach(function(cb){ cb.checked = false; });
+						return;
+					}
+					var form = addBtn.closest('form'); if (!form) return;
+					var ta = form.querySelector('textarea[data-wv-allowed-models]'); if (!ta) return;
+					var picked = [];
+					picker.querySelectorAll('input[data-wv-catalog-item]:checked').forEach(function(cb){
+						picked.push(cb.value);
+					});
+					if (picked.length === 0) return;
+					var lines = ta.value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+					var seen = {};
+					lines.forEach(function(l){ seen[l] = true; });
+					picked.forEach(function(v){ if (!seen[v]) { lines.push(v); seen[v] = true; } });
+					ta.value = lines.join('\n');
+					// hide the now-redundant rows and uncheck so the list reflects new state
+					picker.querySelectorAll('input[data-wv-catalog-item]:checked').forEach(function(cb){
+						cb.checked = false;
+						var row = cb.closest('.wv-catalog-item');
+						if (row) row.style.display = 'none';
+					});
+				}, true);
+
+				// Service-edit catalog picker filter: typing in the search box hides any
+				// row whose value doesn't contain the (case-insensitive) query.
+				document.addEventListener('input', function(evt){
+					var box = evt.target.closest('[data-wv-catalog-filter]'); if (!box) return;
+					var picker = box.closest('.wv-catalog-picker'); if (!picker) return;
+					var q = box.value.trim().toLowerCase();
+					picker.querySelectorAll('.wv-catalog-item').forEach(function(row){
+						var cb = row.querySelector('input[data-wv-catalog-item]');
+						if (!cb) return;
+						if (!q || cb.value.toLowerCase().indexOf(q) !== -1) row.style.display = '';
+						else row.style.display = 'none';
+					});
+				}, true);
+
 				// If the service-edit form has a filled "직접 입력" field at submit time,
 				// override default_model with that value before wvSubmit serialises.
 				document.addEventListener('submit', function(evt){

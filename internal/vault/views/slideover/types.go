@@ -12,6 +12,10 @@ type ServiceVM struct {
 	AllowedModels []string
 	IsLocal       bool     // ollama / lmstudio / vllm — show LocalURL input
 	Models        []string // live-queried model options for the default_model datalist
+	// CatalogUnused lists provider-registry models that are NOT already in
+	// DefaultModel or AllowedModels — rendered as a checkbox picker so admins
+	// can add registry models into AllowedModels without typing.
+	CatalogUnused []string
 }
 
 // ServiceModelGroup groups a service's candidate models into the default and

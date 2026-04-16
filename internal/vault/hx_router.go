@@ -193,6 +193,19 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 			}
 		}
 	}
+	inUse := map[string]bool{}
+	if sv.DefaultModel != "" {
+		inUse[sv.DefaultModel] = true
+	}
+	for _, m := range sv.AllowedModels {
+		inUse[m] = true
+	}
+	var catalogUnused []string
+	for _, m := range modelNames {
+		if !inUse[m] {
+			catalogUnused = append(catalogUnused, m)
+		}
+	}
 	return &slideover.ServiceVM{
 		ID:            sv.ID,
 		Name:          sv.Name,
@@ -204,6 +217,7 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 		AllowedModels: sv.AllowedModels,
 		IsLocal:       sv.IsLocal(),
 		Models:        modelNames,
+		CatalogUnused: catalogUnused,
 	}
 }
 

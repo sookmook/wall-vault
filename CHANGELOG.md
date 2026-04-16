@@ -8,6 +8,43 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.6] — 2026-04-16
+
+Service edit gains a **catalog picker** so admins can populate
+`allowed_models` by checkbox instead of typing model IDs by hand —
+closes the v0.2.4 asymmetry where the only way to add curated models
+was to know their IDs in advance.
+
+### Added
+
+- **카탈로그에서 추가 picker** in the service edit slideover: a
+  `<details>` block listing every registry-known model that is NOT
+  already in `default_model` or `allowed_models`, each with a
+  checkbox. "선택 항목 허용 목록에 추가" appends the checked rows to
+  the `allowed_models` textarea (skipping dupes) and hides the
+  just-added rows. "체크 해제" clears the selection.
+- **Inline search filter** over the catalog list. Typing in the
+  search box hides any row whose ID doesn't contain the (case-
+  insensitive) query — makes the OpenRouter list (341 items)
+  usable.
+- Catalog picker is scrollable (max-height 220px) and row labels
+  render in a monospace font for readability.
+
+### Internal
+
+- `ServiceVM` gains `CatalogUnused []string` (registry minus
+  default_model and AllowedModels).
+- `toSlideoverService` computes `CatalogUnused` once per slideover
+  render using the already-`ensureRegistry()`'d catalog.
+- New click handler in `base.templ` dispatches on
+  `[data-wv-add-catalog]` / `[data-wv-catalog-clear]`; a separate
+  input handler dispatches on `[data-wv-catalog-filter]`.
+- New styles in `theme.templ`: `.wv-catalog-picker`,
+  `.wv-catalog-filter`, `.wv-catalog-list`, `.wv-catalog-item`,
+  `.wv-catalog-actions`.
+
+---
+
 ## [0.2.5] — 2026-04-16
 
 Server-render the agent model_override dropdown so users see the full

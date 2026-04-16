@@ -8,6 +8,28 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.9] — 2026-04-17
+
+Surface the **active model** in `GET /status` so polling consumers
+(EconoWorld analyzer, dashboards) can tell which model the proxy
+will actually send upstream — not just whether the client happens
+to have a `model_override`.
+
+### Fixed
+
+- **`/status` `model` field no longer empty when `model_override` is
+  unset**: the field now falls back to the vault-synced
+  `serviceDefaults[service]` (the current service's
+  `default_model`). The raw `model_override` still wins when set, so
+  an explicit override always shows through. Test:
+  `TestHandleStatus_ModelFallsBackToServiceDefault`.
+
+Requested by the EconoWorld analyzer team (option 1 of three
+proposed) — their analyzer polls `/status` every 5 s and treated an
+empty `model` as a signal that the proxy was mid-reconfigure.
+
+---
+
 ## [0.2.8] — 2026-04-16
 
 Defensive cleanup to stop OpenClaw's config validator from crashing

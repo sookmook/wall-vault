@@ -488,6 +488,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	svc := s.service
 	mdl := s.model
 	svcs := s.allowedServices
+	// "active model" semantics: if the client has no explicit model_override,
+	// surface the vault-synced default_model for the currently-selected
+	// service. Consumers polling /status (e.g. EconoWorld analyzer) need the
+	// model that will actually be sent upstream, not the raw override.
+	if mdl == "" && s.serviceDefaults != nil {
+		mdl = s.serviceDefaults[svc]
+	}
 	s.mu.RUnlock()
 
 	// show vault-synced services if available, else fall back to config

@@ -69,6 +69,41 @@ func TestHandleStatus(t *testing.T) {
 	}
 }
 
+func TestHandleStatus_ModelFallsBackToServiceDefault(t *testing.T) {
+	// /status should expose the "active model" — the model that actually
+	// gets sent upstream. When the client has no explicit model_override,
+	// fall back to the vault-synced default_model for the current service.
+	// Consumers like EconoWorld analyzer poll /status on a 5s interval and
+	// need the effective model, not an empty string.
+	srv := newTestServer()
+	srv.service = "google"
+	srv.model = "" // no explicit override
+	srv.serviceDefaults = map[string]string{"google": "gemini-3.1-flash-lite-preview"}
+	h := srv.Handler()
+
+	req := httptest.NewRequest("GET", "/status", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got := body["model"]; got != "gemini-3.1-flash-lite-preview" {
+		t.Fatalf("model = %q, want service default %q", got, "gemini-3.1-flash-lite-preview")
+	}
+
+	// An explicit override must still win over the service default.
+	srv.model = "gemini-2.5-flash"
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, httptest.NewRequest("GET", "/status", nil))
+	var body2 map[string]interface{}
+	_ = json.Unmarshal(w2.Body.Bytes(), &body2)
+	if got := body2["model"]; got != "gemini-2.5-flash" {
+		t.Fatalf("override should win; model = %q, want %q", got, "gemini-2.5-flash")
+	}
+}
+
 func TestHandleModels(t *testing.T) {
 	srv := newTestServer()
 	h := srv.Handler()

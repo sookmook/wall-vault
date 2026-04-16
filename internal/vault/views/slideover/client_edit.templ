@@ -52,7 +52,7 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				<select name="model_override" data-wv-model-override data-wv-current={c.ModelOverride}>
 					<option value="">(서비스 기본 사용)</option>
 					if c.ModelOverride != "" && !c.OverrideInCurrentGroup() {
-						<option value={c.ModelOverride} selected>{ c.ModelOverride + " (현재 값)" }</option>
+						<option value={c.ModelOverride} selected>{ c.ModelOverride + " (⚠ 현재 값 · 저장 시 초기화)" }</option>
 					}
 					if c.CurrentGroup.Default != "" {
 						<optgroup label="기본">
@@ -68,6 +68,9 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 					}
 				</select>
 				<small class="hint">{ i18n.T("ph_model_default") }</small>
+				if c.ModelOverride != "" && !c.OverrideInCurrentGroup() {
+					<small class="hint wv-stale-override">{ "⚠ 현재 model_override '" + c.ModelOverride + "'는 이 서비스의 허용 목록에 없어 저장 시 서비스 기본으로 초기화됩니다." }</small>
+				}
 			</label>
 		</div>
 

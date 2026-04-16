@@ -8,6 +8,40 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.7] — 2026-04-16
+
+Stop trapping admins when a client's `model_override` is stale.
+
+### Fixed
+
+- **`PUT /admin/clients/{id}` no longer 422s on stale `model_override`**:
+  previously, if the submitted `model_override` wasn't in the target
+  service's `allowed_models`, the whole update was rejected. This
+  created a trap: switching an agent's `preferred_service` from
+  `google` to `openrouter` (which uses prefixed model IDs like
+  `google/gemini-3.1-flash-lite-preview`) would fail, because the
+  unprefixed override carried over and no longer matched. The admin
+  had to manually wipe `model_override` before any other edit could
+  go through. The handler now silently clears the override in this
+  case — dispatch already falls back to `DefaultModel` per
+  `proxy.ResolveModel` invariant — and logs the event for audit:
+  `vault: client=X model_override=Y cleared on save (not in service=Z allowed_models)`.
+- Updated the corresponding test
+  (`TestAdminPutClient_ModelOverrideWhitelistViolationIsSoftCleared`)
+  to assert the new 200-OK-with-cleared-override contract.
+
+### Added
+
+- **Stale-override warning in the agent edit form**: when a saved
+  `model_override` is not found in the current service's default or
+  allowed_models, `client_edit.templ` now decorates the "(현재 값)"
+  option as `(⚠ 현재 값 · 저장 시 초기화)` and shows an amber hint
+  line below the dropdown spelling out what will happen on save.
+- New `.wv-stale-override` style in `theme.templ` (fixed amber
+  `#b45309` across all 7 themes so the warning stays visible).
+
+---
+
 ## [0.2.6] — 2026-04-16
 
 Service edit gains a **catalog picker** so admins can populate

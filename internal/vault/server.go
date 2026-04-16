@@ -477,11 +477,16 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 					if !allowed {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(http.StatusUnprocessableEntity)
-						fmt.Fprintf(w, `{"error":"model_override %q not in allowed_models of service %q"}`,
-							*inp.ModelOverride, targetService)
-						return
+						// Stale override — either allowed_models was updated, or the admin
+						// switched preferred_service to one whose model namespace differs
+						// (e.g. google's "gemini-3.1-flash-lite-preview" vs openrouter's
+						// "google/gemini-3.1-flash-lite-preview"). Silently clear instead of
+						// rejecting the whole PUT; dispatch falls back to DefaultModel at
+						// runtime per proxy.ResolveModel invariant.
+						log.Printf("vault: client=%s model_override=%q cleared on save (not in service=%q allowed_models)",
+							id, *inp.ModelOverride, targetService)
+						empty := ""
+						inp.ModelOverride = &empty
 					}
 				}
 			}

@@ -502,11 +502,13 @@ func addTestClient(t *testing.T, srv *Server, id, name, token, service string) {
 	}
 }
 
-func TestAdminPutClient_ModelOverrideWhitelistViolation(t *testing.T) {
+func TestAdminPutClient_ModelOverrideWhitelistViolationIsSoftCleared(t *testing.T) {
+	// When model_override is submitted but not in allowed_models, the PUT no
+	// longer 422s — it silently clears the override so edits don't deadlock on
+	// stale data left over from a previous service.
 	srv, cleanup := newTestVaultServer(t)
 	defer cleanup()
 
-	// google restricted to one model
 	if err := srv.store.UpsertService(&ServiceConfig{
 		ID: "google", Name: "Google", DefaultModel: "gemini-3.1-pro-preview",
 		AllowedModels: []string{"gemini-3.1-pro-preview"},
@@ -514,7 +516,6 @@ func TestAdminPutClient_ModelOverrideWhitelistViolation(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertService: %v", err)
 	}
-	// pre-seed an existing client so the PUT targets a real record
 	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
 
 	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
@@ -522,8 +523,15 @@ func TestAdminPutClient_ModelOverrideWhitelistViolation(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer test-admin")
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
-	if w.Code != 422 {
-		t.Fatalf("got %d: %s (expected 422 for model_override whitelist violation)", w.Code, w.Body.String())
+	if w.Code != 200 {
+		t.Fatalf("got %d: %s (expected 200 with soft-cleared override)", w.Code, w.Body.String())
+	}
+	c := srv.store.GetClient("bot-a")
+	if c == nil {
+		t.Fatalf("client disappeared after PUT")
+	}
+	if c.ModelOverride != "" {
+		t.Fatalf("expected model_override cleared, got %q", c.ModelOverride)
 	}
 }
 

@@ -32,6 +32,7 @@ type ClientVM struct {
 	Online        bool
 	RemoteModel   string
 	LastHeartbeat string // human-readable "3분 전" / "just now"
+	Uptime        string // human-readable uptime "2d 3h" / "15h 22m" / "4m"
 }
 
 // KeyVM is the view model for an API-key card in the dashboard.

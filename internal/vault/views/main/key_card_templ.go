@@ -234,7 +234,7 @@ func KeyCard(k *KeyVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if k.DailyLimit > 0 {
+		if k.UsagePct > 0 || k.DailyLimit > 0 {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"progress\"><span data-pct=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

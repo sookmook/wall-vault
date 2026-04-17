@@ -23,8 +23,8 @@ templ AgentCard(c *ClientVM) {
 						<span class="chip chip-accent">{ c.RemoteModel }</span>
 					}
 				</div>
-				if c.LastHeartbeat != "" {
-					<div class="card-meta"><span style="font-size:.88em">⏱ { c.LastHeartbeat }</span></div>
+				if c.Uptime != "" {
+					<div class="card-meta"><span style="font-size:.88em">⏱ { c.Uptime }</span></div>
 				}
 			</div>
 		</div>

@@ -8,6 +8,37 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.16] — 2026-04-17
+
+### Fixed
+
+- **Agent card uptime**: showed "last heartbeat" (e.g. `3s ago`) with
+  ⏱ icon, which was confused with uptime. Now displays actual uptime
+  from `ProxyStatus.StartedAt` (e.g. `2d 3h`, `15h 22m`). Only
+  shown for online agents.
+
+### Added
+
+- **Key card usage bar for unlimited keys**: the progress bar
+  previously only appeared for keys with a `DailyLimit`. Unlimited
+  keys now show a relative-usage bar based on the maximum usage
+  across all unlimited keys (busiest key = 100%). Bar height bumped
+  from 4px → 6px for visibility.
+
+### Security
+
+- **Redacted admin token from plan doc**: a plaintext vault admin
+  token (`TOKEN=…`) was committed in the v0.2 implementation plan.
+  Replaced with `<ADMIN_TOKEN>` placeholder.
+- **Redacted real IPs**: replaced `192.168.1.10` / `192.168.1.20` with
+  generic `192.168.1.10` / `192.168.1.20` across 17 locale JSON
+  files, 2 test files, 17 MANUAL translations, and the plan doc.
+- **Redacted Telegram bot usernames**: replaced 3 real bot usernames
+  in the plan doc with `@<bot>` placeholders.
+- `git filter-repo` recommended to purge history (see below).
+
+---
+
 ## [0.2.15] — 2026-04-17
 
 ### Fixed

@@ -100,6 +100,9 @@ func (s *Server) toMainClients(clients []*Client) []*mainview.ClientVM {
 			if !p.UpdatedAt.IsZero() {
 				vm.LastHeartbeat = relativeTime(now.Sub(p.UpdatedAt))
 			}
+			if !p.StartedAt.IsZero() && vm.Online {
+				vm.Uptime = relativeUptime(now.Sub(p.StartedAt))
+			}
 		}
 		out[i] = vm
 	}
@@ -112,10 +115,24 @@ func (s *Server) toMainClients(clients []*Client) []*mainview.ClientVM {
 func (s *Server) toMainKeys(keys []*APIKey) []*mainview.KeyVM {
 	now := time.Now()
 	out := make([]*mainview.KeyVM, len(keys))
+
+	// First pass: find max usage among unlimited keys so we can show
+	// relative bars ("how much compared to the busiest key").
+	maxUsage := 0
+	for _, k := range keys {
+		if k.DailyLimit == 0 && k.TodayUsage > maxUsage {
+			maxUsage = k.TodayUsage
+		}
+	}
+
 	for i, k := range keys {
 		short := k.ID
 		if len(short) > 10 {
 			short = short[:10]
+		}
+		pct := k.UsagePct() // uses DailyLimit when set
+		if pct == 0 && k.DailyLimit == 0 && maxUsage > 0 {
+			pct = k.TodayUsage * 100 / maxUsage
 		}
 		vm := &mainview.KeyVM{
 			ID:            k.ID,
@@ -125,7 +142,7 @@ func (s *Server) toMainKeys(keys []*APIKey) []*mainview.KeyVM {
 			TodayUsage:    k.TodayUsage,
 			TodayAttempts: k.TodayAttempts,
 			DailyLimit:    k.DailyLimit,
-			UsagePct:      k.UsagePct(),
+			UsagePct:      pct,
 		}
 		switch {
 		case k.IsExhausted():
@@ -157,6 +174,24 @@ func remainingLabel(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%ds left", secs)
 	}
+}
+
+// relativeUptime formats a Duration as a compact uptime label without "ago".
+func relativeUptime(d time.Duration) string {
+	secs := int(d.Seconds())
+	if secs < 60 {
+		return fmt.Sprintf("%ds", secs)
+	}
+	mins := secs / 60
+	if mins < 60 {
+		return fmt.Sprintf("%dm", mins)
+	}
+	hrs := mins / 60
+	if hrs < 24 {
+		return fmt.Sprintf("%dh %dm", hrs, mins%60)
+	}
+	days := hrs / 24
+	return fmt.Sprintf("%dd %dh", days, hrs%24)
 }
 
 // relativeTime formats a Duration as a short Korean/unit-agnostic label

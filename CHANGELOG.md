@@ -8,6 +8,23 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.15] — 2026-04-17
+
+### Fixed
+
+- **Atomic config file writes prevent 0-byte corruption on deploy**:
+  `writeJSON` (used by all agent config writers — OpenClaw, EconoWorld,
+  Cline, Claude Code) now writes to a `.tmp` sidecar and `os.Rename`s
+  into place. Previously `os.WriteFile` truncated the file first, so
+  a `pkill -x wall-vault` during deploy could catch the goroutine
+  between truncate and write, leaving a 0-byte file that crashed
+  OpenClaw's config validator. Observed on bot-b's
+  `~/.openclaw/openclaw.json` (Apr 16 02:30). `updateOpenClawJSON`
+  in `openclaw_sync.go` also switched from inline `os.WriteFile` to
+  the shared `writeJSON` for the same protection.
+
+---
+
 ## [0.2.14] — 2026-04-17
 
 ### Fixed

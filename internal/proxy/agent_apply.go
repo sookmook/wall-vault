@@ -596,11 +596,19 @@ func windowsPathToWSL(winPath string) string {
 	return ""
 }
 
-// writeJSON writes v as indented JSON to path, creating the file if needed.
+// writeJSON writes v as indented JSON to path using an atomic temp+rename
+// pattern. If the process is killed between the temp write and rename, the
+// original file survives intact — this prevents the 0-byte clobber that
+// occurs when os.WriteFile's internal O_TRUNC runs but the data write
+// doesn't complete (observed during pkill -x wall-vault deploys).
 func writeJSON(path string, v interface{}) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }

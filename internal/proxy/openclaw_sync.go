@@ -307,13 +307,7 @@ func updateOpenClawJSON(service, model string) {
 		return
 	}
 
-	out, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		log.Printf("[openclaw-sync] marshal 실패: %v", err)
-		return
-	}
-
-	if err := os.WriteFile(path, out, 0644); err != nil {
+	if err := writeJSON(path, cfg); err != nil {
 		log.Printf("[openclaw-sync] openclaw.json 쓰기 실패: %v", err)
 		return
 	}

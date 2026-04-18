@@ -9,8 +9,7 @@ type KeyCreateVM struct {
 
 templ KeyCreate(vm *KeyCreateVM) {
 	<form data-wv-submit="/admin/keys" data-wv-method="POST" class="wv-form">
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
+		@FormSection(i18n.T("sec_basic")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("lbl_defsvc") }</span>
 				<select name="service" required>
@@ -31,10 +30,10 @@ templ KeyCreate(vm *KeyCreateVM) {
 				<span class="wv-field-label">{ i18n.T("lbl_limit") }</span>
 				<input name="daily_limit" type="number" min="0" value="0"/>
 			</label>
-		</div>
-		<div class="wv-form-actions">
+		}
+		@FormActions() {
 			<button type="button" class="btn-secondary" data-wv-dismiss>{ i18n.T("act_cancel") }</button>
 			<button type="submit">{ i18n.T("act_add") }</button>
-		</div>
+		}
 	</form>
 }

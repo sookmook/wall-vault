@@ -58,3 +58,7 @@ CLAUDE.md
 .claude/
 scripts/
 .superpowers/
+
+# ── 개인 계획·스펙 문서 (내부 fleet 정보 포함) ────────
+# 로컬에는 남기되 공개 리포에는 추적하지 않습니다.
+docs/superpowers/

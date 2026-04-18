@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ var defaultServiceList = []*ServiceConfig{
 	{ID: "ollama",         Name: "Ollama (Local)",    Enabled: false},
 	{ID: "lmstudio",       Name: "LM Studio (Local)", Enabled: false},
 	{ID: "vllm",           Name: "vLLM (Local)",      Enabled: false},
+	{ID: "llamacpp",       Name: "llama.cpp (Local)", Enabled: false},
 }
 
 // Store: thread-safe data store (in-memory + JSON persistence)
@@ -372,7 +374,7 @@ func (s *Store) RecordKeyUsage(id string, tokens int) {
 func (s *Store) SetKeyUsage(id string, tokens int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Format("2006-01-02")
 	for _, k := range s.keys {
 		if k.ID == id {
 			// auto-reset if it's a new day (guards against stale heartbeat values after midnight)
@@ -427,7 +429,7 @@ func (s *Store) SetKeyCooldown(id string, errCode int, until time.Time) {
 func (s *Store) SetKeyAttempts(id string, attempts int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Format("2006-01-02")
 	for _, k := range s.keys {
 		if k.ID == id {
 			// auto-reset if it's a new day
@@ -450,7 +452,7 @@ func (s *Store) SetKeyAttempts(id string, attempts int) bool {
 func (s *Store) ResetDailyUsage() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Format("2006-01-02")
 	for _, k := range s.keys {
 		k.TodayUsage = 0
 		k.TodayAttempts = 0
@@ -464,7 +466,7 @@ func (s *Store) ResetDailyUsage() {
 func (s *Store) BatchUpdateKeyMetrics(usage, attempts map[string]int, cooldowns map[string]string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Format("2006-01-02")
 	changed := false
 	for _, k := range s.keys {
 		if k.UsageDate != today {
@@ -859,8 +861,13 @@ func (s *Store) SetLang(lang string) error {
 
 // ─── Util ─────────────────────────────────────────────────────────────────────
 
+// newID returns a 64-bit hex ID backed by crypto/rand. A read failure here
+// means the OS entropy source is unusable, so we fail fast rather than emit
+// a partially-initialized identifier.
 func newID() string {
 	b := make([]byte, 8)
-	rand.Read(b) //nolint:errcheck
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		panic(fmt.Sprintf("wall-vault: entropy source unavailable: %v", err))
+	}
 	return hex.EncodeToString(b)
 }

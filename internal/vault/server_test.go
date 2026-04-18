@@ -516,7 +516,7 @@ func TestAdminPutClient_ModelOverrideWhitelistViolationIsSoftCleared(t *testing.
 	}); err != nil {
 		t.Fatalf("UpsertService: %v", err)
 	}
-	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+	addTestClient(t, srv, "bot-a", "Alpha", "t", "google")
 
 	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
 		strings.NewReader(`{"preferred_service":"google","model_override":"gemini-2.5-flash-lite"}`))
@@ -546,7 +546,7 @@ func TestAdminPutClient_ModelOverrideValid(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertService: %v", err)
 	}
-	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+	addTestClient(t, srv, "bot-a", "Alpha", "t", "google")
 
 	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
 		strings.NewReader(`{"model_override":"gemini-3.1-flash-lite-preview"}`))
@@ -574,7 +574,7 @@ func TestAdminPutClient_ModelOverrideAllowedWhenWhitelistEmpty(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertService: %v", err)
 	}
-	addTestClient(t, srv, "bot-a", "Delta", "t", "google")
+	addTestClient(t, srv, "bot-a", "Alpha", "t", "google")
 
 	req := httptest.NewRequest("PUT", "/admin/clients/bot-a",
 		strings.NewReader(`{"model_override":"any-model-name"}`))
@@ -631,14 +631,14 @@ func TestDashboardHomeContainsServicesAndAgents(t *testing.T) {
 		t.Fatalf("UpsertService: %v", err)
 	}
 	enabled := true
-	if _, err := srv.store.AddClient(ClientInput{ID: "bot-a", Name: "Delta", Token: "t", DefaultService: "google", Enabled: &enabled}); err != nil {
+	if _, err := srv.store.AddClient(ClientInput{ID: "bot-a", Name: "Alpha", Token: "t", DefaultService: "google", Enabled: &enabled}); err != nil {
 		t.Fatalf("AddClient: %v", err)
 	}
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 	body := w.Body.String()
-	for _, want := range []string{"Google", "Delta", "htmx.org"} {
+	for _, want := range []string{"Google", "Alpha", "htmx.org"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("body missing %q — got first 500 chars: %s", want, truncate(body, 500))
 		}

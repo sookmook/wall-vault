@@ -2,13 +2,29 @@
 package hooks
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
+	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
+
+// hookTimeout resolves the per-invocation shell command deadline. Defaults to
+// 30s but can be stretched via WV_HOOK_TIMEOUT (e.g. "2m") when a legitimate
+// hook runs a slow backup or webhook with external dependencies.
+func hookTimeout() time.Duration {
+	if raw := os.Getenv("WV_HOOK_TIMEOUT"); raw != "" {
+		if d, err := time.ParseDuration(strings.TrimSpace(raw)); err == nil && d > 0 {
+			return d
+		}
+	}
+	return 30 * time.Second
+}
 
 // EventType: hook event type
 type EventType string
@@ -54,11 +70,25 @@ func (m *Manager) fire(evt EventType, data map[string]string) {
 		Data:      data,
 	}
 
-	// 1. execute shell command (with timeout to prevent goroutine leak)
+	// 1. execute shell command with timeout + stdout/stderr capture so a
+	// failing hook doesn't vanish into /dev/null. We log a truncated tail on
+	// failure (full output can be huge and contain secrets).
 	if cmd, ok := m.shellCmds[evt]; ok && cmd != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		timeout := hookTimeout()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		exec.CommandContext(ctx, "sh", "-c", cmd).Run() //nolint:errcheck
+		var outBuf, errBuf bytes.Buffer
+		c := exec.CommandContext(ctx, "sh", "-c", cmd)
+		c.Stdout = &outBuf
+		c.Stderr = &errBuf
+		start := time.Now()
+		runErr := c.Run()
+		elapsed := time.Since(start)
+		if runErr != nil {
+			log.Printf("[hooks] %s command failed after %s: %v | stdout=%q stderr=%q",
+				evt, elapsed.Round(time.Millisecond), runErr,
+				truncate(outBuf.String(), 400), truncate(errBuf.String(), 400))
+		}
 	}
 
 	// 2. notify OpenClaw TUI socket
@@ -99,4 +129,13 @@ func (m *Manager) DoctorFixGuard(configPath string) {
 		"config": configPath,
 		"action": "guard",
 	})
+}
+
+// truncate returns s if shorter than n, otherwise s[:n] + "…". Used to keep
+// hook stdout/stderr log lines readable when a hook spews many kilobytes.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }

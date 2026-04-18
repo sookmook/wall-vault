@@ -73,28 +73,41 @@ func notifyOpenClaw(primaryModel string) {
 
 // sanitizeModelForTmux strips control characters, newlines, and other dangerous
 // bytes from a model name before passing it to tmux send-keys. This prevents
-// tmux command injection via crafted model names.
-func sanitizeModelForTmux(model string) string {
+// tmux command injection via crafted model names. Returns the cleaned value and
+// a boolean indicating whether any runes were dropped — callers use that to
+// avoid injecting a silently-mangled model name (e.g. a Korean alias reduced
+// to the empty string, which would become a bare `/model` command and confuse
+// the OpenClaw TUI).
+func sanitizeModelForTmux(model string) (string, bool) {
 	var b strings.Builder
 	b.Grow(len(model))
+	dropped := false
 	for _, r := range model {
 		// Allow only printable, non-control ASCII characters (space through tilde).
 		// This blocks newlines, carriage returns, escape sequences, and any unicode
 		// control characters that could be interpreted by tmux or the shell.
 		if r >= 0x20 && r <= 0x7e {
 			b.WriteRune(r)
+		} else {
+			dropped = true
 		}
 	}
-	return b.String()
+	return b.String(), dropped
 }
 
 // injectModelToTUI: 실행 중인 tmux 패인에서 openclaw TUI를 찾아 /model 명령 주입
 func injectModelToTUI(primaryModel string) {
 	// Sanitize model name to prevent tmux command injection
-	primaryModel = sanitizeModelForTmux(primaryModel)
-	if primaryModel == "" {
+	original := primaryModel
+	sanitized, dropped := sanitizeModelForTmux(primaryModel)
+	if dropped {
+		log.Printf("[openclaw-sync] tmux: dropped non-ASCII characters from model %q → %q", original, sanitized)
+	}
+	if sanitized == "" {
+		log.Printf("[openclaw-sync] tmux: sanitized model is empty (original %q), skipping injection", original)
 		return
 	}
+	primaryModel = sanitized
 
 	tmuxBin, err := exec.LookPath("tmux")
 	if err != nil {

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,7 +61,17 @@ type Server struct {
 	sse             *SSEClient
 	registry        *models.Registry
 	hooksMgr        *hooks.Manager
-	ollamaMu        sync.Mutex // protect single concurrent Ollama request
+	// ollamaSem caps concurrent Ollama requests. A buffered channel doubles as
+	// a context-aware semaphore: callOllama's acquire selects on ctx.Done(),
+	// so a caller whose HTTP request is cancelled won't keep holding a slot
+	// behind a slow upstream — which the previous plain Mutex couldn't offer.
+	ollamaSem       chan struct{}
+
+	// stopCh is closed by Stop() to signal background goroutines (periodic
+	// vault sync, token-cache eviction, initial-load delay) to exit instead
+	// of leaking past server shutdown. systemd `Restart=always` or a
+	// launchctl unload then runs with a clean slate.
+	stopCh          chan struct{}
 	tokenCacheMu    sync.RWMutex
 	tokenCache      map[string]*tokenCacheEntry // Bearer token → client model config
 	clientActMu     sync.Mutex
@@ -81,6 +92,12 @@ func NewServer(cfg *config.Config) *Server {
 		registry:   models.NewRegistry(10 * time.Minute),
 		tokenCache: make(map[string]*tokenCacheEntry),
 		clientActs: make(map[string]*clientAct),
+		// Ollama stays serialized (size 1): large local models are typically
+		// memory-bound, and running two inferences concurrently tends to be
+		// slower than two sequential ones. Bumped via a constant when your
+		// local setup can genuinely parallelize.
+		ollamaSem: make(chan struct{}, 1),
+		stopCh:    make(chan struct{}),
 	}
 
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
@@ -182,18 +199,46 @@ func NewServer(cfg *config.Config) *Server {
 		})
 		s.sse.Start()
 
-		// initial load of client config and keys from vault
+		// initial load of client config and keys from vault (2s delay,
+		// cancellable via stopCh so Stop() during startup doesn't leak this
+		// goroutine).
 		go func() {
-			time.Sleep(2 * time.Second)
-			s.syncFromVault()
+			select {
+			case <-time.After(2 * time.Second):
+				s.syncFromVault()
+			case <-s.stopCh:
+				return
+			}
 		}()
 
 		// periodic key sync (every 5 minutes)
 		go func() {
 			ticker := time.NewTicker(5 * time.Minute)
 			defer ticker.Stop()
-			for range ticker.C {
-				s.syncFromVault()
+			for {
+				select {
+				case <-s.stopCh:
+					return
+				case <-ticker.C:
+					s.syncFromVault()
+				}
+			}
+		}()
+
+		// periodic token cache eviction — trim expired entries every 30s so the
+		// map stays bounded even when many short-lived third-party tokens are
+		// seen (without this, eviction only ran when the cache crossed a fixed
+		// threshold).
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-s.stopCh:
+					return
+				case <-ticker.C:
+					s.evictExpiredTokens()
+				}
 			}
 		}()
 
@@ -208,6 +253,19 @@ func NewServer(cfg *config.Config) *Server {
 	}()
 
 	return s
+}
+
+// Stop signals all background goroutines to exit. Safe to call multiple times
+// because closing an already-closed channel panics — we guard with a sync.Once
+// pattern via a defer/recover hack would obscure intent, so callers are
+// expected to call Stop at most once (typical for `os.Exit` / systemd stop).
+func (s *Server) Stop() {
+	select {
+	case <-s.stopCh:
+		return // already closed
+	default:
+		close(s.stopCh)
+	}
 }
 
 // refreshClientAct: update lastSeen for a tracked client after response completion.
@@ -299,8 +357,10 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 		s.clientActMu.Unlock()
 	}
 	s.tokenCacheMu.Lock()
-	// evict expired entries when cache grows large
-	if len(s.tokenCache) > 500 {
+	// keep the map bounded: if the periodic eviction can't keep up (e.g. a
+	// short burst of unique tokens), prune expired entries inline before
+	// inserting the new one.
+	if len(s.tokenCache) > tokenCacheMaxSize {
 		now := time.Now()
 		for k, v := range s.tokenCache {
 			if now.After(v.expiresAt) {
@@ -311,6 +371,24 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	s.tokenCache[token] = entry
 	s.tokenCacheMu.Unlock()
 	return entry
+}
+
+// tokenCacheMaxSize bounds the in-memory token→config cache. The periodic
+// eviction goroutine keeps it roughly empty under normal load; this cap is an
+// inline safety valve for bursty traffic.
+const tokenCacheMaxSize = 200
+
+// evictExpiredTokens removes tokenCache entries whose TTL has passed.
+// Called both periodically (ticker) and opportunistically from lookupTokenConfig.
+func (s *Server) evictExpiredTokens() {
+	s.tokenCacheMu.Lock()
+	defer s.tokenCacheMu.Unlock()
+	now := time.Now()
+	for k, v := range s.tokenCache {
+		if now.After(v.expiresAt) {
+			delete(s.tokenCache, k)
+		}
+	}
 }
 
 // syncFromVault: sync client config and keys from vault
@@ -482,8 +560,14 @@ func (s *Server) Handler() http.Handler {
 	// Agent config writer (local proxy only — writes config files for cline/claude-code/openclaw/nanoclaw)
 	mux.HandleFunc("/agent/apply", s.handleAgentApply)
 
+	// Generous per-IP limit (100 req/s, burst 20) — wall-vault's proxy carries
+	// AI traffic for at most a handful of agents, so legitimate callers never
+	// approach this, while a misbehaving loop or scanner is bounded.
+	rl := middleware.NewRateLimiter(100, 20)
 	return middleware.Chain(mux,
 		middleware.Recovery,
+		middleware.SecurityHeaders,
+		rl.Middleware,
 		middleware.CORS,
 		middleware.Logger,
 	)
@@ -492,10 +576,22 @@ func (s *Server) Handler() http.Handler {
 // ─── Health / Status ──────────────────────────────────────────────────────────
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]string{
-		"status":  "ok",
-		"version": Version,
-		"client":  s.cfg.Proxy.ClientID,
+	// sseConnected: in distributed mode the proxy is only "ready" once it has
+	// successfully subscribed to the vault SSE stream; otherwise key changes /
+	// model changes are missed silently. We expose the bit so K8s readiness
+	// probes and the doctor command can treat "port open but vault unreachable"
+	// as degraded rather than healthy.
+	sseConnected := true
+	if s.cfg.Proxy.VaultURL != "" {
+		sseConnected = s.sse != nil && s.sse.IsConnected()
+	}
+	readiness := sseConnected
+	jsonOK(w, map[string]interface{}{
+		"status":        "ok",
+		"readiness":     readiness,
+		"version":       Version,
+		"client":        s.cfg.Proxy.ClientID,
+		"sse_connected": sseConnected,
 	})
 }
 
@@ -511,8 +607,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Token-aware: if the caller presents a Bearer token for a known client,
 	// return THAT client's config instead of the proxy's own. This lets
-	// observability consumers (e.g. EconoWorld analyzer whose token maps to
-	// the econoworld client, not bot-b) see the routing that will be
+	// observability consumers (e.g. an analyzer whose token maps to a
+	// different client than the proxy itself) see the routing that will be
 	// applied to their own requests. Unauthenticated callers keep the
 	// previous behaviour — proxy's own client config.
 	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
@@ -676,7 +772,7 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	resp, err := s.dispatch(svc, mdl, &req)
+	result, err := s.dispatch(r.Context(), svc, mdl, &req)
 	if err != nil {
 		log.Printf("[proxy] 오류: %v", err)
 		w.WriteHeader(http.StatusBadGateway)
@@ -685,7 +781,7 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(result.Response)
 }
 
 // ─── OpenAI API Handler ───────────────────────────────────────────────────────
@@ -738,10 +834,19 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	svc, mdl = parseProviderModel(svc, mdl)
 
 	geminiReq := OpenAIToGemini(&oaiReq)
-	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
+	dispatchRes, err := s.dispatch(r.Context(), svc, mdl, geminiReq)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadGateway)
 		return
+	}
+	geminiResp := dispatchRes.Response
+	// Reflect the actual service/model used — may differ from the requested
+	// pair when dispatch fell back to another provider (see DispatchResult).
+	if dispatchRes.UsedModel != "" {
+		mdl = dispatchRes.UsedModel
+	}
+	if dispatchRes.UsedService != "" {
+		svc = dispatchRes.UsedService
 	}
 
 	// Convert Gemini functionCall parts to OAI tool_calls (for native Gemini backend).
@@ -915,6 +1020,10 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if stripped := s.filter.FilterAnthropic(&req); stripped > 0 {
+		log.Printf("[Security] blocked %d tools from anthropic request (client=%s)", stripped, s.cfg.Proxy.ClientID)
+	}
+
 	s.mu.RLock()
 	svc := s.service
 	mdl := s.model
@@ -969,7 +1078,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if usePassthrough {
-		if body, _, err := s.callAnthropicPassthrough(&req, mdl); err == nil {
+		if body, _, err := s.callAnthropicPassthrough(r.Context(), &req, mdl); err == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(body) //nolint:errcheck
 			return
@@ -983,7 +1092,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	// via RawOAI so that OpenRouter-based fallback preserves tools.
 	geminiReq := AnthropicToGemini(&req)
 	geminiReq.RawOAI = anthropicToOpenAIReq(&req, mdl)
-	geminiResp, err := s.dispatch(svc, mdl, geminiReq)
+	dispatchRes, err := s.dispatch(r.Context(), svc, mdl, geminiReq)
 	if err != nil {
 		log.Printf("[anthropic] dispatch error: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -993,6 +1102,12 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			"error": map[string]string{"type": "api_error", "message": err.Error()},
 		})
 		return
+	}
+	geminiResp := dispatchRes.Response
+	// Use the actual serving model in the Anthropic response so a fallback
+	// from claude-* to (e.g.) google/gemini-flash is accurately reflected.
+	if dispatchRes.UsedModel != "" {
+		mdl = dispatchRes.UsedModel
 	}
 
 	resp := GeminiRespToAnthropic(mdl, geminiResp)
@@ -1057,7 +1172,18 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 
 // ─── Request Dispatch ─────────────────────────────────────────────────────────
 
-func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiResponse, error) {
+// DispatchResult carries the dispatch response along with which service/model
+// actually produced it. Callers use UsedService/UsedModel to render an accurate
+// `model` field in their OpenAI/Anthropic response bodies — otherwise a fallback
+// from (e.g.) anthropic/claude-sonnet-4-6 → google/gemini-flash would still be
+// labeled as the original Claude model, making traces misleading.
+type DispatchResult struct {
+	Response    *GeminiResponse
+	UsedService string
+	UsedModel   string
+}
+
+func (s *Server) dispatch(ctx context.Context, service, model string, req *GeminiRequest) (*DispatchResult, error) {
 	s.mu.RLock()
 	allowedServices := s.allowedServices
 	serviceDefaults := s.serviceDefaults
@@ -1091,7 +1217,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		// — prevents the dispatch chain from spending seconds on forced retries
 		// that will re-hit 429/402 and extend the cooldown. Local services
 		// (ollama/lmstudio/vllm) carry no keys and are always tried.
-		needsKey := svc != "ollama" && svc != "lmstudio" && svc != "vllm"
+		needsKey := svc != "ollama" && svc != "lmstudio" && svc != "vllm" && svc != "llamacpp"
 		if needsKey && !s.keyMgr.CanServe(svc) {
 			log.Printf("[proxy] %s skip: 전체 쿨다운 또는 등록된 키 없음", svc)
 			lastErr = fmt.Errorf("서비스 '%s' 전체 쿨다운", svc)
@@ -1113,17 +1239,17 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 		var err error
 		switch svc {
 		case "google":
-			resp, err = s.callGoogle(targetModel, req)
+			resp, err = s.callGoogle(ctx, targetModel, req)
 		case "openrouter":
-			resp, err = s.callOpenRouter(targetModel, req)
+			resp, err = s.callOpenRouter(ctx, targetModel, req)
 		case "ollama":
-			resp, err = s.callOllama(targetModel, req)
+			resp, err = s.callOllama(ctx, targetModel, req)
 		case "openai":
-			resp, err = s.callOpenAI(targetModel, req)
+			resp, err = s.callOpenAI(ctx, targetModel, req)
 		case "anthropic":
-			resp, err = s.callAnthropic(targetModel, req)
-		case "lmstudio", "vllm":
-			resp, err = s.callLocalService(svc, targetModel, req)
+			resp, err = s.callAnthropic(ctx, targetModel, req)
+		case "lmstudio", "vllm", "llamacpp":
+			resp, err = s.callLocalService(ctx, svc, targetModel, req)
 		default:
 			continue
 		}
@@ -1135,7 +1261,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 					"model":   targetModel,
 				})
 			}
-			return resp, nil
+			return &DispatchResult{Response: resp, UsedService: svc, UsedModel: targetModel}, nil
 		}
 		log.Printf("[proxy] %s (%s) failed → fallback: %v", svc, targetModel, err)
 		lastErr = err
@@ -1150,7 +1276,7 @@ func (s *Server) dispatch(service, model string, req *GeminiRequest) (*GeminiRes
 
 // ─── Google Gemini ────────────────────────────────────────────────────────────
 
-func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callGoogle(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	// Strip "google/" prefix if present (passed through from parseProviderModel for fallback compatibility)
 	model = strings.TrimPrefix(model, "google/")
 	const maxAttempts = 3
@@ -1165,7 +1291,7 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, plainKey)
 		data, _ := json.Marshal(req)
-		resp, err := s.doRequest("POST", url, data, nil)
+		resp, err := s.doRequest(ctx, "POST", url, data, nil)
 		if err != nil {
 			s.keyMgr.RecordError(key, 0)
 			lastErr = err
@@ -1213,8 +1339,8 @@ func (s *Server) callGoogle(model string, req *GeminiRequest) (*GeminiResponse, 
 
 // ─── OpenRouter ───────────────────────────────────────────────────────────────
 
-func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiResponse, error) {
-	resp, err := s.callOpenRouterModel(model, req)
+func (s *Server) callOpenRouter(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
+	resp, err := s.callOpenRouterModel(ctx, model, req)
 	if err == nil {
 		return resp, nil
 	}
@@ -1222,14 +1348,14 @@ func (s *Server) callOpenRouter(model string, req *GeminiRequest) (*GeminiRespon
 	if !strings.HasSuffix(model, ":free") {
 		freeModel := model + ":free"
 		log.Printf("[proxy] openrouter paid failed, retrying free tier: %s", freeModel)
-		if resp, err2 := s.callOpenRouterModel(freeModel, req); err2 == nil {
+		if resp, err2 := s.callOpenRouterModel(ctx, freeModel, req); err2 == nil {
 			return resp, nil
 		}
 	}
 	return nil, err
 }
 
-func (s *Server) callOpenRouterModel(model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callOpenRouterModel(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	const maxAttempts = 3
 	var lastErr error
 	oaiReq := GeminiToOpenAI(model, req)
@@ -1247,7 +1373,7 @@ func (s *Server) callOpenRouterModel(model string, req *GeminiRequest) (*GeminiR
 			"HTTP-Referer":  "https://github.com/sookmook/wall-vault",
 			"X-Title":       "wall-vault",
 		}
-		resp, err := s.doRequest("POST", "https://openrouter.ai/api/v1/chat/completions", data, headers)
+		resp, err := s.doRequest(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", data, headers)
 		if err != nil {
 			s.keyMgr.RecordError(key, 0)
 			lastErr = err
@@ -1291,7 +1417,7 @@ func (s *Server) callOpenRouterModel(model string, req *GeminiRequest) (*GeminiR
 
 // ─── OpenAI Direct Call ───────────────────────────────────────────────────────
 
-func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callOpenAI(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	const maxAttempts = 3
 	var lastErr error
 	oaiReq := GeminiToOpenAI(model, req)
@@ -1307,7 +1433,7 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 		headers := map[string]string{
 			"Authorization": "Bearer " + plainKey,
 		}
-		resp, err := s.doRequest("POST", "https://api.openai.com/v1/chat/completions", data, headers)
+		resp, err := s.doRequest(ctx, "POST", "https://api.openai.com/v1/chat/completions", data, headers)
 		if err != nil {
 			s.keyMgr.RecordError(key, 0)
 			lastErr = err
@@ -1351,15 +1477,21 @@ func (s *Server) callOpenAI(model string, req *GeminiRequest) (*GeminiResponse, 
 
 // ─── Ollama (single concurrent request via mutex) ────────────────────────────
 
-func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callOllama(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	// v0.2: Ollama name-mismatch heuristic removed.
 	// dispatch_v2.go's dispatchWith() now uses each service's default_model,
 	// so a Gemini/Claude model id can never reach the Ollama endpoint
 	// structurally. See ResolveModel + dispatchWith.
 	ollamaURL := s.ollamaURL()
 
-	s.ollamaMu.Lock()
-	defer s.ollamaMu.Unlock()
+	// Wait for a free slot (bounded by ollamaSem capacity), but bail out if
+	// the caller's context was cancelled in the meantime.
+	select {
+	case s.ollamaSem <- struct{}{}:
+		defer func() { <-s.ollamaSem }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 
 	// Use Ollama's OpenAI-compatible /v1/chat/completions endpoint.
 	// The native /api/chat expects tool_calls.function.arguments as a JSON object,
@@ -1373,7 +1505,7 @@ func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, 
 	// Ollama is a local service: inference can take several minutes for large models.
 	// Use a dedicated client with no hard timeout so generation is never cut off.
 	// Connection errors (server not running) still surface immediately.
-	httpReq, err := http.NewRequest("POST", ollamaURL+"/v1/chat/completions", bytes.NewReader(data))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/v1/chat/completions", bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("Ollama 요청 생성 실패: %w", err)
 	}
@@ -1403,7 +1535,7 @@ func (s *Server) callOllama(model string, req *GeminiRequest) (*GeminiResponse, 
 
 // callLocalService: generic OpenAI-compatible local server (LM Studio, vLLM, etc.)
 // Generic OpenAI-compatible local server handler.
-func (s *Server) callLocalService(serviceID, model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callLocalService(ctx context.Context, serviceID, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	s.mu.RLock()
 	baseURL := s.serviceURLs[serviceID]
 	s.mu.RUnlock()
@@ -1424,7 +1556,7 @@ func (s *Server) callLocalService(serviceID, model string, req *GeminiRequest) (
 	oaiReq.Stream = false
 	data, _ := json.Marshal(oaiReq)
 
-	httpReq, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("%s 요청 생성 실패: %w", serviceID, err)
 	}
@@ -1454,8 +1586,8 @@ func (s *Server) callLocalService(serviceID, model string, req *GeminiRequest) (
 
 // ─── Common HTTP Request ──────────────────────────────────────────────────────
 
-func (s *Server) doRequest(method, url string, body []byte, headers map[string]string) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+func (s *Server) doRequest(ctx context.Context, method, url string, body []byte, headers map[string]string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

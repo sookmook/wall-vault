@@ -222,9 +222,11 @@ func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model strin
 	}
 	ollamaURL := s.ollamaURL()
 
-	// limit concurrent Ollama requests
-	s.ollamaMu.Lock()
-	defer s.ollamaMu.Unlock()
+	// limit concurrent Ollama requests. streamOllama runs without a plumbed
+	// context today, so this acquire blocks until a slot is free — same
+	// behavior as the former Mutex. ctx-aware acquire lives in callOllama.
+	s.ollamaSem <- struct{}{}
+	defer func() { <-s.ollamaSem }()
 
 	ollamaReq := GeminiToOllama(model, req)
 	ollamaReq.Stream = true

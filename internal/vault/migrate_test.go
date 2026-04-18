@@ -11,7 +11,7 @@ func TestMigrateV1ToV2(t *testing.T) {
 			{"id":"ollama","name":"Ollama","local_url":"http://192.168.1.20:11434","enabled":true,"proxy_enabled":true}
 		],
 		"clients": [
-			{"id":"bot-a","name":"Delta","token":"t","default_service":"google","default_model":"gemini-3.1-pro-preview","agent_type":"nanoclaw","enabled":true,"sort_order":4},
+			{"id":"bot-a","name":"Alpha","token":"t","default_service":"google","default_model":"gemini-3.1-pro-preview","agent_type":"nanoclaw","enabled":true,"sort_order":4},
 			{"id":"bot-b","name":"Bravo","token":"t2","default_service":"google","default_model":"gemini-3.1-pro-preview","agent_type":"openclaw","enabled":true,"sort_order":1}
 		],
 		"api_keys": []
@@ -28,15 +28,15 @@ func TestMigrateV1ToV2(t *testing.T) {
 		t.Fatalf("google default_model = %q, want gemini-3.1-pro-preview", googleDM)
 	}
 	// clients renamed
-	var bot-a Client
+	var botA Client
 	for _, c := range out.Clients {
-		if c.ID == "bot-a" { bot-a = *c }
+		if c.ID == "bot-a" { botA = *c }
 	}
-	if bot-a.PreferredService != "google" {
-		t.Fatalf("preferred_service = %q", bot-a.PreferredService)
+	if botA.PreferredService != "google" {
+		t.Fatalf("preferred_service = %q", botA.PreferredService)
 	}
-	if bot-a.ModelOverride != "gemini-3.1-pro-preview" {
-		t.Fatalf("model_override = %q", bot-a.ModelOverride)
+	if botA.ModelOverride != "gemini-3.1-pro-preview" {
+		t.Fatalf("model_override = %q", botA.ModelOverride)
 	}
 }
 

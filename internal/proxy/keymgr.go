@@ -74,7 +74,7 @@ func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 		vaultURL:     vaultURL,
 		token:        token,
 		clientID:     clientID,
-		lastSyncDate: time.Now().Format("2006-01-02"),
+		lastSyncDate: time.Now().UTC().Format("2006-01-02"),
 	}
 }
 
@@ -83,7 +83,7 @@ func NewKeyManager(vaultURL, token, clientID string) *KeyManager {
 func (km *KeyManager) ResetDailyCounters() {
 	km.mu.Lock()
 	defer km.mu.Unlock()
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Format("2006-01-02")
 	for _, keys := range km.keys {
 		for _, k := range keys {
 			k.todayUsage = 0
@@ -348,12 +348,14 @@ func (km *KeyManager) SyncFromVault() error {
 		}
 	}
 	// detect midnight rollover: if the date changed since last sync, discard stale local counters
-	// so that max(vault=0, local=yesterday) does not keep yesterday's values
-	today := time.Now().Format("2006-01-02")
+	// so that max(vault=0, local=yesterday) does not keep yesterday's values.
+	// Uses UTC so proxies in different time zones (or with clock drift vs vault)
+	// roll over at the same wall-clock moment and produce the same UsageDate.
+	today := time.Now().UTC().Format("2006-01-02")
 	if km.lastSyncDate != today {
 		km.lastSyncDate = today
 		localCtrs = make(map[string]localCounters) // all zeros — vault values win
-		log.Printf("[sync] date changed to %s — discarding stale local counters", today)
+		log.Printf("[sync] date changed to %s (UTC) — discarding stale local counters", today)
 	}
 	// replace only vault-sourced keys (env var keys are kept)
 	for svc := range km.keys {

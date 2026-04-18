@@ -1,11 +1,13 @@
 package layouts
 
+import "github.com/sookmook/wall-vault/internal/i18n"
+
 templ Shell(header, sidebar, main, slideover, footer templ.Component) {
 	<div class="shell">
 		@header
-		<nav class="shell-nav">@sidebar</nav>
+		<nav class="shell-nav" aria-label={ i18n.T("nav_label_sections") }>@sidebar</nav>
 		<main id="main" class="shell-main">@main</main>
-		<aside id="slideover" class="shell-aside" hx-swap-oob="true">@slideover</aside>
+		<aside id="slideover" class="shell-aside" hx-swap-oob="true" aria-hidden="true">@slideover</aside>
 		@footer
 	</div>
 }

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,7 @@ import (
 // Anthropic without any format conversion. Preserves tools, multi-block content,
 // and all other fields that would be lost in a GeminiRequest round-trip.
 // Returns the raw Anthropic response body, or an error.
-func (s *Server) callAnthropicPassthrough(req *AnthropicRequest, model string) ([]byte, *localKey, error) {
+func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicRequest, model string) ([]byte, *localKey, error) {
 	if !strings.HasPrefix(model, "claude-") {
 		log.Printf("[anthropic] non-Claude model %q → fallback to claude-haiku-4-5", model)
 		model = "claude-haiku-4-5-20251001"
@@ -56,7 +57,7 @@ func (s *Server) callAnthropicPassthrough(req *AnthropicRequest, model string) (
 			lastErr = err
 			break
 		}
-		resp, err := s.doRequest("POST", "https://api.anthropic.com/v1/messages", data, map[string]string{
+		resp, err := s.doRequest(ctx, "POST", "https://api.anthropic.com/v1/messages", data, map[string]string{
 			"x-api-key":         plainKey,
 			"anthropic-version": "2023-06-01",
 		})
@@ -99,7 +100,7 @@ func (s *Server) callAnthropicPassthrough(req *AnthropicRequest, model string) (
 
 // callAnthropic: call Anthropic API directly using vault anthropic keys.
 // If `model` is not a Claude model, falls back to claude-haiku-4-5-20251001.
-func (s *Server) callAnthropic(model string, req *GeminiRequest) (*GeminiResponse, error) {
+func (s *Server) callAnthropic(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	if !strings.HasPrefix(model, "claude-") {
 		model = "claude-haiku-4-5-20251001"
 	}
@@ -113,7 +114,7 @@ func (s *Server) callAnthropic(model string, req *GeminiRequest) (*GeminiRespons
 			break
 		}
 
-		resp, err := s.doAnthropicRequest(plainKey, model, req)
+		resp, err := s.doAnthropicRequest(ctx, plainKey, model, req)
 		if err != nil {
 			s.keyMgr.RecordError(key, 0)
 			lastErr = err
@@ -206,7 +207,7 @@ func (s *Server) callAnthropic(model string, req *GeminiRequest) (*GeminiRespons
 	return nil, lastErr
 }
 
-func (s *Server) doAnthropicRequest(apiKey, model string, req *GeminiRequest) (*http.Response, error) {
+func (s *Server) doAnthropicRequest(ctx context.Context, apiKey, model string, req *GeminiRequest) (*http.Response, error) {
 	type antMsg struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
@@ -262,7 +263,7 @@ func (s *Server) doAnthropicRequest(apiKey, model string, req *GeminiRequest) (*
 	}
 
 	data, _ := json.Marshal(ar)
-	return s.doRequest("POST", "https://api.anthropic.com/v1/messages", data, map[string]string{
+	return s.doRequest(ctx, "POST", "https://api.anthropic.com/v1/messages", data, map[string]string{
 		"x-api-key":         apiKey,
 		"anthropic-version": "2023-06-01",
 	})

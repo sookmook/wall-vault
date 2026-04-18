@@ -2,7 +2,9 @@ package vault
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,7 +81,15 @@ type Server struct {
 	cfgPath   string           // config file path to save on theme change
 	startedAt time.Time        // service start time
 	limiter   *authLimiter     // auth failure rate limiter
+
+	// sseTickets: one-shot tickets exchanged for SSE authentication so that
+	// the admin/client token never appears in a URL query string (see
+	// /api/sse-ticket and sseAuth). Keyed by ticket → issuance time; 5 min TTL.
+	sseTicketsMu sync.Mutex
+	sseTickets   map[string]time.Time
 }
+
+const sseTicketTTL = 5 * time.Minute
 
 // SetConfigPath: specify the config file path to use for saving theme
 func (s *Server) SetConfigPath(path string) {
@@ -108,12 +118,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		log.Println("[WARNING] ======================================================")
 	}
 	srv := &Server{
-		cfg:       cfg,
-		store:     store,
-		broker:    NewBroker(),
-		registry:  models.NewRegistry(10 * time.Minute),
-		startedAt: time.Now(),
-		limiter:   newAuthLimiter(),
+		cfg:        cfg,
+		store:      store,
+		broker:     NewBroker(),
+		registry:   models.NewRegistry(10 * time.Minute),
+		startedAt:  time.Now(),
+		limiter:    newAuthLimiter(),
+		sseTickets: make(map[string]time.Time),
 	}
 	// send full state to every new SSE client (handles reconnect sync)
 	srv.broker.OnConnect = func() { srv.broadcastAgentsSync() }
@@ -129,8 +140,10 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// public
+	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/events", s.sseAuth(s.broker.ServeHTTP))
+	mux.HandleFunc("/api/sse-ticket", s.handleSSETicket)
 	mux.HandleFunc("/api/clients", s.handlePublicClients)
 
 	// proxy-only (client token auth)
@@ -166,10 +179,40 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/", s.handleDashboard)
 
 	return middleware.Chain(mux,
+		s.langMiddleware(),
 		middleware.Recovery,
+		middleware.SecurityHeaders,
 		middleware.CORS,
 		middleware.Logger,
 	)
+}
+
+// currentLang resolves the active UI language preferring per-install vault
+// settings, falling back to config and finally whatever i18n already has.
+func (s *Server) currentLang() string {
+	if s.store != nil {
+		if st := s.store.GetSettings(); st.Lang != "" {
+			return st.Lang
+		}
+	}
+	if s.cfg != nil && s.cfg.Lang != "" {
+		return s.cfg.Lang
+	}
+	return i18n.Lang()
+}
+
+// langMiddleware ensures every incoming request sets the i18n locale before
+// any templ render. Without this, HX fragment endpoints (/hx/*) inherited
+// whatever language the last request happened to leave in the global, so the
+// edit slideovers could render in English even though the dashboard root was
+// set to Korean. Runs outermost so all downstream handlers see the right lang.
+func (s *Server) langMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			i18n.SetLang(s.currentLang())
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -183,6 +226,12 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 		ip := realIP(r)
 		if s.limiter.blocked(ip) {
 			jsonError(w, "too many failed attempts", http.StatusTooManyRequests)
+			return
+		}
+		// Optional admin-scope IP whitelist — gate before token comparison
+		// so a leaked token cannot be exercised from outside allowed ranges.
+		if len(s.cfg.Vault.AdminIPWhitelist) > 0 && !ipAllowed(ip, s.cfg.Vault.AdminIPWhitelist) {
+			jsonError(w, "admin ip not allowed", http.StatusForbidden)
 			return
 		}
 		token := bearerToken(r)
@@ -220,27 +269,35 @@ func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 
 // sseAuth: protect the SSE endpoint when admin token is configured.
 // If no admin token is set, the endpoint remains open (backward compatible).
-// When a token IS configured, require a valid client token or admin token.
-// The token can be provided via Authorization header or ?token= query param
-// (the query param is needed because EventSource API cannot set headers).
+// Authentication preference, in order:
+//  1. ?ticket= — one-shot token issued by /api/sse-ticket (preferred; the
+//     only value that ever appears in reverse-proxy access logs)
+//  2. Authorization: Bearer — standard header for programmatic clients
+//  3. ?token= — legacy path kept for compatibility; emits a deprecation log
 func (s *Server) sseAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// If no admin token is configured, SSE is open (backward compatible)
 		if s.cfg.Vault.AdminToken == "" {
 			next(w, r)
 			return
 		}
-		// Try Authorization header first, then ?token= query param
+		if ticket := r.URL.Query().Get("ticket"); ticket != "" {
+			if s.consumeSSETicket(ticket) {
+				next(w, r)
+				return
+			}
+		}
 		token := bearerToken(r)
 		if token == "" {
-			token = r.URL.Query().Get("token")
+			if qt := r.URL.Query().Get("token"); qt != "" {
+				token = qt
+				log.Printf("[deprecation] SSE auth via ?token= (ip=%s) — switch to /api/sse-ticket",
+					realIP(r))
+			}
 		}
-		// Accept admin token
 		if secureCompare(token, s.cfg.Vault.AdminToken) {
 			next(w, r)
 			return
 		}
-		// Accept registered client token
 		if s.store.GetClientByToken(token) != nil {
 			next(w, r)
 			return
@@ -249,7 +306,96 @@ func (s *Server) sseAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// issueSSETicket generates a one-shot SSE ticket and records its issuance time.
+// Also opportunistically evicts expired tickets so the map stays bounded.
+func (s *Server) issueSSETicket() (string, error) {
+	b := make([]byte, 24)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return "", err
+	}
+	ticket := hex.EncodeToString(b)
+	now := time.Now()
+	cutoff := now.Add(-sseTicketTTL)
+	s.sseTicketsMu.Lock()
+	for k, issued := range s.sseTickets {
+		if issued.Before(cutoff) {
+			delete(s.sseTickets, k)
+		}
+	}
+	s.sseTickets[ticket] = now
+	s.sseTicketsMu.Unlock()
+	return ticket, nil
+}
+
+// consumeSSETicket validates and removes a ticket atomically. Returns true
+// only if the ticket exists and is still within its TTL.
+func (s *Server) consumeSSETicket(ticket string) bool {
+	s.sseTicketsMu.Lock()
+	issued, ok := s.sseTickets[ticket]
+	if ok {
+		delete(s.sseTickets, ticket)
+	}
+	s.sseTicketsMu.Unlock()
+	return ok && time.Since(issued) < sseTicketTTL
+}
+
+// handleSSETicket: exchange an admin or client token for a one-shot SSE ticket.
+// This keeps the bearer secret out of the URL query string that EventSource
+// forces us to use for auth.
+func (s *Server) handleSSETicket(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	// Open mode — no admin token configured, so tickets aren't required either.
+	// Issue a ticket anyway so clients can use a uniform code path.
+	if s.cfg.Vault.AdminToken == "" {
+		ticket, err := s.issueSSETicket()
+		if err != nil {
+			jsonError(w, "entropy error", http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, map[string]interface{}{"ticket": ticket, "expires_in": int(sseTicketTTL.Seconds())})
+		return
+	}
+	ip := realIP(r)
+	if s.limiter.blocked(ip) {
+		jsonError(w, "too many failed attempts", http.StatusTooManyRequests)
+		return
+	}
+	token := bearerToken(r)
+	isAdmin := secureCompare(token, s.cfg.Vault.AdminToken)
+	isClient := !isAdmin && s.store.GetClientByToken(token) != nil
+	if !isAdmin && !isClient {
+		s.limiter.record(ip)
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if isAdmin && len(s.cfg.Vault.AdminIPWhitelist) > 0 && !ipAllowed(ip, s.cfg.Vault.AdminIPWhitelist) {
+		jsonError(w, "admin ip not allowed", http.StatusForbidden)
+		return
+	}
+	ticket, err := s.issueSSETicket()
+	if err != nil {
+		jsonError(w, "entropy error", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]interface{}{"ticket": ticket, "expires_in": int(sseTicketTTL.Seconds())})
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+// handleHealth: minimal, unauthenticated readiness probe. Separate from
+// /api/status so K8s livenessProbe / readinessProbe / systemd health scripts
+// can hit a single predictable endpoint without triggering the status page's
+// auth gating. Returns 200 as long as the process is serving.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]interface{}{
+		"status":    "ok",
+		"readiness": true,
+		"version":   Version,
+	})
+}
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// When admin token is configured, only expose detailed counts to authenticated callers.
@@ -278,8 +424,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"status":  "ok",
 		"version": Version,
 		"keys":    len(keys),
-		"clients": len(clients),
-		"sse":     s.broker.Count(),
+		"clients":       len(clients),
+		"sse":           s.broker.Count(),
+		"sse_dropped":   s.broker.DroppedEvents(),
 	})
 }
 
@@ -765,9 +912,15 @@ func (s *Server) handleProxyKeys(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "client disabled", http.StatusForbidden)
 		return
 	}
-	// check IP whitelist (skip for admin token)
+	ip := realIP(r)
+	// admin-scope IP whitelist also applies when admin token is used here
+	if isAdmin && len(s.cfg.Vault.AdminIPWhitelist) > 0 && !ipAllowed(ip, s.cfg.Vault.AdminIPWhitelist) {
+		jsonError(w, "admin ip not allowed", http.StatusForbidden)
+		return
+	}
+	// per-client IP whitelist (not enforced when the caller is admin)
 	if !isAdmin && client != nil && len(client.IPWhitelist) > 0 {
-		if !ipAllowed(realIP(r), client.IPWhitelist) {
+		if !ipAllowed(ip, client.IPWhitelist) {
 			jsonError(w, "ip not allowed", http.StatusForbidden)
 			return
 		}
@@ -1162,7 +1315,7 @@ func (s *Server) startDailyReset() {
 		s.store.ResetDailyUsage()
 		s.broker.Broadcast(SSEEvent{
 			Type: "usage_reset",
-			Data: map[string]string{"time": time.Now().Format("2006-01-02")},
+			Data: map[string]string{"time": time.Now().UTC().Format("2006-01-02")},
 		})
 	}
 }

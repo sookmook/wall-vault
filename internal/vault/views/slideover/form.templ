@@ -1,0 +1,27 @@
+package slideover
+
+// FormSection wraps the repetitive
+//   <div class="wv-form-section">
+//     <div class="wv-form-section-title">…</div>
+//     …fields…
+//   </div>
+// pattern that every edit/create slideover (client, service, key) inlined. The
+// callers now just write
+//   @FormSection(i18n.T("sec_basic")) { …field markup… }
+// which keeps intent visible instead of hiding it behind four lines of div
+// plumbing.
+templ FormSection(title string) {
+	<div class="wv-form-section">
+		<div class="wv-form-section-title">{ title }</div>
+		{ children... }
+	</div>
+}
+
+// FormActions wraps the cancel/save button pair that every form has. Using
+// the same shared component also makes it trivial to tweak button order,
+// spacing, or keyboard shortcut bindings in one spot later.
+templ FormActions() {
+	<div class="wv-form-actions">
+		{ children... }
+	</div>
+}

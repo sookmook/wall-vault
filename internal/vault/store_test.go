@@ -226,7 +226,7 @@ func TestLoadAutoMigratesV1(t *testing.T) {
 			{"id":"google","name":"Google","enabled":true,"proxy_enabled":true}
 		],
 		"clients":[
-			{"id":"bot-a","name":"Delta","token":"t",
+			{"id":"bot-a","name":"Alpha","token":"t",
 			 "default_service":"google","default_model":"gemini-3.1-pro-preview",
 			 "agent_type":"nanoclaw","enabled":true,"sort_order":1}
 		],

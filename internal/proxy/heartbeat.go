@@ -37,7 +37,7 @@ type activeClientItem struct {
 }
 
 // readLocalAvatar reads the configured avatar file and returns a base64 data URI.
-// avatarPath is relative to ~/.openclaw/ (e.g. "workspace/avatars/bot-a.png").
+// avatarPath is relative to ~/.openclaw/ (e.g. "workspace/avatars/<client-id>.png").
 // Falls back to workspace/avatar.png if avatarPath is empty.
 func readLocalAvatar(avatarPath string) string {
 	home, err := os.UserHomeDir()

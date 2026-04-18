@@ -83,6 +83,32 @@ func (f *ToolFilter) FilterOpenAI(req *OpenAIRequest) int {
 	return stripped
 }
 
+// FilterAnthropic: handle tools in Anthropic (/v1/messages) requests.
+// Anthropic tool shape: {"name": "...", "description": "...", "input_schema": {...}}
+func (f *ToolFilter) FilterAnthropic(req *AnthropicRequest) int {
+	if f.mode == FilterPassthrough {
+		return 0
+	}
+	stripped := 0
+	if req.Tools != nil {
+		if f.mode == FilterStripAll {
+			stripped = len(req.Tools)
+			req.Tools = nil
+		} else if f.mode == FilterWhitelist {
+			var kept []interface{}
+			for _, t := range req.Tools {
+				if f.toolAllowed(t) {
+					kept = append(kept, t)
+				} else {
+					stripped++
+				}
+			}
+			req.Tools = kept
+		}
+	}
+	return stripped
+}
+
 func (f *ToolFilter) toolAllowed(t interface{}) bool {
 	if len(f.allowedTools) == 0 {
 		return false
@@ -111,6 +137,10 @@ func (f *ToolFilter) toolAllowed(t interface{}) bool {
 		if name, ok := fn["name"].(string); ok && f.allowedTools[name] {
 			return true
 		}
+	}
+	// Anthropic: {"name": "...", "description": "...", "input_schema": {...}}
+	if name, ok := m["name"].(string); ok && f.allowedTools[name] {
+		return true
 	}
 	return false
 }

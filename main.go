@@ -5,9 +5,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/sookmook/wall-vault/cmd/doctor"
@@ -23,11 +25,32 @@ import (
 
 var version = "dev" // overridden at build time via -ldflags "-X main.version=..."
 
+// initSlog installs a console-friendly slog TextHandler as the default.
+// Level is controlled via WV_LOG_LEVEL (debug|info|warn|error) and falls back
+// to info. The classic `log` package keeps working in parallel — existing
+// log.Printf calls still write with their own prefixes — while newly added
+// code can use slog.Info / slog.Warn / slog.Error with structured key=value
+// attributes for better grep/parse.
+func initSlog() {
+	level := slog.LevelInfo
+	switch strings.ToLower(os.Getenv("WV_LOG_LEVEL")) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	}
+	h := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(h))
+}
+
 func main() {
 	// propagate build-injected version to all packages
 	iproxy.Version = version
 	ivault.Version = version
 
+	initSlog()
 	i18n.Init()
 
 	if len(os.Args) < 2 {
@@ -91,15 +114,18 @@ func runAll() {
 		}
 	}()
 
-	log.Printf("wall-vault %s 실행 중", version)
-	log.Printf("  대시보드: http://localhost:%d", cfg.Vault.Port)
-	log.Printf("  프록시:   http://localhost:%d", cfg.Proxy.Port)
+	slog.Info("wall-vault running",
+		"version", version,
+		"dashboard", fmt.Sprintf("http://localhost:%d", cfg.Vault.Port),
+		"proxy", fmt.Sprintf("http://localhost:%d", cfg.Proxy.Port),
+	)
 	log.Printf("Ctrl+C로 종료")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("종료 중...")
+	slog.Info("wall-vault shutting down")
+	proxySrv.Stop()
 }
 
 func printHelp() {

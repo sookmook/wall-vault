@@ -8,6 +8,240 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.17] — 2026-04-19
+
+Full-surface audit rollup: rounds A (security), B (reliability), C (UX /
+i18n / observability), and D (hardening). Single release so existing
+deployments can move off v0.2.16 in one step.
+
+### Added
+
+- **`llama.cpp` as a local service**: new `llamacpp` entry in the default
+  service list and dispatch switch. Shares `callLocalService` with
+  `lmstudio`/`vllm` (OpenAI-compatible `/v1/chat/completions`). Dashboard
+  treats it as a local service (no key required). Users configure
+  `local_url` and `default_model` via the service edit slideover.
+
+### Changed
+
+- **SSE broker channel size 8 → 64** and **drop counter**: per-subscriber
+  buffer was too tight for the 15s `agents_sync` cadence plus
+  `config_change` bursts — slow tabs silently dropped events. Now holds
+  ~1 min of peak traffic, and `/api/status` (authenticated) exposes
+  `sse_dropped` so operators can spot slow clients.
+- **SSEClient reconnect throttle**: proxy's SSE client used to spawn a
+  fresh `onReconnect` goroutine on every reconnect. A flapping vault
+  could pile up concurrent sync calls. Now guarded by an `atomic.Bool`
+  so only one sync runs at a time; further reconnects log a skip line.
+- **Daily-usage date comparison unified to UTC** (`internal/proxy/keymgr.go`,
+  `internal/vault/store.go`, `internal/vault/server.go`): proxies and the
+  vault were both formatting `time.Now().Format("2006-01-02")` against
+  local time. Different time zones or clock drift could flag fresh usage
+  as stale. All three sites now use `time.Now().UTC().Format(...)`.
+- **Token cache periodic eviction** (`internal/proxy/server.go`): the
+  proxy's in-memory token→config cache previously only evicted when it
+  crossed 500 entries. A 30-second background ticker now trims expired
+  rows, and the inline safety-valve cap was tightened to 200.
+- **Config `Validate()` on load**: `config.Load` now rejects an invalid
+  `mode` / out-of-range ports / non-positive `proxy.timeout` / unknown
+  `tool_filter` / empty `proxy.services` instead of silently starting a
+  service that will misbehave at runtime.
+- **Dispatch returns actual used service/model**: `dispatch` now returns
+  a `DispatchResult{Response, UsedService, UsedModel}`. Handlers
+  (OpenAI, Anthropic) populate the response `model` field with the
+  actual backend used, so a fallback from `claude-sonnet-4-6` to
+  `google/gemini-flash` is no longer misleadingly labeled as the
+  originally-requested model.
+- **HTTP context propagation through dispatch chain**: `handleOpenAI` /
+  `handleGemini` / `handleAnthropic` now forward `r.Context()` through
+  `dispatch` → `callGoogle` / `callOpenRouter` / `callOpenAI` /
+  `callAnthropic` / `callOllama` / `callLocalService` /
+  `callAnthropicPassthrough` / `doRequest` / `doAnthropicRequest`. All
+  upstream HTTP calls use `NewRequestWithContext`, so a client
+  disconnect cancels the outbound request instead of letting it run to
+  completion and leak a socket.
+- **Ollama concurrency: mutex → context-aware semaphore**: the plain
+  `sync.Mutex` guarding Ollama requests is replaced by a buffered
+  channel (`ollamaSem`, capacity 1). `callOllama` acquires via `select`
+  with `ctx.Done()`, so a caller whose request is cancelled while
+  another is mid-inference no longer holds a slot for up to 10 minutes.
+  `streamOllama` keeps the same blocking behavior (no ctx plumbed yet).
+- **Tool-call argument parse failures now log**: `convert.go` used to
+  silently replace unparseable `tool_call.arguments` with an empty map,
+  hiding misbehaving agents. Both OpenAI `tool_calls` and Anthropic
+  `tool_result` paths now emit a log line when they fall back, naming
+  the function so traces point at the offending caller.
+- **OpenClaw tmux model injection fails safely**: `sanitizeModelForTmux`
+  now returns a `dropped` flag. `injectModelToTUI` logs when non-ASCII
+  runes are stripped and aborts when the sanitized value is empty, so a
+  Korean-only alias no longer becomes a bare `/model` command that
+  confuses the OpenClaw TUI.
+- **CORS private-IP coverage**: `isAllowedOrigin` now accepts any
+  RFC1918 range (`10/8`, `172.16/12`, `192.168/16`) plus loopback and
+  link-local, via `net.IP.IsPrivate()` / `IsLoopback()` /
+  `IsLinkLocalUnicast()`. Corporate `10.x` networks no longer hit CORS
+  errors when hosting wall-vault. Also handles `[::1]:port` / IPv6
+  origins through `net.SplitHostPort`.
+- **Doctor degraded-state detection**: a 200 response is no longer
+  auto-classified "정상". The body is now validated as JSON with a
+  `status` field; otherwise Doctor surfaces "응답 형식 오류" so a
+  wrong-binary or crashed-handler port that still returns 200 on
+  `/health` doesn't mask a broken service.
+- **Proxy graceful-shutdown signal**: added `Server.stopCh` + `Stop()`.
+  Background goroutines (initial vault load, 5-min key sync, 30-s
+  token-cache evict) now exit on `select { case <-stopCh: return }`
+  instead of leaking past the owner's Stop call.
+- **writeJSON parent-dir TOCTOU guard**: `agent_apply.writeJSON` now
+  `Stat`s the target parent directory before writing, wraps errors with
+  the path involved (`write %s`, `rename %s → %s`), and surfaces a
+  clear `parent missing` message when the agent directory was removed
+  between discovery and write.
+- **Slideover accessibility**: `Frame` now renders
+  `role="dialog" aria-modal="true" aria-labelledby="wv-slideover-title"`
+  with the title element carrying the matching id; the close button
+  has an explicit `aria-label`. Sidebar nav gets `aria-label`. Empty
+  slideover state gets `aria-hidden="true"`.
+- **Default UI theme → light**: `config.Default().Theme` is now
+  `"light"` so fresh installs start with the most accessible palette.
+  Existing installs are unaffected — `Settings.Theme` from vault.json
+  continues to take precedence via `handleAdminTheme`'s persistence
+  path, so user selections stay put across restarts.
+- **Docs: v0.2 canonical field resolution**: `.claude/docs/endpoints.md`
+  gained "Client Model Resolution (v0.2)" (preferred_service/model_override
+  vs legacy default_*; empty string = "use service default"; stale-override
+  soft-clear) and "SSE Authentication" (`?ticket=`/Authorization/`?token=`
+  deprecation) sections.
+- **CI version stamp aligned with Makefile**: `.github/workflows/ci.yml`
+  now derives `BASE_VERSION` from the Makefile and appends a UTC
+  timestamp + short SHA, matching `make build` output instead of the
+  unrelated `git describe --tags --always --dirty` that previously
+  produced diverging version strings between local and CI artifacts.
+- **i18n hardcoded UI strings externalized**: 20 new keys
+  (`act_close`, `opt_service_default`, `warn_stale_override_*`,
+  `lbl_group_*`, `tip_*`, `act_*`, `sum_*`, `ph_*`, `nav_label_sections`)
+  replace raw Korean literals in `slideover.templ` / `client_edit.templ`
+  / `client_create.templ` / `service_edit.templ` / `service_create.templ`
+  / `agent_card.templ` / `key_card.templ` / `service_card.templ` /
+  `shell.templ`. All **17 locale JSONs** received native translations
+  (ko/en authored in-place; ar/de/es/fr/ha/hi/id/ja/mn/ne/pt/sw/th/zh/zu
+  translated by localization pass). `{val}` / `{n}` placeholders and
+  unicode symbols (`↓`, `✕`, `⚠`, `·`, `…`) are preserved across all
+  languages. Remaining Korean in JS alerts / `confirm()` prompts is
+  scheduled for a later pass that plumbs the i18n dictionary into the
+  base template as a JS object.
+- **slog introduced (console-friendly default)**: `main.initSlog`
+  installs a `slog.TextHandler` on stderr honoring `WV_LOG_LEVEL`
+  (debug|info|warn|error, default info). New code paths — starting with
+  the `wall-vault start` banner — use `slog.Info` with structured
+  key/value attrs, while existing `log.Printf` calls continue to work
+  unchanged. `runAll` now calls `proxySrv.Stop()` on SIGINT/SIGTERM so
+  the stopCh goroutine-shutdown wiring from round B actually fires.
+- **Default UI theme → light**: `config.Default().Theme` is now
+  `"light"` so fresh installs pick the most accessible palette.
+  Existing installs retain their saved `Settings.Theme` — persistence
+  was already wired end-to-end via `handleAdminTheme` / `store.SetTheme`
+  / `handleDashboard`.
+- **HTTP security headers**: new `middleware.SecurityHeaders` sets
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and a
+  conservative `Content-Security-Policy` (allows the unpkg htmx script
+  + inline style/script needed by templ) on every response. Wired into
+  both vault and proxy chains. TLS/HSTS is left to whatever reverse
+  proxy terminates TLS.
+- **Config file permission hardening**: `config.Load` now warns on
+  stderr when the file it read is group/world readable (`000077`
+  mask). `config.Save` enforces `chmod 0600` after write so a pre-
+  existing loose-mode file gets tightened by any subsequent save.
+- **Model registry capped at 2000 entries**: `models.Registry` gained
+  a `maxSize` (default 2000) so a runaway upstream catalog can't blow
+  memory across refreshes. Exceeding it logs a truncation note. Also
+  registered the new `llamacpp` service in `Refresh` (defaulting to
+  `http://localhost:8080`) and in the `compatFallback` list.
+- **Proxy per-IP rate limit**: new `middleware.RateLimiter` (100 req/s
+  per IP, burst 20) shields the proxy's public endpoints
+  (`/v1/chat/completions`, `/v1/messages`, `/v1/models`, `/health`,
+  `/status`) from accidental loops and scanners. Idle visitor entries
+  are reaped every 5 min. No external dependency — small token-bucket
+  implementation kept in-tree.
+- **Healthcheck endpoints normalized**: both proxy and vault now serve
+  `GET /health` returning `{status, readiness, version, …}`. Proxy
+  also reports `sse_connected` so K8s / doctor probes can distinguish
+  "running but not sync'd" from fully ready. Vault's endpoint is
+  auth-free so probes don't need admin tokens.
+- **Hooks shell command: stdout/stderr capture + tunable timeout**:
+  `hooks.Manager.fire` now captures both streams via `bytes.Buffer`
+  and logs a truncated tail + elapsed time on failure, instead of
+  silently swallowing errors. Timeout defaults stay at 30s but can be
+  overridden with `WV_HOOK_TIMEOUT` (e.g. `2m`) for slow backup or
+  webhook hooks.
+- **Deploy hardening guide**: new `.claude/docs/deploy-hardening.md`
+  collects the systemd unit options (`KillSignal`, `RestartSec`,
+  `ProtectSystem`, `PrivateTmp`, `NoNewPrivileges`,
+  `MemoryDenyWriteExecute`, `IPAddressAllow`), the launchd plist
+  counterparts, the **`launchctl kickstart -k` env-reload gotcha**
+  documented from the 2026-04-18 incident, and the new `/health`
+  probe recipes.
+- **templ form layout extracted**: new `FormSection(title)` and
+  `FormActions()` components in
+  `internal/vault/views/slideover/form.templ` replace the repeated
+  `<div class="wv-form-section"><div class="wv-form-section-title">…`
+  / `<div class="wv-form-actions">…` plumbing across
+  `client_create`, `client_edit`, `service_create`, `service_edit`,
+  `key_create`. CSS untouched — same DOM, far cleaner templ sources
+  so future form tweaks happen in one place.
+- **JS alerts / SSE status / confirm dialogs externalized**: the
+  remaining hardcoded Korean in `base.templ`'s inline JavaScript
+  (`confirm('정말 삭제하시겠습니까?')`, `alert('순서 저장 실패: …')`,
+  SSE status tooltip map, avatar preview alt, `(사용자 지정)`,
+  `무료/유료` optgroup labels, etc.) now come from a new
+  `window.WV_I18N` object. `layouts.I18nJSONBlob()` emits the 16-key
+  subset as inline `<script type="application/json">`; a bootstrap
+  IIFE parses it before any other script runs, and a tiny
+  `wvFmt(tpl, vars)` helper handles `{err}` / `{val}` / `{n}`
+  placeholder substitution. 12 new `js_*` keys authored in ko/en and
+  translated into all 15 other locales (ar/de/es/fr/ha/hi/id/ja/mn/ne/
+  pt/sw/th/zh/zu) respecting language-specific typography (French
+  spaces before `:` and `?`, Chinese full-width parentheses, Arabic
+  RTL wording, Hausa hooked-ɗ spelling, etc.).
+
+### Fixed
+
+- **Slideover i18n locale leak**: edit slideovers rendered in English even
+  after the dashboard was set to Korean, because only `handleDashboard`
+  called `i18n.SetLang` while `/hx/*` fragment endpoints inherited the
+  global. Added a `langMiddleware` that resolves the active language
+  (vault settings → config → current) on every request before any templ
+  render. Mitigates the most visible symptom; a proper per-request i18n
+  context is scheduled for a later round.
+
+### Security
+
+- **Anthropic tool filter**: `handleAnthropic` now runs the request
+  through `ToolFilter.FilterAnthropic` (new) right after decode, so
+  `tool_filter: strip_all` and `whitelist` modes are enforced for
+  Claude-format clients. Previously only OpenAI and Gemini paths were
+  filtered — Anthropic requests bypassed the policy.
+- **One-shot SSE tickets**: new `POST /api/sse-ticket` exchanges an
+  admin or client bearer token for a 24-byte random ticket (5 min TTL,
+  single-use). The dashboard connects to `/api/events?ticket=…` so the
+  admin token no longer appears in URLs, Referer headers, or access
+  logs. Legacy `?token=` is still accepted but logs a deprecation line
+  with the caller IP.
+- **Admin IP whitelist**: new `vault.admin_ip_whitelist` setting —
+  when populated, `adminAuth` and the admin-scope path of
+  `handleProxyKeys` both reject callers whose IP is not in the list.
+  Unset keeps the existing behavior.
+- **Mode-aware host defaults**: `ProxyConfig.Host` /
+  `VaultConfig.Host` are now empty by default; `applyHostDefaults`
+  fills them with `127.0.0.1` in `standalone` mode and `0.0.0.0` in
+  `distributed`. YAML and the new `WV_PROXY_HOST` / `WV_VAULT_HOST`
+  env vars still win. Stops single-host installs from exposing the
+  vault to the LAN unintentionally.
+- **Fail-fast on entropy exhaustion**: `newID()` now uses
+  `io.ReadFull(rand.Reader, …)` and panics on error instead of
+  silently producing a partially-initialized hex ID.
+
+---
+
 ## [0.2.16] — 2026-04-17
 
 ### Fixed
@@ -30,9 +264,10 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 - **Redacted admin token from plan doc**: a plaintext vault admin
   token (`TOKEN=…`) was committed in the v0.2 implementation plan.
   Replaced with `<ADMIN_TOKEN>` placeholder.
-- **Redacted real IPs**: replaced `192.168.1.10` / `192.168.1.20` with
-  generic `192.168.1.10` / `192.168.1.20` across 17 locale JSON
-  files, 2 test files, 17 MANUAL translations, and the plan doc.
+- **Redacted concrete LAN IPs from committed examples**: replaced
+  deployment-specific addresses with generic `192.168.1.10` /
+  `192.168.1.20` across 17 locale JSON files, 2 test files, 17
+  MANUAL translations, and the plan doc.
 - **Redacted Telegram bot usernames**: replaced 3 real bot usernames
   in the plan doc with `@<bot>` placeholders.
 - `git filter-repo` recommended to purge history (see below).
@@ -49,7 +284,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   into place. Previously `os.WriteFile` truncated the file first, so
   a `pkill -x wall-vault` during deploy could catch the goroutine
   between truncate and write, leaving a 0-byte file that crashed
-  OpenClaw's config validator. Observed on bot-b's
+  OpenClaw's config validator. Observed on a deployed host's
   `~/.openclaw/openclaw.json` (Apr 16 02:30). `updateOpenClawJSON`
   in `openclaw_sync.go` also switched from inline `os.WriteFile` to
   the shared `writeJSON` for the same protection.
@@ -104,16 +339,16 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ### Fixed
 
-- **`/status` is now token-aware** — previously it always returned the
-  proxy's own client config (e.g. bot-b), so Echo/EconoWorld polling
-  /status from bot-b's proxy saw bot-b's model (`gemini-3.1-flash-lite-preview`)
-  instead of econoworld's model (`google/gemini-3.1-pro-preview`).
-  Echo's model badge reported the wrong value even though
-  `ai_config.json` was correct. With a Bearer token header, `/status`
-  now looks up the caller's client config via `lookupTokenConfig`
-  and returns that client's `client/service/model` instead. Without
-  a token it still returns the proxy's own config (backward
-  compatible).
+- **`/status` is now token-aware** — previously it always returned
+  the proxy's own client config, so an observability consumer polling
+  `/status` via a different client's proxy saw that proxy's own model
+  (e.g. `gemini-3.1-flash-lite-preview`) instead of the caller's model
+  (e.g. `google/gemini-3.1-pro-preview`). The consumer's model badge
+  reported the wrong value even though its `ai_config.json` was
+  correct. With a Bearer token header, `/status` now looks up the
+  caller's client config via `lookupTokenConfig` and returns that
+  client's `client/service/model` instead. Without a token it still
+  returns the proxy's own config (backward compatible).
 - **`/api/token/config` prefers v0.2 canonical fields** — the vault
   endpoint now returns `preferred_service` / `model_override` when
   set, falling back to legacy `default_service` / `default_model`.
@@ -926,7 +1161,7 @@ edge-case.
 ## [0.1.16] — 2026-03-25
 
 ### Added
-- **Bidirectional model sync for Cline**: When bot-b_vsc's model is changed in the
+- **Bidirectional model sync for Cline**: When a Cline client's model is changed in the
   vault dashboard, the proxy automatically updates Cline's `globalState.json` with the
   correct fields (`actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`).
   Preserves `openAiBaseUrl` — only model fields are touched.
@@ -948,7 +1183,7 @@ edge-case.
   polluting Cline's settings. Removed — Cline is now only updated via `onAnyConfig`
   when a `cline`-typed client changes.
 - **Unrelated client changes polluted Cline**: `onAnyConfig` previously fired for
-  *all* foreign clients. When bot-c's model changed to `gemini-3.1-pro-preview`,
+  *all* foreign clients. When another client's model changed to `gemini-3.1-pro-preview`,
   it overwrote Cline's config. Now filtered by `agent_type`.
 
 ### Changed

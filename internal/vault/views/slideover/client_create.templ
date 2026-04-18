@@ -20,8 +20,7 @@ var agentTypeOptions = []string{
 templ ClientCreate(services []*ServiceVM, serviceModels map[string]ServiceModelGroup) {
 	<form data-wv-submit="/admin/clients" data-wv-method="POST" class="wv-form"
 		data-wv-service-models={ serviceModelJSON(serviceModels) }>
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
+		@FormSection(i18n.T("sec_basic")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_id") }</span>
 				<input name="id" required placeholder={ i18n.T("ph_id_example") }/>
@@ -39,10 +38,9 @@ templ ClientCreate(services []*ServiceVM, serviceModels map[string]ServiceModelG
 					}
 				</select>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_routing") }</div>
+		@FormSection(i18n.T("sec_routing")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_preferred_service") }</span>
 				<select name="default_service" data-wv-service-select>
@@ -55,14 +53,13 @@ templ ClientCreate(services []*ServiceVM, serviceModels map[string]ServiceModelG
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_model_override") }</span>
 				<select name="default_model" data-wv-model-override data-wv-current="">
-					<option value="">(서비스 기본 사용)</option>
+					<option value="">{ i18n.T("opt_service_default") }</option>
 				</select>
 				<small class="hint">{ i18n.T("ph_model_default") }</small>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_access") }</div>
+		@FormSection(i18n.T("sec_access")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_work_dir") }</span>
 				<input name="work_dir" placeholder={ i18n.T("ph_workdir") }/>
@@ -77,10 +74,9 @@ templ ClientCreate(services []*ServiceVM, serviceModels map[string]ServiceModelG
 				<span class="wv-field-label">{ i18n.T("f_token") }</span>
 				<input name="token" placeholder={ i18n.T("ph_token_auto") }/>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_appearance") }</div>
+		@FormSection(i18n.T("sec_appearance")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_avatar") }</span>
 				<div class="avatar-row">
@@ -89,11 +85,11 @@ templ ClientCreate(services []*ServiceVM, serviceModels map[string]ServiceModelG
 				</div>
 				<small class="hint">{ i18n.T("hint_avatar") }</small>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-actions">
+		@FormActions() {
 			<button type="button" class="btn-secondary" data-wv-dismiss>{ i18n.T("act_cancel") }</button>
 			<button type="submit">{ i18n.T("act_add") }</button>
-		</div>
+		}
 	</form>
 }

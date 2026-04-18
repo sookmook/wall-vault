@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -24,13 +25,21 @@ type Registry struct {
 	models    []Model
 	updatedAt time.Time
 	ttl       time.Duration
+	maxSize   int
 }
+
+// defaultRegistryMax caps the cached model list. OpenRouter alone serves
+// hundreds of models and new ones land constantly; without this the cache
+// can grow unbounded across refreshes, which hurts handleOpenAIModels
+// response size and registry walk cost. 2000 leaves huge headroom for real
+// fleets while preventing pathological blowup.
+const defaultRegistryMax = 2000
 
 func NewRegistry(ttl time.Duration) *Registry {
 	if ttl == 0 {
 		ttl = 10 * time.Minute
 	}
-	return &Registry{ttl: ttl}
+	return &Registry{ttl: ttl, maxSize: defaultRegistryMax}
 }
 
 // All: return all models (optional service filter)
@@ -80,12 +89,21 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 			all = append(all, fetchOpenAICompat(svc, localURLs["lmstudio"], "http://localhost:1234")...)
 		case "vllm":
 			all = append(all, fetchOpenAICompat(svc, localURLs["vllm"], "http://localhost:8000")...)
+		case "llamacpp":
+			all = append(all, fetchOpenAICompat(svc, localURLs["llamacpp"], "http://localhost:8080")...)
 		default:
 			// custom service: try OpenAI-compatible model list if URL is present
 			if u := localURLs[svc]; u != "" {
 				all = append(all, fetchOpenAICompat(svc, u, "")...)
 			}
 		}
+	}
+
+	// Cap cache size so a buggy or unusually large upstream catalog can't
+	// balloon memory indefinitely across refreshes.
+	if r.maxSize > 0 && len(all) > r.maxSize {
+		fmt.Fprintf(os.Stderr, "[registry] model catalog truncated: %d → %d (maxSize)\n", len(all), r.maxSize)
+		all = all[:r.maxSize]
 	}
 
 	r.models = all
@@ -377,6 +395,10 @@ func compatFallback(service string) []Model {
 	case "vllm":
 		return []Model{
 			{ID: "local-model", Name: "Local Model (vLLM)", Service: "vllm"},
+		}
+	case "llamacpp":
+		return []Model{
+			{ID: "local-model", Name: "Local Model (llama.cpp)", Service: "llamacpp"},
 		}
 	default:
 		return nil

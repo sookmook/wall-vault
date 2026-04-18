@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 )
 
 // Broker: SSE event broadcaster
@@ -12,7 +13,19 @@ type Broker struct {
 	mu        sync.RWMutex
 	clients   map[chan string]struct{}
 	OnConnect func() // called (in a goroutine) after a new SSE client connects
+
+	// droppedEvents counts events that had to be dropped because a subscriber's
+	// channel was full. Surfaced via /api/status so operators can spot slow
+	// clients instead of silently losing agents_sync / config_change updates.
+	droppedEvents atomic.Int64
 }
+
+// subscribeBufferSize is the per-subscriber channel buffer. 8 turned out to be
+// too tight for the 15s agents_sync cadence + burstier config_change bursts —
+// slow tabs dropped events silently. 64 keeps roughly a minute of peak traffic
+// in memory per subscriber; memory footprint is negligible for the few tabs we
+// ever have open.
+const subscribeBufferSize = 64
 
 func NewBroker() *Broker {
 	return &Broker{
@@ -22,11 +35,17 @@ func NewBroker() *Broker {
 
 // Subscribe: register a new SSE client channel
 func (b *Broker) Subscribe() chan string {
-	ch := make(chan string, 8)
+	ch := make(chan string, subscribeBufferSize)
 	b.mu.Lock()
 	b.clients[ch] = struct{}{}
 	b.mu.Unlock()
 	return ch
+}
+
+// DroppedEvents returns how many SSE events have been dropped because a
+// subscriber's buffer was full.
+func (b *Broker) DroppedEvents() int64 {
+	return b.droppedEvents.Load()
 }
 
 // Unsubscribe: deregister a client channel
@@ -55,7 +74,8 @@ func (b *Broker) Broadcast(evt SSEEvent) {
 		select {
 		case ch <- msg:
 		default:
-			// skip full channels (slow client)
+			// slow subscriber — count the drop so it shows up in /api/status
+			b.droppedEvents.Add(1)
 		}
 	}
 }

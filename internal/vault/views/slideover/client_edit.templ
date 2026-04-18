@@ -2,6 +2,7 @@ package slideover
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/sookmook/wall-vault/internal/i18n"
 )
@@ -20,8 +21,7 @@ func serviceModelJSON(m map[string]ServiceModelGroup) string {
 templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 	<form data-wv-submit={"/admin/clients/" + c.ID} data-wv-method="PUT" class="wv-form"
 		data-wv-service-models={ serviceModelJSON(c.ServiceModelMap) }>
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_basic") }</div>
+		@FormSection(i18n.T("sec_basic")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_name") }</span>
 				<input name="name" value={c.Name}/>
@@ -35,10 +35,9 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 					}
 				</select>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_routing") }</div>
+		@FormSection(i18n.T("sec_routing")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_preferred_service") }</span>
 				<select name="preferred_service" data-wv-service-select>
@@ -50,17 +49,17 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_model_override") }</span>
 				<select name="model_override" data-wv-model-override data-wv-current={c.ModelOverride}>
-					<option value="">(서비스 기본 사용)</option>
+					<option value="">{ i18n.T("opt_service_default") }</option>
 					if c.ModelOverride != "" && !c.OverrideInCurrentGroup() {
-						<option value={c.ModelOverride} selected>{ c.ModelOverride + " (⚠ 현재 값 · 저장 시 초기화)" }</option>
+						<option value={c.ModelOverride} selected>{ c.ModelOverride + " " + i18n.T("warn_stale_override_short") }</option>
 					}
 					if c.CurrentGroup.Default != "" {
-						<optgroup label="기본">
+						<optgroup label={ i18n.T("lbl_group_default") }>
 							<option value={c.CurrentGroup.Default} selected?={c.CurrentGroup.Default == c.ModelOverride}>{ c.CurrentGroup.Default }</option>
 						</optgroup>
 					}
 					if len(c.CurrentGroup.Allowed) > 0 {
-						<optgroup label="허용 목록">
+						<optgroup label={ i18n.T("lbl_group_allowed") }>
 							for _, m := range c.CurrentGroup.Allowed {
 								<option value={m} selected?={m == c.ModelOverride}>{ m }</option>
 							}
@@ -69,13 +68,12 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				</select>
 				<small class="hint">{ i18n.T("ph_model_default") }</small>
 				if c.ModelOverride != "" && !c.OverrideInCurrentGroup() {
-					<small class="hint wv-stale-override">{ "⚠ 현재 model_override '" + c.ModelOverride + "'는 이 서비스의 허용 목록에 없어 저장 시 서비스 기본으로 초기화됩니다." }</small>
+					<small class="hint wv-stale-override">{ strings.Replace(i18n.T("warn_stale_override_body"), "{val}", c.ModelOverride, 1) }</small>
 				}
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_access") }</div>
+		@FormSection(i18n.T("sec_access")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_work_dir") }</span>
 				<input name="work_dir" value={c.WorkDir} placeholder={ i18n.T("ph_workdir") }/>
@@ -90,10 +88,9 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				<input type="checkbox" name="enabled" checked?={c.Enabled}/>
 				<span>{ i18n.T("f_enabled") }</span>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-section">
-			<div class="wv-form-section-title">{ i18n.T("sec_appearance") }</div>
+		@FormSection(i18n.T("sec_appearance")) {
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_avatar") }</span>
 				<div class="avatar-row">
@@ -106,11 +103,11 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				</div>
 				<small class="hint">{ i18n.T("hint_avatar") }</small>
 			</label>
-		</div>
+		}
 
-		<div class="wv-form-actions">
+		@FormActions() {
 			<button type="button" class="btn-secondary" data-wv-dismiss>{ i18n.T("act_cancel") }</button>
 			<button type="submit">{ i18n.T("act_save") }</button>
-		</div>
+		}
 	</form>
 }

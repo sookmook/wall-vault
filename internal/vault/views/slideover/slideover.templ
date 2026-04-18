@@ -1,10 +1,14 @@
 package slideover
 
+import "github.com/sookmook/wall-vault/internal/i18n"
+
 templ Frame(title string, body templ.Component) {
-	<aside id="slideover" data-open="true" hx-swap-oob="true">
+	<aside id="slideover" data-open="true" hx-swap-oob="true"
+		role="dialog" aria-modal="true" aria-labelledby="wv-slideover-title">
 		<div class="slideover-head">
-			<b>✏︎ { title }</b>
-			<button type="button" class="slideover-close" data-wv-dismiss title="닫기 (Esc)">✕</button>
+			<b id="wv-slideover-title">✏︎ { title }</b>
+			<button type="button" class="slideover-close" data-wv-dismiss
+				aria-label={ i18n.T("act_close") } title={ i18n.T("act_close") }>✕</button>
 		</div>
 		<hr/>
 		@body
@@ -12,5 +16,5 @@ templ Frame(title string, body templ.Component) {
 }
 
 templ Empty() {
-	<aside id="slideover" hx-swap-oob="true"></aside>
+	<aside id="slideover" hx-swap-oob="true" aria-hidden="true"></aside>
 }

@@ -1,11 +1,15 @@
 package mainview
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
 
 templ ServiceCard(s *ServiceVM) {
 	<div class="card" data-wv-id={s.ID} hx-get={"/hx/services/" + s.ID + "/edit"} hx-target="#slideover" hx-swap="outerHTML">
 		<div class="card-head">
-			<span class="drag-handle" title="드래그하여 순서 변경" draggable="true">⋮⋮</span>
+			<span class="drag-handle" title={ i18n.T("tip_drag_reorder") } draggable="true">⋮⋮</span>
 			<span class={ "dot " + dotClass(s.Enabled, s.ProxyEnabled) }></span>
 			<span class="card-title">{ s.Name }</span>
 			if s.ProxyEnabled {

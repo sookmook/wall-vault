@@ -127,7 +127,7 @@ func applyClineConfig(baseURL, model, token string) (string, error) {
 // findClineDataDir returns the path to the Cline data directory.
 // Search order:
 //  1. $HOME/.cline/data           — native Linux / macOS
-//  2. WSL mount from $USERPROFILE — e.g. /mnt/c/Users/sookmook/.cline/data
+//  2. WSL mount from $USERPROFILE — e.g. /mnt/c/Users/<windows-user>/.cline/data
 //  3. Scan /mnt/c/Users/*/        — WSL fallback when $USERPROFILE is unset
 func findClineDataDir() (string, error) {
 	var candidates []string
@@ -601,14 +601,30 @@ func windowsPathToWSL(winPath string) string {
 // original file survives intact — this prevents the 0-byte clobber that
 // occurs when os.WriteFile's internal O_TRUNC runs but the data write
 // doesn't complete (observed during pkill -x wall-vault deploys).
+//
+// Also re-checks the parent directory exists: findClineDataDir / other
+// discovery helpers return a path that was valid at lookup time, but the
+// user may have uninstalled or moved the agent between discovery and the
+// write (TOCTOU). Failing early with a clear "parent missing" message
+// beats a cryptic os.Rename error in the logs.
 func writeJSON(path string, v interface{}) error {
+	parent := filepath.Dir(path)
+	if fi, err := os.Stat(parent); err != nil {
+		return fmt.Errorf("agent config parent %s missing: %w", parent, err)
+	} else if !fi.IsDir() {
+		return fmt.Errorf("agent config parent %s is not a directory", parent)
+	}
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal %s: %w", path, err)
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return err
+		return fmt.Errorf("write %s: %w", tmp, err)
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		// Leave the .tmp behind for inspection; caller will surface the error.
+		return fmt.Errorf("rename %s → %s: %w", tmp, path, err)
+	}
+	return nil
 }

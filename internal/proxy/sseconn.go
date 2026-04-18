@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -26,6 +27,12 @@ type SSEClient struct {
 	onUsageReset    func()                                   // midnight daily-counter reset callback
 	onServiceChange func([]string)                           // proxy service list change callback
 	onReconnect     func()                                   // called after SSE reconnect to re-sync state
+
+	// reconnectInFlight ensures at most one onReconnect handler runs at a time.
+	// Without this, a vault that keeps dropping the SSE stream would spawn a
+	// fresh sync goroutine on every reconnect, piling up indefinitely when the
+	// sync itself is slow or stuck on a hung HTTP call.
+	reconnectInFlight atomic.Bool
 }
 
 func NewSSEClient(vaultURL, clientID, token string, onConfig func(service, model string), onAnyConfig func(clientID, agentType, service, model string), onConfigFlush func(), onKeyChange func(), onUsageReset func(), onServiceChange func([]string), onReconnect func()) *SSEClient {
@@ -71,8 +78,16 @@ func (c *SSEClient) loop() {
 		}
 		// On reconnect (not first connect): immediately re-sync model/config from vault
 		// to pick up any changes that occurred while the SSE connection was down.
+		// Throttled so a flapping vault can't pile up concurrent syncs.
 		if !first && c.onReconnect != nil {
-			go c.onReconnect()
+			if c.reconnectInFlight.CompareAndSwap(false, true) {
+				go func() {
+					defer c.reconnectInFlight.Store(false)
+					c.onReconnect()
+				}()
+			} else {
+				log.Printf("[SSE] skip onReconnect — previous sync still running")
+			}
 		}
 		first = false
 	}

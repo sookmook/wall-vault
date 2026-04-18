@@ -52,11 +52,23 @@ func Check(cfg *config.Config) []ServiceStatus {
 		resp.Body.Close()
 		s.Running = resp.StatusCode == http.StatusOK
 		s.Version = extractVersion(body)
-		if s.Running {
-			s.Detail = "정상"
-		} else {
+		if !s.Running {
 			s.Detail = fmt.Sprintf("HTTP %d", resp.StatusCode)
+			continue
 		}
+		// 200 OK alone is not enough — validate the body parses as JSON with a
+		// `status` field, otherwise the port is listening but the service is
+		// misconfigured (e.g. wrong binary, crashed handler returning HTML).
+		var probe map[string]interface{}
+		if err := json.Unmarshal(body, &probe); err != nil {
+			s.Detail = "응답 형식 오류 (JSON 파싱 실패)"
+			continue
+		}
+		if _, ok := probe["status"]; !ok {
+			s.Detail = "응답 형식 오류 (status 필드 없음)"
+			continue
+		}
+		s.Detail = "정상"
 	}
 	return services
 }

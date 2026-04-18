@@ -106,7 +106,13 @@ func OpenAIToGemini(req *OpenAIRequest) *GeminiRequest {
 					}
 					argsStr, _ := fn["arguments"].(string)
 					var args interface{}
-					if json.Unmarshal([]byte(argsStr), &args) != nil {
+					if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
+						// Upstream (or our own converter upstream of this) sent a
+						// tool_call whose arguments field isn't valid JSON. Log with
+						// the function name so a misbehaving agent can be spotted,
+						// and fall back to an empty object so the conversion doesn't
+						// drop the call entirely (Gemini requires an args map).
+						log.Printf("[convert] tool_call %q arguments parse failed: %v", name, err)
 						args = map[string]interface{}{}
 					}
 					parts = append(parts, GeminiPart{
@@ -562,19 +568,25 @@ func anthropicToOpenAIReq(req *AnthropicRequest, model string) *OpenAIRequest {
 					case "tool_result":
 						content := ""
 						// tool_result content can be string or content blocks
-						if json.Unmarshal(b.Content, &content) != nil {
+						if err := json.Unmarshal(b.Content, &content); err != nil {
 							// Try as content blocks
 							var parts []struct {
 								Type string `json:"type"`
 								Text string `json:"text"`
 							}
-							if json.Unmarshal(b.Content, &parts) == nil {
+							if err2 := json.Unmarshal(b.Content, &parts); err2 == nil {
 								for _, p := range parts {
 									if p.Type == "text" {
 										content += p.Text
 									}
 								}
 							} else {
+								// Neither string nor content-block array — this is
+								// unexpected from a spec-conformant Anthropic client.
+								// Log once so the malformed tool result can be traced
+								// back to the caller; still forward the raw bytes as
+								// a string so the turn isn't silently dropped.
+								log.Printf("[convert] tool_result content parse failed (string: %v, blocks: %v), forwarding raw", err, err2)
 								content = string(b.Content)
 							}
 						}

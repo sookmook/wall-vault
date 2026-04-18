@@ -59,11 +59,20 @@ jobs:
           go-version: "1.22"
           cache: true
 
+      - name: Derive version (Makefile-compatible)
+        id: ver
+        run: |
+          # Match `make build`: BASE_VERSION (from Makefile) + UTC timestamp.
+          BASE=$(awk -F '= *' '/^BASE_VERSION[[:space:]]*=/{print $2; exit}' Makefile)
+          STAMP=$(date -u +%Y%m%d.%H%M%S)
+          SHA=$(git rev-parse --short HEAD)
+          echo "version=${BASE}.${STAMP}+${SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
           go build \
-            -ldflags "-X main.version=$(git describe --tags --always --dirty) -s -w" \
+            -ldflags "-X main.version=${{ steps.ver.outputs.version }} -s -w" \
             -o bin/wall-vault-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .

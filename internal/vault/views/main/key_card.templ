@@ -1,6 +1,10 @@
 package mainview
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
 
 templ KeyCard(k *KeyVM) {
 	<div class="card key-card" data-wv-id={k.ID}>
@@ -10,7 +14,7 @@ templ KeyCard(k *KeyVM) {
 			if k.Label != "" {
 				<span class="chip">{ k.Label }</span>
 			}
-			<button type="button" class="card-del" title="삭제" data-wv-delete={"/admin/keys/" + k.ID}>✕</button>
+			<button type="button" class="card-del" title={ i18n.T("tip_delete") } data-wv-delete={"/admin/keys/" + k.ID}>✕</button>
 		</div>
 		<div class="card-meta">
 			<span class="chip" title="ID">🔑 { k.IDShort }</span>

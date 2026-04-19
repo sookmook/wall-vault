@@ -361,6 +361,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Detecção automática de servidores locais instalados no seu computador |
 | LM Studio | Servidor local no seu computador (porta 1234) |
 | vLLM | Servidor local no seu computador (porta 8000) |
+| llama.cpp | Servidor local no seu computador (porta 8080) |
 
 ---
 
@@ -612,11 +613,12 @@ Usado ao instalar o proxy wall-vault pela primeira vez em um novo computador e c
 Card para ativar/desativar ou configurar os serviços de IA.
 
 - Switch toggle para ativar/desativar cada serviço
-- Ao inserir o endereço de servidores de IA locais (Ollama, LM Studio, vLLM, etc., executados no seu computador), os modelos disponíveis são detectados automaticamente.
+- Ao inserir o endereço de servidores de IA locais (Ollama, LM Studio, vLLM, llama.cpp, etc., executados no seu computador), os modelos disponíveis são detectados automaticamente.
 - **Indicador de status de conexão de serviço local**: O ponto ● ao lado do nome do serviço fica **verde** quando conectado, **cinza** quando não conectado
-- **Semáforo automático de serviço local** (v0.1.23+): Serviços locais (Ollama, LM Studio, vLLM) são ativados/desativados automaticamente com base na disponibilidade de conexão. Ao ativar um serviço, em até 15 segundos o ponto ● fica verde e a checkbox é ativada; ao desativar o serviço, ele é desligado automaticamente. Funciona da mesma forma que o toggle automático de serviços cloud (Google, OpenRouter, etc.) baseado na presença de API keys.
+- **Semáforo automático de serviço local** (v0.1.23+): Serviços locais (Ollama, LM Studio, vLLM, llama.cpp) são ativados/desativados automaticamente com base na disponibilidade de conexão. Ao ativar um serviço, em até 15 segundos o ponto ● fica verde e a checkbox é ativada; ao desativar o serviço, ele é desligado automaticamente. Funciona da mesma forma que o toggle automático de serviços cloud (Google, OpenRouter, etc.) baseado na presença de API keys.
+- **Toggle do modo de raciocínio** (v0.2.17+): Uma checkbox **modo de raciocínio** aparece na parte inferior do formulário de edição dos serviços locais. Quando ativada, o proxy adiciona `"reasoning": true` ao corpo das chat-completions enviado ao upstream, permitindo que modelos compatíveis com a saída do processo de raciocínio — como DeepSeek R1 ou Qwen QwQ — retornem também blocos `<think>…</think>`. Servidores que não conhecem esse campo simplesmente o ignoram, então você pode deixá-la ativada com segurança mesmo em workloads mistas.
 
-> 💡 **Se o serviço local está rodando em outro computador**: Insira o IP daquele computador no campo de URL do serviço. Ex.: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Se o serviço estiver vinculado apenas a `127.0.0.1` e não a `0.0.0.0`, o acesso por IP externo não funcionará — verifique o endereço de vinculação nas configurações do serviço.
+> 💡 **Se o serviço local está rodando em outro computador**: Insira o IP daquele computador no campo de URL do serviço. Ex.: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Se o serviço estiver vinculado apenas a `127.0.0.1` e não a `0.0.0.0`, o acesso por IP externo não funcionará — verifique o endereço de vinculação nas configurações do serviço.
 
 ### Entrada do token de administrador
 

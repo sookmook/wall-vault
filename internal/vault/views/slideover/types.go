@@ -8,9 +8,10 @@ type ServiceVM struct {
 	LocalURL      string
 	Enabled       bool
 	ProxyEnabled  bool
+	ReasoningMode bool     // local services: inject reasoning flag on forwarded requests
 	SortOrder     int
 	AllowedModels []string
-	IsLocal       bool     // ollama / lmstudio / vllm — show LocalURL input
+	IsLocal       bool     // ollama / lmstudio / vllm / llamacpp — show LocalURL input + reasoning toggle
 	Models        []string // live-queried model options for the default_model datalist
 	// CatalogUnused lists provider-registry models that are NOT already in
 	// DefaultModel or AllowedModels — rendered as a checkbox picker so admins

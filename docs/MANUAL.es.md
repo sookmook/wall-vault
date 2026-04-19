@@ -324,6 +324,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Detección automática desde servidor instalado localmente |
 | LM Studio | Servidor local (puerto 1234) |
 | vLLM | Servidor local (puerto 8000) |
+| llama.cpp | Servidor local (puerto 8080) |
 
 ---
 
@@ -575,11 +576,12 @@ Cuando cierras VS Code, la tarjeta de agente en el panel se vuelve amarilla (ret
 Una tarjeta para habilitar/deshabilitar y configurar servicios de IA.
 
 - Interruptor de activación/desactivación por servicio
-- Ingresa la dirección de servidores de IA locales (Ollama, LM Studio, vLLM, etc. en tu máquina) y los modelos disponibles se descubren automáticamente.
+- Ingresa la dirección de servidores de IA locales (Ollama, LM Studio, vLLM, llama.cpp, etc. en tu máquina) y los modelos disponibles se descubren automáticamente.
 - **Estado de conexión del servicio local**: El punto junto al nombre del servicio es **verde** si está conectado, **gris** si no
-- **Semáforo automático de servicio local** (v0.1.23+): Los servicios locales (Ollama, LM Studio, vLLM) se activan/desactivan automáticamente según la conectividad. Cuando un servicio se vuelve accesible, cambia a verde y la casilla se activa en 15 segundos; cuando se vuelve inaccesible, se desactiva automáticamente. Funciona de la misma manera que los servicios en la nube (Google, OpenRouter, etc.) que se alternan automáticamente según la disponibilidad de claves API.
+- **Semáforo automático de servicio local** (v0.1.23+): Los servicios locales (Ollama, LM Studio, vLLM, llama.cpp) se activan/desactivan automáticamente según la conectividad. Cuando un servicio se vuelve accesible, cambia a verde y la casilla se activa en 15 segundos; cuando se vuelve inaccesible, se desactiva automáticamente. Funciona de la misma manera que los servicios en la nube (Google, OpenRouter, etc.) que se alternan automáticamente según la disponibilidad de claves API.
+- **Interruptor de modo de razonamiento** (v0.2.17+): Aparece una casilla de **modo de razonamiento** en la parte inferior del panel de edición del servicio local. Al activarla, el proxy agrega `"reasoning": true` al cuerpo de chat-completions enviado al upstream, de modo que los modelos que exponen su proceso de pensamiento — como DeepSeek R1 o Qwen QwQ — devuelven un bloque `<think>…</think>` junto con la respuesta. Los servidores que no reconocen este campo simplemente lo ignoran, así que es seguro dejarla activada incluso en cargas de trabajo mixtas.
 
-> :bulb: **Si un servicio local se ejecuta en otra computadora**: Ingresa la IP de esa computadora en el campo URL del servicio. Ejemplo: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Si el servicio está vinculado a `127.0.0.1` en lugar de `0.0.0.0`, el acceso por IP externa no funcionará — verifica la dirección de enlace en la configuración del servicio.
+> :bulb: **Si un servicio local se ejecuta en otra computadora**: Ingresa la IP de esa computadora en el campo URL del servicio. Ejemplo: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Si el servicio está vinculado a `127.0.0.1` en lugar de `0.0.0.0`, el acceso por IP externa no funcionará — verifica la dirección de enlace en la configuración del servicio.
 
 ### Entrada del Token de Administrador
 

@@ -357,6 +357,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Auto-detected from locally installed server |
 | LM Studio | Local server (port 1234) |
 | vLLM | Local server (port 8000) |
+| llama.cpp | Local server (port 8080) |
 
 ---
 
@@ -608,11 +609,12 @@ Use this when first installing wall-vault proxy on a new computer and connecting
 A card for enabling/disabling and configuring AI services.
 
 - Per-service enable/disable toggle switch
-- Enter the address of local AI servers (Ollama, LM Studio, vLLM, etc. running on your machine) and available models are automatically discovered.
+- Enter the address of local AI servers (Ollama, LM Studio, vLLM, llama.cpp, etc. running on your machine) and available models are automatically discovered.
 - **Local service connection status**: The dot next to the service name is **green** if connected, **gray** if not
-- **Local service auto traffic light** (v0.1.23+): Local services (Ollama, LM Studio, vLLM) are automatically enabled/disabled based on connectivity. When a service becomes reachable, it turns green and the checkbox activates within 15 seconds; when it becomes unreachable, it automatically deactivates. This works the same way cloud services (Google, OpenRouter, etc.) auto-toggle based on API key availability.
+- **Local service auto traffic light** (v0.1.23+): Local services (Ollama, LM Studio, vLLM, llama.cpp) are automatically enabled/disabled based on connectivity. When a service becomes reachable, it turns green and the checkbox activates within 15 seconds; when it becomes unreachable, it automatically deactivates. This works the same way cloud services (Google, OpenRouter, etc.) auto-toggle based on API key availability.
+- **Reasoning mode toggle** (v0.2.17+): A **reasoning mode** checkbox appears at the bottom of the local service edit pane. When enabled, the proxy adds `"reasoning": true` to the chat-completions body sent upstream, so models that expose their thought process — such as DeepSeek R1 or Qwen QwQ — return a `<think>…</think>` block alongside the answer. Servers that don't recognize the field simply ignore it, so it's safe to leave enabled even in mixed workloads.
 
-> :bulb: **If a local service is running on another computer**: Enter that computer's IP in the service URL field. Example: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). If the service is bound to `127.0.0.1` rather than `0.0.0.0`, external IP access won't work — check the binding address in the service settings.
+> :bulb: **If a local service is running on another computer**: Enter that computer's IP in the service URL field. Example: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). If the service is bound to `127.0.0.1` rather than `0.0.0.0`, external IP access won't work — check the binding address in the service settings.
 
 ### Admin Token Entry
 

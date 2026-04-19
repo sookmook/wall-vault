@@ -174,6 +174,8 @@
   "hint_ip_open": "Leave blank to allow all IPs.",
   "hint_default_model": "Used when an agent leaves model_override blank.",
   "hint_proxy_enabled": "Disabled = excluded from dispatch chain (still shown).",
+  "f_reasoning_mode": "推理模式",
+  "hint_reasoning_mode": "请求本地模型输出推理过程 (仅对支持的模型有效)",
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",

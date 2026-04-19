@@ -54,8 +54,9 @@ type Server struct {
 	claudeCodeClientID string            // vault client ID for the local claude-code agent (from syncFromVault)
 	ownAgentType       string            // this proxy's own agent_type (from syncFromVault)
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
-	serviceURLs     map[string]string // service ID → local URL from vault config
-	serviceDefaults map[string]string // service ID → default_model from vault config
+	serviceURLs      map[string]string // service ID → local URL from vault config
+	serviceDefaults  map[string]string // service ID → default_model from vault config
+	serviceReasoning map[string]bool   // service ID → reasoning_mode toggle from vault config
 	keyMgr          *KeyManager
 	filter          *ToolFilter
 	sse             *SSEClient
@@ -485,9 +486,10 @@ func (s *Server) syncAllowedServices() error {
 		return fmt.Errorf("서비스 목록 조회 실패: HTTP %d", resp.StatusCode)
 	}
 	var svcs []struct {
-		ID           string `json:"id"`
-		LocalURL     string `json:"local_url"`
-		DefaultModel string `json:"default_model"`
+		ID            string `json:"id"`
+		LocalURL      string `json:"local_url"`
+		DefaultModel  string `json:"default_model"`
+		ReasoningMode bool   `json:"reasoning_mode"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&svcs); err != nil {
 		return err
@@ -495,6 +497,7 @@ func (s *Server) syncAllowedServices() error {
 	ids := make([]string, 0, len(svcs))
 	urls := make(map[string]string, len(svcs))
 	defaults := make(map[string]string, len(svcs))
+	reasoning := make(map[string]bool, len(svcs))
 	for _, sv := range svcs {
 		ids = append(ids, sv.ID)
 		if sv.LocalURL != "" {
@@ -503,13 +506,17 @@ func (s *Server) syncAllowedServices() error {
 		if sv.DefaultModel != "" {
 			defaults[sv.ID] = sv.DefaultModel
 		}
+		if sv.ReasoningMode {
+			reasoning[sv.ID] = true
+		}
 	}
 	s.mu.Lock()
 	s.allowedServices = ids
 	s.serviceURLs = urls
 	s.serviceDefaults = defaults
+	s.serviceReasoning = reasoning
 	s.mu.Unlock()
-	log.Printf("[sync] 프록시 서비스 목록: %v (urls: %v, defaults: %v)", ids, urls, defaults)
+	log.Printf("[sync] 프록시 서비스 목록: %v (urls: %v, defaults: %v, reasoning: %v)", ids, urls, defaults, reasoning)
 	return nil
 }
 
@@ -1500,6 +1507,9 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// /v1/chat/completions accepts the standard OpenAI format including arguments-as-string.
 	oaiReq := GeminiToOpenAI(model, req)
 	oaiReq.Stream = false
+	s.mu.RLock()
+	oaiReq.Reasoning = s.serviceReasoning["ollama"]
+	s.mu.RUnlock()
 	data, _ := json.Marshal(oaiReq)
 
 	// Ollama is a local service: inference can take several minutes for large models.
@@ -1554,6 +1564,9 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 
 	oaiReq := GeminiToOpenAI(model, req)
 	oaiReq.Stream = false
+	s.mu.RLock()
+	oaiReq.Reasoning = s.serviceReasoning[serviceID]
+	s.mu.RUnlock()
 	data, _ := json.Marshal(oaiReq)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))

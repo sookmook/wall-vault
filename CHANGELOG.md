@@ -21,6 +21,25 @@ deployments can move off v0.2.16 in one step.
   `lmstudio`/`vllm` (OpenAI-compatible `/v1/chat/completions`). Dashboard
   treats it as a local service (no key required). Users configure
   `local_url` and `default_model` via the service edit slideover.
+- **Reasoning mode toggle for local services** (`ServiceConfig.ReasoningMode`):
+  new per-service checkbox shown in the edit slideover for Ollama /
+  lmstudio / vLLM / llama.cpp. When enabled, the proxy sets
+  `OpenAIRequest.Reasoning = true` before marshalling, so forwarded
+  chat-completions bodies include `"reasoning": true`. Servers that
+  understand the flag emit thinking/chain-of-thought output; others
+  ignore the unknown field. The toggle is synced from vault to proxies
+  via `/api/services` (now returns `reasoning_mode` alongside
+  `local_url` / `default_model`) and stored in `serviceReasoning` on
+  the proxy side. New i18n keys `f_reasoning_mode` /
+  `hint_reasoning_mode` across all 17 locales.
+- **Service edit dropdown falls back to on-demand model fetch**: opening
+  the edit slideover for a *disabled* local service (e.g. a freshly
+  added llama.cpp) used to show an empty `default_model` dropdown
+  because `ensureRegistry` skipped disabled services. A new
+  `Registry.RefreshService(svcID, localURL, orKey)` method fetches
+  models for a single service and upserts them into the cache; the
+  slideover renderer now triggers it whenever the registry returns
+  zero entries for the service being edited.
 
 ### Changed
 

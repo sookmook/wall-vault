@@ -324,6 +324,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Hugundua kiotomatiki seva ya ndani iliyofungwa kwenye kompyuta yako |
 | LM Studio | Seva ya ndani ya kompyuta (bandari 1234) |
 | vLLM | Seva ya ndani ya kompyuta (bandari 8000) |
+| llama.cpp | Seva ya ndani ya kompyuta (bandari 8080) |
 
 ---
 
@@ -575,11 +576,12 @@ Kinatumika unapofunga proxy ya wall-vault kwenye kompyuta mpya na kuiunganisha n
 Kadi ya kuwasha, kuzima, au kusanidi huduma za AI za kutumia.
 
 - Swichi ya kuzima·kuwasha kwa kila huduma
-- Ukiingiza anwani ya seva ya AI ya ndani (Ollama, LM Studio, vLLM n.k. inayoendesha kwenye kompyuta yako), itagundua kiotomatiki modeli zinazopatikana.
+- Ukiingiza anwani ya seva ya AI ya ndani (Ollama, LM Studio, vLLM, llama.cpp n.k. inayoendesha kwenye kompyuta yako), itagundua kiotomatiki modeli zinazopatikana.
 - **Onyesho la hali ya muunganisho wa huduma ya ndani**: Nukta ya ● kando ya jina la huduma ikiwa **kijani** imeunganishwa, **kijivu** haijaunganishwa
-- **Taa ya trafiki ya kiotomatiki ya huduma ya ndani** (v0.1.23+): Huduma za ndani (Ollama, LM Studio, vLLM) zinawashwa/kuzimwa kiotomatiki kulingana na upatikanaji wa muunganisho. Ukiwasha huduma, ndani ya sekunde 15 ● inaonekana kijani na kisanduku cha kuangalia kinawashwa, na ukizima huduma, inazimwa kiotomatiki. Njia ile ile na huduma za wingu (Google, OpenRouter n.k.) zinazobadilika kiotomatiki kulingana na upatikanaji wa API key.
+- **Taa ya trafiki ya kiotomatiki ya huduma ya ndani** (v0.1.23+): Huduma za ndani (Ollama, LM Studio, vLLM, llama.cpp) zinawashwa/kuzimwa kiotomatiki kulingana na upatikanaji wa muunganisho. Ukiwasha huduma, ndani ya sekunde 15 ● inaonekana kijani na kisanduku cha kuangalia kinawashwa, na ukizima huduma, inazimwa kiotomatiki. Njia ile ile na huduma za wingu (Google, OpenRouter n.k.) zinazobadilika kiotomatiki kulingana na upatikanaji wa API key.
+- **Kibadilishaji cha hali ya ufikirishaji** (v0.2.17+): Chini ya dirisha la kuhariri huduma ya ndani kunaonekana kisanduku cha kuangalia cha **hali ya ufikirishaji**. Ukikiwasha, proksi itaongeza `"reasoning": true` kwenye mwili wa chat-completions inayotumwa kwa seva ya juu, ili modeli zinazoauni utoaji wa mchakato wa mawazo kama DeepSeek R1, Qwen QwQ zirudishe pamoja kizuizi cha `<think>…</think>`. Seva zisizojua uwanja huu zitaupuuza, kwa hivyo unaweza kuiacha imewashwa kwa usalama hata katika mizigo mchanganyiko.
 
-> 💡 **Ikiwa huduma ya ndani inaendesha kwenye kompyuta nyingine**: Ingiza IP ya kompyuta hiyo kwenye sehemu ya kuingiza URL ya huduma. Mfano: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Ikiwa huduma imefungwa kwa `127.0.0.1` tu badala ya `0.0.0.0`, kufikia kwa IP ya nje hakutafanya kazi, kwa hivyo angalia anwani ya kufunga kwenye usanidi wa huduma.
+> 💡 **Ikiwa huduma ya ndani inaendesha kwenye kompyuta nyingine**: Ingiza IP ya kompyuta hiyo kwenye sehemu ya kuingiza URL ya huduma. Mfano: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Ikiwa huduma imefungwa kwa `127.0.0.1` tu badala ya `0.0.0.0`, kufikia kwa IP ya nje hakutafanya kazi, kwa hivyo angalia anwani ya kufunga kwenye usanidi wa huduma.
 
 ### Kuingiza Tokeni ya Msimamizi
 

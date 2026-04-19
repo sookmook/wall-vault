@@ -95,6 +95,15 @@ templ ServiceEdit(s *ServiceVM) {
 				</label>
 				<small class="hint">{ i18n.T("hint_proxy_enabled") }</small>
 			</div>
+			if s.IsLocal {
+				<div class="wv-field">
+					<label class="wv-field-inline">
+						<input type="checkbox" name="reasoning_mode" checked?={s.ReasoningMode}/>
+						<span>{ i18n.T("f_reasoning_mode") }</span>
+					</label>
+					<small class="hint">{ i18n.T("hint_reasoning_mode") }</small>
+				</div>
+			}
 		}
 
 		@FormActions() {

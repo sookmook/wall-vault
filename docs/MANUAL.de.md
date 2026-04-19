@@ -361,6 +361,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Automatisch erkannt vom lokal installierten Server |
 | LM Studio | Lokaler Server (Port 1234) |
 | vLLM | Lokaler Server (Port 8000) |
+| llama.cpp | Lokaler Server (Port 8080) |
 
 ---
 
@@ -612,11 +613,12 @@ Verwenden Sie dies bei der Erstinstallation des wall-vault-Proxy auf einem neuen
 Eine Karte zum Ein-/Ausschalten und Konfigurieren von KI-Diensten.
 
 - Ein/Aus-Schalter pro Service
-- Geben Sie die Adresse lokaler KI-Server ein (Ollama, LM Studio, vLLM usw. auf Ihrem Rechner), und verfügbare Modelle werden automatisch erkannt.
+- Geben Sie die Adresse lokaler KI-Server ein (Ollama, LM Studio, vLLM, llama.cpp usw. auf Ihrem Rechner), und verfügbare Modelle werden automatisch erkannt.
 - **Lokaler Service-Verbindungsstatus**: Der Punkt neben dem Servicenamen ist **grün** bei Verbindung, **grau** wenn nicht verbunden
-- **Lokale Service-Automatik** (v0.1.23+): Lokale Dienste (Ollama, LM Studio, vLLM) werden basierend auf der Erreichbarkeit automatisch aktiviert/deaktiviert. Wenn ein Dienst erreichbar wird, wechselt er innerhalb von 15 Sekunden auf grün und das Kontrollkästchen wird aktiviert; bei Verbindungsabbruch wird automatisch deaktiviert. Funktioniert wie die schlüsselbasierte Automatik bei Cloud-Diensten (Google, OpenRouter usw.).
+- **Lokale Service-Automatik** (v0.1.23+): Lokale Dienste (Ollama, LM Studio, vLLM, llama.cpp) werden basierend auf der Erreichbarkeit automatisch aktiviert/deaktiviert. Wenn ein Dienst erreichbar wird, wechselt er innerhalb von 15 Sekunden auf grün und das Kontrollkästchen wird aktiviert; bei Verbindungsabbruch wird automatisch deaktiviert. Funktioniert wie die schlüsselbasierte Automatik bei Cloud-Diensten (Google, OpenRouter usw.).
+- **Reasoning-Modus-Schalter** (v0.2.17+): Am unteren Rand des Bearbeitungsdialogs für lokale Dienste erscheint ein **Reasoning-Modus**-Kontrollkästchen. Wenn aktiviert, fügt der Proxy dem an den Upstream gesendeten chat-completions-Body `"reasoning": true` hinzu, sodass Modelle, die Gedankenprozess-Ausgaben unterstützen — etwa DeepSeek R1 oder Qwen QwQ — zusätzlich `<think>…</think>`-Blöcke zurückgeben. Server, die dieses Feld nicht kennen, ignorieren es, daher kann die Option auch bei gemischten Workloads bedenkenlos aktiviert bleiben.
 
-> :bulb: **Wenn ein lokaler Dienst auf einem anderen Computer läuft**: Geben Sie die IP dieses Computers in das Service-URL-Feld ein. Beispiel: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Wenn der Dienst nur an `127.0.0.1` statt `0.0.0.0` gebunden ist, funktioniert der Zugriff über externe IP nicht — prüfen Sie die Bindungsadresse in den Diensteinstellungen.
+> :bulb: **Wenn ein lokaler Dienst auf einem anderen Computer läuft**: Geben Sie die IP dieses Computers in das Service-URL-Feld ein. Beispiel: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Wenn der Dienst nur an `127.0.0.1` statt `0.0.0.0` gebunden ist, funktioniert der Zugriff über externe IP nicht — prüfen Sie die Bindungsadresse in den Diensteinstellungen.
 
 ### Admin-Token-Eingabe
 

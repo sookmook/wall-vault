@@ -101,6 +101,7 @@ type OpenAIRequest struct {
 	Tools       []interface{}   `json:"tools,omitempty"`
 	ToolChoice  interface{}     `json:"tool_choice,omitempty"`
 	ServiceTier string          `json:"service_tier,omitempty"` // OpenClaw fast mode (strip before forwarding)
+	Reasoning   bool            `json:"reasoning,omitempty"`    // local services: request reasoning/thinking output
 }
 
 type OpenAIMessage struct {

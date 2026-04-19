@@ -111,6 +111,53 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 	return nil
 }
 
+// RefreshService fetches models for a single service and upserts them into the
+// cache, leaving entries for other services untouched. Called on demand from
+// the dashboard edit flow so a disabled service (skipped by the TTL-gated
+// full Refresh) still has model choices in its default_model dropdown.
+// orKey is only read when svcID == "openrouter"; pass "" otherwise.
+func (r *Registry) RefreshService(svcID, localURL, orKey string) {
+	var fetched []Model
+	switch svcID {
+	case "google":
+		fetched = fetchGoogle()
+	case "openrouter":
+		fetched = fetchOpenRouter(orKey)
+		if len(fetched) == 0 {
+			fetched = fetchOpenRouterKnown()
+		}
+	case "ollama":
+		fetched = fetchOllama(localURL)
+	case "openai":
+		fetched = fetchOpenAI()
+	case "anthropic":
+		fetched = fetchAnthropic()
+	case "github-copilot":
+		fetched = fetchGitHubCopilot()
+	case "lmstudio":
+		fetched = fetchOpenAICompat(svcID, localURL, "http://localhost:1234")
+	case "vllm":
+		fetched = fetchOpenAICompat(svcID, localURL, "http://localhost:8000")
+	case "llamacpp":
+		fetched = fetchOpenAICompat(svcID, localURL, "http://localhost:8080")
+	default:
+		if localURL != "" {
+			fetched = fetchOpenAICompat(svcID, localURL, "")
+		}
+	}
+	kept := make([]Model, 0, len(r.models)+len(fetched))
+	for _, m := range r.models {
+		if m.Service != svcID {
+			kept = append(kept, m)
+		}
+	}
+	kept = append(kept, fetched...)
+	if r.maxSize > 0 && len(kept) > r.maxSize {
+		kept = kept[:r.maxSize]
+	}
+	r.models = kept
+}
+
 // ─── Google ──────────────────────────────────────────────────────────────────
 
 // Google models use a fixed list (ListModels API requires authentication)

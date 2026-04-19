@@ -203,7 +203,7 @@ Same for VS Code + Continue extension:
 |---------|-------------|
 | **[OpenClaw Integration](#openclaw-integration)** ⭐ | The primary use case — Unix socket TUI events, openclaw.json auto-config, SSE model sync |
 | **NanoClaw Support** ⭐ | Lightweight OpenClaw-compatible agent — same `~/.openclaw/openclaw.json` config, default workdir `~/nanoclaw` |
-| **AI Proxy** | Google Gemini / OpenAI / Anthropic / OpenRouter / GitHub Copilot / Ollama / LMStudio / vLLM |
+| **AI Proxy** | Google Gemini / OpenAI / Anthropic / OpenRouter / GitHub Copilot / Ollama / LMStudio / vLLM / llama.cpp |
 | **Client Support** | OpenClaw / NanoClaw / Claude Code / Gemini CLI / Antigravity IDE / Cursor / VS Code / LM Studio / scripts |
 | **Key Vault** | API key management, usage monitoring, round-robin rotation |
 | **AES-GCM Encryption** | Keys encrypted with master password, never stored in plaintext |
@@ -211,7 +211,8 @@ Same for VS Code + Continue extension:
 | **Tool Security Filter** | Block function calling (`strip_all` / `whitelist` / `passthrough`) |
 | **Fallback Chain** | Auto-switch on service failure, final fallback to local Ollama |
 | **Model Registry** | 340+ OpenRouter models + dynamic local model discovery |
-| **Local AI Support** | Ollama / LM Studio / vLLM auto-detection + manual URL |
+| **Local AI Support** | Ollama / LM Studio / vLLM / llama.cpp auto-detection + manual URL |
+| **Local Reasoning Mode** | Per-service toggle for local backends — injects `"reasoning": true` into forwarded requests so models like DeepSeek R1 / Qwen QwQ emit thinking output |
 | **Service Management** | Add/edit/delete services from UI, custom service support |
 | **Proxy Service Filter** | "프록시 사용" checkbox per service — only checked services appear in agent model dropdowns and are dispatched by the proxy |
 | **Service Auto-check** | Dashboard load / key change → cloud services auto-enable/disable by key count |
@@ -524,9 +525,16 @@ vault:
 | `ollama` | Ollama | 11434 |
 | `lmstudio` | LM Studio | 1234 |
 | `vllm` | vLLM | 8000 |
+| `llamacpp` | llama.cpp | 8080 |
 | (custom) | Add your own | any |
 
 Local services: set URL and auto-detect models from the **Services** card in the dashboard.
+
+**Reasoning mode** — toggle per local service in the edit slideover. When enabled, the proxy
+adds `"reasoning": true` to the forwarded chat-completions body so models that support a
+thinking mode (e.g. DeepSeek R1 family on Ollama, Qwen QwQ on llama.cpp) emit their
+chain-of-thought output. Servers that don't recognize the field ignore it, so the flag is
+safe to leave on for mixed workloads.
 
 ---
 

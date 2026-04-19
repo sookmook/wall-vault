@@ -324,6 +324,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Yana gano server na cikin kwamfuta da aka girka ta atomatik |
 | LM Studio | Server na cikin kwamfuta (tashar 1234) |
 | vLLM | Server na cikin kwamfuta (tashar 8000) |
+| llama.cpp | Server na cikin kwamfuta (tashar 8080) |
 
 ---
 
@@ -575,11 +576,12 @@ Ana amfani da shi idan ana girka proxy na wall-vault a sabon kwamfuta da hadawa 
 Katin don kunna, kashe, ko saita sabis na AI da za a yi amfani da su.
 
 - Maballin kunna·kashe na kowane sabis
-- Idan ka shigar da adireshi na server na AI na cikin gida (Ollama, LM Studio, vLLM d.s. da ke gudana a kwamfutarka), zai gano model da ake samu ta atomatik.
+- Idan ka shigar da adireshi na server na AI na cikin gida (Ollama, LM Studio, vLLM, llama.cpp d.s. da ke gudana a kwamfutarka), zai gano model da ake samu ta atomatik.
 - **Nuni na halin hadar sabis na cikin gida**: Digon ● kusa da sunan sabis idan **kore** an hada, **toka** ba a hada ba
-- **Fitilun traffik ta atomatik na sabis na cikin gida** (v0.1.23+): Sabis na cikin gida (Ollama, LM Studio, vLLM) suna kunna/kashe ta atomatik bisa yiwuwar hada. Idan ka kunna sabis, a cikin dakika 15 ● ya zama kore kuma akwatin zabi ya kunna, kuma idan ka kashe sabis, ya kashe ta atomatik. Hanya guda ce da sabis na cloud (Google, OpenRouter d.s.) da ke canjawa ta atomatik bisa yiwuwar API key.
+- **Fitilun traffik ta atomatik na sabis na cikin gida** (v0.1.23+): Sabis na cikin gida (Ollama, LM Studio, vLLM, llama.cpp) suna kunna/kashe ta atomatik bisa yiwuwar hada. Idan ka kunna sabis, a cikin dakika 15 ● ya zama kore kuma akwatin zabi ya kunna, kuma idan ka kashe sabis, ya kashe ta atomatik. Hanya guda ce da sabis na cloud (Google, OpenRouter d.s.) da ke canjawa ta atomatik bisa yiwuwar API key.
+- **Maballin yanayin tunani** (v0.2.17+): A kasan taga gyara sabis na cikin gida, akwatin zabi na **yanayin tunani** zai bayyana. Idan ka kunna, proxy zai sa `"reasoning": true` a cikin jikin chat-completions da yake aikawa zuwa server na sama, domin model din da ke goyon bayan fitar da tsarin tunani kamar DeepSeek R1, Qwen QwQ su mayar da block na `<think>…</think>` tare. Serverin da ba su san filin ba za su yi watsi da shi, don haka kana iya barin shi kunne lafiya koda kuwa a cikin ayyuka masu haduwa.
 
-> 💡 **Idan sabis na cikin gida tana gudana a wani kwamfuta**: Shigar da IP na wannan kwamfuta a wurin shigar URL na sabis. Misali: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Idan sabis tana daure ne kawai ga `127.0.0.1` maimakon `0.0.0.0`, shiga ta IP na waje ba zai yi aiki ba, don haka ka duba adireshi na daure a saitin sabis.
+> 💡 **Idan sabis na cikin gida tana gudana a wani kwamfuta**: Shigar da IP na wannan kwamfuta a wurin shigar URL na sabis. Misali: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Idan sabis tana daure ne kawai ga `127.0.0.1` maimakon `0.0.0.0`, shiga ta IP na waje ba zai yi aiki ba, don haka ka duba adireshi na daure a saitin sabis.
 
 ### Shigar da Alamar Mai Gudanarwa
 

@@ -361,6 +361,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Détection automatique depuis le serveur installé localement |
 | LM Studio | Serveur local (port 1234) |
 | vLLM | Serveur local (port 8000) |
+| llama.cpp | Serveur local (port 8080) |
 
 ---
 
@@ -612,11 +613,12 @@ Utilisez ceci lors de la première installation du proxy wall-vault sur un nouve
 Une carte pour activer/désactiver et configurer les services IA.
 
 - Interrupteur d'activation/désactivation par service
-- Entrez l'adresse des serveurs IA locaux (Ollama, LM Studio, vLLM, etc. sur votre machine) et les modèles disponibles sont automatiquement découverts.
+- Entrez l'adresse des serveurs IA locaux (Ollama, LM Studio, vLLM, llama.cpp, etc. sur votre machine) et les modèles disponibles sont automatiquement découverts.
 - **Statut de connexion du service local** : Le point à côté du nom du service est **vert** si connecté, **gris** sinon
-- **Feu tricolore automatique du service local** (v0.1.23+) : Les services locaux (Ollama, LM Studio, vLLM) sont automatiquement activés/désactivés en fonction de la connectivité. Lorsqu'un service devient accessible, il passe au vert et la case s'active dans les 15 secondes ; lorsqu'il devient inaccessible, il se désactive automatiquement. Fonctionne de la même manière que les services cloud (Google, OpenRouter, etc.) qui basculent automatiquement en fonction de la disponibilité des clés API.
+- **Feu tricolore automatique du service local** (v0.1.23+) : Les services locaux (Ollama, LM Studio, vLLM, llama.cpp) sont automatiquement activés/désactivés en fonction de la connectivité. Lorsqu'un service devient accessible, il passe au vert et la case s'active dans les 15 secondes ; lorsqu'il devient inaccessible, il se désactive automatiquement. Fonctionne de la même manière que les services cloud (Google, OpenRouter, etc.) qui basculent automatiquement en fonction de la disponibilité des clés API.
+- **Bascule du mode raisonnement** (v0.2.17+) : Une case à cocher **mode raisonnement** apparaît en bas du formulaire d'édition des services locaux. Lorsqu'elle est activée, le proxy ajoute `"reasoning": true` au corps des chat-completions envoyé en amont, permettant aux modèles qui prennent en charge la sortie du processus de réflexion — comme DeepSeek R1 ou Qwen QwQ — de renvoyer également des blocs `<think>…</think>`. Les serveurs qui ne connaissent pas ce champ l'ignorent, vous pouvez donc la laisser activée en toute sécurité même pour des charges de travail mixtes.
 
-> :bulb: **Si un service local s'exécute sur un autre ordinateur** : Entrez l'IP de cet ordinateur dans le champ URL du service. Exemple : `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Si le service est lié à `127.0.0.1` plutôt qu'à `0.0.0.0`, l'accès par IP externe ne fonctionnera pas — vérifiez l'adresse de liaison dans les paramètres du service.
+> :bulb: **Si un service local s'exécute sur un autre ordinateur** : Entrez l'IP de cet ordinateur dans le champ URL du service. Exemple : `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Si le service est lié à `127.0.0.1` plutôt qu'à `0.0.0.0`, l'accès par IP externe ne fonctionnera pas — vérifiez l'adresse de liaison dans les paramètres du service.
 
 ### Saisie du token administrateur
 

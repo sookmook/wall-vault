@@ -1155,6 +1155,9 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 		if v, ok := fields["default_model"].(string); ok {
 			inp.DefaultModel = v
 		}
+		if v, ok := fields["reasoning_mode"].(bool); ok {
+			inp.ReasoningMode = v
+		}
 		if v, ok := fields["allowed_models"]; ok {
 			switch val := v.(type) {
 			case []interface{}:

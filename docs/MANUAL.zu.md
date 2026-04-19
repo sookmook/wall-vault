@@ -361,6 +361,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Ithola ngokuzenzakalela iseva yendawo efakwe kukhompyutha yakho |
 | LM Studio | Iseva yendawo yekhompyutha (iphothi 1234) |
 | vLLM | Iseva yendawo yekhompyutha (iphothi 8000) |
+| llama.cpp | Iseva yendawo yekhompyutha (iphothi 8080) |
 
 ---
 
@@ -612,11 +613,12 @@ Lisetshenziswa uma ufaka i-proxy ye-wall-vault kukhompyutha entsha nokuyixhuma n
 Ikhadi lokuvula, lokuvala, noma lokusetha amasevisi e-AI azosetshenziwa.
 
 - Iswitshi yokuvula·yokuvala esevisi ngayinye
-- Uma ufaka ikheli leseva ye-AI yendawo (i-Ollama, i-LM Studio, i-vLLM njll. esebenza kukhompyutha yakho), izothola ngokuzenzakalela amamodeli atholakalayo.
+- Uma ufaka ikheli leseva ye-AI yendawo (i-Ollama, i-LM Studio, i-vLLM, i-llama.cpp njll. esebenza kukhompyutha yakho), izothola ngokuzenzakalela amamodeli atholakalayo.
 - **Isiboniso sesimo sokuxhuma sesevisi yendawo**: Iqhaza le-● eceleni kwegama lesevisi uma **liluhlaza** kuxhunyiwe, **limpunga** akuxhunyiwe
-- **Ithafikhilayithi yendawo yesevisi ngokuzenzakalela** (v0.1.23+): Amasevisi endawo (Ollama, LM Studio, vLLM) ayavulwa/ayavala ngokuzenzakalela ngokuya ngokuthi ukuxhuma kungatholakala yini. Uma uvula isevisi, ngaphakathi kwamasekhondi angu-15 ● iba luhlaza nebhokisi lokuhlola livulwa, futhi uma uvala isevisi, kuvala ngokuzenzakalela. Indlela efanayo namasevisi efu (Google, OpenRouter njll.) ashintsha ngokuzenzakalela ngokuya ngokutholakala kwe-API key.
+- **Ithafikhilayithi yendawo yesevisi ngokuzenzakalela** (v0.1.23+): Amasevisi endawo (Ollama, LM Studio, vLLM, llama.cpp) ayavulwa/ayavala ngokuzenzakalela ngokuya ngokuthi ukuxhuma kungatholakala yini. Uma uvula isevisi, ngaphakathi kwamasekhondi angu-15 ● iba luhlaza nebhokisi lokuhlola livulwa, futhi uma uvala isevisi, kuvala ngokuzenzakalela. Indlela efanayo namasevisi efu (Google, OpenRouter njll.) ashintsha ngokuzenzakalela ngokuya ngokutholakala kwe-API key.
+- **Iswitshi yemodi yokucabanga** (v0.2.17+): Ezansi ewindini lokuhlela isevisi yendawo, kuvela ibhokisi lokuhlola le-**modi yokucabanga**. Uma uyivula, i-proxy ifaka `"reasoning": true` emzimbeni we-chat-completions othunyelwa kuseva ephezulu, ukuze amamodeli asekela ukukhipha inqubo yokucabanga njenge-DeepSeek R1, Qwen QwQ abuyise nebhloki le-`<think>…</think>` kanye nayo. Iziseva ezingasazi lesi sikhala ziyasishaya indiva, ngakho ungasishiya kuvuliwe ngokuphephile ngisho nasekulethwembula okuxubile.
 
-> 💡 **Uma isevisi yendawo isebenza kukhompyutha enye**: Faka i-IP yaleyo khompyutha endaweni yokufaka i-URL yesevisi. Isibonelo: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Uma isevisi iboshwe ku-`127.0.0.1` kuphela esikhundleni sika-`0.0.0.0`, ukufinyelela nge-IP yangaphandle ngeke kusebenze, ngakho hlola ikheli lokuboshwa ezilungiselelweni zesevisi.
+> 💡 **Uma isevisi yendawo isebenza kukhompyutha enye**: Faka i-IP yaleyo khompyutha endaweni yokufaka i-URL yesevisi. Isibonelo: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Uma isevisi iboshwe ku-`127.0.0.1` kuphela esikhundleni sika-`0.0.0.0`, ukufinyelela nge-IP yangaphandle ngeke kusebenze, ngakho hlola ikheli lokuboshwa ezilungiselelweni zesevisi.
 
 ### Ukufaka Ithokheni Yomphathi
 

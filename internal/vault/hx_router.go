@@ -228,6 +228,29 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 			}
 		}
 	}
+	// ensureRegistry only refreshes ENABLED services, so a disabled service
+	// (e.g. a newly-added llama.cpp the user hasn't enabled yet) would yield
+	// an empty dropdown. Fall back to an on-demand single-service fetch so
+	// the edit form can always show model choices.
+	if len(modelNames) == 0 && s.registry != nil {
+		var orKey string
+		if sv.ID == "openrouter" {
+			for _, k := range s.store.ListKeys() {
+				if k.Service == "openrouter" && k.IsAvailable() {
+					if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
+						orKey = plain
+						break
+					}
+				}
+			}
+		}
+		s.registry.RefreshService(sv.ID, sv.LocalURL, orKey)
+		for _, m := range s.registry.All(sv.ID) {
+			if m.ID != "" {
+				modelNames = append(modelNames, m.ID)
+			}
+		}
+	}
 	inUse := map[string]bool{}
 	if sv.DefaultModel != "" {
 		inUse[sv.DefaultModel] = true
@@ -248,6 +271,7 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 		LocalURL:      sv.LocalURL,
 		Enabled:       sv.Enabled,
 		ProxyEnabled:  sv.ProxyEnabled,
+		ReasoningMode: sv.ReasoningMode,
 		SortOrder:     sv.SortOrder,
 		AllowedModels: sv.AllowedModels,
 		IsLocal:       sv.IsLocal(),

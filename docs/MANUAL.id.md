@@ -361,6 +361,7 @@ curl "http://localhost:56244/api/models?q=claude"
 | Ollama | Auto-deteksi server lokal yang terinstal di komputer Anda |
 | LM Studio | Server lokal komputer Anda (port 1234) |
 | vLLM | Server lokal komputer Anda (port 8000) |
+| llama.cpp | Server lokal komputer Anda (port 8080) |
 
 ---
 
@@ -612,11 +613,12 @@ Digunakan saat pertama kali menginstal proxy wall-vault di komputer baru dan men
 Kartu untuk mengaktifkan/menonaktifkan atau mengatur layanan AI yang digunakan.
 
 - Toggle switch aktif/nonaktif per layanan
-- Jika alamat server AI lokal (Ollama, LM Studio, vLLM dll yang berjalan di komputer Anda) dimasukkan, model yang tersedia ditemukan secara otomatis.
+- Jika alamat server AI lokal (Ollama, LM Studio, vLLM, llama.cpp dll yang berjalan di komputer Anda) dimasukkan, model yang tersedia ditemukan secara otomatis.
 - **Tampilan status koneksi layanan lokal**: Titik ● di samping nama layanan berwarna **hijau** jika terhubung, **abu-abu** jika tidak terhubung
-- **Lampu lalu lintas otomatis layanan lokal** (v0.1.23+): Layanan lokal (Ollama, LM Studio, vLLM) otomatis aktif saat bisa terhubung, otomatis nonaktif saat terputus. Cara yang sama seperti auto-toggle berbasis API key pada layanan cloud (Google, OpenRouter dll).
+- **Lampu lalu lintas otomatis layanan lokal** (v0.1.23+): Layanan lokal (Ollama, LM Studio, vLLM, llama.cpp) otomatis aktif saat bisa terhubung, otomatis nonaktif saat terputus. Cara yang sama seperti auto-toggle berbasis API key pada layanan cloud (Google, OpenRouter dll).
+- **Toggle mode reasoning** (v0.2.17+): Checkbox **mode reasoning** muncul di bagian bawah jendela edit layanan lokal. Jika diaktifkan, proxy menambahkan `"reasoning": true` ke body chat-completions yang dikirim ke upstream, sehingga model yang mendukung output proses berpikir seperti DeepSeek R1, Qwen QwQ mengembalikan blok `<think>…</think>` bersama respons. Server yang tidak mengenali field ini akan mengabaikannya, jadi aman untuk tetap diaktifkan bahkan pada workload campuran.
 
-> 💡 **Jika layanan lokal berjalan di komputer lain**: Masukkan IP komputer tersebut di kolom URL layanan. Contoh: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio). Jika layanan hanya bind ke `127.0.0.1` bukan `0.0.0.0`, koneksi via IP eksternal tidak akan berfungsi, periksa alamat bind di pengaturan layanan.
+> 💡 **Jika layanan lokal berjalan di komputer lain**: Masukkan IP komputer tersebut di kolom URL layanan. Contoh: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Jika layanan hanya bind ke `127.0.0.1` bukan `0.0.0.0`, koneksi via IP eksternal tidak akan berfungsi, periksa alamat bind di pengaturan layanan.
 
 ### Input Token Admin
 

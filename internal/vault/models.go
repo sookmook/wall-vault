@@ -202,19 +202,20 @@ func (s *Service) IsLocal() bool {
 type ServiceConfig struct {
 	ID            string   `json:"id"`
 	Name          string   `json:"name"`
-	LocalURL      string   `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM only
+	LocalURL      string   `json:"local_url,omitempty"` // Ollama/LMStudio/vLLM/llama.cpp
 	Enabled       bool     `json:"enabled"`
 	Custom        bool     `json:"custom,omitempty"`          // user-added service
 	ProxyEnabled  bool     `json:"proxy_enabled,omitempty"`   // enabled for proxy dispatch
 	DefaultModel  string   `json:"default_model,omitempty"`   // v0.2: most-common client model for this service
 	AllowedModels []string `json:"allowed_models,omitempty"`  // v0.2: whitelist of models for this service
 	SortOrder     int      `json:"sort_order,omitempty"`      // display order preserved from v1
+	ReasoningMode bool     `json:"reasoning_mode,omitempty"`  // local services: request reasoning/thinking output
 }
 
 // IsLocal: whether this is a local server service
 func (s *ServiceConfig) IsLocal() bool {
 	switch s.ID {
-	case "ollama", "lmstudio", "vllm":
+	case "ollama", "lmstudio", "vllm", "llamacpp":
 		return true
 	}
 	return s.Custom && s.LocalURL != ""

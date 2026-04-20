@@ -901,7 +901,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			reason = "tool_calls"
 		}
 		cands = append(cands, candidate{
-			text:         stripControlTokens(extractText(c.Content.Parts)),
+			text:         stripControlTokens(extractTextAndMediaNotes(c.Content.Parts)),
 			finishReason: reason,
 			index:        c.Index,
 		})

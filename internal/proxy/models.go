@@ -116,13 +116,38 @@ type OpenAIMessage struct {
 	Name       string          `json:"name,omitempty"`
 }
 
-// MarshalJSON ensures assistant messages always include the `content` field,
-// even when empty. Some clients (e.g. Claude Code) call .trim() on content
-// and crash with "Cannot read properties of undefined" if it's missing.
-// This can happen when thinking models (gemini-3.1-pro) exhaust max_tokens
-// on reasoning before producing visible output.
+// MarshalJSON emits the multi-part `content` array when RawContent is set
+// (preserving image_url / input_audio / input_image / input_file parts on
+// outbound requests to OpenAI-compatible upstreams), and otherwise falls back
+// to the flat `content` string. It also guarantees that assistant messages
+// always include the `content` field — some clients (e.g. Claude Code) call
+// .trim() on content and crash with "Cannot read properties of undefined" if
+// it's missing, which can happen when thinking models (gemini-3.1-pro)
+// exhaust max_tokens on reasoning before producing visible output.
 func (m OpenAIMessage) MarshalJSON() ([]byte, error) {
 	type alias OpenAIMessage
+	// Multi-part form takes priority so multimodal content is preserved
+	// end-to-end: UnmarshalJSON parks the original array in RawContent (and
+	// extracts a text-only Content for legacy consumers), and this branch
+	// re-emits that array verbatim when the proxy forwards to any OpenAI
+	// chat-completions endpoint (Ollama, lmstudio, vllm, llamacpp, OpenAI
+	// direct, OpenRouter).
+	if len(m.RawContent) > 0 {
+		out := map[string]interface{}{
+			"role":    m.Role,
+			"content": m.RawContent,
+		}
+		if len(m.ToolCalls) > 0 {
+			out["tool_calls"] = m.ToolCalls
+		}
+		if m.ToolCallID != "" {
+			out["tool_call_id"] = m.ToolCallID
+		}
+		if m.Name != "" {
+			out["name"] = m.Name
+		}
+		return json.Marshal(out)
+	}
 	if m.Role == "assistant" && m.Content == "" {
 		// Build JSON manually to include content:"" explicitly
 		out := map[string]interface{}{
@@ -425,6 +450,22 @@ type AnthropicContent struct {
 	// undefined (reading 'trim')" when thinking models exhaust max_tokens on
 	// reasoning before producing visible output.
 	Text string `json:"text"`
+	// Source carries the upstream blob for image / document blocks so
+	// multimodal responses from Gemini image-generation models don't
+	// collapse to text-only on the Anthropic wire.
+	Source *AnthropicSource `json:"source,omitempty"`
+}
+
+// AnthropicSource mirrors the Anthropic content-block `source` object used by
+// image and document blocks in both requests and responses. Inbound base64
+// form fills (Type="base64", MediaType, Data); url form fills (Type="url",
+// URL). The proxy uses this struct only on the response path — inbound user
+// blocks are parsed ad-hoc in anthropicToOpenAIReq.
+type AnthropicSource struct {
+	Type      string `json:"type"`                 // "base64" or "url"
+	MediaType string `json:"media_type,omitempty"` // e.g. "image/png"
+	Data      string `json:"data,omitempty"`       // base64 bytes for Type="base64"
+	URL       string `json:"url,omitempty"`        // HTTP URL for Type="url"
 }
 
 // AnthropicResponse: /v1/messages response

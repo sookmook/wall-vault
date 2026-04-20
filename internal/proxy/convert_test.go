@@ -287,3 +287,222 @@ func TestParseDataURI(t *testing.T) {
 		t.Fatalf("non-base64 data URI must return ok=false")
 	}
 }
+
+// TestOpenAIMessage_MarshalJSON_PreservesMultiPart guards the outbound
+// multimodal path: UnmarshalJSON parks multi-part content in RawContent, and
+// MarshalJSON must re-emit that array so upstream OpenAI-compat servers
+// (Ollama, lmstudio, vllm, llamacpp, OpenAI direct, OpenRouter) see the
+// image_url / input_audio parts the client sent. Regression guard for the
+// bug where multimodal content silently turned into text-only on the wire.
+func TestOpenAIMessage_MarshalJSON_PreservesMultiPart(t *testing.T) {
+	inbound := []byte(`{
+		"role":"user",
+		"content":[
+			{"type":"text","text":"what's in this image?"},
+			{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw=="}}
+		]
+	}`)
+	var m OpenAIMessage
+	if err := json.Unmarshal(inbound, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(m.RawContent) == 0 {
+		t.Fatal("RawContent should be populated for multi-part array content")
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	// Parse back and assert content is an array with the original parts.
+	var decoded struct {
+		Role    string            `json:"role"`
+		Content []json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(out, &decoded); err != nil {
+		t.Fatalf("decode roundtrip: %v (out=%s)", err, out)
+	}
+	if decoded.Role != "user" {
+		t.Errorf("role = %q, want user", decoded.Role)
+	}
+	if len(decoded.Content) != 2 {
+		t.Fatalf("content parts = %d, want 2 (out=%s)", len(decoded.Content), out)
+	}
+	// First part: text
+	var p1 struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(decoded.Content[0], &p1); err != nil || p1.Type != "text" || p1.Text == "" {
+		t.Errorf("part[0] type=%q text=%q err=%v", p1.Type, p1.Text, err)
+	}
+	// Second part: image_url with data URI preserved
+	var p2 struct {
+		Type     string `json:"type"`
+		ImageURL struct {
+			URL string `json:"url"`
+		} `json:"image_url"`
+	}
+	if err := json.Unmarshal(decoded.Content[1], &p2); err != nil {
+		t.Fatalf("part[1] decode: %v", err)
+	}
+	if p2.Type != "image_url" {
+		t.Errorf("part[1] type = %q, want image_url", p2.Type)
+	}
+	if p2.ImageURL.URL != "data:image/png;base64,iVBORw==" {
+		t.Errorf("part[1] url = %q, want data URI preserved", p2.ImageURL.URL)
+	}
+}
+
+// TestOpenAIMessage_MarshalJSON_AssistantEmptyGuard ensures the earlier
+// guard for assistant Role with empty Content (added for Claude Code's
+// .trim() crash) still works when RawContent is absent.
+func TestOpenAIMessage_MarshalJSON_AssistantEmptyGuard(t *testing.T) {
+	m := OpenAIMessage{Role: "assistant", Content: ""}
+	out, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(out, &decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, ok := decoded["content"]; !ok {
+		t.Fatalf("assistant empty-content guard missing content key: %s", out)
+	}
+	if decoded["content"] != "" {
+		t.Errorf("assistant empty-content: got %v, want \"\"", decoded["content"])
+	}
+}
+
+// TestAnthropicToGemini_ImageBlockBase64 verifies that an Anthropic user
+// message with an `image` content block (base64 source) survives the
+// Anthropic → OpenAI → Gemini pipeline and lands in the final GeminiRequest
+// as InlineData. Previously image/document blocks were silently dropped.
+func TestAnthropicToGemini_ImageBlockBase64(t *testing.T) {
+	req := &AnthropicRequest{
+		Model: "claude-haiku-4-5-20251001",
+		Messages: []AnthropicMessage{{
+			Role: "user",
+			Content: json.RawMessage(`[
+				{"type":"text","text":"describe it"},
+				{"type":"image","source":{"type":"base64","media_type":"image/png","data":"iVBORw=="}}
+			]`),
+		}},
+	}
+	gem := AnthropicToGemini(req)
+	var foundImage bool
+	var foundText bool
+	for _, c := range gem.Contents {
+		for _, p := range c.Parts {
+			if p.Text == "describe it" {
+				foundText = true
+			}
+			if p.InlineData != nil && p.InlineData.MimeType == "image/png" && p.InlineData.Data == "iVBORw==" {
+				foundImage = true
+			}
+		}
+	}
+	if !foundText {
+		t.Error("text block not preserved through conversion")
+	}
+	if !foundImage {
+		t.Error("image block (base64) not converted to InlineData")
+	}
+}
+
+// TestAnthropicToGemini_ImageBlockURL verifies the url-source form of
+// Anthropic image blocks. The URL is threaded through as image_url so the
+// proxy's fetch-and-inline path can resolve it (best-effort).
+func TestAnthropicToGemini_ImageBlockURL(t *testing.T) {
+	url := anthropicImageSourceToURL(json.RawMessage(`{"type":"url","url":"https://example.com/a.png"}`))
+	if url != "https://example.com/a.png" {
+		t.Fatalf("url form: got %q", url)
+	}
+	if got := anthropicImageSourceToURL(json.RawMessage(`{"type":"base64","media_type":"image/jpeg","data":"/9j/4AAQ"}`)); got != "data:image/jpeg;base64,/9j/4AAQ" {
+		t.Fatalf("base64 form: got %q", got)
+	}
+	if got := anthropicImageSourceToURL(json.RawMessage(`{"type":"base64","media_type":"image/png","data":""}`)); got != "" {
+		t.Fatalf("empty data must yield empty URL, got %q", got)
+	}
+}
+
+// TestAnthropicDocumentSourceToPart verifies document blocks map to
+// input_file (for base64 PDFs) or image_url (for URL form).
+func TestAnthropicDocumentSourceToPart(t *testing.T) {
+	part := anthropicDocumentSourceToPart(json.RawMessage(`{"type":"base64","media_type":"application/pdf","data":"JVBERi0="}`))
+	if part == nil || part["type"] != "input_file" || part["mime"] != "application/pdf" || part["data"] != "JVBERi0=" {
+		t.Fatalf("base64 pdf: %+v", part)
+	}
+	part = anthropicDocumentSourceToPart(json.RawMessage(`{"type":"url","url":"https://example.com/doc.pdf"}`))
+	if part == nil || part["type"] != "image_url" {
+		t.Fatalf("url form: %+v", part)
+	}
+	if anthropicDocumentSourceToPart(json.RawMessage(`{"type":"unknown"}`)) != nil {
+		t.Fatal("unknown source type must return nil")
+	}
+}
+
+// TestGeminiRespToAnthropic_PreservesInlineData verifies that an image
+// returned by a Gemini candidate (e.g. gemini-3.1-flash-image-preview) is
+// emitted as a proper Anthropic `image` content block instead of collapsing
+// to text-only.
+func TestGeminiRespToAnthropic_PreservesInlineData(t *testing.T) {
+	resp := &GeminiResponse{
+		Candidates: []GeminiCandidate{{
+			Content: GeminiContent{
+				Parts: []GeminiPart{
+					{Text: "here's the result"},
+					{InlineData: &BlobData{MimeType: "image/png", Data: "iVBORw=="}},
+				},
+			},
+		}},
+	}
+	ar := GeminiRespToAnthropic("claude-haiku-4-5-20251001", resp)
+	if len(ar.Content) != 2 {
+		t.Fatalf("content blocks = %d, want 2 (text + image): %+v", len(ar.Content), ar.Content)
+	}
+	if ar.Content[0].Type != "text" || ar.Content[0].Text != "here's the result" {
+		t.Errorf("block[0] type=%q text=%q", ar.Content[0].Type, ar.Content[0].Text)
+	}
+	img := ar.Content[1]
+	if img.Type != "image" || img.Source == nil {
+		t.Fatalf("block[1] type=%q source=%v", img.Type, img.Source)
+	}
+	if img.Source.Type != "base64" || img.Source.MediaType != "image/png" || img.Source.Data != "iVBORw==" {
+		t.Errorf("image source: %+v", img.Source)
+	}
+}
+
+// TestExtractTextAndMediaNotes verifies that on the OpenAI response path
+// (which can't carry binary in its string-only `content` field) InlineData
+// yields an inline placeholder note rather than disappearing silently.
+func TestExtractTextAndMediaNotes(t *testing.T) {
+	got := extractTextAndMediaNotes([]GeminiPart{
+		{Text: "header"},
+		{InlineData: &BlobData{MimeType: "image/jpeg", Data: "/9j/4AAQSkZJRg=="}},
+		{Text: "footer"},
+	})
+	if got == "" {
+		t.Fatal("result must not be empty")
+	}
+	if !contains(got, "header") || !contains(got, "footer") {
+		t.Errorf("text parts missing: %q", got)
+	}
+	if !contains(got, "image/jpeg") || !contains(got, "media attached") {
+		t.Errorf("media note missing: %q", got)
+	}
+	// Plain text-only input keeps original behaviour (no noise).
+	plain := extractTextAndMediaNotes([]GeminiPart{{Text: "just text"}})
+	if plain != "just text" {
+		t.Errorf("text-only regression: got %q", plain)
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

@@ -224,6 +224,49 @@ deployments can move off v0.2.16 in one step.
 
 ### Fixed
 
+- **Multimodal content silently dropped on OpenAI-compat upstreams**:
+  `OpenAIMessage.RawContent` was declared `json:"-"` so the multi-part
+  array parked by `UnmarshalJSON` (text + image_url + input_audio + …)
+  never made it back onto the wire — outbound `MarshalJSON` only emitted
+  the flat `Content` string extracted for legacy consumers. Every
+  chat-completions-style upstream (Ollama, lmstudio, vLLM, llama.cpp,
+  OpenAI direct, OpenRouter) therefore received a text-only body even
+  when the client sent images. `MarshalJSON` now re-emits `RawContent`
+  verbatim as the `content` field whenever it's populated, falling back
+  to the existing assistant empty-content guard otherwise. Gemini path
+  was never affected because `openaiPartsToGemini` materialises parts
+  into `InlineData` before marshal.
+- **Anthropic `image` / `document` blocks dropped on non-Claude
+  dispatch**: `anthropicToOpenAIReq`'s user-message loop handled only
+  `text` and `tool_result`, so any Claude-format client sending an
+  `image` (base64 or URL) or `document` source block had the block
+  silently skipped before the request reached Gemini / Ollama / etc.
+  New helpers `anthropicImageSourceToURL` and
+  `anthropicDocumentSourceToPart` convert them to OpenAI `image_url`
+  (data URI for base64, passthrough URL for http(s)) and `input_file`
+  (for base64 PDFs) respectively, packed into `RawContent` so Fix 1
+  carries them the rest of the way.
+- **Gemini image responses collapsed to text on the Anthropic wire**:
+  `GeminiRespToAnthropic` previously ran every candidate through
+  `extractText`, discarding any `InlineData` that image-generation
+  models (e.g. `gemini-3.1-flash-image-preview`) returned. It now walks
+  each part in order, emitting `{type:"text", text:"…"}` blocks for
+  text spans and `{type:"image", source:{type:"base64", media_type,
+  data}}` blocks for `InlineData`. A new `AnthropicSource` struct plus
+  an optional `Source` field on `AnthropicContent` carry the payload.
+- **Gemini image responses invisible to OpenAI clients**: the response
+  builder in `handleOpenAI` called `extractText`, so the binary blob
+  disappeared without a trace. A new `extractTextAndMediaNotes`
+  preserves the text while appending a one-line placeholder
+  (`[media attached: <mime>, ~N bytes …]`) whenever `InlineData` is
+  present, making the dropped blob at least observable on the
+  string-only OpenAI `content` field.
+- **Remote `image_url` fetch failures invisible**: `fetchAsBase64`
+  returned `ok=false` on timeout / >5 MB body / non-2xx, which
+  `openaiPartsToGemini` silently ignored — the request proceeded as if
+  the image never existed. The caller now substitutes a
+  `[image_url fetch failed: <url> …]` text part so the upstream model
+  and downstream logs surface the drop.
 - **Slideover i18n locale leak**: edit slideovers rendered in English even
   after the dashboard was set to Korean, because only `handleDashboard`
   called `i18n.SetLang` while `/hx/*` fragment endpoints inherited the

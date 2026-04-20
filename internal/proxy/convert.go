@@ -318,6 +318,14 @@ func openaiPartsToGemini(raw json.RawMessage) []GeminiPart {
 						out = append(out, GeminiPart{
 							InlineData: &BlobData{MimeType: mime, Data: data},
 						})
+					} else {
+						// Make the failed fetch visible to the upstream model
+						// instead of silently dropping the image. Previous
+						// behaviour logged and moved on, which looked to the
+						// caller exactly like the image never existed.
+						out = append(out, GeminiPart{
+							Text: fmt.Sprintf("[image_url fetch failed: %s — remote image was not inlined]", url),
+						})
 					}
 				}
 			}
@@ -531,6 +539,7 @@ func anthropicToOpenAIReq(req *AnthropicRequest, model string) *OpenAIRequest {
 			Input     json.RawMessage `json:"input"`
 			ToolUseID string          `json:"tool_use_id"`
 			Content   json.RawMessage `json:"content"`
+			Source    json.RawMessage `json:"source"` // image / document
 		}
 		if json.Unmarshal(msg.Content, &blocks) == nil && len(blocks) > 0 {
 			if msg.Role == "assistant" {
@@ -565,6 +574,30 @@ func anthropicToOpenAIReq(req *AnthropicRequest, model string) *OpenAIRequest {
 					switch b.Type {
 					case "text":
 						oai.Messages = append(oai.Messages, OpenAIMessage{Role: "user", Content: b.Text})
+					case "image":
+						if url := anthropicImageSourceToURL(b.Source); url != "" {
+							part := []map[string]interface{}{{
+								"type":      "image_url",
+								"image_url": map[string]string{"url": url},
+							}}
+							raw, err := json.Marshal(part)
+							if err == nil {
+								oai.Messages = append(oai.Messages, OpenAIMessage{
+									Role:       "user",
+									RawContent: raw,
+								})
+							}
+						}
+					case "document":
+						if p := anthropicDocumentSourceToPart(b.Source); p != nil {
+							raw, err := json.Marshal([]map[string]interface{}{p})
+							if err == nil {
+								oai.Messages = append(oai.Messages, OpenAIMessage{
+									Role:       "user",
+									RawContent: raw,
+								})
+							}
+						}
 					case "tool_result":
 						content := ""
 						// tool_result content can be string or content blocks
@@ -639,12 +672,47 @@ func GeminiRespToAnthropic(model string, resp *GeminiResponse) *AnthropicRespons
 		StopReason: "end_turn",
 	}
 
+	// Walk each candidate's parts, preserving both text and InlineData so
+	// image-generation models (e.g. gemini-3.1-flash-image-preview) round-trip
+	// to an Anthropic client as a proper {type:"image", source:{...}} block
+	// instead of silently collapsing to text.
 	for _, c := range resp.Candidates {
-		text := extractText(c.Content.Parts)
-		ar.Content = append(ar.Content, AnthropicContent{
-			Type: "text",
-			Text: text,
-		})
+		var textBuf strings.Builder
+		for _, p := range c.Content.Parts {
+			if p.Text != "" {
+				textBuf.WriteString(p.Text)
+				continue
+			}
+			if p.InlineData != nil && p.InlineData.Data != "" {
+				// Flush accumulated text first so the block order matches the
+				// upstream part order.
+				if textBuf.Len() > 0 {
+					ar.Content = append(ar.Content, AnthropicContent{
+						Type: "text",
+						Text: textBuf.String(),
+					})
+					textBuf.Reset()
+				}
+				mime := p.InlineData.MimeType
+				if mime == "" {
+					mime = "application/octet-stream"
+				}
+				ar.Content = append(ar.Content, AnthropicContent{
+					Type: "image",
+					Source: &AnthropicSource{
+						Type:      "base64",
+						MediaType: mime,
+						Data:      p.InlineData.Data,
+					},
+				})
+			}
+		}
+		if textBuf.Len() > 0 {
+			ar.Content = append(ar.Content, AnthropicContent{
+				Type: "text",
+				Text: textBuf.String(),
+			})
+		}
 	}
 	if len(ar.Content) == 0 {
 		ar.Content = []AnthropicContent{{Type: "text", Text: ""}}
@@ -667,4 +735,109 @@ func extractText(parts []GeminiPart) string {
 		sb.WriteString(p.Text)
 	}
 	return sb.String()
+}
+
+// extractTextAndMediaNotes returns the text content plus an inline placeholder
+// for any InlineData parts so OpenAI clients (whose response `content` field
+// is a plain string) at least see that a media blob was attached instead of
+// the image silently disappearing. Used on the response path where Gemini
+// returned a mix of text and images (rare — primarily image-generation
+// preview models).
+func extractTextAndMediaNotes(parts []GeminiPart) string {
+	var sb strings.Builder
+	for _, p := range parts {
+		if p.Text != "" {
+			sb.WriteString(p.Text)
+			continue
+		}
+		if p.InlineData != nil && p.InlineData.Data != "" {
+			if sb.Len() > 0 {
+				sb.WriteByte('\n')
+			}
+			mime := p.InlineData.MimeType
+			if mime == "" {
+				mime = "application/octet-stream"
+			}
+			// Approximate decoded size from base64 length (3 bytes per 4 chars).
+			approxBytes := len(p.InlineData.Data) * 3 / 4
+			sb.WriteString(fmt.Sprintf("[media attached: %s, ~%d bytes (OpenAI response cannot carry binary; use /v1/messages or Gemini endpoint for image output)]", mime, approxBytes))
+		}
+	}
+	return sb.String()
+}
+
+// anthropicImageSourceToURL converts an Anthropic content block `source` object
+// (as used by `{type:"image", source:{...}}`) to an OpenAI image_url URL
+// string. Returns "" when the source is missing or unrecognised.
+//
+//	base64 form: {type:"base64", media_type:"image/png", data:"..."}
+//	           → "data:image/png;base64,..."
+//	url form:    {type:"url", url:"https://..."}
+//	           → the URL as-is (proxy will fetch-and-inline downstream)
+func anthropicImageSourceToURL(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var src struct {
+		Type      string `json:"type"`
+		MediaType string `json:"media_type"`
+		Data      string `json:"data"`
+		URL       string `json:"url"`
+	}
+	if err := json.Unmarshal(raw, &src); err != nil {
+		return ""
+	}
+	switch src.Type {
+	case "base64":
+		if src.MediaType == "" || src.Data == "" {
+			return ""
+		}
+		return "data:" + src.MediaType + ";base64," + src.Data
+	case "url":
+		return src.URL
+	}
+	return ""
+}
+
+// anthropicDocumentSourceToPart converts an Anthropic `document` content block
+// `source` into a single OpenAI content part (input_file for base64 PDFs,
+// image_url for URL form so the proxy's fetch-and-inline path picks it up).
+// Returns nil when the source is missing or unrecognised.
+func anthropicDocumentSourceToPart(raw json.RawMessage) map[string]interface{} {
+	if len(raw) == 0 {
+		return nil
+	}
+	var src struct {
+		Type      string `json:"type"`
+		MediaType string `json:"media_type"`
+		Data      string `json:"data"`
+		URL       string `json:"url"`
+	}
+	if err := json.Unmarshal(raw, &src); err != nil {
+		return nil
+	}
+	switch src.Type {
+	case "base64":
+		if src.Data == "" {
+			return nil
+		}
+		mime := src.MediaType
+		if mime == "" {
+			mime = "application/pdf"
+		}
+		return map[string]interface{}{
+			"type": "input_file",
+			"mime": mime,
+			"data": src.Data,
+		}
+	case "url":
+		if src.URL == "" {
+			return nil
+		}
+		return map[string]interface{}{
+			"type":      "image_url",
+			"image_url": map[string]string{"url": src.URL},
+		}
+	}
+	return nil
 }

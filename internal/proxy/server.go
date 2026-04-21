@@ -1063,6 +1063,23 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	}
 	defer s.refreshClientAct(resolvedClientID)
 
+	// BYO Anthropic credentials — if the caller supplied an `sk-ant-*` token
+	// (Claude Code OAuth via NanoClaw's credential-proxy is the primary case),
+	// forward it through instead of letting the passthrough clobber it with
+	// a vault x-api-key. Vault-issued client tokens use a different prefix
+	// so there's no overlap.
+	byoAPIKey := ""
+	byoBearer := ""
+	if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+		tok := strings.TrimPrefix(authHeader, "Bearer ")
+		if strings.HasPrefix(tok, "sk-ant-") {
+			byoBearer = tok
+		}
+	}
+	if xKey := r.Header.Get("x-api-key"); strings.HasPrefix(xKey, "sk-ant-") {
+		byoAPIKey = xKey
+	}
+
 	// Parse provider/model form (e.g. "anthropic/claude-opus-4-6")
 	svc, mdl = parseProviderModel(svc, mdl)
 
@@ -1085,8 +1102,11 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if usePassthrough {
-		if body, _, err := s.callAnthropicPassthrough(r.Context(), &req, mdl); err == nil {
-			w.Header().Set("Content-Type", "application/json")
+		if body, contentType, _, err := s.callAnthropicPassthrough(r.Context(), &req, mdl, byoAPIKey, byoBearer); err == nil {
+			if contentType == "" {
+				contentType = "application/json"
+			}
+			w.Header().Set("Content-Type", contentType)
 			w.Write(body) //nolint:errcheck
 			return
 		} else {

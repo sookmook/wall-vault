@@ -240,6 +240,24 @@ deployments can move off v0.2.16 in one step.
 
 ### Fixed
 
+- **Anthropic passthrough honours caller-supplied Anthropic credentials**
+  (Bring-Your-Own auth): `callAnthropicPassthrough` used to unconditionally
+  overwrite the upstream auth with a vault `x-api-key`, so a Claude Code
+  session whose OAuth token had been injected by an intermediary
+  (e.g. NanoClaw's credential-proxy) never actually reached Anthropic
+  with that token — every call was billed against the vault key instead.
+  When that vault key ran out of credits the upstream returned HTTP 400
+  "credit balance too low", wall-vault fell through openrouter → google
+  → ollama → llamacpp (6–10 minutes per request), Claude Code's SDK
+  retried, and after a handful of rounds hit its own 30-minute ceiling
+  with no reply on the Telegram side. `handleAnthropic` now detects an
+  Anthropic-formatted token in the request (`sk-ant-*` in either
+  `Authorization: Bearer` or `x-api-key`) and forwards it upstream
+  verbatim; the BYO branch does a single-shot call, skips vault-key
+  rotation / cooldown / usage tracking, and returns the upstream
+  Content-Type so streaming (`stream: true`) responses aren't mislabelled
+  as `application/json`. Vault-key requests keep their existing retry +
+  cooldown + token-accounting semantics untouched.
 - **Multimodal content silently dropped on OpenAI-compat upstreams**:
   `OpenAIMessage.RawContent` was declared `json:"-"` so the multi-part
   array parked by `UnmarshalJSON` (text + image_url + input_audio + …)

@@ -10,11 +10,33 @@ import (
 	"strings"
 )
 
-// callAnthropicPassthrough: forward the original AnthropicRequest directly to
+// anthropicMessagesURL is the upstream target for passthrough. Extracted as a
+// package-level var so unit tests can redirect it to httptest.Server without
+// refactoring call sites.
+var anthropicMessagesURL = "https://api.anthropic.com/v1/messages"
+
+// callAnthropicPassthrough forwards the original AnthropicRequest directly to
 // Anthropic without any format conversion. Preserves tools, multi-block content,
 // and all other fields that would be lost in a GeminiRequest round-trip.
-// Returns the raw Anthropic response body, or an error.
-func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicRequest, model string) ([]byte, *localKey, error) {
+//
+// When byoBearer or byoAPIKey is non-empty the caller has already extracted a
+// client-supplied Anthropic credential (OAuth token or personal API key) from
+// the inbound request headers — we forward that credential to upstream in a
+// single shot with no vault-key tracking, cooldown, or retry. This lets Claude
+// Code sessions (whose OAuth token NanoClaw's credential-proxy injects into
+// the Authorization header) reach Anthropic even when the vault's stored
+// API keys are exhausted or on cooldown.
+//
+// Returns the raw Anthropic response body, its Content-Type header (so SSE
+// stream=true responses aren't mislabelled as application/json downstream),
+// and the vault key used (nil on the BYO path). A non-nil error signals the
+// caller should fall back to dispatch.
+func (s *Server) callAnthropicPassthrough(
+	ctx context.Context,
+	req *AnthropicRequest,
+	model string,
+	byoAPIKey, byoBearer string,
+) ([]byte, string, *localKey, error) {
 	if !strings.HasPrefix(model, "claude-") {
 		log.Printf("[anthropic] non-Claude model %q → fallback to claude-haiku-4-5", model)
 		model = "claude-haiku-4-5-20251001"
@@ -46,7 +68,34 @@ func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicReq
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Anthropic passthrough 직렬화 오류: %w", err)
+		return nil, "", nil, fmt.Errorf("Anthropic passthrough 직렬화 오류: %w", err)
+	}
+
+	// BYO credential path — client supplied their own Anthropic auth, so skip
+	// vault-key rotation/cooldown and send exactly once.
+	if byoBearer != "" || byoAPIKey != "" {
+		authKind := "x-api-key"
+		headers := map[string]string{
+			"anthropic-version": "2023-06-01",
+		}
+		if byoBearer != "" {
+			authKind = "bearer"
+			headers["Authorization"] = "Bearer " + byoBearer
+		} else {
+			headers["x-api-key"] = byoAPIKey
+		}
+		log.Printf("[anthropic] BYO passthrough (auth=%s) model=%s", authKind, model)
+		resp, err := s.doRequest(ctx, "POST", anthropicMessagesURL, data, headers)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("Anthropic BYO passthrough: %w", err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		ct := resp.Header.Get("Content-Type")
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, "", nil, fmt.Errorf("Anthropic BYO passthrough: HTTP %d: %s", resp.StatusCode, body)
+		}
+		return body, ct, nil, nil
 	}
 
 	const maxAttempts = 3
@@ -57,7 +106,7 @@ func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicReq
 			lastErr = err
 			break
 		}
-		resp, err := s.doRequest(ctx, "POST", "https://api.anthropic.com/v1/messages", data, map[string]string{
+		resp, err := s.doRequest(ctx, "POST", anthropicMessagesURL, data, map[string]string{
 			"x-api-key":         plainKey,
 			"anthropic-version": "2023-06-01",
 		})
@@ -67,6 +116,7 @@ func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicReq
 			continue
 		}
 		body, _ := io.ReadAll(resp.Body)
+		ct := resp.Header.Get("Content-Type")
 		resp.Body.Close()
 
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusPaymentRequired {
@@ -76,7 +126,7 @@ func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicReq
 		}
 		if resp.StatusCode != http.StatusOK {
 			s.keyMgr.RecordError(key, resp.StatusCode)
-			return nil, key, fmt.Errorf("Anthropic passthrough: HTTP %d: %s", resp.StatusCode, body)
+			return nil, "", key, fmt.Errorf("Anthropic passthrough: HTTP %d: %s", resp.StatusCode, body)
 		}
 
 		// record token usage
@@ -93,9 +143,9 @@ func (s *Server) callAnthropicPassthrough(ctx context.Context, req *AnthropicReq
 		} else {
 			s.keyMgr.RecordSuccess(key, 0)
 		}
-		return body, key, nil
+		return body, ct, key, nil
 	}
-	return nil, nil, lastErr
+	return nil, "", nil, lastErr
 }
 
 // callAnthropic: call Anthropic API directly using vault anthropic keys.
@@ -263,7 +313,7 @@ func (s *Server) doAnthropicRequest(ctx context.Context, apiKey, model string, r
 	}
 
 	data, _ := json.Marshal(ar)
-	return s.doRequest(ctx, "POST", "https://api.anthropic.com/v1/messages", data, map[string]string{
+	return s.doRequest(ctx, "POST", anthropicMessagesURL, data, map[string]string{
 		"x-api-key":         apiKey,
 		"anthropic-version": "2023-06-01",
 	})

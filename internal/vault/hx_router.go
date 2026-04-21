@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sookmook/wall-vault/internal/models"
 	mainview "github.com/sookmook/wall-vault/internal/vault/views/main"
 	sidebar "github.com/sookmook/wall-vault/internal/vault/views/sidebar"
 	slideover "github.com/sookmook/wall-vault/internal/vault/views/slideover"
@@ -233,18 +234,20 @@ func (s *Server) toSlideoverService(sv *ServiceConfig) *slideover.ServiceVM {
 	// an empty dropdown. Fall back to an on-demand single-service fetch so
 	// the edit form can always show model choices.
 	if len(modelNames) == 0 && s.registry != nil {
-		var orKey string
-		if sv.ID == "openrouter" {
-			for _, k := range s.store.ListKeys() {
-				if k.Service == "openrouter" && k.IsAvailable() {
-					if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
-						orKey = plain
-						break
-					}
+		// Decrypt the first available key for this service so providers
+		// with a live model-list endpoint (openrouter, anthropic) can
+		// populate the edit slideover dropdown instead of showing only
+		// the static known-list fallback.
+		keys := models.ServiceKeys{}
+		for _, k := range s.store.ListKeys() {
+			if k.Service == sv.ID && k.IsAvailable() {
+				if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
+					keys[sv.ID] = plain
+					break
 				}
 			}
 		}
-		s.registry.RefreshService(sv.ID, sv.LocalURL, orKey)
+		s.registry.RefreshService(sv.ID, sv.LocalURL, keys)
 		for _, m := range s.registry.All(sv.ID) {
 			if m.ID != "" {
 				modelNames = append(modelNames, m.ID)

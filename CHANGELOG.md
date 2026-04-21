@@ -222,6 +222,22 @@ deployments can move off v0.2.16 in one step.
   spaces before `:` and `?`, Chinese full-width parentheses, Arabic
   RTL wording, Hausa hooked-ɗ spelling, etc.).
 
+### Added
+
+- **Anthropic live model-list fetch + Claude Opus 4.7**: `fetchAnthropic`
+  now tries `GET https://api.anthropic.com/v1/models` first (using the
+  configured Anthropic API key from the vault) and only falls back to
+  the hand-curated static list when no key is set or the endpoint is
+  unreachable. The static list gained `claude-opus-4-7` so the newest
+  Opus release shows up in the dashboard dropdown even before the live
+  fetch lands. `Registry.Refresh` / `Registry.RefreshService` now take
+  a `ServiceKeys map[string]string` so the vault can hand both the
+  OpenRouter and Anthropic keys through the same channel (same pattern
+  already used for `ServiceURLs`). Callers in `vault/server.go`,
+  `vault/hx_router.go`, and `proxy/server.go` were updated; the
+  proxy-side call passes `nil` because that path only cares about
+  local URLs.
+
 ### Fixed
 
 - **Multimodal content silently dropped on OpenAI-compat upstreams**:

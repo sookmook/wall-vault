@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -59,10 +60,18 @@ func (r *Registry) All(service string) []Model {
 // ServiceURLs: local service URL map (service ID → base URL)
 type ServiceURLs map[string]string
 
+// ServiceKeys: service ID → plaintext API key. Used by Refresh to run live
+// model-list lookups against providers that expose one (currently openrouter
+// and anthropic). Keys for services without a live endpoint are ignored.
+type ServiceKeys map[string]string
+
 // Refresh: re-fetch models from all services
-func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterKey string) error {
+func (r *Registry) Refresh(services []string, localURLs ServiceURLs, keys ServiceKeys) error {
 	if localURLs == nil {
 		localURLs = ServiceURLs{}
+	}
+	if keys == nil {
+		keys = ServiceKeys{}
 	}
 	var all []Model
 
@@ -71,7 +80,7 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 		case "google":
 			all = append(all, fetchGoogle()...)
 		case "openrouter":
-			fetched := fetchOpenRouter(openRouterKey)
+			fetched := fetchOpenRouter(keys["openrouter"])
 			if len(fetched) == 0 {
 				// API unreachable — use curated known models as fallback
 				fetched = fetchOpenRouterKnown()
@@ -82,7 +91,7 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 		case "openai":
 			all = append(all, fetchOpenAI()...)
 		case "anthropic":
-			all = append(all, fetchAnthropic()...)
+			all = append(all, fetchAnthropic(keys["anthropic"])...)
 		case "github-copilot":
 			all = append(all, fetchGitHubCopilot()...)
 		case "lmstudio":
@@ -114,15 +123,20 @@ func (r *Registry) Refresh(services []string, localURLs ServiceURLs, openRouterK
 // RefreshService fetches models for a single service and upserts them into the
 // cache, leaving entries for other services untouched. Called on demand from
 // the dashboard edit flow so a disabled service (skipped by the TTL-gated
-// full Refresh) still has model choices in its default_model dropdown.
-// orKey is only read when svcID == "openrouter"; pass "" otherwise.
-func (r *Registry) RefreshService(svcID, localURL, orKey string) {
+// full Refresh) still has model choices in its default_model dropdown. Pass
+// a ServiceKeys map whose svcID entry holds the plaintext API key when the
+// service supports live model-list fetches (openrouter, anthropic); nil or
+// empty is fine for services that don't.
+func (r *Registry) RefreshService(svcID, localURL string, keys ServiceKeys) {
+	if keys == nil {
+		keys = ServiceKeys{}
+	}
 	var fetched []Model
 	switch svcID {
 	case "google":
 		fetched = fetchGoogle()
 	case "openrouter":
-		fetched = fetchOpenRouter(orKey)
+		fetched = fetchOpenRouter(keys["openrouter"])
 		if len(fetched) == 0 {
 			fetched = fetchOpenRouterKnown()
 		}
@@ -131,7 +145,7 @@ func (r *Registry) RefreshService(svcID, localURL, orKey string) {
 	case "openai":
 		fetched = fetchOpenAI()
 	case "anthropic":
-		fetched = fetchAnthropic()
+		fetched = fetchAnthropic(keys["anthropic"])
 	case "github-copilot":
 		fetched = fetchGitHubCopilot()
 	case "lmstudio":
@@ -362,15 +376,77 @@ func fetchOpenRouterKnown() []Model {
 
 // ─── Anthropic ───────────────────────────────────────────────────────────────
 
-func fetchAnthropic() []Model {
+// fetchAnthropic returns the Anthropic model catalog, preferring a live
+// fetch from /v1/models when an API key is available and falling back to the
+// known-good static list when the API is unreachable or no key was supplied.
+func fetchAnthropic(apiKey string) []Model {
+	if apiKey != "" {
+		if live := fetchAnthropicLive(apiKey); len(live) > 0 {
+			return live
+		}
+	}
+	return fetchAnthropicKnown()
+}
+
+// fetchAnthropicKnown returns a hand-curated fallback list. Kept current
+// with the latest Claude 4.x family so brand-new releases show up in the
+// dashboard even when the live endpoint is unreachable or the Anthropic
+// key hasn't been added yet.
+func fetchAnthropicKnown() []Model {
 	return []Model{
+		{ID: "claude-opus-4-7",               Name: "Claude Opus 4.7",              Service: "anthropic", Context: 200000},
 		{ID: "claude-opus-4-6",               Name: "Claude Opus 4.6",              Service: "anthropic", Context: 200000},
 		{ID: "claude-sonnet-4-6",             Name: "Claude Sonnet 4.6",            Service: "anthropic", Context: 200000},
-		{ID: "claude-haiku-4-5-20251001",     Name: "Claude Haiku 4.5",            Service: "anthropic", Context: 200000},
-		{ID: "claude-3-5-sonnet-20241022",    Name: "Claude 3.5 Sonnet",           Service: "anthropic", Context: 200000},
-		{ID: "claude-3-5-haiku-20241022",     Name: "Claude 3.5 Haiku",            Service: "anthropic", Context: 200000},
-		{ID: "claude-3-opus-20240229",        Name: "Claude 3 Opus",               Service: "anthropic", Context: 200000},
+		{ID: "claude-haiku-4-5-20251001",     Name: "Claude Haiku 4.5",             Service: "anthropic", Context: 200000},
+		{ID: "claude-3-5-sonnet-20241022",    Name: "Claude 3.5 Sonnet",            Service: "anthropic", Context: 200000},
+		{ID: "claude-3-5-haiku-20241022",     Name: "Claude 3.5 Haiku",             Service: "anthropic", Context: 200000},
+		{ID: "claude-3-opus-20240229",        Name: "Claude 3 Opus",                Service: "anthropic", Context: 200000},
 	}
+}
+
+// fetchAnthropicLive queries Anthropic's /v1/models endpoint. Requires the
+// `x-api-key` and `anthropic-version` headers; returns nil on any
+// failure so the caller falls back to the static list.
+func fetchAnthropicLive(apiKey string) []Model {
+	client := &http.Client{Timeout: 8 * time.Second}
+	req, err := http.NewRequest("GET", "https://api.anthropic.com/v1/models?limit=100", nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[registry] anthropic live fetch: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[registry] anthropic live fetch: HTTP %d", resp.StatusCode)
+		return nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Data []struct {
+			ID          string `json:"id"`
+			DisplayName string `json:"display_name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil
+	}
+	out := make([]Model, 0, len(result.Data))
+	for _, m := range result.Data {
+		if m.ID == "" {
+			continue
+		}
+		name := m.DisplayName
+		if name == "" {
+			name = m.ID
+		}
+		out = append(out, Model{ID: m.ID, Name: name, Service: "anthropic", Context: 200000})
+	}
+	return out
 }
 
 // ─── GitHub Copilot ──────────────────────────────────────────────────────────

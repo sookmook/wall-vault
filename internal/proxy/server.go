@@ -250,7 +250,7 @@ func NewServer(cfg *config.Config) *Server {
 	// initialize model registry (async)
 	go func() {
 		ollamaURL := s.ollamaURL()
-		s.registry.Refresh(cfg.Proxy.Services, models.ServiceURLs{"ollama": ollamaURL}, "")
+		s.registry.Refresh(cfg.Proxy.Services, models.ServiceURLs{"ollama": ollamaURL}, nil)
 	}()
 
 	return s

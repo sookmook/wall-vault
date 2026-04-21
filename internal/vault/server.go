@@ -1237,16 +1237,23 @@ func (s *Server) ensureRegistry() {
 			svcIDs = append(svcIDs, sv.ID)
 		}
 	}
-	var orKey string
+	// Gather the first available key per service so providers that expose a
+	// live model-list endpoint (openrouter, anthropic) can advertise freshly
+	// released models without waiting on a binary update. Services that
+	// don't use keys ignore the map entry.
+	keys := models.ServiceKeys{}
 	for _, k := range s.store.ListKeys() {
-		if k.Service == "openrouter" && k.IsAvailable() {
-			if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
-				orKey = plain
-				break
-			}
+		if !k.IsAvailable() {
+			continue
+		}
+		if _, ok := keys[k.Service]; ok {
+			continue
+		}
+		if plain, err := decryptKey(k.EncryptedKey, s.cfg.Vault.MasterPass); err == nil {
+			keys[k.Service] = plain
 		}
 	}
-	_ = s.registry.Refresh(svcIDs, s.store.ServiceURLMap(), orKey)
+	_ = s.registry.Refresh(svcIDs, s.store.ServiceURLMap(), keys)
 }
 
 // ─── Periodic Status Broadcast ────────────────────────────────────────────────

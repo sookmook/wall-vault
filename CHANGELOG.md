@@ -8,6 +8,45 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.21] — 2026-04-24
+
+### Added
+
+- **Per-agent time distribution across the fleet**: multi-proxy
+  deployments that share an upstream local inference host and a shared
+  vault exhibited two collision patterns — several proxies failing
+  over to the same local backend at the same instant after an upstream
+  4xx and driving the server queue toward the host's per-model queue
+  limits, and several proxies booted within the same second running
+  their heartbeat / vault-sync tickers on the same wall-clock edge.
+  A new `internal/proxy/timing.go` introduces two helpers: `AgentOffset`
+  returns a deterministic delay derived from `sha256(client_id)`, so
+  two proxies in the same fleet land on different phase positions;
+  `FallbackJitter` returns a uniform `crypto/rand` delay that smooths
+  residual hash-bucket collisions. The offset+jitter pair (~700 ms
+  worst case, ctx-cancellable) is now applied at every local-inference
+  call entry (`callOllama`, `streamOllama`, `callLocalService`); the
+  deterministic offset alone (bounded by each goroutine's period) is
+  applied at the initial tick of the two periodic goroutines
+  (`startHeartbeat` and the vault-sync loop in `NewServer`).
+  Standalone deployments with an empty `client_id` see no offset
+  change; the jitter component remains small enough to be cosmetic
+  there.
+
+### Changed
+
+- **`Server.ollamaSem` replaced with `Server.localSems` map**: the
+  previous single Ollama-only semaphore is now a cap-1 channel per
+  local inference backend (`ollama`, `llamacpp`, `lmstudio`, `vllm`),
+  initialised at construction time. `callOllama` and `streamOllama`
+  acquire `s.localSems["ollama"]`; `callLocalService` — which
+  previously had no concurrency control at all — now acquires the
+  service's own slot. A fleet that migrates primary off Ollama to any
+  other local backend inherits the same proxy-side serialisation
+  Ollama had.
+
+---
+
 ## [0.2.20] — 2026-04-24
 
 ### Fixed

@@ -62,11 +62,15 @@ type Server struct {
 	sse             *SSEClient
 	registry        *models.Registry
 	hooksMgr        *hooks.Manager
-	// ollamaSem caps concurrent Ollama requests. A buffered channel doubles as
-	// a context-aware semaphore: callOllama's acquire selects on ctx.Done(),
-	// so a caller whose HTTP request is cancelled won't keep holding a slot
-	// behind a slow upstream — which the previous plain Mutex couldn't offer.
-	ollamaSem       chan struct{}
+	// localSems caps concurrent requests per local inference backend. Each
+	// service gets its own cap-1 buffered channel that doubles as a
+	// context-aware semaphore — the acquire site selects on ctx.Done() so
+	// a caller whose HTTP request is cancelled won't keep holding a slot
+	// behind a slow upstream. Populated for every local backend wall-vault
+	// knows about (ollama, llamacpp, lmstudio, vllm) regardless of whether
+	// the current config enables them, so a later config reload that adds
+	// a service does not race against a missing entry.
+	localSems       map[string]chan struct{}
 
 	// stopCh is closed by Stop() to signal background goroutines (periodic
 	// vault sync, token-cache eviction, initial-load delay) to exit instead
@@ -93,12 +97,18 @@ func NewServer(cfg *config.Config) *Server {
 		registry:   models.NewRegistry(10 * time.Minute),
 		tokenCache: make(map[string]*tokenCacheEntry),
 		clientActs: make(map[string]*clientAct),
-		// Ollama stays serialized (size 1): large local models are typically
-		// memory-bound, and running two inferences concurrently tends to be
-		// slower than two sequential ones. Bumped via a constant when your
-		// local setup can genuinely parallelize.
-		ollamaSem: make(chan struct{}, 1),
-		stopCh:    make(chan struct{}),
+		// Each local backend stays serialized (cap 1): large local models
+		// are typically memory-bound, and running two inferences concurrently
+		// tends to be slower than two sequential ones. Keyed by service id
+		// so llamacpp / lmstudio / vllm queue independently from ollama even
+		// when they share a host.
+		localSems: map[string]chan struct{}{
+			"ollama":   make(chan struct{}, 1),
+			"llamacpp": make(chan struct{}, 1),
+			"lmstudio": make(chan struct{}, 1),
+			"vllm":     make(chan struct{}, 1),
+		},
+		stopCh: make(chan struct{}),
 	}
 
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
@@ -1570,11 +1580,12 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// structurally. See ResolveModel + dispatchWith.
 	ollamaURL := s.ollamaURL()
 
-	// Wait for a free slot (bounded by ollamaSem capacity), but bail out if
+	// Wait for a free slot on the per-service semaphore, but bail out if
 	// the caller's context was cancelled in the meantime.
+	sem := s.localSems["ollama"]
 	select {
-	case s.ollamaSem <- struct{}{}:
-		defer func() { <-s.ollamaSem }()
+	case sem <- struct{}{}:
+		defer func() { <-sem }()
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}

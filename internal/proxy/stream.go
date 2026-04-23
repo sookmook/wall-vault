@@ -224,13 +224,14 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 	}
 	ollamaURL := s.ollamaURL()
 
-	// Bounded by ollamaSem capacity. Abort the acquire if the caller's
-	// context was cancelled (e.g. client disconnect while we're queued)
-	// so we don't leak a goroutine waiting on a slot whose response will
-	// be dropped anyway.
+	// Bounded by the per-service local semaphore. Abort the acquire if
+	// the caller's context was cancelled (e.g. client disconnect while
+	// we're queued) so we don't leak a goroutine waiting on a slot whose
+	// response will be dropped anyway.
+	sem := s.localSems["ollama"]
 	select {
-	case s.ollamaSem <- struct{}{}:
-		defer func() { <-s.ollamaSem }()
+	case sem <- struct{}{}:
+		defer func() { <-sem }()
 	case <-ctx.Done():
 		writeGeminiErrorChunk(w, f, ctx.Err())
 		return

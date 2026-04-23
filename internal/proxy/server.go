@@ -224,6 +224,18 @@ func NewServer(cfg *config.Config) *Server {
 
 		// periodic key sync (every 5 minutes)
 		go func() {
+			// Phase-shift the sync cadence by a client-specific offset
+			// so proxies booted within the same second do not re-pull
+			// vault state in lock-step. Bounded by the 5-minute period.
+			const syncPeriodMs = 5 * 60 * 1000
+			if offset := AgentOffset(s.cfg.Proxy.ClientID, syncPeriodMs); offset > 0 {
+				select {
+				case <-time.After(offset):
+				case <-s.stopCh:
+					return
+				}
+			}
+
 			ticker := time.NewTicker(5 * time.Minute)
 			defer ticker.Stop()
 			for {

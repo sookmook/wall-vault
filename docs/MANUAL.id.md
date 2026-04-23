@@ -38,7 +38,7 @@
 - **Penambahan layanan + penyusunan ulang seret-dan-lepas**: grid layanan mendapatkan tombol + tambah dan pegangan seret (`⋮⋮`).
 - **Header / footer / animasi tema / pengalih bahasa** dipulihkan. Ketujuh tema (cherry/dark/light/ocean/gold/autumn/winter) memainkan efek partikelnya pada lapisan di belakang kartu namun di atas latar belakang.
 - **UX penutupan slideover**: klik di luar atau Esc menutup slideover.
-- **Indikator status SSE** di footer (hijau = terhubung, oranye = menyambung ulang, abu-abu = terputus).
+- **Indikator status SSE + pengatur waktu aktif**: di bar atas (topbar), di samping pemilih bahasa/tema, terdapat penghitung `⏱ uptime` dan indikator `● SSE` (hijau = terhubung, oranye = menyambung ulang, abu-abu = terputus) yang diletakkan berdampingan (dipindahkan dari footer ke header sejak v0.2.18 — status bisa dilihat tanpa menggulir).
 
 ---
 

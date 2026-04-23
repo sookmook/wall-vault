@@ -8,6 +8,68 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.18] — 2026-04-23
+
+### Changed
+
+- **Uptime ticker + SSE indicator promoted from footer to topbar**:
+  `HeaderVM` gained a `StartedAt` field and the header template now
+  renders a `topbar-meta` cluster holding the `⏱ <uptime>` ticker and
+  the `● SSE` dot. `FooterVM` dropped `StartedAt` and the two indicator
+  spans — the footer is now identity/attribution only (version +
+  github / domain / email links). `theme.templ` gained
+  `.topbar-meta`/`.topbar-uptime`/`.topbar-sse` CSS rules. Existing JS
+  driving `#wv-uptime` and `#wv-sse-dot` works unchanged (DOM IDs
+  preserved), so operators see connection health without scrolling to
+  the footer.
+- **Dispatch fallback chain reordered by reliability**: `dispatch()`
+  previously iterated `allowedServices` in dashboard sort order, which
+  meant a primary failure would spend minutes waiting on metered
+  clouds (openrouter → anthropic → openai) whose keys might all be
+  exhausted before finally reaching a local backend. A new
+  `fallbackPriority` constant pins the order to
+  `ollama → llamacpp → lmstudio → vllm → google → github-copilot →
+  openrouter → anthropic → openai`. Primary (`preferred_service`) is
+  still tried first; custom services absent from the priority list
+  keep their dashboard order at the tail.
+- **Anthropic passthrough honours caller OAuth / API-key (BYO auth)**:
+  `handleAnthropic` now detects `sk-ant-*` tokens in `Authorization:
+  Bearer` or `x-api-key` and forwards them to Anthropic verbatim,
+  bypassing the vault-key rotation / cooldown / token-accounting path.
+  Single-shot call, no retry, no vault-key side effects. Lets upstream
+  OAuth sessions reach Anthropic even when the proxy's own vault key
+  is exhausted.
+- **SSE bridge for buffered Anthropic responses**: handlers used to
+  return a single JSON blob even for `stream: true` requests, which
+  made the Claude Code SDK hang waiting for the first SSE chunk. A new
+  `WriteAnthropicSSEFromJSON` splits the buffered response into the
+  spec'd event sequence (`message_start` → `content_block_start` /
+  `content_block_delta` / `content_block_stop` per block →
+  `message_delta` → `message_stop`), flushes between events, and
+  preserves the upstream Content-Type. Used by both the passthrough
+  and dispatch paths whenever the original request had
+  `stream: true`.
+
+### Fixed
+
+- **Network / context-cancel no longer parks keys in cooldown**:
+  `cooldownDurations[0]` was falling through to the default 5-minute
+  bucket, so a client disconnect (errCode=0) mid-request was treated
+  as a key fault and every key on the service cycled into cooldown.
+  `cooldownDurations[0] = 0` now explicitly marks transport-layer
+  errors as non-key faults — the request fails, the key stays
+  available, the next retry proceeds normally.
+
+### Security
+
+- **Pre-release leak sweep**: grep pattern across all tracked files
+  for real fleet hostnames / LAN IPs / persistent tokens — zero hits
+  after prior `v0.2.17` scrub remains zero after the v0.2.18 diffs.
+  Only the intentionally-public owner email + github/domain links
+  remain in `footer.templ`.
+
+---
+
 ## [0.2.17] — 2026-04-19
 
 Full-surface audit rollup: rounds A (security), B (reliability), C (UX /

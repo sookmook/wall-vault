@@ -1405,6 +1405,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		CurrentTheme: themeName,
 		CurrentLang:  langCode,
 		Langs:        langs,
+		StartedAt:    s.startedAt.Unix(),
 	}
 
 	inner := layouts.Shell(
@@ -1412,7 +1413,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		sidebar.Sidebar(toSidebarServices(services), toSidebarClients(clients)),
 		renderHome(s.toMainServices(services), s.toMainClients(clients), s.toMainKeys(s.store.ListKeys())),
 		slideover.Empty(),
-		layouts.Footer(&layouts.FooterVM{Version: Version, StartedAt: s.startedAt.Unix()}),
+		layouts.Footer(&layouts.FooterVM{Version: Version}),
 	)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

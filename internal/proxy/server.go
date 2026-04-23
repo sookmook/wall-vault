@@ -1101,8 +1101,21 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Streaming bridge: Claude Code (agent SDK) opens with `stream: true`
+	// but wall-vault currently buffers upstream via io.ReadAll. Returning a
+	// single JSON blob for a stream-opened session makes the SDK hang until
+	// its 30-minute ceiling. Force upstream to non-streaming, capture the
+	// full JSON, then replay it as a proper Anthropic SSE event stream so
+	// the SDK sees a complete turn arrive in one fast burst.
+	originalStream := req.Stream
+	req.Stream = false
+
 	if usePassthrough {
 		if body, contentType, _, err := s.callAnthropicPassthrough(r.Context(), &req, mdl, byoAPIKey, byoBearer); err == nil {
+			if originalStream {
+				WriteAnthropicSSEFromJSON(w, body)
+				return
+			}
 			if contentType == "" {
 				contentType = "application/json"
 			}
@@ -1138,6 +1151,11 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := GeminiRespToAnthropic(mdl, geminiResp)
+	if originalStream {
+		body, _ := json.Marshal(resp)
+		WriteAnthropicSSEFromJSON(w, body)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
@@ -1210,6 +1228,20 @@ type DispatchResult struct {
 	UsedModel   string
 }
 
+// fallbackPriority orders non-primary dispatch attempts by response
+// reliability first. Local services (no quota, lowest latency) lead so a
+// credit-out day on every cloud provider still yields a reply in seconds.
+// Stable clouds (google, github-copilot) sit in the middle, and metered
+// clouds most likely to return 402 (openrouter, anthropic, openai) trail
+// the chain. Primary service — whatever the caller's preferred_service is
+// — is prepended in dispatch() and always tried first regardless of this
+// list.
+var fallbackPriority = []string{
+	"ollama", "llamacpp", "lmstudio", "vllm",
+	"google", "github-copilot",
+	"openrouter", "anthropic", "openai",
+}
+
 func (s *Server) dispatch(ctx context.Context, service, model string, req *GeminiRequest) (*DispatchResult, error) {
 	s.mu.RLock()
 	allowedServices := s.allowedServices
@@ -1218,24 +1250,42 @@ func (s *Server) dispatch(ctx context.Context, service, model string, req *Gemin
 
 	var lastErr error
 
-	// Build try order from the vault UI proxy-enabled service list (allowedServices),
-	// which matches the order shown in the Services section of the dashboard.
-	// The currently configured service is moved to the front so it is always tried first.
-	// Falls back to s.cfg.Proxy.Services when the vault list is not yet available.
+	// Build try order. Primary (preferred_service) is always tried first so
+	// the caller's explicit choice wins when it's available. Fallbacks then
+	// follow a fixed reliability/latency ordering rather than whatever sort
+	// order the dashboard happened to ship the services in — previously a
+	// primary failure would spend minutes timing out through metered clouds
+	// (openrouter → anthropic → openai) whose keys might all be exhausted,
+	// before finally reaching an always-on local backend. With local-first
+	// fallback the chain resolves in seconds even on credit-out days.
+	basePool := allowedServices
+	if len(basePool) == 0 {
+		basePool = s.cfg.Proxy.Services
+	}
+	allowedSet := make(map[string]bool, len(basePool))
+	for _, sv := range basePool {
+		allowedSet[sv] = true
+	}
+
 	var tryOrder []string
-	if len(allowedServices) > 0 {
+	seen := make(map[string]bool)
+	if service != "" {
 		tryOrder = append(tryOrder, service)
-		for _, svc := range allowedServices {
-			if svc != service {
-				tryOrder = append(tryOrder, svc)
-			}
+		seen[service] = true
+	}
+	for _, svc := range fallbackPriority {
+		if allowedSet[svc] && !seen[svc] {
+			tryOrder = append(tryOrder, svc)
+			seen[svc] = true
 		}
-	} else {
-		tryOrder = append(tryOrder, service)
-		for _, svc := range s.cfg.Proxy.Services {
-			if svc != service {
-				tryOrder = append(tryOrder, svc)
-			}
+	}
+	// Custom / unknown services (not in fallbackPriority) keep their
+	// dashboard-defined order at the tail so admin-added providers aren't
+	// silently dropped from the chain.
+	for _, svc := range basePool {
+		if !seen[svc] {
+			tryOrder = append(tryOrder, svc)
+			seen[svc] = true
 		}
 	}
 

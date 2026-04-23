@@ -1,17 +1,14 @@
 package layouts
 
-import "fmt"
-
-// FooterVM carries everything the footer needs to render: the running version
-// label and the server start time as a Unix epoch seconds value (used by the
-// client-side uptime ticker).
+// FooterVM carries the footer's version/link block. Uptime ticker and SSE
+// connection indicator moved to the topbar in v0.2.18 so they stay visible
+// without scrolling — the footer now hosts only identity/attribution.
 type FooterVM struct {
-	Version   string
-	StartedAt int64
+	Version string
 }
 
 templ Footer(vm *FooterVM) {
-	<footer class="shell-footer" data-wv-started={ fmt.Sprint(vm.StartedAt) }>
+	<footer class="shell-footer">
 		<span>wall-vault { vm.Version }</span>
 		<span class="sep">·</span>
 		<a href="https://github.com/sookmook/wall-vault" target="_blank" rel="noopener">github.com/sookmook/wall-vault</a>
@@ -19,9 +16,5 @@ templ Footer(vm *FooterVM) {
 		<a href="https://sookmook.org/" target="_blank" rel="noopener">sookmook.org</a>
 		<span class="sep">·</span>
 		<a href="mailto:sookmook@gmail.com">sookmook@gmail.com</a>
-		<span class="sep">·</span>
-		<span>⏱ <span id="wv-uptime">…</span></span>
-		<span class="sep">·</span>
-		<span><span id="wv-sse-dot" class="dot dot-off" title="SSE"></span> SSE</span>
 	</footer>
 }

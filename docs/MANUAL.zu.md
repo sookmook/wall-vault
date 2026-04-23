@@ -38,7 +38,7 @@
 - **Ukungezwa kwesevisi + ukuhleleka kabusha ngokudonsa-nokulahla**: igridi yesevisi ithola inkinobho ye-+ add kanye nesibambo sokudonsa (`⋮⋮`).
 - **Isihloko / isihlathi / ukuhamba kwezihloko / isishintshi solimi** kubuyiselwe. Izihloko eziyisi-7 (cherry/dark/light/ocean/gold/autumn/winter) zidlala umthelela wazo wezinhlayiya kusendlalelo ngemuva kwamakhadi kodwa ngenhla kwesizinda.
 - **I-UX yokuchitha i-Slideover**: ukuchofoza ngaphandle noma u-Esc kuvala i-slideover.
-- **Isikhombi sesimo se-SSE** esihlathini (okuluhlaza okwesibhakabhaka = kuxhunyiwe, i-orange = kuxhumeka kabusha, okugreyi = akuxhumekile).
+- **Isikhombi sesimo se-SSE + isibali-sikhathi sokusebenza**: embhedeni ophezulu (topbar), eduze kwesikhethi solimi/sendikimba, isibali-sikhathi se-`⏱ uptime` nesikhombi se-`● SSE` (okuluhlaza okwesibhakabhaka = kuxhunyiwe, i-orange = kuxhumeka kabusha, okugreyi = akuxhumekile) zibekwe ndawonye (zithuthelwe esihlathini zaya esihlokweni kusukela ku-v0.2.18 — isimo siyabonakala ngaphandle kokuskrola).
 
 ---
 

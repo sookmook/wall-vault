@@ -860,7 +860,7 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Si se ejecuta en otra computadora
 - **Añadir servicio + reordenar por arrastrar y soltar**: La cuadrícula de servicios incorpora un botón de + añadir y un asa de arrastre (`⋮⋮`).
 - **Encabezado / pie de página / animaciones de tema / selector de idioma** restaurados. Los 7 temas (cherry/dark/light/ocean/gold/autumn/winter) reproducen su efecto de partículas en una capa detrás de las tarjetas pero delante del fondo.
 - **UX de cierre del panel deslizable**: Un clic fuera o la tecla Esc cierra el panel deslizable.
-- **Indicador de estado SSE** en el pie de página (verde = conectado, naranja = reconectando, gris = desconectado).
+- **Indicador de estado SSE + temporizador de tiempo de actividad** en la barra superior (topbar), junto al selector de idioma/tema. El contador `⏱ uptime` y el indicador `● SSE` (verde = conectado, naranja = reconectando, gris = desconectado) se muestran juntos (movidos del pie de página al encabezado desde v0.2.18 — estado visible sin hacer scroll).
 
 ---
 

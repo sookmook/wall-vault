@@ -860,7 +860,7 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Ikiwa inaendesha kwenye kompyuta 
 - **Kuongeza huduma + kupanga upya kwa kuburuta-na-kuacha**: gridi ya huduma inapata kitufe cha + ongeza pamoja na kishiko cha kuburuta (`⋮⋮`).
 - **Kichwa / chini / uhuishaji wa mandhari / kibadilishi cha lugha** vimerejeshwa. Mandhari 7 (cherry/dark/light/ocean/gold/autumn/winter) huchezesha athari yao ya chembe kwenye safu nyuma ya kadi lakini juu ya mandharinyuma.
 - **Uzoefu wa kufunga slideover**: kubofya nje au Esc kunafunga slideover.
-- **Kiashiria cha hali cha SSE** chini ya ukurasa (kijani = imeunganishwa, chungwa = inaunganisha upya, kijivu = imekatika).
+- **Kiashiria cha hali ya SSE + kipima muda wa uendeshaji**: kwenye upau wa juu (topbar), kando ya kichaguzi cha lugha/mandhari, kuna kihesabu cha `⏱ uptime` na kiashiria cha `● SSE` (kijani = kimeunganishwa, chungwa = kinaunganisha upya, kijivu = kimekatika) vilivyowekwa pamoja (vilihamishwa kutoka footer hadi header tangu v0.2.18 — hali inaonekana bila kusogeza).
 
 ---
 

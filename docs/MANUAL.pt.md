@@ -38,7 +38,7 @@
 - **Adicionar serviço + reordenação por arrastar e soltar**: a grade de serviços ganha um botão + adicionar e uma alça de arrastar (`⋮⋮`).
 - **Cabeçalho / rodapé / animações de tema / seletor de idioma** restaurados. Os 7 temas (cherry/dark/light/ocean/gold/autumn/winter) exibem seu efeito de partículas em uma camada atrás dos cartões, mas acima do fundo.
 - **UX de dispensa do slideover**: clique fora ou Esc fecha o slideover.
-- **Indicador de status SSE** no rodapé (verde = conectado, laranja = reconectando, cinza = desconectado).
+- **Indicador de status SSE + cronômetro de tempo de atividade** na barra superior (topbar), ao lado do seletor de idioma/tema. O contador `⏱ uptime` e o indicador `● SSE` (verde = conectado, laranja = reconectando, cinza = desconectado) ficam juntos (movidos do rodapé para o cabeçalho a partir de v0.2.18 — status visível sem precisar rolar).
 
 ---
 

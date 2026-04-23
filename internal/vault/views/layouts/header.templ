@@ -1,19 +1,25 @@
 package layouts
 
+import "fmt"
+
 // LangOption represents a selectable locale in the header dropdown.
 type LangOption struct {
 	Code  string
 	Label string
 }
 
-// HeaderVM carries every value the topbar needs to render.
+// HeaderVM carries every value the topbar needs to render. StartedAt is the
+// server start time (unix seconds) used by the client-side uptime ticker —
+// the ticker + SSE connection indicator live in the topbar since v0.2.18
+// so operators always have them in view without scrolling to the footer.
 type HeaderVM struct {
-	Title       string
-	Subtitle    string
-	Version     string
+	Title        string
+	Subtitle     string
+	Version      string
 	CurrentTheme string
 	CurrentLang  string
 	Langs        []LangOption
+	StartedAt    int64
 }
 
 var themeOptions = []struct {
@@ -30,13 +36,17 @@ var themeOptions = []struct {
 }
 
 templ Header(vm *HeaderVM) {
-	<header class="topbar">
+	<header class="topbar" data-wv-started={ fmt.Sprint(vm.StartedAt) }>
 		<div class="topbar-brand">
 			<img src="/logo" alt="logo" class="topbar-logo"/>
 			<div class="topbar-titles">
 				<h1>{ vm.Title }</h1>
 				<small>{ vm.Subtitle } · { vm.Version }</small>
 			</div>
+		</div>
+		<div class="topbar-meta">
+			<span class="topbar-uptime">⏱ <span id="wv-uptime">…</span></span>
+			<span class="topbar-sse"><span id="wv-sse-dot" class="dot dot-off" title="SSE"></span> SSE</span>
 		</div>
 		<div class="topbar-switchers">
 			<label class="switcher">

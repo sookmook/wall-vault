@@ -727,6 +727,148 @@ func GeminiRespToAnthropic(model string, resp *GeminiResponse) *AnthropicRespons
 	return ar
 }
 
+// WriteAnthropicSSEFromJSON takes a completed Anthropic `/v1/messages` JSON
+// response body and replays it to the client as a legal Anthropic SSE event
+// stream. Lets wall-vault keep buffering the upstream (io.ReadAll) while
+// still honouring the caller's `stream: true` request — the Claude SDK only
+// knows how to consume SSE chunks when it opened a streaming session, so
+// returning a single JSON blob with stream=true set would make it hang.
+// Upstream streaming fully inside the proxy is the proper fix; this wrapper
+// is the narrow unblock so Claude Code sessions through NanoClaw can
+// finish before their 30-minute SDK timeout.
+func WriteAnthropicSSEFromJSON(w http.ResponseWriter, body []byte) {
+	type contentBlock struct {
+		Type  string `json:"type"`
+		Text  string `json:"text,omitempty"`
+		ID    string `json:"id,omitempty"`
+		Name  string `json:"name,omitempty"`
+		Input json.RawMessage `json:"input,omitempty"`
+	}
+	type antUsage struct {
+		InputTokens  int `json:"input_tokens,omitempty"`
+		OutputTokens int `json:"output_tokens,omitempty"`
+	}
+	var msg struct {
+		ID           string         `json:"id"`
+		Type         string         `json:"type"`
+		Role         string         `json:"role"`
+		Model        string         `json:"model"`
+		Content      []contentBlock `json:"content"`
+		StopReason   string         `json:"stop_reason"`
+		StopSequence json.RawMessage `json:"stop_sequence"`
+		Usage        *antUsage      `json:"usage"`
+	}
+	if err := json.Unmarshal(body, &msg); err != nil {
+		// Upstream returned something that isn't a normal message envelope
+		// (e.g. upstream error JSON). Forward as-is on the JSON Content-Type
+		// so the client at least gets the error body instead of waiting.
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, _ := w.(http.Flusher)
+
+	writeEvent := func(event string, payload any) {
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, b)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	if msg.Type == "" {
+		msg.Type = "message"
+	}
+	if msg.Role == "" {
+		msg.Role = "assistant"
+	}
+
+	// 1) message_start — empty content array, the real blocks arrive as
+	// content_block_start + content_block_delta below.
+	writeEvent("message_start", map[string]any{
+		"type": "message_start",
+		"message": map[string]any{
+			"id":            msg.ID,
+			"type":          msg.Type,
+			"role":          msg.Role,
+			"content":       []any{},
+			"model":         msg.Model,
+			"stop_reason":   nil,
+			"stop_sequence": nil,
+			"usage":         msg.Usage,
+		},
+	})
+
+	// 2) content blocks — emit one (start, delta, stop) triple per block.
+	for i, cb := range msg.Content {
+		switch cb.Type {
+		case "text":
+			writeEvent("content_block_start", map[string]any{
+				"type":          "content_block_start",
+				"index":         i,
+				"content_block": map[string]string{"type": "text", "text": ""},
+			})
+			if cb.Text != "" {
+				writeEvent("content_block_delta", map[string]any{
+					"type":  "content_block_delta",
+					"index": i,
+					"delta": map[string]string{"type": "text_delta", "text": cb.Text},
+				})
+			}
+			writeEvent("content_block_stop", map[string]any{
+				"type":  "content_block_stop",
+				"index": i,
+			})
+		case "tool_use":
+			writeEvent("content_block_start", map[string]any{
+				"type":  "content_block_start",
+				"index": i,
+				"content_block": map[string]any{
+					"type":  "tool_use",
+					"id":    cb.ID,
+					"name":  cb.Name,
+					"input": map[string]any{},
+				},
+			})
+			if len(cb.Input) > 0 {
+				writeEvent("content_block_delta", map[string]any{
+					"type":  "content_block_delta",
+					"index": i,
+					"delta": map[string]any{"type": "input_json_delta", "partial_json": string(cb.Input)},
+				})
+			}
+			writeEvent("content_block_stop", map[string]any{
+				"type":  "content_block_stop",
+				"index": i,
+			})
+		}
+	}
+
+	// 3) message_delta — stop_reason + final usage totals.
+	stopReason := msg.StopReason
+	if stopReason == "" {
+		stopReason = "end_turn"
+	}
+	deltaPayload := map[string]any{
+		"type":  "message_delta",
+		"delta": map[string]any{"stop_reason": stopReason, "stop_sequence": nil},
+	}
+	if msg.Usage != nil {
+		deltaPayload["usage"] = map[string]int{"output_tokens": msg.Usage.OutputTokens}
+	}
+	writeEvent("message_delta", deltaPayload)
+
+	// 4) message_stop — stream terminator.
+	writeEvent("message_stop", map[string]any{"type": "message_stop"})
+}
+
 // ─── Util ─────────────────────────────────────────────────────────────────────
 
 func extractText(parts []GeminiPart) string {

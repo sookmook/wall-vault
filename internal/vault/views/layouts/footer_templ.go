@@ -8,14 +8,11 @@ package layouts
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "fmt"
-
-// FooterVM carries everything the footer needs to render: the running version
-// label and the server start time as a Unix epoch seconds value (used by the
-// client-side uptime ticker).
+// FooterVM carries the footer's version/link block. Uptime ticker and SSE
+// connection indicator moved to the topbar in v0.2.18 so they stay visible
+// without scrolling — the footer now hosts only identity/attribution.
 type FooterVM struct {
-	Version   string
-	StartedAt int64
+	Version string
 }
 
 func Footer(vm *FooterVM) templ.Component {
@@ -36,33 +33,20 @@ func Footer(vm *FooterVM) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<footer class=\"shell-footer\" data-wv-started=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<footer class=\"shell-footer\"><span>wall-vault ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(vm.StartedAt))
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Version)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/footer.templ`, Line: 14, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/footer.templ`, Line: 12, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"><span>wall-vault ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Version)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/footer.templ`, Line: 15, Col: 31}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span> <span class=\"sep\">·</span> <a href=\"https://github.com/sookmook/wall-vault\" target=\"_blank\" rel=\"noopener\">github.com/sookmook/wall-vault</a> <span class=\"sep\">·</span> <a href=\"https://sookmook.org/\" target=\"_blank\" rel=\"noopener\">sookmook.org</a> <span class=\"sep\">·</span> <a href=\"mailto:sookmook@gmail.com\">sookmook@gmail.com</a> <span class=\"sep\">·</span> <span>⏱ <span id=\"wv-uptime\">…</span></span> <span class=\"sep\">·</span> <span><span id=\"wv-sse-dot\" class=\"dot dot-off\" title=\"SSE\"></span> SSE</span></footer>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span> <span class=\"sep\">·</span> <a href=\"https://github.com/sookmook/wall-vault\" target=\"_blank\" rel=\"noopener\">github.com/sookmook/wall-vault</a> <span class=\"sep\">·</span> <a href=\"https://sookmook.org/\" target=\"_blank\" rel=\"noopener\">sookmook.org</a> <span class=\"sep\">·</span> <a href=\"mailto:sookmook@gmail.com\">sookmook@gmail.com</a></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

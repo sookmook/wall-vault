@@ -721,7 +721,7 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 				});
 
 				// SSE status indicator — subscribe to /api/events and reflect connection
-				// state into a #wv-sse-dot element in the footer.
+				// state into a #wv-sse-dot element in the topbar.
 				// Uses one-shot tickets from /api/sse-ticket so the admin token never
 				// appears in a URL. Since tickets are single-use, reconnects fetch a new
 				// one instead of relying on the browser's built-in EventSource retry.

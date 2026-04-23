@@ -69,7 +69,7 @@ OpenClaw (écran terminal TUI)
 - **Ajout de service + réorganisation par glisser-déposer** : la grille des services gagne un bouton + ajouter et une poignée de glissement (`⋮⋮`).
 - **En-tête / pied de page / animations de thème / sélecteur de langue** restaurés. Les 7 thèmes (cherry/dark/light/ocean/gold/autumn/winter) jouent leur effet de particules sur une couche derrière les cartes mais au-dessus de l'arrière-plan.
 - **UX de fermeture du volet latéral** : un clic à l'extérieur ou la touche Esc ferme le volet latéral.
-- **Indicateur d'état SSE** dans le pied de page (vert = connecté, orange = reconnexion, gris = déconnecté).
+- **Indicateur d'état SSE + minuteur de temps de fonctionnement** dans la barre supérieure (topbar), à côté du sélecteur de langue / thème. Le compteur `⏱ uptime` et l'indicateur `● SSE` (vert = connecté, orange = reconnexion, gris = déconnecté) sont placés côte à côte (déplacés du pied de page vers l'en-tête depuis v0.2.18 — état visible sans défilement).
 
 ---
 

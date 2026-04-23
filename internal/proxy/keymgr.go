@@ -15,6 +15,7 @@ import (
 // ─── Cooldown Durations ───────────────────────────────────────────────────────
 
 var cooldownDurations = map[int]time.Duration{
+	0:   0,                // network / context cancel — not a key fault
 	429: 5 * time.Minute,  // rate limit — short retry (prevents total lockout)
 	402: 30 * time.Minute, // payment required — moderate retry
 	401: 6 * time.Hour,    // invalid key — retire

@@ -860,7 +860,7 @@ export OLLAMA_URL=http://192.168.x.x:11434   # Idan tana gudana a wani kwamfuta
 - **Ƙara sabis + sake tsara ta hanyar ja-da-zube**: grid na sabis ya samu maballin + ƙara da riƙo na ja (`⋮⋮`).
 - **Header / footer / motsi na jigo / canza harshe** an mayar da su. Jigogi 7 (cherry/dark/light/ocean/gold/autumn/winter) suna kunna sakamakon barbashi a kan Layer a bayan kartuna amma sama da bango.
 - **UX na kore slideover**: danna waje ko Esc yana rufe slideover.
-- **Mai nuna halin SSE** a cikin footer (kore = an haɗa, orange = ana sake haɗawa, launin toka = an cire haɗi).
+- **Mai nuna halin SSE + ma'aunin lokacin aiki**: a sandar sama (topbar), kusa da mai zaɓar harshe/jigo, akwai ma'aunin `⏱ uptime` da alamar `● SSE` (kore = an haɗa, orange = ana sake haɗawa, launin toka = an cire haɗi) a kusa da juna (an matsar da su daga footer zuwa header tun v0.2.18 — ana iya ganin halin ba tare da zazzagewa ba).
 
 ---
 

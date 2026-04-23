@@ -38,7 +38,7 @@
 - **Dienst-Hinzufügen + Drag-and-Drop-Sortierung**: Das Dienste-Raster erhält eine +-Schaltfläche zum Hinzufügen sowie einen Ziehgriff (`⋮⋮`).
 - **Kopfzeile / Fußzeile / Theme-Animationen / Sprachumschalter** wiederhergestellt. Die 7 Themes (cherry/dark/light/ocean/gold/autumn/winter) spielen ihren Partikeleffekt auf einer Ebene hinter den Karten, aber über dem Hintergrund ab.
 - **Slideover-Schließen-UX**: Ein Klick außerhalb oder Esc schließt den Slideover.
-- **SSE-Statusanzeige** in der Fußzeile (grün = verbunden, orange = erneut verbindend, grau = getrennt).
+- **SSE-Statusanzeige + Betriebszeit-Timer** in der oberen Leiste (topbar), neben der Sprach-/Theme-Auswahl. Der `⏱ Betriebszeit`-Zähler und die `● SSE`-Anzeige (grün = verbunden, orange = erneut verbindend, grau = getrennt) stehen nebeneinander (seit v0.2.18 von der Fußzeile in den Header verschoben — Status ohne Scrollen sichtbar).
 
 ---
 

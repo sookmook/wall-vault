@@ -1580,6 +1580,19 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// structurally. See ResolveModel + dispatchWith.
 	ollamaURL := s.ollamaURL()
 
+	// Distribute fleet arrival times: each proxy delays entry by a
+	// deterministic phase offset (derived from its client_id) plus a
+	// small random jitter. Prevents simultaneous fan-in when several
+	// proxies fail over to a shared local backend in lock-step.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
 	// Wait for a free slot on the per-service semaphore, but bail out if
 	// the caller's context was cancelled in the meantime.
 	sem := s.localSems["ollama"]

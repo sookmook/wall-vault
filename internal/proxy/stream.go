@@ -224,6 +224,19 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 	}
 	ollamaURL := s.ollamaURL()
 
+	// Fleet time distribution — same AgentOffset + FallbackJitter used
+	// at the non-streaming entry in callOllama. Keeps both Ollama paths
+	// in sync with each other and with the generic local-service path.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			writeGeminiErrorChunk(w, f, ctx.Err())
+			return
+		}
+	}
+
 	// Bounded by the per-service local semaphore. Abort the acquire if
 	// the caller's context was cancelled (e.g. client disconnect while
 	// we're queued) so we don't leak a goroutine waiting on a slot whose

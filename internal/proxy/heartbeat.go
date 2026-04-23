@@ -84,6 +84,18 @@ func (s *Server) startHeartbeat() {
 		return
 	}
 	go func() {
+		// Phase-shift the heartbeat cadence by a client-specific offset
+		// so proxies booted within the same second do not send synchronised
+		// bursts to the vault. Bounded by the 20-second heartbeat period.
+		const heartbeatPeriodMs = 20 * 1000
+		if offset := AgentOffset(s.cfg.Proxy.ClientID, heartbeatPeriodMs); offset > 0 {
+			select {
+			case <-time.After(offset):
+			case <-s.stopCh:
+				return
+			}
+		}
+
 		// first send after 5 seconds (allow service to start up)
 		time.Sleep(5 * time.Second)
 		s.sendHeartbeat()

@@ -31,7 +31,7 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
   straight to `http://localhost:11434` on hosts with no local Ollama,
   producing `dial tcp 127.0.0.1:11434: connect: connection refused`
   even though the vault had published the correct fleet URL
-  (`http://192.168.0.6:11434`). Env vars still work as explicit
+  (`http://192.168.1.20:11434`). Env vars still work as explicit
   overrides when no `ollama` service entry is registered in vault.
 
 ---

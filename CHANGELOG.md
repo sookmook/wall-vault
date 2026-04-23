@@ -8,6 +8,29 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.20] — 2026-04-24
+
+### Fixed
+
+- **`streamOllama` now honours caller context, uses a 10-minute client
+  timeout, and acquires the concurrency semaphore in a cancellable
+  select** (`internal/proxy/stream.go`). Previously it built requests
+  with `http.NewRequest` (no context), took the `ollamaSem` slot via a
+  bare `<-` send with no way to unwind on client disconnect, and ran
+  under `cfg.Proxy.Timeout` (default 60s) — too tight once
+  `OLLAMA_KEEP_ALIVE` is tuned down, since the first post-idle call has
+  to cover a cold model reload that can take tens of seconds for large
+  (>8 GB) models. The fix threads `r.Context()` from
+  `handleGeminiStream` into `streamOllama`, swaps to
+  `NewRequestWithContext`, wraps the semaphore acquire in a `select`
+  that aborts on `ctx.Done()`, and bumps the HTTP client timeout to
+  match `callOllama`'s 10-minute budget. The practical path
+  (`/v1/chat/completions` → non-streaming `callOllama`) already behaves
+  correctly; this aligns the Gemini streaming path
+  (`/v1beta/.../streamGenerateContent`) with the same guarantees.
+
+---
+
 ## [0.2.19] — 2026-04-24
 
 ### Fixed

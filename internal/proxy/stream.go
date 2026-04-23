@@ -3,12 +3,14 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // ─── Gemini Streaming Handler ────────────────────────────────────────────────
@@ -64,7 +66,7 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 	case "openrouter":
 		s.streamOpenRouter(w, flusher, mdl, &req)
 	case "ollama":
-		s.streamOllama(w, flusher, mdl, &req)
+		s.streamOllama(r.Context(), w, flusher, mdl, &req)
 	default:
 		writeGeminiErrorChunk(w, flusher, fmt.Errorf("서비스 미지원: %s", svc))
 	}
@@ -216,26 +218,39 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 
 // ─── Ollama Streaming ─────────────────────────────────────────────────────────
 
-func (s *Server) streamOllama(w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
+func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
 	if model == "" {
 		model = "qwen3.5:35b"
 	}
 	ollamaURL := s.ollamaURL()
 
-	// limit concurrent Ollama requests. streamOllama runs without a plumbed
-	// context today, so this acquire blocks until a slot is free — same
-	// behavior as the former Mutex. ctx-aware acquire lives in callOllama.
-	s.ollamaSem <- struct{}{}
-	defer func() { <-s.ollamaSem }()
+	// Bounded by ollamaSem capacity. Abort the acquire if the caller's
+	// context was cancelled (e.g. client disconnect while we're queued)
+	// so we don't leak a goroutine waiting on a slot whose response will
+	// be dropped anyway.
+	select {
+	case s.ollamaSem <- struct{}{}:
+		defer func() { <-s.ollamaSem }()
+	case <-ctx.Done():
+		writeGeminiErrorChunk(w, f, ctx.Err())
+		return
+	}
 
 	ollamaReq := GeminiToOllama(model, req)
 	ollamaReq.Stream = true
 	data, _ := json.Marshal(ollamaReq)
 
-	httpReq, _ := http.NewRequest("POST", ollamaURL+"/api/chat", bytes.NewReader(data))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/api/chat", bytes.NewReader(data))
+	if err != nil {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("Ollama 요청 생성 실패: %w", err))
+		return
+	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: s.cfg.Proxy.Timeout}
+	// Match callOllama's budget — local inference with cold model reload
+	// (OLLAMA_KEEP_ALIVE can unload large models between calls) easily
+	// exceeds cfg.Proxy.Timeout's default 60s.
+	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		writeGeminiErrorChunk(w, f, fmt.Errorf("Ollama 연결 실패: %w", err))

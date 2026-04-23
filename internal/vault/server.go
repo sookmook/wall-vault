@@ -479,6 +479,26 @@ func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Resolve the "effective" routing fields for each client: the v0.2 canonical
+	// PreferredService / ModelOverride win over the v0.1 legacy DefaultService /
+	// DefaultModel. Before v0.2.19 this endpoint only serialised the legacy pair,
+	// so a client whose dashboard preferred_service had been changed would still
+	// see its proxy syncFromVault receive the stale legacy value — producing the
+	// pathological "[sync] 설정 로드: openrouter/" where service-model mismatch
+	// sent the fallback chain into a 6-10 minute timeout.
+	effectiveSvc := func(c *Client) string {
+		if c.PreferredService != "" {
+			return c.PreferredService
+		}
+		return c.DefaultService
+	}
+	effectiveMdl := func(c *Client) string {
+		if c.ModelOverride != "" {
+			return c.ModelOverride
+		}
+		return c.DefaultModel
+	}
+
 	if authenticated {
 		type pub struct {
 			ID             string `json:"id"`
@@ -489,7 +509,7 @@ func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {
 		}
 		result := make([]pub, 0, len(clients))
 		for _, c := range clients {
-			result = append(result, pub{c.ID, c.Name, c.DefaultService, c.DefaultModel, c.AgentType})
+			result = append(result, pub{c.ID, c.Name, effectiveSvc(c), effectiveMdl(c), c.AgentType})
 		}
 		jsonOK(w, result)
 		return
@@ -503,7 +523,7 @@ func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {
 	}
 	result := make([]pub, 0, len(clients))
 	for _, c := range clients {
-		result = append(result, pub{c.ID, c.Name, c.DefaultService, c.DefaultModel})
+		result = append(result, pub{c.ID, c.Name, effectiveSvc(c), effectiveMdl(c)})
 	}
 	jsonOK(w, result)
 }

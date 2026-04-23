@@ -520,19 +520,28 @@ func (s *Server) syncAllowedServices() error {
 	return nil
 }
 
-// ollamaURL: return Ollama URL — env > vault service config > localhost default
+// ollamaURL returns the Ollama base URL with the resolution order
+//   vault service config  >  WV_OLLAMA_URL / OLLAMA_URL env  >  localhost default
+//
+// Before v0.2.19 env vars won out even when vault had a real fleet URL
+// (e.g. http://192.168.0.6:11434), which meant any proxy that started before
+// its syncAllowedServices goroutine finished would fall straight through to
+// the localhost default — producing "connection refused" on hosts with no
+// local Ollama. vault-side config is now the primary source of truth; env
+// remains as a fallback override for environments that never register an
+// Ollama service entry.
 func (s *Server) ollamaURL() string {
-	if v := os.Getenv("OLLAMA_URL"); v != "" {
-		return v
-	}
-	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
-		return v
-	}
 	s.mu.RLock()
 	u := s.serviceURLs["ollama"]
 	s.mu.RUnlock()
 	if u != "" {
 		return u
+	}
+	if v := os.Getenv("OLLAMA_URL"); v != "" {
+		return v
+	}
+	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
+		return v
 	}
 	return "http://localhost:11434"
 }

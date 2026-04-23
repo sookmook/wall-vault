@@ -8,6 +8,34 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.19] — 2026-04-24
+
+### Fixed
+
+- **`/api/clients` now advertises v0.2 canonical routing fields to
+  proxies**: the response still uses the `default_service` /
+  `default_model` wire names (backwards-compat unchanged), but their
+  value is now the **effective** one — `PreferredService` if set,
+  falling back to the legacy `DefaultService`; same pattern for
+  `ModelOverride` vs `DefaultModel`. Before this fix a client whose
+  dashboard `preferred_service` had been changed to `ollama` would
+  still ship its old legacy `default_service=openrouter` to every
+  proxy's `syncFromVault`, yielding `[sync] 설정 로드: openrouter/`
+  and a silent service–model mismatch. EconoWorld (바비2호) and other
+  hosts whose proxies had migrated their config to canonical fields
+  were trapped in the 6–10 minute fallback timeout loop this caused.
+- **`ollamaURL()` prefers vault-synced URL over environment / default**:
+  the resolution order changed from `env > vault sync > localhost`
+  to **`vault sync > env > localhost`**. A proxy that started before
+  its `syncAllowedServices` had finished would previously fall through
+  straight to `http://localhost:11434` on hosts with no local Ollama,
+  producing `dial tcp 127.0.0.1:11434: connect: connection refused`
+  even though the vault had published the correct fleet URL
+  (`http://192.168.0.6:11434`). Env vars still work as explicit
+  overrides when no `ollama` service entry is registered in vault.
+
+---
+
 ## [0.2.18] — 2026-04-23
 
 ### Changed

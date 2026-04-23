@@ -1660,6 +1660,31 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 		return nil, fmt.Errorf("%s: URL 미설정", serviceID)
 	}
 
+	// Fleet time distribution — same AgentOffset + FallbackJitter used
+	// by callOllama. Smooths simultaneous fan-in when several proxies
+	// converge on a shared local backend.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	// Per-service cap-1 semaphore. Local inference is memory-bound, so
+	// two concurrent requests on the same backend usually run slower
+	// than two sequential ones. If the caller cancels while queued,
+	// bail out cleanly.
+	if sem, ok := s.localSems[serviceID]; ok {
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
 	// Strip provider prefix from model (e.g. "google/gemma-4-26b-a4b" → "gemma-4-26b-a4b")
 	if i := strings.Index(model, "/"); i >= 0 {
 		model = model[i+1:]

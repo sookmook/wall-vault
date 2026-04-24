@@ -8,6 +8,36 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.22] — 2026-04-24
+
+### Fixed
+
+- **Signal light attribution across a multi-agent host**:
+  `proxy.syncFromVault` selected the claude-code client to report
+  activity for by iterating the vault's client list and letting the
+  last match win, so every proxy pinned the same id (whichever sorted
+  last) and every other claude-code client's signal light was
+  permanently offline even while its host was active. Additionally,
+  only a single claude-code client was ever emitted per heartbeat, so
+  a host that legitimately runs multiple claude-code agents (WSL +
+  Windows, multiple profiles, or a mix of claude-code / cline /
+  openclaw in one box) could not light all of them up at once. The
+  new scheme adds a `Host` field to the vault `Client` record plus a
+  `Hostname` input in the admin slideover (i18n keys `f_host`,
+  `ph_host`, `hint_host` across all 17 locales); each proxy then
+  caches the full set of clients whose Host equals `os.Hostname()`
+  and emits every one of them in each heartbeat's `ActiveClients`
+  list, so N co-hosted agents produce N green lights. An explicit
+  `proxy.claude_code_client_id` config (env `WV_CC_CLIENT_ID`)
+  overrides the match for hosts where `os.Hostname()` is unreliable
+  (renamed boxes, WSL). The previous per-agent pgrep liveness probe
+  is dropped in favour of the operator-assigned Host field, because
+  liveness detection isn't uniform across agent types (VSCode
+  extensions have no binary to pgrep; Windows-side claude-code is
+  invisible to WSL pgrep).
+
+---
+
 ## [0.2.21] — 2026-04-24
 
 ### Added

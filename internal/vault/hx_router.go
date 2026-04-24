@@ -309,6 +309,7 @@ func (s *Server) toSlideoverClient(c *Client) *slideover.ClientVM {
 		ModelOverride:    c.ModelOverride,
 		Enabled:          c.Enabled,
 		WorkDir:          c.WorkDir,
+		Host:             c.Host,
 		IPWhitelist:      strings.Join(c.IPWhitelist, ", "),
 		Avatar:           c.Avatar,
 		ServiceModelMap:  svcMap,

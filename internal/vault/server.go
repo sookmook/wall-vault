@@ -506,10 +506,11 @@ func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {
 			DefaultService string `json:"default_service"`
 			DefaultModel   string `json:"default_model"`
 			AgentType      string `json:"agent_type,omitempty"`
+			Host           string `json:"host,omitempty"`
 		}
 		result := make([]pub, 0, len(clients))
 		for _, c := range clients {
-			result = append(result, pub{c.ID, c.Name, effectiveSvc(c), effectiveMdl(c), c.AgentType})
+			result = append(result, pub{c.ID, c.Name, effectiveSvc(c), effectiveMdl(c), c.AgentType, c.Host})
 		}
 		jsonOK(w, result)
 		return

@@ -38,6 +38,11 @@ type ProxyConfig struct {
 	Services     []string      `yaml:"services"`      // active service list
 	Timeout      time.Duration `yaml:"timeout"`       // API timeout
 	Avatar       string        `yaml:"avatar"`        // relative path under ~/.openclaw/ (e.g. workspace/avatars/<client-id>.png)
+	// ClaudeCodeClientID overrides automatic claude-code client selection. When
+	// empty, the proxy auto-picks the claude-code client whose Host matches
+	// os.Hostname(). When set, this value wins — lets operators pin the mapping
+	// on hosts where hostname detection is unreliable (WSL, renamed boxes).
+	ClaudeCodeClientID string `yaml:"claude_code_client_id"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -243,6 +248,9 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WV_TOOL_FILTER"); v != "" {
 		cfg.Proxy.ToolFilter = v
+	}
+	if v := os.Getenv("WV_CC_CLIENT_ID"); v != "" {
+		cfg.Proxy.ClaudeCodeClientID = v
 	}
 	if v := os.Getenv("WV_PROXY_HOST"); v != "" {
 		cfg.Proxy.Host = v

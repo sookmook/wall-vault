@@ -153,12 +153,26 @@ func (s *Server) sendHeartbeat() {
 	}
 	s.clientActMu.Unlock()
 
-	// Detect locally-running Claude Code (uses Anthropic OAuth directly, bypasses proxy)
+	// Emit every co-hosted agent (Client.Host == os.Hostname()) as active.
+	// syncFromVault curates this list; we skip any entry whose activity was
+	// already reported via the clientActs path above to avoid double-counting.
+	already := make(map[string]bool, len(activeClients))
+	for _, ac := range activeClients {
+		already[ac.ClientID] = true
+	}
 	s.mu.RLock()
-	ccClientID := s.claudeCodeClientID
+	hosted := make([]hostAgent, len(s.hostAgents))
+	copy(hosted, s.hostAgents)
 	s.mu.RUnlock()
-	if cc := detectClaudeCode(ccClientID); cc != nil {
-		activeClients = append(activeClients, *cc)
+	for _, ha := range hosted {
+		if already[ha.ClientID] {
+			continue
+		}
+		activeClients = append(activeClients, activeClientItem{
+			ClientID: ha.ClientID,
+			Service:  ha.Service,
+			Model:    ha.Model,
+		})
 	}
 
 	// detect local agent process health
@@ -199,38 +213,6 @@ func (s *Server) sendHeartbeat() {
 		return
 	}
 	resp.Body.Close()
-}
-
-// detectClaudeCode checks if a Claude Code process is running locally
-// and returns its activity info, or nil if not running.
-func detectClaudeCode(clientID string) *activeClientItem {
-	if clientID == "" {
-		return nil
-	}
-	if err := exec.Command("pgrep", "-x", "claude").Run(); err != nil {
-		return nil
-	}
-	// read model from ~/.claude/settings.json
-	model := ""
-	for _, path := range findClaudeSettingsPaths() {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		var settings map[string]interface{}
-		if err := json.Unmarshal(data, &settings); err != nil {
-			continue
-		}
-		if m, ok := settings["model"].(string); ok && m != "" {
-			model = m
-			break
-		}
-	}
-	return &activeClientItem{
-		ClientID: clientID,
-		Service:  "anthropic",
-		Model:    model,
-	}
 }
 
 // detectAgentProcess checks if the local agent process matching the given

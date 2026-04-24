@@ -554,6 +554,7 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 		AllowedServices:  []string(inp.AllowedServices),
 		AgentType:        inp.AgentType,
 		WorkDir:          inp.WorkDir,
+		Host:             inp.Host,
 		Description:      inp.Description,
 		IPWhitelist:      []string(inp.IPWhitelist),
 		Enabled:          enabled,
@@ -608,6 +609,9 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 			}
 			if inp.WorkDir != nil {
 				c.WorkDir = *inp.WorkDir
+			}
+			if inp.Host != nil {
+				c.Host = *inp.Host
 			}
 			if inp.Description != nil {
 				c.Description = *inp.Description

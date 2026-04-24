@@ -102,6 +102,11 @@ type Client struct {
 	// v0.2 extended fields
 	AgentType   string   `json:"agent_type,omitempty"`
 	WorkDir     string   `json:"work_dir,omitempty"`
+	// Host: machine hostname this client runs on (matches os.Hostname() on the
+	// target box). Used by the proxy to auto-select the correct claude-code
+	// client when multiple exist in the vault. Optional — left empty disables
+	// auto-match and falls back to proxy.claude_code_client_id config override.
+	Host        string   `json:"host,omitempty"`
 	IPWhitelist []string `json:"ip_whitelist,omitempty"`
 	Avatar      string   `json:"avatar,omitempty"`
 	Enabled     bool     `json:"enabled"`
@@ -126,6 +131,7 @@ type ClientInput struct {
 	AllowedServices  StringOrList `json:"allowed_services"`
 	AgentType        string       `json:"agent_type"`
 	WorkDir          string       `json:"work_dir"`
+	Host             string       `json:"host"`
 	Description      string       `json:"description"`
 	IPWhitelist      StringOrList `json:"ip_whitelist"`
 	Avatar           string       `json:"avatar,omitempty"`
@@ -162,6 +168,7 @@ type ClientUpdateInput struct {
 	AllowedServices  StringOrList `json:"allowed_services"`
 	AgentType        *string      `json:"agent_type"`
 	WorkDir          *string      `json:"work_dir"`
+	Host             *string      `json:"host"`
 	IPWhitelist      StringOrList `json:"ip_whitelist"`
 	Avatar           *string  `json:"avatar"`
 	Enabled          *bool    `json:"enabled"`

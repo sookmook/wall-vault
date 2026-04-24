@@ -45,6 +45,19 @@ type clientAct struct {
 	applied  bool // true if config was applied via /agent/apply — never expires from heartbeat
 }
 
+// hostAgent is a vault client that shares this proxy's physical host (matched
+// by Client.Host == os.Hostname()). Cached on syncFromVault, emitted verbatim
+// into each heartbeat's ActiveClients list — trusting the operator-assigned
+// Host field is simpler and more reliable than per-type process probes for
+// agents whose liveness can't be inferred from a single pgrep (VSCode
+// extensions, Windows-side clients behind WSL, etc.).
+type hostAgent struct {
+	ClientID  string
+	AgentType string
+	Service   string
+	Model     string
+}
+
 // Server: proxy HTTP server
 type Server struct {
 	cfg             *config.Config
@@ -53,6 +66,12 @@ type Server struct {
 	model           string            // user-configured preferred model (from vault dashboard)
 	claudeCodeClientID string            // vault client ID for the local claude-code agent (from syncFromVault)
 	ownAgentType       string            // this proxy's own agent_type (from syncFromVault)
+	// hostAgents is the set of vault clients whose Host field matches this
+	// proxy's os.Hostname(). Populated by syncFromVault, consumed by sendHeartbeat
+	// to report every co-hosted sub-client in a single heartbeat — so a host
+	// running N agents lights up N signal lights instead of one. Self-reference
+	// (cfg.ClientID) is filtered out; the main heartbeat already covers self.
+	hostAgents         []hostAgent
 	allowedServices []string          // proxy-enabled services from vault (empty = no restriction)
 	serviceURLs      map[string]string // service ID → local URL from vault config
 	serviceDefaults  map[string]string // service ID → default_model from vault config
@@ -438,15 +457,58 @@ func (s *Server) syncFromVault() {
 		DefaultService string `json:"default_service"`
 		DefaultModel   string `json:"default_model"`
 		AgentType      string `json:"agent_type"`
+		Host           string `json:"host"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
 		return
 	}
-	ccID := ""
+	// Build the co-hosted agent set for this proxy. The operator-assigned
+	// Client.Host field drives inclusion — every client whose Host matches
+	// os.Hostname() is reported in every heartbeat's ActiveClients, so one
+	// host running N agents keeps N signal lights green. We trust the Host
+	// field rather than probing per-agent-type liveness because reliable
+	// detection varies (claude-code uses pgrep; VSCode extensions have no
+	// matching binary; Windows-side clients are invisible from WSL pgrep).
+	//
+	// cfg.Proxy.ClaudeCodeClientID is kept as a compatibility override — if
+	// set, the named client is force-included even when its Host field is
+	// blank. Useful when os.Hostname() is unreliable (renamed boxes, WSL
+	// before admin fills in Host values).
+	host, _ := os.Hostname()
+	var hosted []hostAgent
+	seen := map[string]bool{}
+	override := strings.TrimSpace(s.cfg.Proxy.ClaudeCodeClientID)
 	for _, c := range clients {
-		if c.AgentType == "claude-code" {
-			ccID = c.ID
+		if c.ID == "" || c.ID == s.cfg.Proxy.ClientID {
+			continue // proxy's own client_id is already covered by the main heartbeat
 		}
+		match := false
+		if override != "" && c.ID == override {
+			match = true
+		} else if host != "" && c.Host == host {
+			match = true
+		}
+		if !match || seen[c.ID] {
+			continue
+		}
+		seen[c.ID] = true
+		hosted = append(hosted, hostAgent{
+			ClientID:  c.ID,
+			AgentType: c.AgentType,
+			Service:   c.DefaultService,
+			Model:     c.DefaultModel,
+		})
+	}
+	// ccID kept for any legacy reader that still references claudeCodeClientID.
+	// Prefer the first claude-code entry in the hosted set.
+	ccID := ""
+	for _, a := range hosted {
+		if a.AgentType == "claude-code" {
+			ccID = a.ClientID
+			break
+		}
+	}
+	for _, c := range clients {
 		if c.ID == s.cfg.Proxy.ClientID {
 			s.mu.Lock()
 			oldSvc, oldMdl := s.service, s.model
@@ -473,9 +535,18 @@ func (s *Server) syncFromVault() {
 		}
 	}
 	s.mu.Lock()
+	prev := len(s.hostAgents)
 	s.claudeCodeClientID = ccID
 	s.ownAgentType = ownType
+	s.hostAgents = hosted
 	s.mu.Unlock()
+	if prev != len(hosted) {
+		ids := make([]string, 0, len(hosted))
+		for _, a := range hosted {
+			ids = append(ids, a.ClientID)
+		}
+		log.Printf("[sync] host agents (host=%q): %v", host, ids)
+	}
 
 	// sync keys
 	if err := s.keyMgr.SyncFromVault(); err != nil {

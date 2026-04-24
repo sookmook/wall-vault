@@ -80,6 +80,11 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				<small class="hint">{ i18n.T("hint_workdir_multi") }</small>
 			</label>
 			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_host") }</span>
+				<input name="host" value={c.Host} placeholder={ i18n.T("ph_host") }/>
+				<small class="hint">{ i18n.T("hint_host") }</small>
+			</label>
+			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_ip_whitelist") }</span>
 				<input name="ip_whitelist" value={c.IPWhitelist} placeholder={ i18n.T("ph_ip_csv") }/>
 				<small class="hint">{ i18n.T("hint_ip_open") }</small>

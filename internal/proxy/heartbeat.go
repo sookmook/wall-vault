@@ -153,9 +153,12 @@ func (s *Server) sendHeartbeat() {
 	}
 	s.clientActMu.Unlock()
 
-	// Emit every co-hosted agent (Client.Host == os.Hostname()) as active.
-	// syncFromVault curates this list; we skip any entry whose activity was
-	// already reported via the clientActs path above to avoid double-counting.
+	// Emit every co-hosted agent (Client.Host == os.Hostname()) that also
+	// passes a per-agent-type liveness probe. syncFromVault curates which
+	// clients we *may* claim (Host match); detectClientAlive decides which
+	// of those are *actually running right now*. Without the second check
+	// the dashboard would show green for an agent whose host is up but
+	// whose process isn't (e.g. VSCode closed → cline not running).
 	already := make(map[string]bool, len(activeClients))
 	for _, ac := range activeClients {
 		already[ac.ClientID] = true
@@ -166,6 +169,9 @@ func (s *Server) sendHeartbeat() {
 	s.mu.RUnlock()
 	for _, ha := range hosted {
 		if already[ha.ClientID] {
+			continue
+		}
+		if !detectClientAlive(ha.AgentType) {
 			continue
 		}
 		activeClients = append(activeClients, activeClientItem{
@@ -213,6 +219,43 @@ func (s *Server) sendHeartbeat() {
 		return
 	}
 	resp.Body.Close()
+}
+
+// detectClientAlive reports whether a process consistent with the given
+// agent_type is running on this host. Used to gate which co-hosted clients
+// (those whose Client.Host matches os.Hostname()) get reported as ACTIVE
+// in the heartbeat — host membership decides who *may* be claimed, this
+// function decides who *actually is up right now*.
+//
+// Detection per type:
+//   - claude-code   pgrep -x claude              (Claude Code CLI binary)
+//   - cline         pgrep -x code                (VSCode binary; Cline is an
+//                                                 extension and can't run
+//                                                 without VSCode)
+//   - openclaw      pgrep -f openclaw-gateway
+//   - nanoclaw      systemctl --user is-active nanoclaw
+//   - econoworld    always false                 (self-reports via its own
+//                                                 heartbeat — should not
+//                                                 appear in hostAgents)
+//   - other         false                        (be honest — don't fake
+//                                                 green for unknown types)
+//
+// Multiple claude-code clients sharing one Host all match the same pgrep,
+// so a single running CLI lights all of them up. Disambiguating across
+// OS namespaces (e.g. Windows-side claude-code visible from a WSL proxy)
+// would need cwd or interop probes — out of scope for this iteration.
+func detectClientAlive(agentType string) bool {
+	switch agentType {
+	case "claude-code":
+		return exec.Command("pgrep", "-x", "claude").Run() == nil
+	case "cline":
+		return exec.Command("pgrep", "-x", "code").Run() == nil
+	case "openclaw":
+		return exec.Command("pgrep", "-f", "openclaw-gateway").Run() == nil
+	case "nanoclaw":
+		return exec.Command("systemctl", "--user", "is-active", "--quiet", "nanoclaw").Run() == nil
+	}
+	return false
 }
 
 // detectAgentProcess checks if the local agent process matching the given

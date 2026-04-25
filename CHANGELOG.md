@@ -8,6 +8,39 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.24] — 2026-04-25
+
+### Fixed
+
+- **Signal light no longer shows green for an agent whose process isn't
+  running.** v0.2.22 simplified the dashboard liveness model to "any
+  vault Client whose Host field equals the reporting proxy's
+  `os.Hostname()` is broadcast as active in every heartbeat" — a clean
+  rule that incidentally meant a host-matched cline (or any other
+  agent type) stayed permanently green even after VSCode was closed,
+  because the host was still up. Heartbeat now runs `detectClientAlive`
+  on every host-matched client before emitting it, so the operator-
+  assigned Host field decides *who may be claimed by this proxy* and
+  the per-agent-type process probe decides *who is actually up right
+  now*. Initial probe table:
+
+  | agent_type | probe |
+  |---|---|
+  | claude-code | `pgrep -x claude` |
+  | cline | `pgrep -x code` (VSCode binary) |
+  | openclaw | `pgrep -f openclaw-gateway` |
+  | nanoclaw | `systemctl --user is-active nanoclaw` |
+  | econoworld | always false (self-reports via its own heartbeat) |
+  | other | false (don't fake green for unknown types) |
+
+  Multiple claude-code clients sharing one Host all match the same
+  pgrep, so a single running CLI still lights all of them up — fully
+  disambiguating WSL-side from Windows-side claude-code on the same
+  physical box would need a cwd-based or OS-interop probe and is left
+  for a future iteration.
+
+---
+
 ## [0.2.23] — 2026-04-25
 
 ### Changed

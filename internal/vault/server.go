@@ -457,11 +457,19 @@ func (s *Server) handleTokenConfig(w http.ResponseWriter, r *http.Request) {
 	if c.ModelOverride != "" {
 		mdl = c.ModelOverride
 	}
-	jsonOK(w, map[string]string{
+	out := map[string]interface{}{
 		"id":              c.ID,
 		"default_service": svc,
 		"default_model":   mdl,
-	})
+	}
+	// FallbackServices: empty/nil omitted so older proxies decode to nil too.
+	if len(c.FallbackServices) > 0 {
+		out["fallback_services"] = c.FallbackServices
+	}
+	if len(c.AllowedServices) > 0 {
+		out["allowed_services"] = c.AllowedServices
+	}
+	jsonOK(w, out)
 }
 
 func (s *Server) handlePublicClients(w http.ResponseWriter, r *http.Request) {

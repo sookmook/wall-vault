@@ -224,8 +224,17 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 	}
 	ollamaURL := s.ollamaURL()
 
-	// Per-call AgentOffset+FallbackJitter (v0.2.21) removed in v0.2.23.
-	// Re-introduction trigger: see callOllama in server.go + CHANGELOG.md v0.2.23.
+	// Fleet time distribution — same AgentOffset + FallbackJitter as the
+	// non-streaming path. Restored in v0.2.27. See timing.go.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			writeGeminiErrorChunk(w, f, ctx.Err())
+			return
+		}
+	}
 
 	// Bounded by the per-service local semaphore. Abort the acquire if
 	// the caller's context was cancelled (e.g. client disconnect while

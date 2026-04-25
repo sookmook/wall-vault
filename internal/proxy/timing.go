@@ -8,10 +8,21 @@ import (
 	"time"
 )
 
-// Local-inference per-call delay constants (localAgentOffsetMs,
-// localFallbackJitterMs) lived here in v0.2.21 and were removed in
-// v0.2.23; see CHANGELOG. AgentOffset and FallbackJitter functions are
-// retained for the boot-time phase shift on heartbeat / vault-sync tickers.
+// Local-inference per-call delay budgets, shared across all local backends
+// (ollama / llamacpp / lmstudio / vllm). Restored in v0.2.27 after the
+// v0.2.23 removal turned out to be premature: the "0 queue overflow events
+// in 24h" data point that justified removal was an artifact of the
+// v0.2.26-fixed ollama URL bug — requests weren't reaching the queue at
+// all. Once routing was fixed the four-proxy fan-in actually hit mini's
+// Ollama and the host hung, exactly the pattern v0.2.21 was preventing.
+//
+// Four nodes with 500ms bucket spacing average ~125ms apart; 200ms of
+// additive jitter smooths residual hash collisions. Total worst case
+// ~700ms, ctx-cancellable.
+const (
+	localAgentOffsetMs    = 500
+	localFallbackJitterMs = 200
+)
 
 // AgentOffset returns a deterministic per-agent delay in [0, maxMs) ms
 // derived from clientID. Same clientID always maps to the same offset,

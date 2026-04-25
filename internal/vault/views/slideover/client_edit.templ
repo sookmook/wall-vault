@@ -85,6 +85,11 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 				<small class="hint">{ i18n.T("hint_host") }</small>
 			</label>
 			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_fallback_services") }</span>
+				<input name="fallback_services" value={c.FallbackServices} placeholder={ i18n.T("ph_fallback_services") }/>
+				<small class="hint">{ i18n.T("hint_fallback_services") }</small>
+			</label>
+			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_ip_whitelist") }</span>
 				<input name="ip_whitelist" value={c.IPWhitelist} placeholder={ i18n.T("ph_ip_csv") }/>
 				<small class="hint">{ i18n.T("hint_ip_open") }</small>

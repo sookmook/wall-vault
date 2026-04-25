@@ -98,7 +98,15 @@ type Client struct {
 	Token            string    `json:"token"`
 	PreferredService string    `json:"preferred_service"`           // v0.2 canonical
 	ModelOverride    string    `json:"model_override,omitempty"`    // v0.2 canonical
-	AllowedServices  []string  `json:"allowed_services,omitempty"`
+	AllowedServices  []string  `json:"allowed_services,omitempty"`  // security whitelist (empty = all services allowed)
+	// FallbackServices is the ordered list of services to try if PreferredService
+	// fails. Empty (default) means strict primary-only — a primary failure
+	// returns 502 instead of silently substituting a different model on a
+	// different provider. Each entry must also pass the AllowedServices
+	// whitelist if AllowedServices is non-empty. Introduced in v0.2.27 to
+	// replace the implicit "all services in proxy.services in fallback order"
+	// behaviour, which was hiding model substitution from callers.
+	FallbackServices []string  `json:"fallback_services,omitempty"`
 	// v0.2 extended fields
 	AgentType   string   `json:"agent_type,omitempty"`
 	WorkDir     string   `json:"work_dir,omitempty"`
@@ -129,6 +137,7 @@ type ClientInput struct {
 	DefaultService   string       `json:"default_service"`   // v0.1 compat — used when preferred_service is empty
 	DefaultModel     string       `json:"default_model"`     // v0.1 compat — used when model_override is empty
 	AllowedServices  StringOrList `json:"allowed_services"`
+	FallbackServices StringOrList `json:"fallback_services"`
 	AgentType        string       `json:"agent_type"`
 	WorkDir          string       `json:"work_dir"`
 	Host             string       `json:"host"`
@@ -166,6 +175,7 @@ type ClientUpdateInput struct {
 	PreferredService *string  `json:"preferred_service"`        // v0.2 canonical
 	ModelOverride    *string  `json:"model_override"`           // v0.2 canonical
 	AllowedServices  StringOrList `json:"allowed_services"`
+	FallbackServices StringOrList `json:"fallback_services"`
 	AgentType        *string      `json:"agent_type"`
 	WorkDir          *string      `json:"work_dir"`
 	Host             *string      `json:"host"`

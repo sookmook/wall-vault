@@ -31,10 +31,12 @@ const (
 
 // tokenCacheEntry: cached result of a token→model lookup from the vault
 type tokenCacheEntry struct {
-	clientID  string // vault client ID for this token
-	service   string
-	model     string
-	expiresAt time.Time
+	clientID         string // vault client ID for this token
+	service          string
+	model            string
+	fallbackServices []string // ordered fallback chain; empty = strict primary-only
+	allowedServices  []string // security whitelist; empty = no restriction
+	expiresAt        time.Time
 }
 
 // clientAct: last-seen activity record for a non-proxy client served by this proxy
@@ -367,19 +369,23 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	}
 
 	var result struct {
-		ID             string `json:"id"`
-		DefaultService string `json:"default_service"`
-		DefaultModel   string `json:"default_model"`
+		ID               string   `json:"id"`
+		DefaultService   string   `json:"default_service"`
+		DefaultModel     string   `json:"default_model"`
+		FallbackServices []string `json:"fallback_services,omitempty"`
+		AllowedServices  []string `json:"allowed_services,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil
 	}
 
 	entry := &tokenCacheEntry{
-		clientID:  result.ID,
-		service:   result.DefaultService,
-		model:     result.DefaultModel,
-		expiresAt: time.Now().Add(5 * time.Second),
+		clientID:         result.ID,
+		service:          result.DefaultService,
+		model:            result.DefaultModel,
+		fallbackServices: result.FallbackServices,
+		allowedServices:  result.AllowedServices,
+		expiresAt:        time.Now().Add(5 * time.Second),
 	}
 	// Record client activity so the heartbeat can report it to vault.
 	// Preserve the applied flag if the entry was previously set via /agent/apply,
@@ -889,6 +895,9 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
+	// Native Gemini path: strict-by-default. Add per-token fallback chain
+	// support here too if a use case emerges (currently this path does not
+	// look up Bearer token, so it always runs strict).
 	result, err := s.dispatch(r.Context(), svc, mdl, &req)
 	if err != nil {
 		log.Printf("[proxy] 오류: %v", err)
@@ -897,6 +906,15 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 			Error: &GeminiError{Code: 502, Message: err.Error()},
 		})
 		return
+	}
+	if result.UsedService != "" {
+		w.Header().Set("X-WV-Used-Service", result.UsedService)
+	}
+	if result.UsedModel != "" {
+		w.Header().Set("X-WV-Used-Model", result.UsedModel)
+	}
+	if result.FallbackReason != "" {
+		w.Header().Set("X-WV-Fallback-Reason", result.FallbackReason)
 	}
 	json.NewEncoder(w).Encode(result.Response)
 }
@@ -917,19 +935,28 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	}
 	s.filter.FilterOpenAI(&oaiReq)
 
+	// Resolution order for (service, model) — most-specific source wins:
+	//   1. Vault-side token override (entry.service / entry.model)
+	//      → operator's enforcement on a specific client. Final.
+	//   2. Request body's explicit model
+	//      → caller's stated intent. Honoured when vault has no override.
+	//   3. Proxy's own default (s.service / s.model)
+	//      → fallback for unauthenticated callers / empty body.
+	//
+	// Pre-v0.2.27 the proxy's default was layered ABOVE the request body, so
+	// a token-auth'd client whose model_override is empty would get the
+	// proxy's own model regardless of what they typed in the request — the
+	// pattern that hit 바비2호 in post #36, where an econoworld token route
+	// to mini9's proxy (s.model="anthropic/claude-opus-4-7") swallowed the
+	// requested "qwen3.6:27b".
+	mdl := oaiReq.Model
 	s.mu.RLock()
 	svc := s.service
-	mdl := s.model
+	proxyDefaultMdl := s.model
 	s.mu.RUnlock()
-	if mdl == "" {
-		mdl = oaiReq.Model
-	}
 
-	// Token-based model override: if the request carries a different client token,
-	// look up that client's dashboard-configured model and override the request model.
-	// This allows third-party clients (Cline, Cursor, etc.) to be controlled from
-	// the wall-vault dashboard without changing their local settings.
 	var resolvedClientID string
+	var fallbackChain []string
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
 		if entry := s.lookupTokenConfig(reqToken); entry != nil {
@@ -940,7 +967,12 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			if entry.model != "" {
 				mdl = entry.model
 			}
+			fallbackChain = entry.fallbackServices
 		}
+	}
+	// No request-body model and no vault override → fall back to proxy default.
+	if mdl == "" {
+		mdl = proxyDefaultMdl
 	}
 	// Refresh lastSeen after response completes so long-running requests
 	// (streaming AI responses) keep the client visible on the dashboard.
@@ -951,7 +983,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	svc, mdl = parseProviderModel(svc, mdl)
 
 	geminiReq := OpenAIToGemini(&oaiReq)
-	dispatchRes, err := s.dispatch(r.Context(), svc, mdl, geminiReq)
+	dispatchRes, err := s.dispatchWithChain(r.Context(), svc, mdl, fallbackChain, geminiReq)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadGateway)
 		return
@@ -964,6 +996,14 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	}
 	if dispatchRes.UsedService != "" {
 		svc = dispatchRes.UsedService
+	}
+	// Surface routing decisions to the caller via response headers so downstream
+	// agents (post #36 etc.) can react to silent provider switches without
+	// having to compare the response body's model field against the request.
+	w.Header().Set("X-WV-Used-Service", svc)
+	w.Header().Set("X-WV-Used-Model", mdl)
+	if dispatchRes.FallbackReason != "" {
+		w.Header().Set("X-WV-Fallback-Reason", dispatchRes.FallbackReason)
 	}
 
 	// Convert Gemini functionCall parts to OAI tool_calls (for native Gemini backend).
@@ -1141,19 +1181,22 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Security] blocked %d tools from anthropic request (client=%s)", stripped, s.cfg.Proxy.ClientID)
 	}
 
+	// Same resolution priority as handleOpenAI:
+	//   1. Vault-side token override (final)
+	//   2. Request body's model (caller intent)
+	//   3. Proxy's default (s.model)
+	mdl := req.Model
 	s.mu.RLock()
 	svc := s.service
-	mdl := s.model
+	proxyDefaultMdl := s.model
 	allowedServices := s.allowedServices
 	s.mu.RUnlock()
-	if mdl == "" {
-		mdl = req.Model
-	}
 
 	// Token-based model override: same logic as handleOpenAI.
 	// Anthropic API uses x-api-key header instead of Authorization: Bearer,
 	// so check both to support Claude Code and other Anthropic-format clients.
 	var resolvedClientID string
+	var fallbackChain []string
 	reqToken := ""
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		reqToken = strings.TrimPrefix(authHeader, "Bearer ")
@@ -1169,7 +1212,11 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			if entry.model != "" {
 				mdl = entry.model
 			}
+			fallbackChain = entry.fallbackServices
 		}
+	}
+	if mdl == "" {
+		mdl = proxyDefaultMdl
 	}
 	defer s.refreshClientAct(resolvedClientID)
 
@@ -1242,7 +1289,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	// via RawOAI so that OpenRouter-based fallback preserves tools.
 	geminiReq := AnthropicToGemini(&req)
 	geminiReq.RawOAI = anthropicToOpenAIReq(&req, mdl)
-	dispatchRes, err := s.dispatch(r.Context(), svc, mdl, geminiReq)
+	dispatchRes, err := s.dispatchWithChain(r.Context(), svc, mdl, fallbackChain, geminiReq)
 	if err != nil {
 		log.Printf("[anthropic] dispatch error: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -1258,6 +1305,13 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	// from claude-* to (e.g.) google/gemini-flash is accurately reflected.
 	if dispatchRes.UsedModel != "" {
 		mdl = dispatchRes.UsedModel
+	}
+	if dispatchRes.UsedService != "" {
+		w.Header().Set("X-WV-Used-Service", dispatchRes.UsedService)
+	}
+	w.Header().Set("X-WV-Used-Model", mdl)
+	if dispatchRes.FallbackReason != "" {
+		w.Header().Set("X-WV-Fallback-Reason", dispatchRes.FallbackReason)
 	}
 
 	resp := GeminiRespToAnthropic(mdl, geminiResp)
@@ -1332,91 +1386,74 @@ func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
 // `model` field in their OpenAI/Anthropic response bodies — otherwise a fallback
 // from (e.g.) anthropic/claude-sonnet-4-6 → google/gemini-flash would still be
 // labeled as the original Claude model, making traces misleading.
+//
+// When the primary service produced the response, FallbackReason is empty and
+// UsedService == requested primary. When dispatch fell over to a service later
+// in the fallback chain, FallbackReason is the human-readable error from the
+// primary attempt — rendered into the X-WV-Fallback-Reason response header so
+// callers can detect and react to silent provider switches.
 type DispatchResult struct {
-	Response    *GeminiResponse
-	UsedService string
-	UsedModel   string
+	Response       *GeminiResponse
+	UsedService    string
+	UsedModel      string
+	FallbackReason string
 }
 
-// fallbackPriority orders non-primary dispatch attempts by response
-// reliability first. Local services (no quota, lowest latency) lead so a
-// credit-out day on every cloud provider still yields a reply in seconds.
-// Stable clouds (google, github-copilot) sit in the middle, and metered
-// clouds most likely to return 402 (openrouter, anthropic, openai) trail
-// the chain. Primary service — whatever the caller's preferred_service is
-// — is prepended in dispatch() and always tried first regardless of this
-// list.
-var fallbackPriority = []string{
-	"ollama", "llamacpp", "lmstudio", "vllm",
-	"google", "github-copilot",
-	"openrouter", "anthropic", "openai",
-}
-
+// dispatchInternal executes the (primary, fallbackChain) pair against the
+// configured backends and returns a DispatchResult capturing the actual
+// service/model that produced the response. Strict-by-default: an empty
+// fallbackChain means "primary or 502" — no silent substitution to a different
+// model on a different provider. When fallbackChain is non-empty, services in
+// it are tried in order after primary fails, with the primary error captured
+// as FallbackReason on whichever attempt succeeds.
+//
+// The previous behaviour (auto-fallback through s.cfg.Proxy.Services with the
+// destination service's default_model) was removed in v0.2.27 — it surfaced as
+// 바비2호 post #36 where a qwen3.6:27b request returned google/gemini-flash
+// because Ollama was unreachable and dispatch silently swapped the model.
+// Now the operator sets FallbackServices explicitly per client when fallback
+// is desired; default is strict.
 func (s *Server) dispatch(ctx context.Context, service, model string, req *GeminiRequest) (*DispatchResult, error) {
+	return s.dispatchWithChain(ctx, service, model, nil, req)
+}
+
+func (s *Server) dispatchWithChain(ctx context.Context, primary, model string, fallbackChain []string, req *GeminiRequest) (*DispatchResult, error) {
 	s.mu.RLock()
-	allowedServices := s.allowedServices
 	serviceDefaults := s.serviceDefaults
 	s.mu.RUnlock()
 
-	var lastErr error
-
-	// Build try order. Primary (preferred_service) is always tried first so
-	// the caller's explicit choice wins when it's available. Fallbacks then
-	// follow a fixed reliability/latency ordering rather than whatever sort
-	// order the dashboard happened to ship the services in — previously a
-	// primary failure would spend minutes timing out through metered clouds
-	// (openrouter → anthropic → openai) whose keys might all be exhausted,
-	// before finally reaching an always-on local backend. With local-first
-	// fallback the chain resolves in seconds even on credit-out days.
-	basePool := allowedServices
-	if len(basePool) == 0 {
-		basePool = s.cfg.Proxy.Services
-	}
-	allowedSet := make(map[string]bool, len(basePool))
-	for _, sv := range basePool {
-		allowedSet[sv] = true
-	}
-
-	var tryOrder []string
-	seen := make(map[string]bool)
-	if service != "" {
-		tryOrder = append(tryOrder, service)
-		seen[service] = true
-	}
-	for _, svc := range fallbackPriority {
-		if allowedSet[svc] && !seen[svc] {
-			tryOrder = append(tryOrder, svc)
-			seen[svc] = true
+	// Try order: primary first, then fallback chain (skipping the primary if
+	// it appears in the chain). Empty fallback chain → strict primary-only.
+	tryOrder := []string{primary}
+	seen := map[string]bool{primary: true}
+	for _, svc := range fallbackChain {
+		if svc == "" || seen[svc] {
+			continue
 		}
-	}
-	// Custom / unknown services (not in fallbackPriority) keep their
-	// dashboard-defined order at the tail so admin-added providers aren't
-	// silently dropped from the chain.
-	for _, svc := range basePool {
-		if !seen[svc] {
-			tryOrder = append(tryOrder, svc)
-			seen[svc] = true
-		}
+		tryOrder = append(tryOrder, svc)
+		seen[svc] = true
 	}
 
-	for _, svc := range tryOrder {
+	var primaryErr error
+	for i, svc := range tryOrder {
+		isPrimary := i == 0
 		// Fast-skip cloud services whose keys are all on cooldown or exhausted
-		// — prevents the dispatch chain from spending seconds on forced retries
-		// that will re-hit 429/402 and extend the cooldown. Local services
-		// (ollama/lmstudio/vllm) carry no keys and are always tried.
+		// — prevents dispatch from spending seconds on retries that will re-hit
+		// 429/402. Local services (ollama/lmstudio/vllm/llamacpp) carry no keys.
 		needsKey := svc != "ollama" && svc != "lmstudio" && svc != "vllm" && svc != "llamacpp"
 		if needsKey && !s.keyMgr.CanServe(svc) {
 			log.Printf("[proxy] %s skip: 전체 쿨다운 또는 등록된 키 없음", svc)
-			lastErr = fmt.Errorf("서비스 '%s' 전체 쿨다운", svc)
+			err := fmt.Errorf("서비스 '%s' 전체 쿨다운", svc)
+			if isPrimary {
+				primaryErr = err
+			}
 			continue
 		}
 
-		// Primary respects the caller's requested model; fallback swaps in the
-		// target service's default_model when available so Anthropic doesn't
-		// receive "gemini-2.5-flash" etc. If the target has no default_model,
-		// the original is tried (better to log a 404 than silently skip).
+		// Primary uses the caller's requested model; fallback uses the
+		// destination service's default_model (different namespaces).
 		targetModel := model
-		if svc != service {
+		if !isPrimary {
 			if dm := serviceDefaults[svc]; dm != "" {
 				targetModel = dm
 			}
@@ -1438,20 +1475,35 @@ func (s *Server) dispatch(ctx context.Context, service, model string, req *Gemin
 		case "lmstudio", "vllm", "llamacpp":
 			resp, err = s.callLocalService(ctx, svc, targetModel, req)
 		default:
-			continue
+			err = fmt.Errorf("unknown service: %s", svc)
 		}
 		if err == nil {
-			if svc != service {
-				log.Printf("[proxy] fallback: %s/%s → %s/%s", service, model, svc, targetModel)
+			result := &DispatchResult{Response: resp, UsedService: svc, UsedModel: targetModel}
+			if !isPrimary {
+				log.Printf("[proxy] fallback: %s/%s → %s/%s (primary err: %v)", primary, model, svc, targetModel, primaryErr)
+				if primaryErr != nil {
+					result.FallbackReason = primaryErr.Error()
+				} else {
+					result.FallbackReason = "primary failed"
+				}
 				s.hooksMgr.Fire(hooks.EventModelChanged, map[string]string{
 					"service": svc,
 					"model":   targetModel,
 				})
 			}
-			return &DispatchResult{Response: resp, UsedService: svc, UsedModel: targetModel}, nil
+			return result, nil
 		}
-		log.Printf("[proxy] %s (%s) failed → fallback: %v", svc, targetModel, err)
-		lastErr = err
+		log.Printf("[proxy] %s (%s) failed: %v", svc, targetModel, err)
+		if isPrimary {
+			primaryErr = err
+		}
+	}
+	// Build aggregate error preserving the primary failure as the headline so
+	// callers can render "primary X failed: <reason>" without surfacing a
+	// possibly-misleading last-fallback error.
+	lastErr := primaryErr
+	if lastErr == nil {
+		lastErr = fmt.Errorf("dispatch: 모든 서비스 실패")
 	}
 	if lastErr != nil {
 		s.hooksMgr.Fire(hooks.EventServiceDown, map[string]string{
@@ -1671,14 +1723,19 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// structurally. See ResolveModel + dispatchWith.
 	ollamaURL := s.ollamaURL()
 
-	// Per-call AgentOffset+FallbackJitter (added in v0.2.21) was removed in
-	// v0.2.23: in the current operating point (4 proxies, 1 model, ~1000
-	// daily calls, zero queue-overflow events in 24h) the ~350 ms avg
-	// pre-acquire delay was paid on every call without measurable defence.
-	// Re-introduce when fleet ≥ 6 proxies share one upstream local backend,
-	// or /admin/proxies sees ≥ 5 Ollama 503 / queue-overflow events in a
-	// rolling 24h window, or a multi-model upgrade reintroduces cross-proxy
-	// thundering-herd. See CHANGELOG.md v0.2.21 / v0.2.23 for full context.
+	// Distribute fleet arrival times: each proxy delays entry by a
+	// deterministic phase offset (sha256(client_id) → [0, 500ms)) plus a
+	// small uniform jitter ([0, 200ms)). Prevents simultaneous fan-in when
+	// multiple proxies reach a shared local backend in lock-step. Restored
+	// in v0.2.27 after the v0.2.23 removal — see timing.go for context.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 
 	// Wait for a free slot on the per-service semaphore, but bail out if
 	// the caller's context was cancelled in the meantime.
@@ -1747,8 +1804,16 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 		return nil, fmt.Errorf("%s: URL 미설정", serviceID)
 	}
 
-	// Per-call AgentOffset+FallbackJitter (v0.2.21) removed in v0.2.23.
-	// Re-introduction trigger: see callOllama above + CHANGELOG.md v0.2.23.
+	// Fleet time distribution — same AgentOffset + FallbackJitter as callOllama.
+	// Restored in v0.2.27. See timing.go.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 
 	// Per-service cap-1 semaphore. Local inference is memory-bound, so
 	// two concurrent requests on the same backend usually run slower

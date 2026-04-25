@@ -8,6 +8,75 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.27] — 2026-04-25
+
+### Changed
+
+- **Request-body model is now respected when vault has no model override.**
+  Pre-v0.2.27 priority was `proxy.s.model > request body > nothing`, so
+  a token-auth'd client whose `model_override` was empty had its
+  request-body model silently replaced by the proxy's own default
+  (e.g. an econoworld request for `qwen3.6:27b` routed through
+  jaksooni's `mini9` proxy was rewritten to `anthropic/claude-opus-4-7`).
+  New priority: `vault token override > request body > proxy default`.
+  Vault override is still final — operators can still pin a model on a
+  client by setting its `model_override`. Affects both `/v1/chat/completions`
+  (handleOpenAI) and `/v1/messages` (handleAnthropic).
+- **Model routing redesign — strict-by-default fallback + visible
+  routing decisions.** v0.2.21–v0.2.26 worked through a series of
+  patches (host-based attribution, per-type liveness, env-priority
+  ollama URL) that incrementally exposed how silent the dispatch chain
+  was: a request for `qwen3.6:27b` could quietly return
+  `google/gemini-3.1-flash-lite-preview` because the previous dispatch
+  fell over to the next service with that service's `default_model`,
+  with no signal to the caller other than the response body's `model`
+  field. v0.2.27 splits the decision:
+
+  - `Client.FallbackServices` (new) — ordered list of services to try
+    if the primary fails, **separate from** the existing
+    `AllowedServices` (security whitelist). Empty by default.
+  - Empty `FallbackServices` = strict primary-only. Primary failure
+    returns 502 with the primary error preserved as the headline; no
+    silent model substitution.
+  - When `FallbackServices` is set and dispatch falls over, the
+    response carries three new headers so the caller never has to
+    reverse-engineer a substitution:
+      `X-WV-Used-Service`, `X-WV-Used-Model`, `X-WV-Fallback-Reason`.
+  - The implicit "fall back through `proxy.services` order" path that
+    used `s.allowedServices` / `s.cfg.Proxy.Services` as the default
+    fallback chain is removed. Operators wanting fallback now opt in
+    explicitly per client via the dashboard's new "Fallback service
+    chain" field (i18n: `f_fallback_services`, `ph_fallback_services`,
+    `hint_fallback_services` across all 17 locales).
+  - `dispatchWithChain` is the new core; the old `dispatch(ctx, svc,
+    model, req)` is kept as a convenience wrapper that forwards `nil`
+    for the chain (= strict primary-only).
+
+  Surfaced by 바비2호 post #36 — an econoworld-token call to
+  `qwen3.6:27b` returned `google/gemini-3.1-flash-lite-preview`.
+
+- **Restored per-call `AgentOffset + FallbackJitter` on local-inference
+  paths.** v0.2.23 removed the v0.2.21 entry-distribution logic citing
+  "0 queue overflow events in 24h"; v0.2.26 revealed that data point
+  was an artifact of a separate `ollamaURL()` priority bug — the
+  fleet's traffic was reaching `127.0.0.1:11434` and bouncing on
+  connection-refused before ever queueing. With v0.2.26's URL fix,
+  four proxies actually fan in to mini's Ollama and the host hung in
+  practice. v0.2.27 puts the deterministic `AgentOffset(client_id,
+  500ms)` + uniform `FallbackJitter(0–200ms)` back at all three
+  acquire sites (`callOllama`, `streamOllama`, `callLocalService`).
+
+### Added
+
+- **Agent card "default model" indicator.** When `ModelOverride` is
+  empty the card now renders the configured service's `default_model`
+  alongside a muted "default" chip (i18n: `chip_default_model`,
+  `tip_default_model` across all 17 locales). Previously the model
+  column would simply be blank, leaving operators unsure whether the
+  agent was misconfigured or correctly using the service default.
+
+---
+
 ## [0.2.26] — 2026-04-25
 
 ### Fixed

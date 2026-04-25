@@ -552,6 +552,7 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 		DefaultService:   inp.EffectiveService(),
 		DefaultModel:     inp.EffectiveModel(),
 		AllowedServices:  []string(inp.AllowedServices),
+		FallbackServices: []string(inp.FallbackServices),
 		AgentType:        inp.AgentType,
 		WorkDir:          inp.WorkDir,
 		Host:             inp.Host,
@@ -603,6 +604,9 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 			}
 			if inp.AllowedServices != nil {
 				c.AllowedServices = []string(inp.AllowedServices)
+			}
+			if inp.FallbackServices != nil {
+				c.FallbackServices = []string(inp.FallbackServices)
 			}
 			if inp.AgentType != nil {
 				c.AgentType = *inp.AgentType

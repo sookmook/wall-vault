@@ -21,6 +21,9 @@ templ AgentCard(c *ClientVM) {
 					<span>→ { c.PreferredService }</span>
 					if c.ModelOverride != "" {
 						<span class="chip chip-accent">{ c.ModelOverride }</span>
+					} else if c.ServiceDefaultModel != "" {
+						<span class="chip chip-accent">{ c.ServiceDefaultModel }</span>
+						<span class="chip chip-muted" title={ i18n.T("tip_default_model") }>{ i18n.T("chip_default_model") }</span>
 					} else if c.RemoteModel != "" {
 						<span class="chip chip-accent">{ c.RemoteModel }</span>
 					}

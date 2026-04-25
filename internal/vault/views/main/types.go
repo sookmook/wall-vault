@@ -33,6 +33,13 @@ type ClientVM struct {
 	RemoteModel   string
 	LastHeartbeat string // human-readable "3분 전" / "just now"
 	Uptime        string // human-readable uptime "2d 3h" / "15h 22m" / "4m"
+
+	// ServiceDefaultModel is the PreferredService's configured default_model.
+	// Populated when ModelOverride is empty so the card can render the model
+	// the agent will actually receive (along with a "default" badge), instead
+	// of leaving the model column blank and giving the impression of "no
+	// model configured".
+	ServiceDefaultModel string
 }
 
 // KeyVM is the view model for an API-key card in the dashboard.

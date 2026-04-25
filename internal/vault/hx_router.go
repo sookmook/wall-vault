@@ -95,6 +95,14 @@ func (s *Server) toMainClients(clients []*Client) []*mainview.ClientVM {
 			Enabled:          c.Enabled,
 			Avatar:           c.Avatar,
 		}
+		// When the agent has no model_override, surface the service's
+		// default_model so the card explicitly shows what the agent will
+		// receive and tags it with the "default" marker.
+		if c.ModelOverride == "" && c.PreferredService != "" {
+			if sv := s.store.GetService(c.PreferredService); sv != nil {
+				vm.ServiceDefaultModel = sv.DefaultModel
+			}
+		}
 		if p := byID[c.ID]; p != nil {
 			vm.Online = !p.UpdatedAt.IsZero() && now.Sub(p.UpdatedAt) < 90*time.Second
 			vm.RemoteModel = p.Model
@@ -310,6 +318,7 @@ func (s *Server) toSlideoverClient(c *Client) *slideover.ClientVM {
 		Enabled:          c.Enabled,
 		WorkDir:          c.WorkDir,
 		Host:             c.Host,
+		FallbackServices: strings.Join(c.FallbackServices, ", "),
 		IPWhitelist:      strings.Join(c.IPWhitelist, ", "),
 		Avatar:           c.Avatar,
 		ServiceModelMap:  svcMap,

@@ -221,33 +221,37 @@ func (s *Server) sendHeartbeat() {
 	resp.Body.Close()
 }
 
-// detectClientAlive reports whether a process consistent with the given
-// agent_type is running on this host. Used to gate which co-hosted clients
-// (those whose Client.Host matches os.Hostname()) get reported as ACTIVE
-// in the heartbeat — host membership decides who *may* be claimed, this
-// function decides who *actually is up right now*.
+// detectClientAlive decides which co-hosted clients (those whose
+// Client.Host matches the reporting proxy's os.Hostname()) get reported
+// as ACTIVE in the heartbeat. Host membership says who *may* be claimed
+// by this proxy; this function says who *operationally counts as up*.
 //
-// Detection per type:
-//   - claude-code   pgrep -x claude              (Claude Code CLI binary)
-//   - cline         pgrep -x code                (VSCode binary; Cline is an
-//                                                 extension and can't run
-//                                                 without VSCode)
-//   - openclaw      pgrep -f openclaw-gateway
-//   - nanoclaw      systemctl --user is-active nanoclaw
-//   - econoworld    always false                 (self-reports via its own
-//                                                 heartbeat — should not
-//                                                 appear in hostAgents)
-//   - other         false                        (be honest — don't fake
-//                                                 green for unknown types)
+// Policy is per-agent-type because "operationally up" means different
+// things for different agents:
 //
-// Multiple claude-code clients sharing one Host all match the same pgrep,
-// so a single running CLI lights all of them up. Disambiguating across
-// OS namespaces (e.g. Windows-side claude-code visible from a WSL proxy)
-// would need cwd or interop probes — out of scope for this iteration.
+//   - claude-code   trust Host (always true). The CLI is invoked
+//                   intermittently and talks to Anthropic via OAuth
+//                   bypassing this proxy, so a pgrep-based probe
+//                   produces false reds during normal idle periods —
+//                   exactly the "babi2 잘 하고 있는데 왜 빨간불"
+//                   complaint v0.2.25 resolves. From the operator's
+//                   view a fleet member that hasn't been typed into
+//                   in an hour is still "the agent on that box".
+//
+//   - cline         pgrep -x code (VSCode binary). Cline is a VSCode
+//                   extension; with VSCode closed the extension cannot
+//                   be running. Strict probe is the v0.2.24 fix for
+//                   "클라인은 작동도 안 했는데 초록불" and we keep it.
+//
+//   - openclaw      pgrep -f openclaw-gateway (long-lived daemon).
+//   - nanoclaw      systemctl --user is-active nanoclaw (systemd unit).
+//   - econoworld    false — self-reports through its own heartbeat,
+//                   must not be claimed via hostAgents.
+//   - other         false — don't fake green for an unknown type.
 func detectClientAlive(agentType string) bool {
 	switch agentType {
 	case "claude-code":
-		return exec.Command("pgrep", "-x", "claude").Run() == nil
+		return true
 	case "cline":
 		return exec.Command("pgrep", "-x", "code").Run() == nil
 	case "openclaw":

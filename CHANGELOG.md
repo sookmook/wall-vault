@@ -8,6 +8,34 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.25] — 2026-04-25
+
+### Changed
+
+- **Split `detectClientAlive` policy by agent type.** v0.2.24 ran the
+  same pgrep gate on every agent type, which fixed cline's false-green
+  but introduced a false-red for claude-code clients that simply hadn't
+  been invoked in the last few minutes (operator complaint:
+  "babi2 잘 하고 있는데 왜 빨간불"). The two cases differ in nature —
+  Cline only runs while VSCode is open, while a claude-code client is
+  a fleet member that gets typed into intermittently and uses
+  Anthropic OAuth bypassing this proxy. Updated probe table:
+
+  | agent_type | probe |
+  |---|---|
+  | claude-code | always true (trust Host — operator-assigned membership is the source of truth) |
+  | cline | `pgrep -x code` (VSCode must be open for the extension to be alive) |
+  | openclaw | `pgrep -f openclaw-gateway` |
+  | nanoclaw | `systemctl --user is-active nanoclaw` |
+  | econoworld | always false (self-reports separately) |
+  | other | false (don't fake green for unknown types) |
+
+  Net effect: `claude` / `babi` / `babi2` / `macclaude` / `saweol`
+  light up as long as their host is heartbeating; `motoko_vsc` stays
+  red while VSCode is closed; openclaw/nanoclaw signals are unchanged.
+
+---
+
 ## [0.2.24] — 2026-04-25
 
 ### Fixed

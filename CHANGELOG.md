@@ -8,6 +8,28 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.29] — 2026-04-26
+
+### Fixed
+
+- **Token-less callers now inherit the proxy's own fallback chain.** Local
+  OpenClaw / Claude Code processes call `localhost:56244` without an
+  Authorization header, and the proxy's own `VAULT_TOKEN` is explicitly
+  excluded from `lookupTokenConfig`. The result, after v0.2.27/v0.2.28's
+  strict-by-default and bare-name routing changes shipped, was that
+  every fleet machine's local agent would 502 the moment its inferred
+  service hit a cooldown — `claude-opus-4-7` → anthropic → all keys
+  cooldown → 502 with no chain to fall back through. v0.2.29 loads the
+  proxy's own client `fallback_services` from `/api/clients` into a new
+  `s.ownFallback` field on every `syncFromVault` and uses it when the
+  request carries no token (or its token resolves to nil). Vault's
+  `/api/clients` now serialises `fallback_services` for authenticated
+  callers (the proxies). v0.2.27's strict-by-default policy is preserved
+  for clients whose vault config explicitly leaves `fallback_services`
+  empty.
+
+---
+
 ## [0.2.28] — 2026-04-25
 
 ### Fixed

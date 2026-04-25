@@ -68,6 +68,14 @@ type Server struct {
 	model           string            // user-configured preferred model (from vault dashboard)
 	claudeCodeClientID string            // vault client ID for the local claude-code agent (from syncFromVault)
 	ownAgentType       string            // this proxy's own agent_type (from syncFromVault)
+	// ownFallback is the proxy's own client config's fallback_services list,
+	// applied to incoming requests that do NOT carry a token (or whose token
+	// is the proxy's own VaultToken — explicitly excluded by lookupTokenConfig).
+	// Local OpenClaw / Claude Code processes typically call localhost:56244
+	// without an Authorization header, so without this they would otherwise
+	// run strict-by-default and 502 the moment the inferred service is on
+	// cooldown. Loaded from /api/clients and refreshed on every syncFromVault.
+	ownFallback        []string
 	// hostAgents is the set of vault clients whose Host field matches this
 	// proxy's os.Hostname(). Populated by syncFromVault, consumed by sendHeartbeat
 	// to report every co-hosted sub-client in a single heartbeat — so a host
@@ -459,11 +467,12 @@ func (s *Server) syncFromVault() {
 	defer resp.Body.Close()
 
 	var clients []struct {
-		ID             string `json:"id"`
-		DefaultService string `json:"default_service"`
-		DefaultModel   string `json:"default_model"`
-		AgentType      string `json:"agent_type"`
-		Host           string `json:"host"`
+		ID               string   `json:"id"`
+		DefaultService   string   `json:"default_service"`
+		DefaultModel     string   `json:"default_model"`
+		AgentType        string   `json:"agent_type"`
+		Host             string   `json:"host"`
+		FallbackServices []string `json:"fallback_services,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
 		return
@@ -524,9 +533,10 @@ func (s *Server) syncFromVault() {
 			if c.DefaultModel != "" {
 				s.model = c.DefaultModel
 			}
+			s.ownFallback = append(s.ownFallback[:0], c.FallbackServices...)
 			newSvc, newMdl := s.service, s.model
 			s.mu.Unlock()
-			log.Printf("[sync] 설정 로드: %s/%s", c.DefaultService, c.DefaultModel)
+			log.Printf("[sync] 설정 로드: %s/%s  fallback=%v", c.DefaultService, c.DefaultModel, c.FallbackServices)
 			if newSvc != oldSvc || newMdl != oldMdl {
 				go updateOpenClawJSON(newSvc, newMdl)
 			}
@@ -953,6 +963,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	svc := s.service
 	proxyDefaultMdl := s.model
+	ownFb := append([]string(nil), s.ownFallback...)
 	s.mu.RUnlock()
 
 	var resolvedClientID string
@@ -969,6 +980,13 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			}
 			fallbackChain = entry.fallbackServices
 		}
+	}
+	// Local-process callers (OpenClaw, Claude Code) usually call without an
+	// Authorization header — fall back to the proxy's own client config's
+	// fallback chain so they still get the cooldown-tolerant routing the
+	// operator configured in vault.
+	if fallbackChain == nil {
+		fallbackChain = ownFb
 	}
 	// No request-body model and no vault override → fall back to proxy default.
 	if mdl == "" {
@@ -1190,6 +1208,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	svc := s.service
 	proxyDefaultMdl := s.model
 	allowedServices := s.allowedServices
+	ownFb := append([]string(nil), s.ownFallback...)
 	s.mu.RUnlock()
 
 	// Token-based model override: same logic as handleOpenAI.
@@ -1214,6 +1233,9 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			}
 			fallbackChain = entry.fallbackServices
 		}
+	}
+	if fallbackChain == nil {
+		fallbackChain = ownFb
 	}
 	if mdl == "" {
 		mdl = proxyDefaultMdl

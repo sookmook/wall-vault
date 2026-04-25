@@ -1,0 +1,336 @@
+/* @theme wall-vault */
+
+@import "default";
+@import "./palette.css";
+
+:root {
+    --wv-font-body: "Pretendard", "Pretendard Variable", "Noto Sans KR", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
+    --wv-font-mono: "D2Coding", "JetBrains Mono", "Menlo", "Consolas", monospace;
+}
+
+section {
+    background: var(--wv-paper);
+    color: var(--wv-ink);
+    font-family: var(--wv-font-body);
+    font-size: 28px;
+    padding: 80px 100px;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    font-weight: 400;
+}
+
+section::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at top right, rgba(200, 136, 26, 0.08), transparent 55%),
+        radial-gradient(ellipse at bottom left, rgba(16, 34, 54, 0.05), transparent 55%);
+    pointer-events: none;
+}
+
+h1, h2, h3 {
+    font-family: var(--wv-font-body);
+    color: var(--wv-ink);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    margin: 0 0 0.4em 0;
+}
+
+h1 {
+    font-size: 78px;
+    font-weight: 800;
+}
+
+h2 {
+    font-size: 56px;
+    color: var(--wv-ink);
+}
+
+h2 strong, h2 em {
+    color: var(--wv-primary);
+    font-style: normal;
+}
+
+h3 {
+    font-size: 38px;
+    color: var(--wv-primary);
+}
+
+p, li {
+    font-size: 28px;
+    color: var(--wv-ink);
+}
+
+strong {
+    color: var(--wv-primary);
+    font-weight: 700;
+}
+
+em {
+    color: var(--wv-accent);
+    font-style: normal;
+    font-weight: 600;
+}
+
+a {
+    color: var(--wv-primary);
+    text-decoration: none;
+    border-bottom: 2px solid var(--wv-line);
+}
+
+ul, ol {
+    margin: 0.6em 0;
+    padding-left: 1.4em;
+}
+
+li {
+    margin-bottom: 0.4em;
+}
+
+li::marker {
+    color: var(--wv-primary);
+}
+
+code {
+    font-family: var(--wv-font-mono);
+    background: rgba(200, 136, 26, 0.12);
+    color: var(--wv-ink);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+pre {
+    background: var(--wv-ink);
+    color: #f5e9d4;
+    padding: 24px 32px;
+    border-radius: 12px;
+    font-size: 22px;
+    line-height: 1.5;
+    overflow-x: auto;
+    border-left: 6px solid var(--wv-primary);
+}
+
+pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5em 0;
+    font-size: 24px;
+}
+
+th {
+    background: var(--wv-ink);
+    color: var(--wv-paper);
+    padding: 14px 18px;
+    text-align: left;
+    font-weight: 600;
+}
+
+td {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--wv-line);
+}
+
+tr:hover td {
+    background: rgba(200, 136, 26, 0.06);
+}
+
+blockquote {
+    border-left: 6px solid var(--wv-primary);
+    padding: 8px 24px;
+    margin: 0.6em 0;
+    color: var(--wv-muted);
+    font-style: italic;
+    font-size: 26px;
+}
+
+img {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    margin: 0 auto;
+}
+
+footer {
+    color: var(--wv-muted);
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+header {
+    color: var(--wv-primary);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+section::after {
+    color: var(--wv-muted);
+    font-size: 18px;
+    font-weight: 500;
+}
+
+/* ── 표지 슬라이드 (lead) ─────────────────────────────────────── */
+
+section.lead {
+    text-align: center;
+    background:
+        radial-gradient(circle at 50% 40%, rgba(200, 136, 26, 0.18), transparent 60%),
+        var(--wv-paper);
+    justify-content: center;
+}
+
+section.lead h1 {
+    font-size: 96px;
+    color: var(--wv-ink);
+    margin-bottom: 0.2em;
+}
+
+section.lead h2 {
+    font-size: 36px;
+    color: var(--wv-primary);
+    font-weight: 600;
+    margin-top: 0;
+}
+
+section.lead .tagline {
+    margin-top: 1em;
+    font-size: 28px;
+    color: var(--wv-muted);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+section.lead img {
+    max-width: 480px;
+    margin-bottom: 1em;
+}
+
+/* ── 섹션 구분 슬라이드 ────────────────────────────────────────── */
+
+section.section-break {
+    background: var(--wv-ink);
+    color: var(--wv-paper);
+    text-align: center;
+    justify-content: center;
+}
+
+section.section-break h1 {
+    color: var(--wv-paper);
+    font-size: 72px;
+}
+
+section.section-break h2 {
+    color: var(--wv-primary);
+    font-size: 32px;
+}
+
+/* ── 강조 칩 ──────────────────────────────────────────────────── */
+
+.chip {
+    display: inline-block;
+    padding: 8px 18px;
+    background: rgba(200, 136, 26, 0.15);
+    border: 1.5px solid var(--wv-primary);
+    border-radius: 999px;
+    color: var(--wv-primary);
+    font-weight: 600;
+    font-size: 22px;
+    margin: 4px 6px 4px 0;
+}
+
+.chip.solid {
+    background: var(--wv-primary);
+    color: var(--wv-paper);
+}
+
+.chip.muted {
+    background: transparent;
+    border-color: var(--wv-muted);
+    color: var(--wv-muted);
+}
+
+/* ── KPI 박스 ─────────────────────────────────────────────────── */
+
+.kpi {
+    display: inline-block;
+    padding: 24px 32px;
+    margin: 8px 12px 8px 0;
+    border: 2px solid var(--wv-line);
+    border-radius: 16px;
+    background: rgba(255, 250, 242, 0.6);
+    text-align: center;
+    min-width: 200px;
+    vertical-align: top;
+}
+
+.kpi .num {
+    display: block;
+    font-size: 64px;
+    color: var(--wv-primary);
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.kpi .lbl {
+    display: block;
+    font-size: 22px;
+    color: var(--wv-muted);
+    letter-spacing: 0.02em;
+}
+
+/* ── 점수 dot (LIVE/OFFLINE) ─────────────────────────────────── */
+
+.dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.dot.live    { background: var(--wv-success); box-shadow: 0 0 12px rgba(47, 157, 107, 0.5); }
+.dot.offline { background: var(--wv-danger); }
+
+/* ── 비교표 ──────────────────────────────────────────────────── */
+
+table.compare th:first-child,
+table.compare td:first-child {
+    background: rgba(16, 34, 54, 0.04);
+    font-weight: 600;
+    width: 36%;
+}
+
+.yes { color: var(--wv-success); font-weight: 700; }
+.no  { color: var(--wv-danger);  font-weight: 700; }
+
+/* ── 두 단 그리드 ────────────────────────────────────────────── */
+
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+}
+
+/* ── 푸터 좌측 워터마크 ───────────────────────────────────────── */
+
+section:not(.lead):not(.section-break)::after {
+    bottom: 28px;
+    right: 56px;
+    color: var(--wv-muted);
+    font-weight: 500;
+}

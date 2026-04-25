@@ -1,0 +1,44 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#fffaf2',
+  'primaryTextColor': '#102236',
+  'primaryBorderColor': '#c8881a',
+  'lineColor': '#5b6877',
+  'secondaryColor': '#ead8b6',
+  'tertiaryColor': '#fff4e0',
+  'fontFamily': 'Pretendard, Noto Sans KR, sans-serif',
+  'fontSize': '20px'
+}}}%%
+flowchart LR
+    subgraph clients["클라이언트"]
+        direction TB
+        c1["OpenClaw"]
+        c2["Claude Code"]
+        c3["Cline / Cursor"]
+        c4["커스텀 앱"]
+    end
+
+    subgraph gateway["wall-vault 게이트웨이"]
+        direction TB
+        proxy["프록시<br/>:56244<br/>지능형 라우팅"]
+        vault["벽금고<br/>:56243<br/>AES-GCM 키 저장 · SSE 브로드캐스트"]
+        proxy <--> vault
+    end
+
+    subgraph upstream["업스트림 (멀티 벤더)"]
+        direction TB
+        u1["Anthropic"]
+        u2["Google Gemini"]
+        u3["OpenAI"]
+        u4["OpenRouter<br/>340+ 모델"]
+        u5["Ollama / 로컬 추론"]
+    end
+
+    clients --> gateway
+    gateway --> upstream
+
+    classDef client fill:#fff4e0,stroke:#c8881a,stroke-width:2px,color:#102236;
+    classDef gw fill:#102236,stroke:#c8881a,stroke-width:3px,color:#fffaf2;
+    classDef upstr fill:#fffaf2,stroke:#5b6877,stroke-width:2px,color:#102236;
+    class c1,c2,c3,c4 client;
+    class proxy,vault gw;
+    class u1,u2,u3,u4,u5 upstr;

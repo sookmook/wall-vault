@@ -1,0 +1,33 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#fffaf2',
+  'primaryTextColor': '#102236',
+  'primaryBorderColor': '#c8881a',
+  'lineColor': '#5b6877',
+  'fontFamily': 'Pretendard, Noto Sans KR, sans-serif',
+  'fontSize': '20px'
+}}}%%
+flowchart TD
+    Start(["요청 도착"]) --> Token{"토큰<br/>매칭?"}
+    Token -- "yes" --> VaultLookup["벽금고 조회<br/>preferred_service<br/>model_override<br/>fallback_services"]
+    Token -- "no" --> Body["요청 body 의 model<br/>그대로 사용"]
+    VaultLookup --> Primary["Primary 시도"]
+    Body --> Primary
+    Primary --> OK{"응답<br/>OK?"}
+    OK -- "yes" --> Emit200["200 OK<br/>X-WV-Used-Service<br/>X-WV-Used-Model"]
+    OK -- "no" --> HasChain{"fallback<br/>설정?"}
+    HasChain -- "no (strict)" --> Emit502["502 Bad Gateway<br/>(모델 무단 치환 없음)"]
+    HasChain -- "yes" --> Next["다음 서비스<br/>(체인 순서)"]
+    Next --> NextOK{"OK?"}
+    NextOK -- "no" --> Next
+    NextOK -- "yes" --> Emit200F["200 OK<br/>X-WV-Used-Service<br/>X-WV-Used-Model<br/><b>X-WV-Fallback-Reason</b>"]
+
+    classDef start fill:#102236,stroke:#c8881a,stroke-width:3px,color:#fffaf2;
+    classDef decision fill:#fff4e0,stroke:#c8881a,stroke-width:2px,color:#102236;
+    classDef step fill:#fffaf2,stroke:#5b6877,stroke-width:2px,color:#102236;
+    classDef ok fill:#dff5ea,stroke:#2f9d6b,stroke-width:2.5px,color:#102236;
+    classDef bad fill:#fbe2dd,stroke:#c64a3c,stroke-width:2.5px,color:#102236;
+    class Start start;
+    class Token,OK,HasChain,NextOK decision;
+    class VaultLookup,Body,Primary,Next step;
+    class Emit200,Emit200F ok;
+    class Emit502 bad;

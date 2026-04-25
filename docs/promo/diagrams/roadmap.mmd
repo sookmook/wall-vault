@@ -1,0 +1,33 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#fffaf2',
+  'primaryTextColor': '#102236',
+  'primaryBorderColor': '#c8881a',
+  'lineColor': '#5b6877',
+  'fontFamily': 'Pretendard, Noto Sans KR, sans-serif',
+  'fontSize': '18px',
+  'taskFontSize': '18px',
+  'sectionFontSize': '20px'
+}}}%%
+gantt
+    title wall-vault 개발 로드맵
+    dateFormat YYYY-MM
+    axisFormat %Y-%m
+
+    section 안정화 (현재)
+    멀티벤더 라우팅·금고 핵심      :done,    s1, 2026-02, 2026-04
+    호스트 기반 신호등             :done,    s2, 2026-04, 1M
+    Strict-by-default 라우팅        :done,    s3, 2026-04, 2w
+
+    section 운영 자동화
+    음성 인터페이스 통합            :active,  o1, 2026-04, 2M
+    주기적 자율 기동 (cron)         :active,  o2, 2026-05, 2M
+    감사 로그·이상 탐지            :         o3, 2026-06, 2M
+
+    section 확장
+    팀·조직 멀티테넌시             :         e1, 2026-07, 3M
+    BYOK 셀프서비스 포털           :         e2, 2026-08, 2M
+    엣지 캐싱·코스트 분석           :         e3, 2026-09, 3M
+
+    section 생태계
+    플러그인 SDK 공개               :         x1, 2026-10, 3M
+    공식 클라이언트 라이브러리      :         x2, 2026-11, 4M

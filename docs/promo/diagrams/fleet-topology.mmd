@@ -1,0 +1,32 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#fffaf2',
+  'primaryTextColor': '#102236',
+  'primaryBorderColor': '#c8881a',
+  'lineColor': '#5b6877',
+  'fontFamily': 'Pretendard, Noto Sans KR, sans-serif',
+  'fontSize': '20px'
+}}}%%
+flowchart TB
+    subgraph fleet["멀티 머신 운영 환경"]
+        direction LR
+        m1["워크 머신<br/>(WSL · Linux)<br/>여러 에이전트 동시 호스팅"]
+        m2["메인 서버<br/>(macOS · GPU)<br/>벽금고 서버 + 로컬 추론"]
+        m3["저전력 노드<br/>(Raspberry Pi · ARM)<br/>경량 에이전트"]
+        m4["보조 노드<br/>(Linux · 전용 도메인)<br/>특화 봇"]
+    end
+
+    central["벽금고 :56243<br/>중앙 키·설정·신호등"]
+
+    m1 -.->|SSE| central
+    m2 -.->|호스트| central
+    m3 -.->|SSE| central
+    m4 -.->|SSE| central
+
+    central -->|"실시간 신호등<br/>호스트 매칭<br/>에이전트 타입별 liveness"| dash["통합 대시보드<br/>(어디서든 접근)"]
+
+    classDef machine fill:#fff4e0,stroke:#c8881a,stroke-width:2px,color:#102236;
+    classDef central fill:#102236,stroke:#c8881a,stroke-width:3px,color:#fffaf2;
+    classDef dash fill:#dff5ea,stroke:#2f9d6b,stroke-width:2.5px,color:#102236;
+    class m1,m2,m3,m4 machine;
+    class central central;
+    class dash dash;

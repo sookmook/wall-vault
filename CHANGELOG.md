@@ -8,6 +8,35 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.23] — 2026-04-25
+
+### Changed
+
+- **Drop per-call AgentOffset + FallbackJitter on local-inference paths.**
+  v0.2.21 added a 500 ms deterministic + 200 ms random pre-acquire delay
+  (~350 ms avg) to spread fan-in across a fleet of proxies sharing one
+  Ollama host. With the current operating point (4 proxies, single
+  model, ~1000 daily calls, zero queue-overflow events observed in 24h)
+  the defence carries measurable cost (latency on every chat completion
+  and stream first-token) without measurable benefit. Per-proxy cap-1
+  semaphore is kept as the cheap GPU-memory serialiser, and the
+  one-shot phase-shift on heartbeat / vault-sync tickers stays — those
+  run once at boot and the cost is invisible. Removed at three sites:
+  `callOllama`, `streamOllama`, `callLocalService`. The
+  `localAgentOffsetMs` / `localFallbackJitterMs` constants are gone;
+  the `AgentOffset` and `FallbackJitter` helpers themselves remain
+  (used by heartbeat / vault-sync boot phase + test coverage).
+
+  Re-introduce the per-call offset/jitter when any of the following
+  is observed:
+    - fleet grows to 6+ proxies sharing the same upstream local backend
+    - /admin/proxies dashboard logs 5+ Ollama 503 / queue-overflow
+      events in a rolling 24h window
+    - a multi-model upgrade (concurrent loads on the Ollama host)
+      reintroduces the cross-proxy thundering-herd pattern
+
+---
+
 ## [0.2.22] — 2026-04-24
 
 ### Fixed

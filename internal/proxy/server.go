@@ -1663,18 +1663,14 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// structurally. See ResolveModel + dispatchWith.
 	ollamaURL := s.ollamaURL()
 
-	// Distribute fleet arrival times: each proxy delays entry by a
-	// deterministic phase offset (derived from its client_id) plus a
-	// small random jitter. Prevents simultaneous fan-in when several
-	// proxies fail over to a shared local backend in lock-step.
-	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
-		FallbackJitter(localFallbackJitterMs); d > 0 {
-		select {
-		case <-time.After(d):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
+	// Per-call AgentOffset+FallbackJitter (added in v0.2.21) was removed in
+	// v0.2.23: in the current operating point (4 proxies, 1 model, ~1000
+	// daily calls, zero queue-overflow events in 24h) the ~350 ms avg
+	// pre-acquire delay was paid on every call without measurable defence.
+	// Re-introduce when fleet ≥ 6 proxies share one upstream local backend,
+	// or /admin/proxies sees ≥ 5 Ollama 503 / queue-overflow events in a
+	// rolling 24h window, or a multi-model upgrade reintroduces cross-proxy
+	// thundering-herd. See CHANGELOG.md v0.2.21 / v0.2.23 for full context.
 
 	// Wait for a free slot on the per-service semaphore, but bail out if
 	// the caller's context was cancelled in the meantime.
@@ -1743,17 +1739,8 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 		return nil, fmt.Errorf("%s: URL 미설정", serviceID)
 	}
 
-	// Fleet time distribution — same AgentOffset + FallbackJitter used
-	// by callOllama. Smooths simultaneous fan-in when several proxies
-	// converge on a shared local backend.
-	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
-		FallbackJitter(localFallbackJitterMs); d > 0 {
-		select {
-		case <-time.After(d):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
+	// Per-call AgentOffset+FallbackJitter (v0.2.21) removed in v0.2.23.
+	// Re-introduction trigger: see callOllama above + CHANGELOG.md v0.2.23.
 
 	// Per-service cap-1 semaphore. Local inference is memory-bound, so
 	// two concurrent requests on the same backend usually run slower

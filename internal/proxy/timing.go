@@ -8,14 +8,10 @@ import (
 	"time"
 )
 
-// Local-inference timing budgets, shared across all local backends
-// (ollama / llamacpp / lmstudio / vllm). Four nodes with 500ms bucket
-// spacing average 125ms apart; 200ms of additive jitter smooths
-// residual collisions.
-const (
-	localAgentOffsetMs    = 500
-	localFallbackJitterMs = 200
-)
+// Local-inference per-call delay constants (localAgentOffsetMs,
+// localFallbackJitterMs) lived here in v0.2.21 and were removed in
+// v0.2.23; see CHANGELOG. AgentOffset and FallbackJitter functions are
+// retained for the boot-time phase shift on heartbeat / vault-sync tickers.
 
 // AgentOffset returns a deterministic per-agent delay in [0, maxMs) ms
 // derived from clientID. Same clientID always maps to the same offset,

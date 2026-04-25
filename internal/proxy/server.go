@@ -1913,6 +1913,14 @@ func parseProviderModel(svc, mdl string) (string, string) {
 	}
 
 	if !strings.Contains(mdl, "/") {
+		// No provider prefix in the model name. Try to infer the service from
+		// the bare name itself — a request like {"model": "gemini-2.5-flash"}
+		// addressed to a client whose preferred_service is ollama would
+		// otherwise be force-routed to ollama and 404 with "model not found",
+		// because ollama does not host google models. Surfaced by post #38.
+		if inferred := inferServiceFromBareModel(mdl); inferred != "" && inferred != svc {
+			return inferred, mdl
+		}
 		return svc, mdl
 	}
 	parts := strings.SplitN(mdl, "/", 2)
@@ -1987,6 +1995,48 @@ func parseProviderModel(svc, mdl string) (string, string) {
 	default:
 		return "openrouter", mdl
 	}
+}
+
+// inferServiceFromBareModel picks a service for a model name that has no
+// explicit "provider/" prefix. Returns "" when the name can't be matched —
+// the caller then keeps whatever preferred_service was already in play.
+//
+// Mapping rules:
+//   - any name containing ":"  →  ollama        (tag-style: gemma4:26b,
+//                                                  qwen3.6:27b, llama3:8b…)
+//   - claude-*                  →  anthropic
+//   - gemini-*  /  gemma-*      →  google         (no colon — Google catalogue)
+//   - gpt-*  /  o1*  /  o3*  /  o4*  →  openai
+//   - everything else           →  ""             (caller's choice stands)
+//
+// Introduced in v0.2.28 after post #38: a request for "gemini-2.5-flash"
+// arrived at a client whose preferred_service was ollama and was forwarded
+// to ollama unchanged, producing a 404 from ollama and a noisy cascade of
+// downstream errors. The cure isn't to override preferred_service for every
+// call — only when the bare model name unambiguously belongs to a different
+// service can wall-vault correct the route. Ambiguous or unknown names
+// (e.g. "qwen3.5-32b" without a colon) leave the caller's choice intact.
+func inferServiceFromBareModel(mdl string) string {
+	if mdl == "" {
+		return ""
+	}
+	// Tag-style names (foo:bar) are ollama's local-model convention.
+	if strings.Contains(mdl, ":") {
+		return "ollama"
+	}
+	switch {
+	case strings.HasPrefix(mdl, "claude-"):
+		return "anthropic"
+	case strings.HasPrefix(mdl, "gemini-"),
+		strings.HasPrefix(mdl, "gemma-"):
+		return "google"
+	case strings.HasPrefix(mdl, "gpt-"),
+		mdl == "o1", mdl == "o1-mini",
+		strings.HasPrefix(mdl, "o3"),
+		strings.HasPrefix(mdl, "o4"):
+		return "openai"
+	}
+	return ""
 }
 
 // stripControlTokens removes model-internal delimiter tokens that should not

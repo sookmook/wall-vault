@@ -8,6 +8,41 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.28] — 2026-04-25
+
+### Fixed
+
+- **Bare-model-name routing — `gemini-2.5-flash` no longer goes to ollama.**
+  `parseProviderModel` previously short-circuited on any model name without a
+  `provider/` prefix, returning the caller's preferred service unchanged. A
+  request like `{"model": "gemini-2.5-flash"}` addressed to a client whose
+  `preferred_service` is `ollama` was therefore forwarded to ollama as-is,
+  producing a 404 from ollama (it does not host google models) and a noisy
+  cascade of downstream errors visible in voice_api logs as
+  `entity.parse.failed` (post #38, "mini 카드 로그 진단 — LLM/TTS 흐름").
+
+  v0.2.28 adds `inferServiceFromBareModel` and consults it whenever the model
+  name has no `/`. Mapping rules:
+
+    | bare name pattern               | service     |
+    |---------------------------------|-------------|
+    | contains `:` (e.g. `qwen:27b`) | `ollama`    |
+    | `claude-*`                      | `anthropic` |
+    | `gemini-*`, `gemma-*`           | `google`    |
+    | `gpt-*`, `o1*`, `o3*`, `o4*`    | `openai`    |
+    | anything else                   | (caller's choice stands) |
+
+  When the inferred service differs from the caller's preferred service the
+  inferred one wins — that's the whole point. Ambiguous or unknown bare names
+  (`qwen3.5-32b` without a colon, `deepseek-r1` bare, custom internal names)
+  leave the caller's preferred service untouched, preserving the v0.2.27
+  priority order (`vault model_override > request body > proxy default`).
+
+  Verified by `internal/proxy/parse_provider_test.go` covering 19 bare-model
+  inference cases and 9 end-to-end `parseProviderModel` cases.
+
+---
+
 ## [0.2.27] — 2026-04-25
 
 ### Changed

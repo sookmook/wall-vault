@@ -43,13 +43,18 @@ CARDS = [
 
 
 def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    candidates = [
+    fonts_dir = Path(__file__).resolve().parents[1] / "fonts"
+    primary = fonts_dir / ("Pretendard-Bold.otf" if bold else "Pretendard-Regular.otf")
+    if primary.exists():
+        try:
+            return ImageFont.truetype(str(primary), size)
+        except OSError:
+            pass
+    # CJK-capable system fallbacks (rare on this sandbox but useful elsewhere)
+    for path in [
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/noto/NotoSansKR-Bold.otf" if bold else "/usr/share/fonts/truetype/noto/NotoSansKR-Regular.otf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/System/Library/Fonts/Supplemental/AppleSDGothicNeo.ttc",
-    ]
-    for path in candidates:
+    ]:
         if Path(path).exists():
             try:
                 return ImageFont.truetype(path, size)

@@ -624,17 +624,25 @@ func (s *Server) syncAllowedServices() error {
 // remains as a fallback override for environments that never register an
 // Ollama service entry.
 func (s *Server) ollamaURL() string {
+	// Per-machine env var wins over vault serviceURLs. Each fleet host knows
+	// its own topology (where the GPU/Ollama is reachable) better than a
+	// single global vault default — e.g. on a multi-machine fleet only one
+	// box runs Ollama and the other proxies need to reach it remotely. The
+	// previous priority (vault > env) ignored the systemd Environment=
+	// override, so even when the operator set WV_OLLAMA_URL correctly the
+	// proxy still used the vault-provided 127.0.0.1, causing connection-refused
+	// fallbacks. See CHANGELOG v0.2.26.
+	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
+		return v
+	}
+	if v := os.Getenv("OLLAMA_URL"); v != "" {
+		return v
+	}
 	s.mu.RLock()
 	u := s.serviceURLs["ollama"]
 	s.mu.RUnlock()
 	if u != "" {
 		return u
-	}
-	if v := os.Getenv("OLLAMA_URL"); v != "" {
-		return v
-	}
-	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
-		return v
 	}
 	return "http://localhost:11434"
 }

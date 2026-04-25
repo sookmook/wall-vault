@@ -8,6 +8,27 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.26] — 2026-04-25
+
+### Fixed
+
+- **`ollamaURL()` priority — per-machine env var now wins over vault
+  serviceURLs.** Each fleet host knows its own topology (where the
+  GPU/Ollama is reachable) better than a single global vault default.
+  In a multi-machine fleet only one box runs Ollama and the other
+  proxies must reach it remotely; the previous priority (vault > env)
+  ignored the systemd `Environment=WV_OLLAMA_URL=...` override, so
+  even when the operator pinned the correct address per-host the proxy
+  still used the vault-provided `127.0.0.1`, producing `connection
+  refused` and a silent fallback to the cloud chain. New order:
+  `WV_OLLAMA_URL` env > `OLLAMA_URL` env > vault `serviceURLs` >
+  `http://localhost:11434`. Surfaced by post #36 ("바비2호 →
+  야마이 클로드 라우팅 문의"): an econoworld-token call to
+  `qwen3.6:27b` was returning `google/gemini-3.1-flash-lite-preview`
+  because jaksooni's proxy could not reach its env-pinned Ollama.
+
+---
+
 ## [0.2.25] — 2026-04-25
 
 ### Changed

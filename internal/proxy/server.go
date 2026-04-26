@@ -76,6 +76,13 @@ type Server struct {
 	// run strict-by-default and 502 the moment the inferred service is on
 	// cooldown. Loaded from /api/clients and refreshed on every syncFromVault.
 	ownFallback        []string
+	// ownModelOverride mirrors the proxy's own client_id's model_override and
+	// is applied to token-less calls so the operator's vault-configured model
+	// wins over whatever the local OpenClaw / Claude Code happens to put in
+	// the request body. Without this, an operator who switches motoko to
+	// OpenRouter via vault still has to chase down OpenClaw's primary model
+	// in openclaw.json. With it, vault is the single source of truth.
+	ownModelOverride   string
 	// hostAgents is the set of vault clients whose Host field matches this
 	// proxy's os.Hostname(). Populated by syncFromVault, consumed by sendHeartbeat
 	// to report every co-hosted sub-client in a single heartbeat — so a host
@@ -470,6 +477,7 @@ func (s *Server) syncFromVault() {
 		ID               string   `json:"id"`
 		DefaultService   string   `json:"default_service"`
 		DefaultModel     string   `json:"default_model"`
+		ModelOverride    string   `json:"model_override,omitempty"`
 		AgentType        string   `json:"agent_type"`
 		Host             string   `json:"host"`
 		FallbackServices []string `json:"fallback_services,omitempty"`
@@ -534,9 +542,11 @@ func (s *Server) syncFromVault() {
 				s.model = c.DefaultModel
 			}
 			s.ownFallback = append(s.ownFallback[:0], c.FallbackServices...)
+			s.ownModelOverride = c.ModelOverride
 			newSvc, newMdl := s.service, s.model
 			s.mu.Unlock()
-			log.Printf("[sync] 설정 로드: %s/%s  fallback=%v", c.DefaultService, c.DefaultModel, c.FallbackServices)
+			log.Printf("[sync] 설정 로드: %s/%s  override=%q  fallback=%v",
+				c.DefaultService, c.DefaultModel, c.ModelOverride, c.FallbackServices)
 			if newSvc != oldSvc || newMdl != oldMdl {
 				go updateOpenClawJSON(newSvc, newMdl)
 			}
@@ -964,13 +974,16 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	svc := s.service
 	proxyDefaultMdl := s.model
 	ownFb := append([]string(nil), s.ownFallback...)
+	ownOverride := s.ownModelOverride
 	s.mu.RUnlock()
 
 	var resolvedClientID string
 	var fallbackChain []string
+	tokenResolved := false
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		reqToken := strings.TrimPrefix(authHeader, "Bearer ")
 		if entry := s.lookupTokenConfig(reqToken); entry != nil {
+			tokenResolved = true
 			resolvedClientID = entry.clientID
 			if entry.service != "" {
 				svc = entry.service
@@ -982,11 +995,16 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Local-process callers (OpenClaw, Claude Code) usually call without an
-	// Authorization header — fall back to the proxy's own client config's
-	// fallback chain so they still get the cooldown-tolerant routing the
-	// operator configured in vault.
-	if fallbackChain == nil {
-		fallbackChain = ownFb
+	// Authorization header. Inherit the proxy's own client config so vault
+	// stays the single source of truth for routing — both fallback chain
+	// and (when set) the operator's explicit model_override.
+	if !tokenResolved {
+		if ownOverride != "" {
+			mdl = ownOverride
+		}
+		if fallbackChain == nil {
+			fallbackChain = ownFb
+		}
 	}
 	// No request-body model and no vault override → fall back to proxy default.
 	if mdl == "" {
@@ -1209,6 +1227,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	proxyDefaultMdl := s.model
 	allowedServices := s.allowedServices
 	ownFb := append([]string(nil), s.ownFallback...)
+	ownOverride := s.ownModelOverride
 	s.mu.RUnlock()
 
 	// Token-based model override: same logic as handleOpenAI.
@@ -1216,6 +1235,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	// so check both to support Claude Code and other Anthropic-format clients.
 	var resolvedClientID string
 	var fallbackChain []string
+	tokenResolved := false
 	reqToken := ""
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		reqToken = strings.TrimPrefix(authHeader, "Bearer ")
@@ -1224,6 +1244,7 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 	}
 	if reqToken != "" {
 		if entry := s.lookupTokenConfig(reqToken); entry != nil {
+			tokenResolved = true
 			resolvedClientID = entry.clientID
 			if entry.service != "" {
 				svc = entry.service
@@ -1234,8 +1255,13 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			fallbackChain = entry.fallbackServices
 		}
 	}
-	if fallbackChain == nil {
-		fallbackChain = ownFb
+	if !tokenResolved {
+		if ownOverride != "" {
+			mdl = ownOverride
+		}
+		if fallbackChain == nil {
+			fallbackChain = ownFb
+		}
 	}
 	if mdl == "" {
 		mdl = proxyDefaultMdl

@@ -8,6 +8,29 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.30] — 2026-04-26
+
+### Fixed
+
+- **Token-less callers now inherit the proxy's own `model_override`.**
+  v0.2.29 made token-less calls pick up the proxy's own `fallback_services`
+  but the model itself still came from the request body — so an operator
+  who switched motoko to OpenRouter via `vault.model_override` was still
+  served whatever local OpenClaw / Claude Code's primary model said.
+  Surfaced when motoko's OpenClaw kept emitting `custom/gemma4:26b`,
+  driving every chat to the (chronically stuck) mini Ollama instead of
+  the freshly-funded OpenRouter. v0.2.30 mirrors `client.ModelOverride`
+  into a new `s.ownModelOverride` field on every `syncFromVault` and
+  applies it to token-less calls before request-body model is consulted.
+  Vault's `/api/clients` now exposes `model_override` separately from
+  the legacy `default_model` field so the proxy can distinguish operator
+  enforcement (override) from the legacy fallback. Token-resolved calls
+  unchanged — they continue to follow the v0.2.27 priority
+  `vault override > body > proxy default`. The fix means vault is now
+  the single source of truth for routing on every host.
+
+---
+
 ## [0.2.29] — 2026-04-26
 
 ### Fixed

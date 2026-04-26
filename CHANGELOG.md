@@ -8,6 +8,147 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.33] — 2026-04-26
+
+### Fixed
+
+- **Vault now shuts down cleanly on SIGTERM.** `wall-vault start` previously
+  held no reference to the vault HTTP server and never stopped its background
+  `startDailyReset` / `startStatusTicker` goroutines, so `systemctl stop` (or
+  Ctrl-C in `start` mode) tore the process down mid-write of `vault.json`.
+  `runAll` now wraps each handler in `*http.Server`, calls `Shutdown(ctx)` on
+  both before exit, and a new `vault.Server.Stop()` closes a `stopCh` that the
+  ticker goroutines now select on. `proxySrv.Stop()` already existed but was
+  reached after the vault routine had been killed; both stops now run in the
+  shutdown ordering the rest of the codebase already expected.
+
+- **Broker no longer panics when a slow SSE subscriber disconnects mid-broadcast.**
+  `broker.Broadcast` snapshotted the channel slice under `RLock`, released the
+  lock, and then iterated. If `Unsubscribe` ran during that gap it could close a
+  channel that `Broadcast` was about to write to, panicking the vault on
+  send-on-closed-channel. The send loop now stays inside `RLock`; each
+  iteration is non-blocking thanks to the existing `default:` drop branch, so
+  there is no deadlock concern.
+
+- **`clientAuth` no longer accepts arbitrary tokens when admin_token is unset.**
+  The dev-mode short-circuit was an `OR` clause that fired before the client
+  token lookup, so `Authorization: Bearer literally-anything` passed through
+  on `/api/keys`, `/api/heartbeat`, etc. The handler now mirrors the
+  `adminAuth` / `sseAuth` pattern (open mode = early return, no header
+  inspection), so the only behaviour change is that bogus tokens are no longer
+  rewarded with success when running without an admin_token.
+
+- **`vault.json` writes are now durable across crashes.** The atomic
+  write-then-rename pattern relied on `os.WriteFile`, which on Linux leaves the
+  bytes buffered in the page cache. A power loss between WriteFile and the
+  next fsync corrupted `vault.json`. `Store.save` now `O_TRUNC|O_CREATE`s the
+  tmp file, `f.Sync()`s before close, renames, and best-effort fsyncs the
+  parent directory so the rename's metadata is also durable.
+
+- **Hot-path saves surface their errors.** `RecordKeyUsage`,
+  `SetKeyUsage`, and `SetKeyCooldownIfLater` discarded the `s.save()` error
+  with `_ =`, so a full disk during heartbeat handling silently lost usage
+  counters. Each callsite now logs the failure with the key id.
+
+- **Migration of legacy keys is no longer silent.** `migrateLegacyKeys`
+  `continue`d past keys whose legacy decrypt failed (typically wrong master
+  password) without logging — operators had no way to notice that a
+  master_password change had stranded entries on the SHA-256 scheme. Both the
+  per-key reason and a tail summary line are now logged.
+
+- **Internal vault errors no longer leak through the API.** Six handlers used
+  `jsonError(w, err.Error(), 500)` which echoed messages like
+  `"duplicate ID: xyz"` straight to the caller, exposing storage internals.
+  A new `jsonInternalError(w, where, err)` helper logs the full error
+  server-side and returns a generic `"internal error"` to the client. All 500
+  paths in `handleAdmin{Clients,ClientsReorder,ServicesReorder,Keys,Services{,ID}}`
+  now route through it.
+
+- **Service plugin loader logs every skip.** `LoadPlugins` swallowed file-read
+  errors, YAML parse errors, and missing-id entries with bare `continue`s, so
+  a typo in `~/.wall-vault/services/*.yaml` made the corresponding service
+  silently disappear. Each skip path now writes a `[plugins] skip <file>:
+  <reason>` line.
+
+- **Proxy → vault key sync no longer accepts a partial body.**
+  `keymgr.SyncFromVault` ignored the `io.ReadAll` error, which meant a
+  truncated response could yield an empty `keys` slice that subsequent
+  Unmarshal happily parsed as "no keys" — with no diagnostic for the operator.
+  The error is now propagated.
+
+- **`streamOllama` no longer hardcodes `qwen3.5:35b`.** Falling back to a
+  hardcoded model name produced a 404 on any Ollama daemon that didn't have
+  that exact tag pulled. The fallback now reads `s.model`, and if that is also
+  empty the handler emits a clear SSE error frame instead of silently calling
+  the wrong model.
+
+- **`parseProviderModel` is now bounded against pathological `custom/` chains.**
+  The recursive arm at the `case "custom":` branch had no depth limit, so a
+  request body containing `model: "custom/custom/.../foo"` could theoretically
+  unwind through Go's stack. The recursion now caps at 8 levels via an
+  internal `parseProviderModelDepth` helper.
+
+- **Dashboard delete failure alert is i18n-aware.** The DELETE button handler
+  in `base.templ` hardcoded `'삭제 실패: '` regardless of the user's selected
+  language; the matching `js_delete_fail_fmt` key was already present in
+  `jsI18nKeys` but never referenced. The handler now uses `wvFmt(WV_I18N.
+  js_delete_fail_fmt || 'Delete failed: {err}', {err: t})`, matching how
+  save/reorder failures are already reported.
+
+- **Unknown theme names log a warning instead of failing silently.**
+  `theme.Get` quietly fell back to `cherry` whenever an unknown name arrived,
+  which made config-file typos hard to diagnose. The fallback now logs once
+  per call.
+
+- **OpenAI multipart messages no longer carry the Korean placeholder
+  `"[이미지]"`.** The `image_url` handler in `models.go` dropped a localized
+  string into request bodies regardless of locale; the placeholder is now the
+  locale-neutral `"[image]"`.
+
+---
+
+## [0.2.32] — 2026-04-26
+
+### Fixed
+
+- **Korean dashboard no longer leaks English `<optgroup>` labels into the agent
+  edit slideover.** `I18nJSONBlob()` was reading the JS-facing strings via
+  `i18n.T()`, which itself read a process-global `lang` variable mutated by
+  every dashboard request through `SetLang`. With multiple users (or a single
+  user toggling languages) the global could be "en" at the moment a Korean
+  page was being rendered, so `WV_I18N.lbl_group_default` and friends shipped
+  empty and the front-end JS fell through to its `'Default' / 'Allowed' /
+  '(use service default)'` literals — producing English entries inside an
+  otherwise-Korean model_override `<select>`. Adds `i18n.TFor(lang, key)`,
+  a stateless variant of `T`, and threads the per-request locale from
+  `layouts.Base(..., lang, ...)` into `I18nJSONBlob(lang)` so the JSON blob
+  always reflects the locale the surrounding HTML rendered in. `T()` retains
+  its old signature for back-compat (it now delegates to `TFor(lang, key)`).
+
+---
+
+## [0.2.31] — 2026-04-26
+
+### Fixed
+
+- **Pin Ollama's per-request `think` switch to stop hidden-reasoning blow-ups.**
+  Thinking-capable models on the fleet's shared Ollama (qwen3.5/3.6, gemma3+,
+  deepseek-r1, …) default to `think=true`. The proxy never overrode this, so
+  every chat completion silently entered reasoning mode: the model burned the
+  full `num_predict` budget on hidden thought, returned `content=""` with
+  `finish_reason="length"`, and held the model resident in wired memory.
+  Across four fleet machines hammering one mini Ollama daemon this accumulated
+  to ~42 GB wired and a hung daemon within minutes — the symptom the operator
+  described as "프록시 안 쓰고 미니 자체에서 큰 모델도 잘만 된다", because
+  `ollama run --think=false` from the CLI bypassed the same setting.
+  `OllamaRequest` and `OpenAIRequest` now expose a `Think *bool` field, and
+  `callOllama` / `streamOllama` / `callLocalService` pin it to the same value
+  as `Reasoning` (vault `reasoning_mode=true` → `think=true`, default → `false`).
+  Pointer type so the field is only emitted when explicitly set, leaving
+  Ollama's behaviour untouched on builds that haven't synced from vault yet.
+
+---
+
 ## [0.2.30] — 2026-04-26
 
 ### Fixed

@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -87,17 +88,25 @@ func LoadPlugins(servicesDir string) ([]ServicePlugin, error) {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".yaml" {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(servicesDir, e.Name()))
+		path := filepath.Join(servicesDir, e.Name())
+		data, err := os.ReadFile(path)
 		if err != nil {
+			log.Printf("[plugins] skip %s: read failed: %v", e.Name(), err)
 			continue
 		}
 		var p ServicePlugin
 		if err := yaml.Unmarshal(data, &p); err != nil {
+			log.Printf("[plugins] skip %s: yaml parse failed: %v", e.Name(), err)
 			continue
 		}
-		if p.Enabled && p.ID != "" {
-			plugins = append(plugins, p)
+		if p.ID == "" {
+			log.Printf("[plugins] skip %s: missing id field", e.Name())
+			continue
 		}
+		if !p.Enabled {
+			continue
+		}
+		plugins = append(plugins, p)
 	}
 	return plugins, nil
 }

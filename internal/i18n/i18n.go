@@ -90,9 +90,21 @@ func SetLang(v string) {
 	}
 }
 
-// T: return message in current language (English fallback)
+// T: return message in current language (English fallback).
+// Reads the process-global `lang` set via SetLang. Use TFor when the caller
+// already knows which locale it wants (e.g. building a per-response payload):
+// T's reliance on global state is unsafe across concurrent requests that may
+// have different cookies/URL params, and produced empty <optgroup> labels in
+// the agent-edit slideover when one client toggled to "en" while another
+// rendered in "ko".
 func T(key string) string {
-	if m, ok := messages[lang]; ok {
+	return TFor(lang, key)
+}
+
+// TFor: return message in the requested language (English fallback). Stateless,
+// safe to call from any goroutine without coordinating with SetLang.
+func TFor(langCode, key string) string {
+	if m, ok := messages[langCode]; ok {
 		if s, ok := m[key]; ok {
 			return s
 		}

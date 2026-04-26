@@ -112,6 +112,10 @@ func decryptV2(encoded, password string) (string, error) {
 }
 
 // decryptLegacy decrypts a legacy SHA-256-derived ciphertext (for migration).
+// Non-base64 input is returned as-is — this is the documented migration path
+// for vaults that pre-date encryption (TestDecryptKey_PlaintextFallback locks
+// it in). Threat model: an attacker who can write vault.json has worse paths
+// than swapping ciphertext for plaintext, so silent acceptance is acceptable.
 func decryptLegacy(encoded, password string) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {

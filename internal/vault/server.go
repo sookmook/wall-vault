@@ -87,6 +87,12 @@ type Server struct {
 	// /api/sse-ticket and sseAuth). Keyed by ticket → issuance time; 5 min TTL.
 	sseTicketsMu sync.Mutex
 	sseTickets   map[string]time.Time
+
+	// Background goroutine lifecycle. Closed by Stop() so startDailyReset and
+	// startStatusTicker can exit cleanly during graceful shutdown — without it
+	// systemd stop would tear the process down mid-write of vault.json.
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 const sseTicketTTL = 5 * time.Minute
@@ -125,6 +131,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		startedAt:  time.Now(),
 		limiter:    newAuthLimiter(),
 		sseTickets: make(map[string]time.Time),
+		stopCh:     make(chan struct{}),
 	}
 	// send full state to every new SSE client (handles reconnect sync)
 	srv.broker.OnConnect = func() { srv.broadcastAgentsSync() }
@@ -134,6 +141,14 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// offline transitions even when no heartbeats arrive
 	go srv.startStatusTicker()
 	return srv, nil
+}
+
+// Stop signals background goroutines to exit. Idempotent via sync.Once so
+// callers (main.go signal handler, tests) can invoke it without coordination.
+func (s *Server) Stop() {
+	s.stopOnce.Do(func() {
+		close(s.stopCh)
+	})
 }
 
 func (s *Server) Handler() http.Handler {
@@ -249,17 +264,23 @@ func bearerToken(r *http.Request) string {
 	return strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 }
 
-// clientAuth: authenticate with a registered client token
+// clientAuth: authenticate with a registered client token. When admin_token is
+// unset the vault runs in "open mode" (a startup banner warns about it); we
+// match adminAuth/sseAuth behaviour and skip the check entirely instead of the
+// older OR-clause that accidentally accepted any non-empty bogus token.
 func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := bearerToken(r)
-		// admin token also accepted (constant-time comparison)
-		if s.cfg.Vault.AdminToken != "" && secureCompare(token, s.cfg.Vault.AdminToken) {
+		if s.cfg.Vault.AdminToken == "" {
 			next(w, r)
 			return
 		}
-		// verify client token
-		if s.cfg.Vault.AdminToken == "" || s.store.GetClientByToken(token) != nil {
+		token := bearerToken(r)
+		// admin token also accepted (constant-time comparison)
+		if secureCompare(token, s.cfg.Vault.AdminToken) {
+			next(w, r)
+			return
+		}
+		if s.store.GetClientByToken(token) != nil {
 			next(w, r)
 			return
 		}
@@ -557,7 +578,7 @@ func (s *Server) handleAdminClients(w http.ResponseWriter, r *http.Request) {
 		}
 		c, err := s.store.AddClient(inp)
 		if err != nil {
-			jsonError(w, err.Error(), http.StatusInternalServerError)
+			jsonInternalError(w, "AddClient", err)
 			return
 		}
 		jsonOK(w, c)
@@ -584,7 +605,7 @@ func (s *Server) handleAdminClientsReorder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := s.store.ReorderClients(body.Order); err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, "ReorderClients", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "ok"})
@@ -610,7 +631,7 @@ func (s *Server) handleAdminServicesReorder(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := s.store.ReorderServices(body.Order); err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, "ReorderServices", err)
 		return
 	}
 	s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
@@ -762,7 +783,7 @@ func (s *Server) handleAdminKeys(w http.ResponseWriter, r *http.Request) {
 		}
 		k, err := s.store.AddKey(body.Service, body.Key, body.Label, body.DailyLimit)
 		if err != nil {
-			jsonError(w, err.Error(), http.StatusInternalServerError)
+			jsonInternalError(w, "AddKey", err)
 			return
 		}
 		// immediately reflect cloud service enabled state after key add
@@ -1098,7 +1119,7 @@ func (s *Server) handleAdminServices(w http.ResponseWriter, r *http.Request) {
 		}
 		inp.Custom = true
 		if err := s.store.UpsertService(&inp); err != nil {
-			jsonError(w, err.Error(), http.StatusInternalServerError)
+			jsonInternalError(w, "UpsertService.add", err)
 			return
 		}
 		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
@@ -1217,7 +1238,7 @@ func (s *Server) handleAdminServicesID(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err := s.store.UpsertService(&inp); err != nil {
-			jsonError(w, err.Error(), http.StatusInternalServerError)
+			jsonInternalError(w, "UpsertService.update", err)
 			return
 		}
 		s.broker.Broadcast(SSEEvent{Type: "service_changed", Data: map[string]interface{}{
@@ -1341,8 +1362,13 @@ func (s *Server) broadcastAgentsSync() {
 func (s *Server) startStatusTicker() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		s.broadcastAgentsSync()
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			s.broadcastAgentsSync()
+		}
 	}
 }
 
@@ -1352,7 +1378,13 @@ func (s *Server) startDailyReset() {
 	for {
 		now := time.Now()
 		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 30, 0, now.Location())
-		time.Sleep(time.Until(next))
+		t := time.NewTimer(time.Until(next))
+		select {
+		case <-s.stopCh:
+			t.Stop()
+			return
+		case <-t.C:
+		}
 		s.store.ResetDailyUsage()
 		s.broker.Broadcast(SSEEvent{
 			Type: "usage_reset",
@@ -1476,6 +1508,16 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, `{"error":%q}`, msg)
+}
+
+// jsonInternalError logs the full error server-side and returns a generic
+// "internal error" message to the client. Use this instead of
+// jsonError(w, err.Error(), 500) so we do not leak internal store error
+// strings (e.g. "duplicate ID: xyz", "client not found: xyz") which expose
+// vault structure to unauthenticated clients.
+func jsonInternalError(w http.ResponseWriter, where string, err error) {
+	log.Printf("[vault] %s: %v", where, err)
+	jsonError(w, "internal error", http.StatusInternalServerError)
 }
 
 // realIP: extract IP from RemoteAddr (strip port).

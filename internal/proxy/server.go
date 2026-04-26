@@ -1803,8 +1803,12 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	oaiReq := GeminiToOpenAI(model, req)
 	oaiReq.Stream = false
 	s.mu.RLock()
-	oaiReq.Reasoning = s.serviceReasoning["ollama"]
+	reasoning := s.serviceReasoning["ollama"]
 	s.mu.RUnlock()
+	oaiReq.Reasoning = reasoning
+	// Pin think so thinking-capable models do not silently consume num_predict
+	// on hidden reasoning. vault reasoning_mode=true → think=true, default → false.
+	oaiReq.Think = &reasoning
 	data, _ := json.Marshal(oaiReq)
 
 	// Ollama is a local service: inference can take several minutes for large models.
@@ -1884,8 +1888,10 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 	oaiReq := GeminiToOpenAI(model, req)
 	oaiReq.Stream = false
 	s.mu.RLock()
-	oaiReq.Reasoning = s.serviceReasoning[serviceID]
+	reasoning := s.serviceReasoning[serviceID]
 	s.mu.RUnlock()
+	oaiReq.Reasoning = reasoning
+	oaiReq.Think = &reasoning
 	data, _ := json.Marshal(oaiReq)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
@@ -1954,6 +1960,19 @@ func (s *Server) getKey(service string) (*localKey, string, error) {
 //
 // Ollama :cloud suffix (e.g. "kimi-k2.5:cloud") is stripped and routed to OpenRouter.
 func parseProviderModel(svc, mdl string) (string, string) {
+	return parseProviderModelDepth(svc, mdl, 0)
+}
+
+// parseProviderModelDepth bounds the "custom/" recursion. A pathological input
+// like "custom/custom/.../foo" would otherwise unwind through Go's stack as
+// many times as the prefix repeats — small in normal traffic but cheap to
+// guard against given the parser sits on the request hot path.
+const maxParseProviderDepth = 8
+
+func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
+	if depth >= maxParseProviderDepth {
+		return svc, mdl
+	}
 	// Strip Ollama :cloud suffix — route cloud variants via OpenRouter
 	if strings.HasSuffix(mdl, ":cloud") {
 		bare := strings.TrimSuffix(mdl, ":cloud")
@@ -2018,7 +2037,7 @@ func parseProviderModel(svc, mdl string) (string, string) {
 	// when the user selects a custom entry. Strip the leading "custom/" and re-parse
 	// so the actual provider is detected correctly.
 	case "custom":
-		return parseProviderModel(svc, bare) // bare = "google/gemini-..." etc.
+		return parseProviderModelDepth(svc, bare, depth+1) // bare = "google/gemini-..." etc.
 
 	// ── wall-vault prefix — auto-detect from model ID ────────────────────────
 	case "wall-vault":

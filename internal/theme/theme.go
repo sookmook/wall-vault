@@ -1,7 +1,10 @@
 // Package theme: UI themes (dark/light/cherry/ocean/gold/autumn/winter)
 package theme
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 // Theme: CSS variable set
 type Theme struct {
@@ -127,10 +130,15 @@ var themes = map[string]*Theme{
 	},
 }
 
-// Get: return theme (falls back to cherry if not found)
+// Get: return theme (falls back to cherry if not found).
+// An unknown name is logged once-per-call so a typo or stale config doesn't
+// silently render the dashboard in the wrong palette.
 func Get(name string) *Theme {
 	if t, ok := themes[name]; ok {
 		return t
+	}
+	if name != "" {
+		log.Printf("[theme] unknown theme %q — falling back to cherry", name)
 	}
 	return themes["cherry"]
 }

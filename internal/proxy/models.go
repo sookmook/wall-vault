@@ -102,6 +102,14 @@ type OpenAIRequest struct {
 	ToolChoice  interface{}     `json:"tool_choice,omitempty"`
 	ServiceTier string          `json:"service_tier,omitempty"` // OpenClaw fast mode (strip before forwarding)
 	Reasoning   bool            `json:"reasoning,omitempty"`    // local services: request reasoning/thinking output
+	// Think pins Ollama's per-request thinking switch. Pointer so the field is
+	// only emitted when explicitly set; nil leaves Ollama on its (model-default)
+	// behaviour. Thinking models (qwen3, gemma3+, deepseek-r1) default to
+	// think=true and burn the entire num_predict budget on hidden reasoning,
+	// returning empty content with finish_reason=length and accumulating wired
+	// memory across requests until the daemon hangs. Forcing think=false on
+	// every call mirrors `ollama run --think=false`.
+	Think *bool `json:"think,omitempty"`
 }
 
 type OpenAIMessage struct {
@@ -316,7 +324,8 @@ func rawContentToString(raw json.RawMessage) string {
 			case "text":
 				sb.WriteString(p.Text)
 			case "image_url":
-				sb.WriteString("[이미지]") // placeholder — proxy는 텍스트 전달만 지원
+				// Locale-neutral placeholder; the proxy forwards text-only on this path.
+				sb.WriteString("[image]")
 			}
 		}
 		return sb.String()
@@ -359,7 +368,10 @@ type OllamaRequest struct {
 	Messages []OpenAIMessage `json:"messages"`
 	Tools    []interface{}   `json:"tools,omitempty"`
 	Stream   bool            `json:"stream"`
-	Options  *OllamaOptions  `json:"options,omitempty"`
+	// Think mirrors `ollama run --think=false`. Pointer so the field is only
+	// emitted when explicitly set; see OpenAIRequest.Think for rationale.
+	Think   *bool          `json:"think,omitempty"`
+	Options *OllamaOptions `json:"options,omitempty"`
 }
 
 type OllamaOptions struct {

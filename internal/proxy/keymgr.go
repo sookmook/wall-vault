@@ -322,7 +322,10 @@ func (km *KeyManager) SyncFromVault() error {
 		return fmt.Errorf("금고 키 조회: HTTP %d", resp.StatusCode)
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("금고 응답 읽기 실패: %w", err)
+	}
 	var keys []struct {
 		ID            string    `json:"id"`
 		Service       string    `json:"service"`

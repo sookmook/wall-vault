@@ -7,7 +7,7 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width,initial-scale=1"/>
 			<meta name="wv-admin-token" content={ adminToken }/>
-			<script id="wv-i18n-data" type="application/json">@templ.Raw(I18nJSONBlob())</script>
+			<script id="wv-i18n-data" type="application/json">@templ.Raw(I18nJSONBlob(lang))</script>
 			<title>{ title }</title>
 			<link rel="icon" href="/logo"/>
 			<script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -693,8 +693,8 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 						headers: {'Authorization': 'Bearer ' + (window.WV_ADMIN_TOKEN || '')}
 					}).then(function(r){
 						if (r.ok) { window.location.reload(); return; }
-						r.text().then(function(t){ alert('삭제 실패: ' + t); });
-					}).catch(function(e){ alert('삭제 실패: ' + e); });
+						r.text().then(function(t){ alert(wvFmt(WV_I18N.js_delete_fail_fmt || 'Delete failed: {err}', {err: t})); });
+					}).catch(function(e){ alert(wvFmt(WV_I18N.js_delete_fail_fmt || 'Delete failed: {err}', {err: e})); });
 				}, true);
 
 				// Slideover dismiss — outside click, Esc, or any [data-wv-dismiss] button.

@@ -3,6 +3,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -11,6 +13,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/sookmook/wall-vault/cmd/doctor"
 	"github.com/sookmook/wall-vault/cmd/proxy"
@@ -96,9 +99,10 @@ func runAll() {
 	}
 	vaultSrv.SetConfigPath("wall-vault.yaml")
 	vaultAddr := fmt.Sprintf("%s:%d", cfg.Vault.Host, cfg.Vault.Port)
+	vaultHTTP := &http.Server{Addr: vaultAddr, Handler: vaultSrv.Handler()}
 	go func() {
 		log.Printf("[vault] 시작 :%d → http://localhost:%d", cfg.Vault.Port, cfg.Vault.Port)
-		if err := http.ListenAndServe(vaultAddr, vaultSrv.Handler()); err != nil {
+		if err := vaultHTTP.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("[vault] 오류: %v", err)
 		}
 	}()
@@ -106,10 +110,11 @@ func runAll() {
 	// start proxy
 	proxySrv := iproxy.NewServer(cfg)
 	proxyAddr := fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port)
+	proxyHTTP := &http.Server{Addr: proxyAddr, Handler: proxySrv.Handler()}
 	go func() {
 		log.Printf("[proxy] 시작 :%d (client=%s, filter=%s)",
 			cfg.Proxy.Port, cfg.Proxy.ClientID, cfg.Proxy.ToolFilter)
-		if err := http.ListenAndServe(proxyAddr, proxySrv.Handler()); err != nil {
+		if err := proxyHTTP.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("[proxy] 오류: %v", err)
 		}
 	}()
@@ -125,7 +130,20 @@ func runAll() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	slog.Info("wall-vault shutting down")
+
+	// Drain in-flight HTTP requests, then tear down each server's background
+	// goroutines. 10s is enough for streaming responses to finish their current
+	// chunk while still keeping systemd stop bounded.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := proxyHTTP.Shutdown(ctx); err != nil {
+		slog.Warn("proxy http shutdown", "err", err)
+	}
+	if err := vaultHTTP.Shutdown(ctx); err != nil {
+		slog.Warn("vault http shutdown", "err", err)
+	}
 	proxySrv.Stop()
+	vaultSrv.Stop()
 }
 
 func printHelp() {

@@ -220,7 +220,17 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 
 func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http.Flusher, model string, req *GeminiRequest) {
 	if model == "" {
-		model = "qwen3.5:35b"
+		// Prefer the proxy's configured default model when callers leave it blank.
+		// The previous hardcoded "qwen3.5:35b" was wrong on hosts whose Ollama did
+		// not have that exact tag pulled. If no default is configured either,
+		// fail loudly rather than silently invoking a model the server cannot serve.
+		s.mu.RLock()
+		model = s.model
+		s.mu.RUnlock()
+		if model == "" {
+			writeGeminiErrorChunk(w, f, fmt.Errorf("ollama: no model specified and no default configured"))
+			return
+		}
 	}
 	ollamaURL := s.ollamaURL()
 
@@ -251,6 +261,12 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 
 	ollamaReq := GeminiToOllama(model, req)
 	ollamaReq.Stream = true
+	// Pin per-request think to avoid silent reasoning blow-ups on
+	// thinking-capable models. See OpenAIRequest.Think rationale.
+	s.mu.RLock()
+	reasoning := s.serviceReasoning["ollama"]
+	s.mu.RUnlock()
+	ollamaReq.Think = &reasoning
 	data, _ := json.Marshal(ollamaReq)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/api/chat", bytes.NewReader(data))

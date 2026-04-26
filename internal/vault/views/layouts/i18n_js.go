@@ -30,13 +30,20 @@ var jsI18nKeys = []string{
 	"warn_stale_override_short",
 }
 
-// I18nJSONBlob returns the JS-facing i18n strings as a JSON object serialized
-// into a string. base.templ embeds it in a <script type="application/json">
-// element; the first bootstrap script then JSON.parses it into window.WV_I18N.
-func I18nJSONBlob() string {
+// I18nJSONBlob returns the JS-facing i18n strings for the requested locale as a
+// JSON object serialized into a string. base.templ embeds it in a
+// <script type="application/json"> element; the first bootstrap script then
+// JSON.parses it into window.WV_I18N.
+//
+// Takes lang explicitly (rather than reading the global via i18n.T) because a
+// concurrent request that toggles the global locale would otherwise leak the
+// wrong language into this response — the symptom that surfaced as English
+// optgroup labels ("Default" / "Allowed") inside an otherwise-Korean agent
+// edit slideover.
+func I18nJSONBlob(lang string) string {
 	m := make(map[string]string, len(jsI18nKeys))
 	for _, k := range jsI18nKeys {
-		m[k] = i18n.T(k)
+		m[k] = i18n.TFor(lang, k)
 	}
 	b, _ := json.Marshal(m)
 	return string(b)

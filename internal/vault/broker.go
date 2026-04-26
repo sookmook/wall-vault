@@ -56,7 +56,13 @@ func (b *Broker) Unsubscribe(ch chan string) {
 	close(ch)
 }
 
-// Broadcast: send event to all subscribed clients
+// Broadcast: send event to all subscribed clients.
+//
+// We hold the read lock for the entire send loop. The previous snapshot-then-
+// send pattern released the lock before iterating, which let Unsubscribe close
+// a channel that Broadcast was about to write to — sending on a closed channel
+// panics. Each iteration is non-blocking thanks to the default branch, so
+// holding RLock here cannot deadlock or stall a slow subscriber.
 func (b *Broker) Broadcast(evt SSEEvent) {
 	data, err := json.Marshal(evt)
 	if err != nil {
@@ -65,12 +71,8 @@ func (b *Broker) Broadcast(evt SSEEvent) {
 	msg := fmt.Sprintf("data: %s\n\n", data)
 
 	b.mu.RLock()
-	snapshot := make([]chan string, 0, len(b.clients))
+	defer b.mu.RUnlock()
 	for ch := range b.clients {
-		snapshot = append(snapshot, ch)
-	}
-	b.mu.RUnlock()
-	for _, ch := range snapshot {
 		select {
 		case ch <- msg:
 		default:

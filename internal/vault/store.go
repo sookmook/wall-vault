@@ -220,22 +220,34 @@ func (s *Store) load() error {
 
 // migrateLegacyKeys re-encrypts any SHA-256 encrypted key with Argon2id.
 // Called once on load. Saves automatically if any key was migrated.
+//
+// Skipped keys are logged so the operator notices when a wrong master password
+// silently leaves the legacy ciphertexts in place — the previous behaviour
+// (continue without logging) hid that the upgrade had failed.
 func (s *Store) migrateLegacyKeys() error {
 	migrated := 0
+	skipped := 0
 	for _, k := range s.keys {
 		if !isLegacyEncrypted(k.EncryptedKey) {
 			continue
 		}
 		plain, err := decryptLegacy(k.EncryptedKey, s.masterPass)
 		if err != nil {
-			continue // skip keys that can't be decrypted (wrong password etc.)
+			log.Printf("[migrate] skip key %s: legacy decrypt failed (%v) — wrong master password or corrupted entry", k.ID, err)
+			skipped++
+			continue
 		}
 		enc, err := encryptKey(plain, s.masterPass)
 		if err != nil {
+			log.Printf("[migrate] skip key %s: re-encrypt failed: %v", k.ID, err)
+			skipped++
 			continue
 		}
 		k.EncryptedKey = enc
 		migrated++
+	}
+	if skipped > 0 {
+		log.Printf("[migrate] %d legacy key(s) could not be migrated and remain on the old SHA-256 scheme", skipped)
 	}
 	if migrated > 0 {
 		return s.save()
@@ -288,12 +300,41 @@ func (s *Store) save() error {
 	if err != nil {
 		return err
 	}
-	// atomic write
+	// Atomic durable write: write to tmp, fsync the file, rename, then fsync
+	// the parent directory so the rename itself survives an OS-level crash.
+	// os.WriteFile alone leaves the data buffered in the page cache on Linux,
+	// which means a crash between WriteFile and the next fsync can corrupt
+	// vault.json (the encrypted key store).
 	tmp := s.dataFile + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, s.dataFile)
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, s.dataFile); err != nil {
+		return err
+	}
+	// fsync the parent directory so the rename's metadata is durable. Best
+	// effort: not all platforms (e.g. some Windows filesystems) need or honour
+	// directory fsync; in those cases the rename above is already durable.
+	if dir, err := os.Open(filepath.Dir(s.dataFile)); err == nil {
+		_ = dir.Sync()
+		_ = dir.Close()
+	}
+	return nil
 }
 
 // ─── Key Management ───────────────────────────────────────────────────────────
@@ -363,7 +404,9 @@ func (s *Store) RecordKeyUsage(id string, tokens int) {
 	for _, k := range s.keys {
 		if k.ID == id {
 			k.TodayUsage += tokens
-			_ = s.save()
+			if err := s.save(); err != nil {
+				log.Printf("[store] RecordKeyUsage save failed for key %s: %v", id, err)
+			}
 			return
 		}
 	}
@@ -385,7 +428,9 @@ func (s *Store) SetKeyUsage(id string, tokens int) bool {
 			}
 			if k.TodayUsage != tokens {
 				k.TodayUsage = tokens
-				_ = s.save()
+				if err := s.save(); err != nil {
+					log.Printf("[store] SetKeyUsage save failed for key %s: %v", id, err)
+				}
 				return true
 			}
 			return false
@@ -403,7 +448,9 @@ func (s *Store) SetKeyCooldownIfLater(id string, until time.Time) bool {
 		if k.ID == id {
 			if until.After(k.CooldownUntil) {
 				k.CooldownUntil = until
-				_ = s.save()
+				if err := s.save(); err != nil {
+					log.Printf("[store] SetKeyCooldownIfLater save failed for key %s: %v", id, err)
+				}
 				return true
 			}
 			return false

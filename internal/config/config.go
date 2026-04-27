@@ -94,7 +94,11 @@ func Default() *Config {
 			ClientID:   "local",
 			ToolFilter: "strip_all",
 			Services:   []string{"google", "openrouter", "ollama"},
-			Timeout:    60 * time.Second,
+			// 5-minute upstream timeout — local Ollama cold-starts on 27B+ models
+			// (qwen3.6:27b ≈ 80s, gemma4:26b ≈ 6m) blow past anything shorter,
+			// causing every minute-cron caller to disconnect mid-load and trigger
+			// the cold-start loop seen on mini.
+			Timeout:    300 * time.Second,
 		},
 		Vault: VaultConfig{
 			Port:        56243,

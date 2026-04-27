@@ -8,6 +8,23 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.34] — 2026-04-27
+
+### Fixed
+
+- **Proxy upstream timeout raised from 60s → 5m to survive Ollama cold-starts.**
+  On the mini (Apple M4 Pro / 64 GB) loading qwen3.6:27b cold takes ≈ 80s and
+  gemma4:26b ≈ 6m for the first request after the model unloads. Every
+  minute-cron caller (machine-status push, voice_assistant's OpenClaw flow,
+  etc.) was disconnecting after 60s, which canceled the in-flight ollama
+  request server-side; ollama then dropped the half-loaded model, the next
+  call started cold again, and the loop reproduced indefinitely — surfacing
+  on `:56240/machines` as `"LLM 프로바이더 다운: 모든 서비스 실패: Ollama 연결
+  실패…"` from speaker=mini. With 5m the cold-start completes, keep_alive=3m
+  keeps the model resident, and subsequent calls return in 1-3s.
+
+---
+
 ## [0.2.33] — 2026-04-26
 
 ### Fixed

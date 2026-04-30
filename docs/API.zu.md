@@ -806,7 +806,7 @@ glm-5:cloud      →  OpenRouter, I-ID yemodeli: glm-5
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "YOUR_AGENT_TOKEN",
         api: "openai-completions",
         models: [
@@ -935,142 +935,142 @@ Ukuchofoza inkinobho ye-**🐾** ekhadini le-ejenti kukopisha ngokuzenzakalelayo
 # ─── I-Proxy ───────────────────────────────────────────────────────────────────
 
 # Ukuhlola impilo
-curl http://localhost:56244/health
+curl https://localhost:56244/health
 
 # Ukuhlola isimo
-curl http://localhost:56244/status
+curl https://localhost:56244/status
 
 # Uhlu lwamamodeli (konke)
-curl http://localhost:56244/api/models
+curl https://localhost:56244/api/models
 
 # Amamodeli e-Google kuphela
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Ukusesha amamodeli amahhala
-curl "http://localhost:56244/api/models?q=alpha"
+curl "https://localhost:56244/api/models?q=alpha"
 
 # Ukushintsha imodeli (yendawo)
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service":"google","model":"gemini-2.5-pro"}'
 
 # Ukuhlaziya izilungiselelo
-curl -X POST http://localhost:56244/reload
+curl -X POST https://localhost:56244/reload
 
 # Ukushayela i-Gemini API ngokuqondile
-curl -X POST "http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
+curl -X POST "https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"role":"user","parts":[{"text":"안녕하세요"}]}]}'
 
 # Ehambisanayo ne-OpenAI (imodeli evamile)
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # Isakhiwo se-provider/model se-OpenClaw
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # Ukusebenzisa imodeli ye-1M context yamahhala
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/hunter-alpha","messages":[{"role":"user","content":"안녕"}]}'
 
 # ─── Isigcini sokhiye (umphakathi) ───────────────────────────────────────────────────────────
 
-curl http://localhost:56243/api/status
-curl http://localhost:56243/api/clients
-curl -s http://localhost:56243/api/events --max-time 3
+curl https://localhost:56243/api/status
+curl https://localhost:56243/api/clients
+curl -s https://localhost:56243/api/events --max-time 3
 
 # ─── Isigcini sokhiye (umphathi) ─────────────────────────────────────────────────────────
 
 ADMIN="Authorization: Bearer admin-token"
 
 # Uhlu lokhiye
-curl -H "$ADMIN" http://localhost:56243/admin/keys
+curl -H "$ADMIN" https://localhost:56243/admin/keys
 
 # Ukwengeza ukhiye we-Google
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
 
 # Ukwengeza ukhiye we-OpenAI
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openai","key":"sk-...","label":"GPT 키"}'
 
 # Ukwengeza ukhiye we-OpenRouter
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
 
 # Ukususa ukhiye (SSE key_deleted iyasakazwa)
-curl -X DELETE http://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
 
 # Ukusetha kabusha inani lokusebenzisa losuku
-curl -X POST http://localhost:56243/admin/keys/reset -H "$ADMIN"
+curl -X POST https://localhost:56243/admin/keys/reset -H "$ADMIN"
 
 # Uhlu lwamaklayenti
-curl -H "$ADMIN" http://localhost:56243/admin/clients
+curl -H "$ADMIN" https://localhost:56243/admin/clients
 
 # Ukwengeza iklayenti (OpenClaw)
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"bot-a","name":"봇 A","agent_type":"openclaw","work_dir":"~/.openclaw","default_service":"google","default_model":"gemini-2.5-flash"}'
 
 # Ukushintsha imodeli yeklayenti (SSE masinyane)
-curl -X PUT http://localhost:56243/admin/clients/bot-a \
+curl -X PUT https://localhost:56243/admin/clients/bot-a \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"default_service":"openrouter","default_model":"wall-vault/hunter-alpha"}'
 
 # Ukukhubaza iklayenti
-curl -X PUT http://localhost:56243/admin/clients/my-bot \
+curl -X PUT https://localhost:56243/admin/clients/my-bot \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":false}'
 
 # Ukususa iklayenti
-curl -X DELETE http://localhost:56243/admin/clients/my-bot -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/clients/my-bot -H "$ADMIN"
 
 # Uhlu lwamasevisi
-curl -H "$ADMIN" http://localhost:56243/admin/services
+curl -H "$ADMIN" https://localhost:56243/admin/services
 
 # Ukusetha i-URL yendawo ye-Ollama (SSE service_changed iyasakazwa)
-curl -X PUT http://localhost:56243/admin/services/ollama \
+curl -X PUT https://localhost:56243/admin/services/ollama \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"local_url":"http://192.168.x.x:11434","enabled":true}'
 
 # Ukuvula isevisi ye-OpenAI
-curl -X PUT http://localhost:56243/admin/services/openai \
+curl -X PUT https://localhost:56243/admin/services/openai \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":true}'
 
 # Ukwengeza isevisi ngokwezifiso (SSE service_changed iyasakazwa)
-curl -X POST http://localhost:56243/admin/services \
+curl -X POST https://localhost:56243/admin/services \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"my-llm","name":"사내 LLM","local_url":"http://10.0.0.50:8080","enabled":true}'
 
 # Ukususa isevisi ngokwezifiso
-curl -X DELETE http://localhost:56243/admin/services/my-llm -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/services/my-llm -H "$ADMIN"
 
 # Ukuhlola uhlu lwamamodeli
-curl -H "$ADMIN" http://localhost:56243/admin/models
-curl -H "$ADMIN" "http://localhost:56243/admin/models?service=openrouter"
-curl -H "$ADMIN" "http://localhost:56243/admin/models?q=hunter"
+curl -H "$ADMIN" https://localhost:56243/admin/models
+curl -H "$ADMIN" "https://localhost:56243/admin/models?service=openrouter"
+curl -H "$ADMIN" "https://localhost:56243/admin/models?q=hunter"
 
 # Isimo se-proxy (heartbeat)
-curl -H "$ADMIN" http://localhost:56243/admin/proxies
+curl -H "$ADMIN" https://localhost:56243/admin/proxies
 
 # ─── Imodi yokusabalalisa — I-Proxy → Isigcini ───────────────────────────────────────────────
 
 # Ukuhlola okhiye abavulwe esifihliwe
-curl http://localhost:56243/api/keys \
+curl https://localhost:56243/api/keys \
   -H "Authorization: Bearer your-bot-a-token"
 
 # Ukuthumela i-Heartbeat
-curl -X POST http://localhost:56243/api/heartbeat \
+curl -X POST https://localhost:56243/api/heartbeat \
   -H "Authorization: Bearer your-bot-a-token" \
   -H "Content-Type: application/json" \
   -d '{"client_id":"bot-a","version":"v0.1.6.20260314.231308","service":"google","model":"gemini-2.5-flash","sse_connected":true}'

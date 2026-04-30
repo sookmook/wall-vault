@@ -115,6 +115,12 @@ type Client struct {
 	// client when multiple exist in the vault. Optional — left empty disables
 	// auto-match and falls back to proxy.claude_code_client_id config override.
 	Host        string   `json:"host,omitempty"`
+	// Runtime: how this client lives. "daemon" (default) = long-running process
+	// that reports liveness via wall-vault proxy sync or self-heartbeat. "on_demand"
+	// = wakes only when a message arrives (lambda style — cokacdir, claude-code
+	// session-style agents); has no "process is alive" concept, so the dashboard
+	// must not paint these as red/offline when no heartbeat arrives.
+	Runtime     string   `json:"runtime,omitempty"`
 	IPWhitelist []string `json:"ip_whitelist,omitempty"`
 	Avatar      string   `json:"avatar,omitempty"`
 	Enabled     bool     `json:"enabled"`
@@ -141,6 +147,7 @@ type ClientInput struct {
 	AgentType        string       `json:"agent_type"`
 	WorkDir          string       `json:"work_dir"`
 	Host             string       `json:"host"`
+	Runtime          string       `json:"runtime"` // "daemon" (default) | "on_demand"
 	Description      string       `json:"description"`
 	IPWhitelist      StringOrList `json:"ip_whitelist"`
 	Avatar           string       `json:"avatar,omitempty"`
@@ -163,6 +170,16 @@ func (inp *ClientInput) EffectiveModel() string {
 	return inp.DefaultModel
 }
 
+// EffectiveRuntime returns the runtime mode, defaulting to "daemon" when the
+// field is empty. Legacy clients created before runtime classification was
+// added carry the empty string and should be treated as long-running daemons.
+func (c *Client) EffectiveRuntime() string {
+	if c.Runtime == "" {
+		return "daemon"
+	}
+	return c.Runtime
+}
+
 // ClientUpdateInput: client update DTO
 // All fields are pointers/slices — nil/omitted = no change, value present = update.
 // NOTE (v0.2): PreferredService / ModelOverride are the canonical v0.2 field names.
@@ -179,6 +196,7 @@ type ClientUpdateInput struct {
 	AgentType        *string      `json:"agent_type"`
 	WorkDir          *string      `json:"work_dir"`
 	Host             *string      `json:"host"`
+	Runtime          *string      `json:"runtime"` // "daemon" | "on_demand"
 	IPWhitelist      StringOrList `json:"ip_whitelist"`
 	Avatar           *string  `json:"avatar"`
 	Enabled          *bool    `json:"enabled"`

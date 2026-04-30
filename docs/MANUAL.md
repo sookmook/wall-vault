@@ -171,10 +171,10 @@ wall-vault start
 
 아래 두 서버가 동시에 시작됩니다:
 
-- **프록시** (`http://localhost:56244`) — 오픈클로와 AI 서비스 사이를 연결하는 대리인
-- **키 금고** (`http://localhost:56243`) — API 키 관리 및 웹 대시보드
+- **프록시** (`https://localhost:56244`) — 오픈클로와 AI 서비스 사이를 연결하는 대리인
+- **키 금고** (`https://localhost:56243`) — API 키 관리 및 웹 대시보드
 
-브라우저에서 `http://localhost:56243`을 열면 대시보드를 바로 확인할 수 있습니다.
+브라우저에서 `https://localhost:56243`을 열면 대시보드를 바로 확인할 수 있습니다.
 
 ---
 
@@ -207,7 +207,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### 방법 2: 대시보드 UI (마우스로 클릭)
 
-1. 브라우저에서 `http://localhost:56243` 접속
+1. 브라우저에서 `https://localhost:56243` 접속
 2. 상단 **🔑 API 키** 카드에서 `[+ 추가]` 버튼 클릭
 3. 서비스 종류, 키 값, 레이블(메모용 이름), 일일 한도를 입력한 뒤 저장
 
@@ -216,7 +216,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API란 프로그램끼리 HTTP로 데이터를 주고받는 방식입니다. 스크립트로 자동 등록할 때 유용합니다.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer 관리자토큰" \
   -H "Content-Type: application/json" \
   -d '{
@@ -251,7 +251,7 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // vault 에이전트 토큰
         api: "openai-completions",
         models: [
@@ -290,13 +290,13 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 Google Gemini API를 직접 쓰던 도구가 있다면, 주소만 wall-vault로 바꿔 주세요:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 또는 URL을 직접 지정하는 도구라면:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### OpenAI SDK(파이썬)에서 사용
@@ -307,7 +307,7 @@ http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # API 키는 wall-vault가 알아서 관리합니다
 )
 
@@ -323,12 +323,12 @@ wall-vault가 이미 실행 중인 상태에서 사용할 AI 모델을 바꾸려
 
 ```bash
 # 프록시에 직접 요청하여 모델 변경
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # 분산 모드(멀티 봇)에서는 금고 서버에서 변경 → SSE로 즉시 반영됨
-curl -X PUT http://localhost:56243/admin/clients/내-봇-id \
+curl -X PUT https://localhost:56243/admin/clients/내-봇-id \
   -H "Authorization: Bearer 관리자토큰" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -338,13 +338,13 @@ curl -X PUT http://localhost:56243/admin/clients/내-봇-id \
 
 ```bash
 # 전체 목록 보기
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Google 모델만 보기
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # 이름으로 검색 (예: "claude"가 포함된 모델)
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **서비스별 주요 모델 요약:**
@@ -363,7 +363,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## 키 금고 대시보드
 
-브라우저에서 `http://localhost:56243`에 접속하면 대시보드를 볼 수 있습니다.
+브라우저에서 `https://localhost:56243`에 접속하면 대시보드를 볼 수 있습니다.
 
 **화면 구성:**
 - **상단 고정 바(topbar)**: 로고, 언어·테마 선택기, SSE 연결 상태 표시
@@ -555,7 +555,7 @@ VS Code 확장 마켓플레이스에서 **Cline** (ID: `saoudrizwan.claude-dev`)
 Cline 사이드바에서 설정(⚙️)을 열고:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://프록시주소:56244/v1`
-  - 같은 머신이면 `http://localhost:56244/v1`
+  - 같은 머신이면 `https://localhost:56244/v1`
   - 미니 서버 등 다른 머신이면 `http://192.168.1.20:56244/v1`
 - **API Key**: 금고에서 발급받은 토큰 (에이전트 카드에서 복사)
 - **Model ID**: 금고에서 설정한 모델 (예: `gemini-2.5-flash`)
@@ -585,7 +585,7 @@ VS Code를 닫으면 금고 대시보드에서 약 **90초** 후에 에이전트
 
 | 증상 | 원인 | 해결 |
 |------|------|------|
-| Cline에서 "연결 실패" 오류 | 프록시 미실행 또는 주소 틀림 | `curl http://localhost:56244/health` 로 프록시 확인 |
+| Cline에서 "연결 실패" 오류 | 프록시 미실행 또는 주소 틀림 | `curl https://localhost:56244/health` 로 프록시 확인 |
 | 금고에서 초록 점이 안 뜸 | API 키(토큰)가 설정 안 됨 | **⚡ Cline 설정 적용** 버튼을 다시 클릭 |
 | Cline 푸터 모델이 안 바뀜 | Cline이 설정을 캐시함 | VS Code 리로드 (`Ctrl+Alt+R`) |
 | 엉뚱한 모델명이 표시됨 | 예전 버그 (v0.1.16에서 수정됨) | 프록시를 v0.1.16 이상으로 업데이트 |
@@ -655,7 +655,7 @@ wall-vault vault
 금고 서버에 접속하는 각 봇의 정보를 미리 등록해 둡니다:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer 관리자토큰" \
   -H "Content-Type: application/json" \
   -d '{
@@ -840,10 +840,10 @@ wall-vault proxy --port 8080   # 다른 포트 번호로 시작
 
 ```bash
 # 등록된 키 목록 및 상태 확인
-curl -H "Authorization: Bearer 관리자토큰" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer 관리자토큰" https://localhost:56243/admin/keys
 
 # 키 사용량 카운터 초기화
-curl -X POST -H "Authorization: Bearer 관리자토큰" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer 관리자토큰" https://localhost:56243/admin/keys/reset
 ```
 
 ### 에이전트가 "미연결"로 표시될 때

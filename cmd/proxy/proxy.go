@@ -100,7 +100,16 @@ func runProxy(cfg *config.Config) {
 	}
 
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if cfg.Proxy.TLS.Enabled {
+			if cfg.Proxy.TLS.CertFile == "" || cfg.Proxy.TLS.KeyFile == "" {
+				log.Fatalf("[proxy] tls.enabled=true requires tls.cert_file and tls.key_file")
+			}
+			err = httpSrv.ListenAndServeTLS(cfg.Proxy.TLS.CertFile, cfg.Proxy.TLS.KeyFile)
+		} else {
+			err = httpSrv.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("[proxy] 서버 오류: %v", err)
 		}
 	}()

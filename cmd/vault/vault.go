@@ -62,7 +62,16 @@ func runVault(cfg *config.Config, cfgPath string) {
 	}
 
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if cfg.Vault.TLS.Enabled {
+			if cfg.Vault.TLS.CertFile == "" || cfg.Vault.TLS.KeyFile == "" {
+				log.Fatalf("[vault] tls.enabled=true requires tls.cert_file and tls.key_file")
+			}
+			err = httpSrv.ListenAndServeTLS(cfg.Vault.TLS.CertFile, cfg.Vault.TLS.KeyFile)
+		} else {
+			err = httpSrv.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("[vault] 서버 오류: %v", err)
 		}
 	}()

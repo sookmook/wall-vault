@@ -603,6 +603,7 @@ func (s *Store) AddClient(inp ClientInput) (*Client, error) {
 		AgentType:        inp.AgentType,
 		WorkDir:          inp.WorkDir,
 		Host:             inp.Host,
+		Runtime:          inp.Runtime,
 		Description:      inp.Description,
 		IPWhitelist:      []string(inp.IPWhitelist),
 		Enabled:          enabled,
@@ -663,6 +664,9 @@ func (s *Store) UpdateClient(id string, inp ClientUpdateInput) error {
 			}
 			if inp.Host != nil {
 				c.Host = *inp.Host
+			}
+			if inp.Runtime != nil {
+				c.Runtime = *inp.Runtime
 			}
 			if inp.Description != nil {
 				c.Description = *inp.Description

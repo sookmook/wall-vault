@@ -94,6 +94,7 @@ func (s *Server) toMainClients(clients []*Client) []*mainview.ClientVM {
 			ModelOverride:    c.ModelOverride,
 			Enabled:          c.Enabled,
 			Avatar:           c.Avatar,
+			Runtime:          c.EffectiveRuntime(),
 		}
 		// When the agent has no model_override, surface the service's
 		// default_model so the card explicitly shows what the agent will
@@ -318,6 +319,7 @@ func (s *Server) toSlideoverClient(c *Client) *slideover.ClientVM {
 		Enabled:          c.Enabled,
 		WorkDir:          c.WorkDir,
 		Host:             c.Host,
+		Runtime:          c.Runtime,
 		FallbackServices: strings.Join(c.FallbackServices, ", "),
 		IPWhitelist:      strings.Join(c.IPWhitelist, ", "),
 		Avatar:           c.Avatar,

@@ -138,10 +138,10 @@ wall-vault start
 
 Los siguientes dos servidores se inician simultáneamente:
 
-- **Proxy** (`http://localhost:56244`) — El intermediario que conecta OpenClaw y los servicios de IA
-- **Almacén de claves** (`http://localhost:56243`) — Gestión de claves API y panel web
+- **Proxy** (`https://localhost:56244`) — El intermediario que conecta OpenClaw y los servicios de IA
+- **Almacén de claves** (`https://localhost:56243`) — Gestión de claves API y panel web
 
-Abre `http://localhost:56243` en tu navegador para acceder al panel.
+Abre `https://localhost:56243` en tu navegador para acceder al panel.
 
 ---
 
@@ -174,7 +174,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Método 2: Interfaz del Panel (apuntar y hacer clic)
 
-1. Abre `http://localhost:56243` en tu navegador
+1. Abre `https://localhost:56243` en tu navegador
 2. Haz clic en el botón `[+ Agregar]` en la tarjeta **:key: Claves API** superior
 3. Ingresa el tipo de servicio, valor de la clave, etiqueta (nombre de memo) y límite diario, luego guarda
 
@@ -183,7 +183,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 La API REST es un método para que los programas intercambien datos vía HTTP. Útil para el registro automatizado mediante scripts.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -218,7 +218,7 @@ Abre `~/.openclaw/openclaw.json` y agrega lo siguiente:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // token de agente del almacén
         api: "openai-completions",
         models: [
@@ -257,13 +257,13 @@ wall-vault determina automáticamente a qué servicio de IA enviar la solicitud 
 Si tienes herramientas que usan directamente la API de Google Gemini, solo cambia la URL a wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 O si la herramienta especifica URLs directamente:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Uso con el SDK de OpenAI (Python)
@@ -274,7 +274,7 @@ Puedes conectar wall-vault a código Python que usa IA. Solo cambia el `base_url
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # wall-vault gestiona las claves API por ti
 )
 
@@ -290,12 +290,12 @@ Para cambiar el modelo de IA mientras wall-vault ya está en ejecución:
 
 ```bash
 # Cambiar modelo vía solicitud directa al proxy
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # En modo distribuido (multi-bot), cambiar en el servidor almacén -> sincronizado instantáneamente vía SSE
-curl -X PUT http://localhost:56243/admin/clients/mi-bot-id \
+curl -X PUT https://localhost:56243/admin/clients/mi-bot-id \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -305,13 +305,13 @@ curl -X PUT http://localhost:56243/admin/clients/mi-bot-id \
 
 ```bash
 # Ver lista completa
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Ver solo modelos de Google
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Buscar por nombre (ej: modelos que contienen "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Modelos principales por servicio:**
@@ -330,7 +330,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Panel del Almacén de Claves
 
-Accede al panel abriendo `http://localhost:56243` en tu navegador.
+Accede al panel abriendo `https://localhost:56243` en tu navegador.
 
 **Diseño de pantalla:**
 - **Barra superior (fija)**: Logo, selector de idioma/tema, estado de conexión SSE
@@ -522,7 +522,7 @@ Instala **Cline** (ID: `saoudrizwan.claude-dev`) desde el Marketplace de Extensi
 Abre la configuración (:gear:) en la barra lateral de Cline:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://dirección-proxy:56244/v1`
-  - Misma máquina: `http://localhost:56244/v1`
+  - Misma máquina: `https://localhost:56244/v1`
   - Máquina diferente (ej: Mac Mini): `http://192.168.1.20:56244/v1`
 - **API Key**: Token emitido por el almacén (copiar de la tarjeta de agente)
 - **Model ID**: Modelo configurado en el almacén (ej: `gemini-2.5-flash`)
@@ -552,7 +552,7 @@ Cuando cierras VS Code, la tarjeta de agente en el panel se vuelve amarilla (ret
 
 | Síntoma | Causa | Solución |
 |---------|-------|----------|
-| Error "Conexión fallida" en Cline | Proxy no ejecutándose o dirección incorrecta | Verificar proxy con `curl http://localhost:56244/health` |
+| Error "Conexión fallida" en Cline | Proxy no ejecutándose o dirección incorrecta | Verificar proxy con `curl https://localhost:56244/health` |
 | El punto verde no aparece en el almacén | Clave API (token) no configurada | Hacer clic en **:zap: Aplicar config Cline** de nuevo |
 | El modelo en el pie de página de Cline no cambia | Cline almacena la configuración en caché | Recargar VS Code (`Ctrl+Alt+R`) |
 | Se muestra un nombre de modelo incorrecto | Bug antiguo (corregido en v0.1.16) | Actualizar proxy a v0.1.16 o posterior |
@@ -622,7 +622,7 @@ wall-vault vault
 Pre-registra la información de cada bot que se conectará al servidor del almacén:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -807,10 +807,10 @@ wall-vault proxy --port 8080   # Iniciar en un puerto diferente
 
 ```bash
 # Verificar lista de claves registradas y estado
-curl -H "Authorization: Bearer token-admin" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys
 
 # Resetear contadores de uso de claves
-curl -X POST -H "Authorization: Bearer token-admin" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys/reset
 ```
 
 ### El Agente Muestra "No Conectado"

@@ -806,7 +806,7 @@ glm-5:cloud      →  OpenRouter, معرف النموذج: glm-5
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "YOUR_AGENT_TOKEN",
         api: "openai-completions",
         models: [
@@ -935,142 +935,142 @@ glm-5:cloud      →  OpenRouter, معرف النموذج: glm-5
 # ─── البروكسي ─────────────────────────────────────────────────────────────────
 
 # فحص الصحة
-curl http://localhost:56244/health
+curl https://localhost:56244/health
 
 # استعلام الحالة
-curl http://localhost:56244/status
+curl https://localhost:56244/status
 
 # قائمة النماذج (الكل)
-curl http://localhost:56244/api/models
+curl https://localhost:56244/api/models
 
 # نماذج Google فقط
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # بحث النماذج المجانية
-curl "http://localhost:56244/api/models?q=alpha"
+curl "https://localhost:56244/api/models?q=alpha"
 
 # تغيير النموذج (محلي)
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service":"google","model":"gemini-2.5-pro"}'
 
 # تحديث الإعدادات
-curl -X POST http://localhost:56244/reload
+curl -X POST https://localhost:56244/reload
 
 # استدعاء مباشر لواجهة Gemini
-curl -X POST "http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
+curl -X POST "https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"role":"user","parts":[{"text":"안녕하세요"}]}]}'
 
 # متوافق مع OpenAI (النموذج الافتراضي)
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # صيغة OpenClaw provider/model
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # استخدام نموذج مجاني 1M context
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/hunter-alpha","messages":[{"role":"user","content":"안녕"}]}'
 
 # ─── خزنة المفاتيح (عامة) ─────────────────────────────────────────────────────
 
-curl http://localhost:56243/api/status
-curl http://localhost:56243/api/clients
-curl -s http://localhost:56243/api/events --max-time 3
+curl https://localhost:56243/api/status
+curl https://localhost:56243/api/clients
+curl -s https://localhost:56243/api/events --max-time 3
 
 # ─── خزنة المفاتيح (المسؤول) ───────────────────────────────────────────────────
 
 ADMIN="Authorization: Bearer admin-token"
 
 # قائمة المفاتيح
-curl -H "$ADMIN" http://localhost:56243/admin/keys
+curl -H "$ADMIN" https://localhost:56243/admin/keys
 
 # إضافة مفتاح Google
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
 
 # إضافة مفتاح OpenAI
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openai","key":"sk-...","label":"GPT 키"}'
 
 # إضافة مفتاح OpenRouter
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
 
 # حذف مفتاح (بث SSE key_deleted)
-curl -X DELETE http://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
 
 # إعادة تعيين الاستخدام اليومي
-curl -X POST http://localhost:56243/admin/keys/reset -H "$ADMIN"
+curl -X POST https://localhost:56243/admin/keys/reset -H "$ADMIN"
 
 # قائمة العملاء
-curl -H "$ADMIN" http://localhost:56243/admin/clients
+curl -H "$ADMIN" https://localhost:56243/admin/clients
 
 # إضافة عميل (OpenClaw)
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"bot-a","name":"봇 A","agent_type":"openclaw","work_dir":"~/.openclaw","default_service":"google","default_model":"gemini-2.5-flash"}'
 
 # تغيير نموذج العميل (انعكاس فوري عبر SSE)
-curl -X PUT http://localhost:56243/admin/clients/bot-a \
+curl -X PUT https://localhost:56243/admin/clients/bot-a \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"default_service":"openrouter","default_model":"wall-vault/hunter-alpha"}'
 
 # تعطيل عميل
-curl -X PUT http://localhost:56243/admin/clients/my-bot \
+curl -X PUT https://localhost:56243/admin/clients/my-bot \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":false}'
 
 # حذف عميل
-curl -X DELETE http://localhost:56243/admin/clients/my-bot -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/clients/my-bot -H "$ADMIN"
 
 # قائمة الخدمات
-curl -H "$ADMIN" http://localhost:56243/admin/services
+curl -H "$ADMIN" https://localhost:56243/admin/services
 
 # تعيين عنوان URL المحلي لـ Ollama (بث SSE service_changed)
-curl -X PUT http://localhost:56243/admin/services/ollama \
+curl -X PUT https://localhost:56243/admin/services/ollama \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"local_url":"http://192.168.x.x:11434","enabled":true}'
 
 # تفعيل خدمة OpenAI
-curl -X PUT http://localhost:56243/admin/services/openai \
+curl -X PUT https://localhost:56243/admin/services/openai \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":true}'
 
 # إضافة خدمة مخصصة (بث SSE service_changed)
-curl -X POST http://localhost:56243/admin/services \
+curl -X POST https://localhost:56243/admin/services \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"my-llm","name":"사내 LLM","local_url":"http://10.0.0.50:8080","enabled":true}'
 
 # حذف خدمة مخصصة
-curl -X DELETE http://localhost:56243/admin/services/my-llm -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/services/my-llm -H "$ADMIN"
 
 # استعلام قائمة النماذج
-curl -H "$ADMIN" http://localhost:56243/admin/models
-curl -H "$ADMIN" "http://localhost:56243/admin/models?service=openrouter"
-curl -H "$ADMIN" "http://localhost:56243/admin/models?q=hunter"
+curl -H "$ADMIN" https://localhost:56243/admin/models
+curl -H "$ADMIN" "https://localhost:56243/admin/models?service=openrouter"
+curl -H "$ADMIN" "https://localhost:56243/admin/models?q=hunter"
 
 # حالة البروكسي (heartbeat)
-curl -H "$ADMIN" http://localhost:56243/admin/proxies
+curl -H "$ADMIN" https://localhost:56243/admin/proxies
 
 # ─── الوضع الموزع — البروكسي → الخزنة ───────────────────────────────────────
 
 # استعلام المفاتيح المفكّكة التشفير
-curl http://localhost:56243/api/keys \
+curl https://localhost:56243/api/keys \
   -H "Authorization: Bearer your-bot-a-token"
 
 # إرسال Heartbeat
-curl -X POST http://localhost:56243/api/heartbeat \
+curl -X POST https://localhost:56243/api/heartbeat \
   -H "Authorization: Bearer your-bot-a-token" \
   -H "Content-Type: application/json" \
   -d '{"client_id":"bot-a","version":"v0.1.6.20260314.231308","service":"google","model":"gemini-2.5-flash","sse_connected":true}'

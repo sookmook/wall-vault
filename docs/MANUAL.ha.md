@@ -138,10 +138,10 @@ wall-vault start
 
 Server guda biyu suna farawa a lokaci guda:
 
-- **Proxy** (`http://localhost:56244`) — Wakili da ke hada OpenClaw da sabis na AI
-- **Key Vault** (`http://localhost:56243`) — Gudanar da API key da dashboard na yanar gizo
+- **Proxy** (`https://localhost:56244`) — Wakili da ke hada OpenClaw da sabis na AI
+- **Key Vault** (`https://localhost:56243`) — Gudanar da API key da dashboard na yanar gizo
 
-Bude `http://localhost:56243` a cikin browser ka don ganin dashboard nan da nan.
+Bude `https://localhost:56243` a cikin browser ka don ganin dashboard nan da nan.
 
 ---
 
@@ -174,7 +174,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Hanya ta 2: UI na Dashboard (Danna da Linzami)
 
-1. Bude `http://localhost:56243` a cikin browser
+1. Bude `https://localhost:56243` a cikin browser
 2. Danna maballin `[+ Kara]` a katin **🔑 API Key** a sama
 3. Shigar da nau'in sabis, darajar key, lakabi (sunan tunawa), da iyakar rana sannan ka adana
 
@@ -183,7 +183,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API hanya ce da shirye-shirye ke musayar bayanai ta hanyar HTTP. Tana da amfani don rajista ta atomatik ta hanyar rubutun.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer alamar-mai-gudanarwa" \
   -H "Content-Type: application/json" \
   -d '{
@@ -218,7 +218,7 @@ Bude fayil `~/.openclaw/openclaw.json` kuma ka kara abubuwan da ke kasa:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // alamar wakili na vault
         api: "openai-completions",
         models: [
@@ -257,13 +257,13 @@ Ta hanyar kallon sunan model, wall-vault tana yanke shawara ta atomatik wace sab
 Idan kana da kayan aiki da suka kasance suna amfani da Google Gemini API kai tsaye, kawai ka canza adireshi zuwa wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Ko idan kayan aikinka suna bayyana URL kai tsaye:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Amfani da OpenAI SDK (Python)
@@ -274,7 +274,7 @@ Za ka iya hada wall-vault a cikin lambar Python da ke amfani da AI. Kawai ka can
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # wall-vault tana gudanar da API key ta atomatik
 )
 
@@ -290,12 +290,12 @@ Don canza model na AI yayin da wall-vault tana gudana:
 
 ```bash
 # Canza model ta hanyar neman proxy kai tsaye
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # A yanayin rarraba (multi bot), canza a server na vault → yana bayyana nan da nan ta SSE
-curl -X PUT http://localhost:56243/admin/clients/id-na-bot-na \
+curl -X PUT https://localhost:56243/admin/clients/id-na-bot-na \
   -H "Authorization: Bearer alamar-mai-gudanarwa" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -305,13 +305,13 @@ curl -X PUT http://localhost:56243/admin/clients/id-na-bot-na \
 
 ```bash
 # Duba duk jerin
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Duba model na Google kawai
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Nema ta suna (misali: model da suka kunshi "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Takaitaccen Babban Model a Kowane Sabis:**
@@ -330,7 +330,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Dashboard na Key Vault
 
-Bude `http://localhost:56243` a cikin browser ka don ganin dashboard.
+Bude `https://localhost:56243` a cikin browser ka don ganin dashboard.
 
 **Tsarin Fuska:**
 - **Sandan sama da aka daidaita (topbar)**: Alamar, mai zabar harshe·jigo, alamar halin hadar SSE
@@ -522,7 +522,7 @@ Girka **Cline** (ID: `saoudrizwan.claude-dev`) daga Kasuwar Kari na VS Code.
 Bude saituna (⚙️) a gefen Cline:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://adireshi-na-proxy:56244/v1`
-  - Injin guda: `http://localhost:56244/v1`
+  - Injin guda: `https://localhost:56244/v1`
   - Wani injin kamar mini server: `http://192.168.1.20:56244/v1`
 - **API Key**: Alamar da aka bayar daga vault (kwafa daga katin wakili)
 - **Model ID**: Model da aka saita a vault (misali: `gemini-2.5-flash`)
@@ -552,7 +552,7 @@ Idan ka rufe VS Code, katin wakili a dashboard na vault zai zama rawaya (an jink
 
 | Alama | Dalili | Magani |
 |------|------|------|
-| Kuskuren "Hada ya gaza" a Cline | Proxy ba ta gudana ba ko adireshi ba daidai ba | Duba proxy da `curl http://localhost:56244/health` |
+| Kuskuren "Hada ya gaza" a Cline | Proxy ba ta gudana ba ko adireshi ba daidai ba | Duba proxy da `curl https://localhost:56244/health` |
 | Digon kore bai bayyana a vault ba | API key (alamar) ba a saita ta ba | Danna maballin **⚡ Aiwatar da Saitin Cline** sake |
 | Model na kasan Cline bai canja ba | Cline tana adana saiti a cache | Sake sabuntar VS Code (`Ctrl+Alt+R`) |
 | Sunan model mara daidai yana bayyana | Tsohuwar matsalar (an gyara a v0.1.16) | Sabunta proxy zuwa v0.1.16 ko sama |
@@ -622,7 +622,7 @@ wall-vault vault
 Rajista tun farko bayanan kowane bot da ke hadawa da server na vault:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer alamar-mai-gudanarwa" \
   -H "Content-Type: application/json" \
   -d '{
@@ -807,10 +807,10 @@ wall-vault proxy --port 8080   # Fara da wata lambar tashar
 
 ```bash
 # Duba jerin da halin key da aka rajista
-curl -H "Authorization: Bearer alamar-mai-gudanarwa" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer alamar-mai-gudanarwa" https://localhost:56243/admin/keys
 
 # Sake saita kidaya amfanin key
-curl -X POST -H "Authorization: Bearer alamar-mai-gudanarwa" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer alamar-mai-gudanarwa" https://localhost:56243/admin/keys/reset
 ```
 
 ### Idan Wakili Yana Bayyana a matsayin "Ba a Hada ba"

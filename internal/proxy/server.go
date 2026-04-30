@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -794,6 +795,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
+	if !s.requireProxyToken(w, r) {
+		return
+	}
 	svc := r.URL.Query().Get("service")
 	all := s.registry.All(svc)
 	jsonOK(w, map[string]interface{}{
@@ -802,9 +806,91 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// requireProxyToken authenticates a request to /v1/chat/completions,
+// /v1/models, /google/*, and /api/models. Accepted tokens: the proxy's own
+// VaultToken, or any token that the vault recognises as a registered client
+// (resolved via lookupTokenConfig with a 5s cache). Writes 401 and returns
+// false on rejection.
+func (s *Server) requireProxyToken(w http.ResponseWriter, r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		jsonError(w, "Authorization header required", http.StatusUnauthorized)
+		return false
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == "" {
+		jsonError(w, "Authorization header required", http.StatusUnauthorized)
+		return false
+	}
+	if s.cfg.Proxy.VaultToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) == 1 {
+		return true
+	}
+	if entry := s.lookupTokenConfig(token); entry != nil {
+		return true
+	}
+	jsonError(w, "invalid token", http.StatusUnauthorized)
+	return false
+}
+
+// requireAnthropicToken authenticates a request to /v1/messages. Accepts the
+// same tokens as requireProxyToken plus (a) Anthropic-native `x-api-key`
+// header and (b) BYO `sk-ant-*` credentials (Claude Code OAuth via NanoClaw's
+// credential proxy) — those are forwarded upstream by the handler and so are
+// trusted as long as they are present.
+func (s *Server) requireAnthropicToken(w http.ResponseWriter, r *http.Request) bool {
+	var token string
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		token = strings.TrimPrefix(auth, "Bearer ")
+	} else if xKey := r.Header.Get("x-api-key"); xKey != "" {
+		token = xKey
+	}
+	if token == "" {
+		jsonError(w, "Authorization header or x-api-key required", http.StatusUnauthorized)
+		return false
+	}
+	// BYO Anthropic OAuth credentials — pass through to upstream as-is.
+	if strings.HasPrefix(token, "sk-ant-") {
+		return true
+	}
+	if s.cfg.Proxy.VaultToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) == 1 {
+		return true
+	}
+	if entry := s.lookupTokenConfig(token); entry != nil {
+		return true
+	}
+	jsonError(w, "invalid token", http.StatusUnauthorized)
+	return false
+}
+
+// requireAdminToken authenticates a request to a privileged proxy endpoint
+// (model override, reload, think-mode toggle). Only the proxy's own VaultToken
+// passes — client tokens are explicitly rejected because these endpoints mutate
+// the proxy's own routing state, which a per-client token has no authority over.
+// Fail-closed when no VaultToken is configured.
+func (s *Server) requireAdminToken(w http.ResponseWriter, r *http.Request) bool {
+	if s.cfg.Proxy.VaultToken == "" {
+		jsonError(w, "admin endpoints disabled (proxy.vault_token not configured)", http.StatusServiceUnavailable)
+		return false
+	}
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		jsonError(w, "Authorization header required", http.StatusUnauthorized)
+		return false
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) != 1 {
+		jsonError(w, "invalid admin token", http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
 func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut && r.Method != http.MethodPost {
 		jsonError(w, "PUT required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireAdminToken(w, r) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxConfigBodySize)
@@ -867,10 +953,16 @@ func (s *Server) pushConfigToVault(service, model string) {
 }
 
 func (s *Server) handleThinkMode(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdminToken(w, r) {
+		return
+	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdminToken(w, r) {
+		return
+	}
 	go s.syncFromVault()
 	jsonOK(w, map[string]string{"status": "reloading"})
 }
@@ -880,6 +972,9 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireProxyToken(w, r) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
@@ -944,6 +1039,9 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireProxyToken(w, r) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
@@ -1205,6 +1303,9 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	if !s.requireAnthropicToken(w, r) {
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxAIBodySize)
 
 	var req AnthropicRequest
@@ -1375,6 +1476,9 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 // ─── OpenAI-compatible model list (/v1/models) ────────────────────────────────
 
 func (s *Server) handleOpenAIModels(w http.ResponseWriter, r *http.Request) {
+	if !s.requireProxyToken(w, r) {
+		return
+	}
 	type oaiModel struct {
 		ID      string `json:"id"`
 		Object  string `json:"object"`
@@ -2015,6 +2119,16 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 
 	// ── Anthropic via OpenRouter (API format differs) ─────────────────────────
 	case "anthropic":
+		// When the caller's preferred service is ollama, treat
+		// "anthropic/<model>" as a local Ollama Modelfile alias on this host —
+		// the operator wired vault model_override="anthropic/<model>" so a
+		// fleet-wide call mirrors Claude naming while resolving against a
+		// locally built tag (e.g. FROM qwen3.6:27b). Without this, the prefix
+		// would force the call to OpenRouter regardless of preferred_service,
+		// bypassing the operator-pinned local route.
+		if svc == "ollama" {
+			return "ollama", mdl
+		}
 		return "openrouter", "anthropic/" + bare
 
 	// ── OpenRouter pass-through (bare already has provider/model) ─────────────

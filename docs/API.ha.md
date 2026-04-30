@@ -806,7 +806,7 @@ glm-5:cloud      →  OpenRouter, ID na model: glm-5
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "YOUR_AGENT_TOKEN",
         api: "openai-completions",
         models: [
@@ -935,142 +935,142 @@ Danna maballin **🐾** na katin wakili zai kwafa snippet na saiti na wannan wak
 # ─── Proxy ───────────────────────────────────────────────────────────────────
 
 # Duba lafiya
-curl http://localhost:56244/health
+curl https://localhost:56244/health
 
 # Duba yanayi
-curl http://localhost:56244/status
+curl https://localhost:56244/status
 
 # Jerin model (duka)
-curl http://localhost:56244/api/models
+curl https://localhost:56244/api/models
 
 # Model na Google kawai
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Binciken model na kyauta
-curl "http://localhost:56244/api/models?q=alpha"
+curl "https://localhost:56244/api/models?q=alpha"
 
 # Canza model (na gida)
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service":"google","model":"gemini-2.5-pro"}'
 
 # Sabunta saiti
-curl -X POST http://localhost:56244/reload
+curl -X POST https://localhost:56244/reload
 
 # Kiran Gemini API kai tsaye
-curl -X POST "http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
+curl -X POST "https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"role":"user","parts":[{"text":"안녕하세요"}]}]}'
 
 # Mai dacewa da OpenAI (model na asali)
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # Tsarin provider/model na OpenClaw
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # Amfani da model na 1M context kyauta
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/hunter-alpha","messages":[{"role":"user","content":"안녕"}]}'
 
 # ─── Makullin asiri (jama'a) ───────────────────────────────────────────────────────────
 
-curl http://localhost:56243/api/status
-curl http://localhost:56243/api/clients
-curl -s http://localhost:56243/api/events --max-time 3
+curl https://localhost:56243/api/status
+curl https://localhost:56243/api/clients
+curl -s https://localhost:56243/api/events --max-time 3
 
 # ─── Makullin asiri (gudanarwa) ─────────────────────────────────────────────────────────
 
 ADMIN="Authorization: Bearer admin-token"
 
 # Jerin makullai
-curl -H "$ADMIN" http://localhost:56243/admin/keys
+curl -H "$ADMIN" https://localhost:56243/admin/keys
 
 # Ƙara makullin Google
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
 
 # Ƙara makullin OpenAI
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openai","key":"sk-...","label":"GPT 키"}'
 
 # Ƙara makullin OpenRouter
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
 
 # Share makulli (SSE key_deleted watsa)
-curl -X DELETE http://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
 
 # Sake saita adadin amfani na yau da kullum
-curl -X POST http://localhost:56243/admin/keys/reset -H "$ADMIN"
+curl -X POST https://localhost:56243/admin/keys/reset -H "$ADMIN"
 
 # Jerin abokan ciniki
-curl -H "$ADMIN" http://localhost:56243/admin/clients
+curl -H "$ADMIN" https://localhost:56243/admin/clients
 
 # Ƙara abokin ciniki (OpenClaw)
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"bot-a","name":"봇 A","agent_type":"openclaw","work_dir":"~/.openclaw","default_service":"google","default_model":"gemini-2.5-flash"}'
 
 # Canza model na abokin ciniki (SSE nan take)
-curl -X PUT http://localhost:56243/admin/clients/bot-a \
+curl -X PUT https://localhost:56243/admin/clients/bot-a \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"default_service":"openrouter","default_model":"wall-vault/hunter-alpha"}'
 
 # Kashe abokin ciniki
-curl -X PUT http://localhost:56243/admin/clients/my-bot \
+curl -X PUT https://localhost:56243/admin/clients/my-bot \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":false}'
 
 # Share abokin ciniki
-curl -X DELETE http://localhost:56243/admin/clients/my-bot -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/clients/my-bot -H "$ADMIN"
 
 # Jerin ayyuka
-curl -H "$ADMIN" http://localhost:56243/admin/services
+curl -H "$ADMIN" https://localhost:56243/admin/services
 
 # Saita URL na gida na Ollama (SSE service_changed watsa)
-curl -X PUT http://localhost:56243/admin/services/ollama \
+curl -X PUT https://localhost:56243/admin/services/ollama \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"local_url":"http://192.168.x.x:11434","enabled":true}'
 
 # Kunna sabis na OpenAI
-curl -X PUT http://localhost:56243/admin/services/openai \
+curl -X PUT https://localhost:56243/admin/services/openai \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":true}'
 
 # Ƙara sabis na musamman (SSE service_changed watsa)
-curl -X POST http://localhost:56243/admin/services \
+curl -X POST https://localhost:56243/admin/services \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"my-llm","name":"사내 LLM","local_url":"http://10.0.0.50:8080","enabled":true}'
 
 # Share sabis na musamman
-curl -X DELETE http://localhost:56243/admin/services/my-llm -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/services/my-llm -H "$ADMIN"
 
 # Duba jerin model
-curl -H "$ADMIN" http://localhost:56243/admin/models
-curl -H "$ADMIN" "http://localhost:56243/admin/models?service=openrouter"
-curl -H "$ADMIN" "http://localhost:56243/admin/models?q=hunter"
+curl -H "$ADMIN" https://localhost:56243/admin/models
+curl -H "$ADMIN" "https://localhost:56243/admin/models?service=openrouter"
+curl -H "$ADMIN" "https://localhost:56243/admin/models?q=hunter"
 
 # Yanayin proxy (heartbeat)
-curl -H "$ADMIN" http://localhost:56243/admin/proxies
+curl -H "$ADMIN" https://localhost:56243/admin/proxies
 
 # ─── Yanayin rarraba — Proxy → Makulli ───────────────────────────────────────────────
 
 # Duba makulli da aka ɓuɓɓuka
-curl http://localhost:56243/api/keys \
+curl https://localhost:56243/api/keys \
   -H "Authorization: Bearer your-bot-a-token"
 
 # Aika Heartbeat
-curl -X POST http://localhost:56243/api/heartbeat \
+curl -X POST https://localhost:56243/api/heartbeat \
   -H "Authorization: Bearer your-bot-a-token" \
   -H "Content-Type: application/json" \
   -d '{"client_id":"bot-a","version":"v0.1.6.20260314.231308","service":"google","model":"gemini-2.5-flash","sse_connected":true}'

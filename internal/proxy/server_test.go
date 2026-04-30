@@ -10,6 +10,10 @@ import (
 	"github.com/sookmook/wall-vault/internal/config"
 )
 
+// testAdminToken is the proxy.vault_token used by newTestServer. Admin endpoint
+// tests must send this in the Authorization header.
+const testAdminToken = "test-admin-token"
+
 // newTestServer: create a test proxy server (no vault connection)
 func newTestServer() *Server {
 	cfg := config.Default()
@@ -17,6 +21,7 @@ func newTestServer() *Server {
 	cfg.Proxy.Services = []string{"ollama"}
 	cfg.Proxy.ToolFilter = "strip_all"
 	cfg.Proxy.VaultURL = "" // disable vault connection
+	cfg.Proxy.VaultToken = testAdminToken
 	return NewServer(cfg)
 }
 
@@ -109,6 +114,7 @@ func TestHandleModels(t *testing.T) {
 	h := srv.Handler()
 
 	req := httptest.NewRequest("GET", "/api/models", nil)
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
@@ -135,6 +141,7 @@ func TestHandleConfigModel(t *testing.T) {
 	body := `{"service":"google","model":"gemini-2.5-flash"}`
 	req := httptest.NewRequest("PUT", "/api/config/model", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
@@ -184,6 +191,7 @@ func TestHandleConfigModel_InvalidBody(t *testing.T) {
 
 	req := httptest.NewRequest("PUT", "/api/config/model", strings.NewReader("not-json"))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
@@ -192,11 +200,43 @@ func TestHandleConfigModel_InvalidBody(t *testing.T) {
 	}
 }
 
+func TestHandleConfigModel_NoToken(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	body := `{"service":"google","model":"gemini-2.5-flash"}`
+	req := httptest.NewRequest("PUT", "/api/config/model", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestHandleConfigModel_WrongToken(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	body := `{"service":"google","model":"gemini-2.5-flash"}`
+	req := httptest.NewRequest("PUT", "/api/config/model", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer wrong-token")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
 func TestHandleReload(t *testing.T) {
 	srv := newTestServer()
 	h := srv.Handler()
 
 	req := httptest.NewRequest("POST", "/reload", nil)
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
@@ -208,6 +248,19 @@ func TestHandleReload(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &body)
 	if body["status"] != "reloading" {
 		t.Errorf("status = %q, want reloading", body["status"])
+	}
+}
+
+func TestHandleReload_NoToken(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	req := httptest.NewRequest("POST", "/reload", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
 	}
 }
 
@@ -237,6 +290,7 @@ func TestHandleGemini_ToolStripping(t *testing.T) {
 		"/google/v1beta/models/gemini-2.5-flash:generateContent",
 		strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
@@ -266,11 +320,75 @@ func TestHandleOpenAI_InvalidBody(t *testing.T) {
 	req := httptest.NewRequest("POST", "/v1/chat/completions",
 		strings.NewReader("not-json"))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", w.Code)
+	}
+}
+
+func TestHandleOpenAI_NoToken(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	req := httptest.NewRequest("POST", "/v1/chat/completions",
+		strings.NewReader(`{"model":"x","messages":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestHandleAnthropic_NoToken(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	req := httptest.NewRequest("POST", "/v1/messages",
+		strings.NewReader(`{"model":"x","messages":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestHandleAnthropic_BYOSkAnt(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	req := httptest.NewRequest("POST", "/v1/messages",
+		strings.NewReader(`{"model":"x","messages":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", "sk-ant-test-byo")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	// BYO sk-ant-* should pass the gate (handler may still 502 due to no upstream)
+	if w.Code == http.StatusUnauthorized {
+		t.Errorf("BYO sk-ant-* rejected at gate, want pass-through")
+	}
+}
+
+func TestHandleGemini_NoToken(t *testing.T) {
+	srv := newTestServer()
+	h := srv.Handler()
+
+	req := httptest.NewRequest("POST",
+		"/google/v1beta/models/gemini-2.5-flash:generateContent",
+		strings.NewReader(`{"contents":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
 	}
 }
 

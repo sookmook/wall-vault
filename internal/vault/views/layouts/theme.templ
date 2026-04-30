@@ -113,6 +113,10 @@ templ Theme() {
 		.dot-ok { background:var(--ok); box-shadow:0 0 8px var(--ok); }
 		.dot-warn { background:var(--warn); box-shadow:0 0 6px var(--warn); }
 		.dot-off { background:var(--off); }
+		/* dot-idle: on-demand agents (cokacdir, lambda sessions). Solid blue so it
+		   reads as "ready, not running" — distinct from green (active),
+		   amber (warn), grey (disabled). */
+		.dot-idle { background:#2563eb; box-shadow:0 0 6px #2563eb; }
 
 		.avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; flex-shrink:0; border:2px solid var(--border); }
 		.avatar-fallback { width:44px; height:44px; border-radius:50%; background:var(--muted-bg); display:inline-flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; border:2px solid var(--border); }

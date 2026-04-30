@@ -72,8 +72,10 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 		path, err = applyClineConfig(body.BaseURL, body.Model, token)
 	case "claude-code":
 		path, err = applyClaudeCodeConfig(body.BaseURL, body.Model, token)
-	case "openclaw", "nanoclaw":
+	case "openclaw":
 		path, err = applyOpenClawConfig(body.BaseURL, body.Model, token)
+	case "nanoclaw":
+		path, err = applyNanoclawConfig(body.BaseURL, body.Model, token)
 	case "econoworld":
 		path, err = applyEconoWorldConfig(body.BaseURL, body.Model, token, body.WorkDir)
 	default:
@@ -332,7 +334,10 @@ func applyOpenClawConfig(baseURL, model, token string) (string, error) {
 	custom["baseUrl"] = baseURL
 	custom["apiKey"] = token
 	custom["api"] = "openai-completions"
-	custom["authHeader"] = false
+	// authHeader=true so OpenClaw forwards the token as
+	// `Authorization: Bearer <token>`. Pre-v0.2.37 this was false (no header
+	// was sent), which the new proxy gate rejects with 401.
+	custom["authHeader"] = true
 
 	// Sanitize any previously-written entries with an empty id. A pre-guard
 	// version of this function, or an external writer, could have left a
@@ -434,6 +439,55 @@ func updateClineModel(model string) {
 	state["planModeOpenAiModelId"] = model
 	state["openAiModelId"] = model
 	_ = writeJSON(path, state)
+}
+
+// ── NanoClaw ──────────────────────────────────────────────────────────────────
+
+// applyNanoclawConfig writes wall-vault proxy settings into NanoClaw's
+// ~/nanoclaw/.env (a dotenv file loaded by systemd's EnvironmentFile).
+// Updates ANTHROPIC_BASE_URL and ONECLI_API_KEY in place; preserves any
+// other lines (TELEGRAM_BOT_TOKEN etc.) untouched. Re-issues the file
+// at 0600 since it holds bot tokens + the wall-vault credential.
+func applyNanoclawConfig(baseURL, _ /*model*/, token string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	path := filepath.Join(home, "nanoclaw", ".env")
+
+	var lines []string
+	if data, err := os.ReadFile(path); err == nil {
+		lines = strings.Split(string(data), "\n")
+		// Drop a single trailing empty line introduced by the final newline,
+		// so we don't blow up the file with extra blanks on every rewrite.
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+
+	setLine := func(in []string, key, value string) []string {
+		prefix := key + "="
+		for i, l := range in {
+			if strings.HasPrefix(l, prefix) {
+				in[i] = prefix + value
+				return in
+			}
+		}
+		return append(in, prefix+value)
+	}
+	lines = setLine(lines, "ANTHROPIC_BASE_URL", baseURL)
+	lines = setLine(lines, "ONECLI_API_KEY", token)
+
+	out := strings.Join(lines, "\n") + "\n"
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(out), 0o600); err != nil {
+		return "", fmt.Errorf("write %s: %w", path, err)
+	}
+	return path, nil
 }
 
 // isValidAgentToken checks whether a Bearer token is authorized to call /agent/apply.

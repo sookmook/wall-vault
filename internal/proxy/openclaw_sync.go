@@ -219,15 +219,15 @@ func updateOpenClawJSON(service, model string) {
 		antProv, _ := providers["anthropic"].(map[string]interface{})
 		if antProv == nil {
 			antProv = map[string]interface{}{
-				"baseUrl": "http://localhost:56244",
+				"baseUrl": "https://localhost:56244",
 				"apiKey":  "proxy-managed",
 			}
 			providers["anthropic"] = antProv
 			changed = true
 		}
 		// Redirect from real Anthropic API to proxy if needed.
-		if bu, _ := antProv["baseUrl"].(string); bu != "http://localhost:56244" {
-			antProv["baseUrl"] = "http://localhost:56244"
+		if bu, _ := antProv["baseUrl"].(string); bu != "https://localhost:56244" {
+			antProv["baseUrl"] = "https://localhost:56244"
 			changed = true
 		}
 		// Add model entry if missing.
@@ -255,7 +255,7 @@ func updateOpenClawJSON(service, model string) {
 		custom, _ := providers["custom"].(map[string]interface{})
 		if custom == nil {
 			custom = map[string]interface{}{
-				"baseUrl":    "http://localhost:56244/v1",
+				"baseUrl":    "https://localhost:56244/v1",
 				"apiKey":     "proxy-managed",
 				"api":        "openai-completions",
 				"authHeader": false,
@@ -270,8 +270,8 @@ func updateOpenClawJSON(service, model string) {
 			changed = true
 		}
 		// Migrate old baseUrl from Gemini path to OpenAI path
-		if bu, _ := custom["baseUrl"].(string); bu == "http://localhost:56244/google/v1beta" {
-			custom["baseUrl"] = "http://localhost:56244/v1"
+		if bu, _ := custom["baseUrl"].(string); bu == "https://localhost:56244/google/v1beta" {
+			custom["baseUrl"] = "https://localhost:56244/v1"
 			changed = true
 		}
 

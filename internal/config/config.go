@@ -42,19 +42,32 @@ type ProxyConfig struct {
 	// empty, the proxy auto-picks the claude-code client whose Host matches
 	// os.Hostname(). When set, this value wins — lets operators pin the mapping
 	// on hosts where hostname detection is unreliable (WSL, renamed boxes).
-	ClaudeCodeClientID string `yaml:"claude_code_client_id"`
+	ClaudeCodeClientID string    `yaml:"claude_code_client_id"`
+	TLS                TLSConfig `yaml:"tls"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
 
 type VaultConfig struct {
-	Port             int      `yaml:"port"`                         // default 56243
-	Host             string   `yaml:"host"`                         // default 0.0.0.0
-	AdminToken       string   `yaml:"admin_token"`
-	AdminIPWhitelist []string `yaml:"admin_ip_whitelist,omitempty"` // IPs/CIDRs allowed to use admin token; empty = unrestricted
-	MasterPass       string   `yaml:"master_password"`
-	DataDir          string   `yaml:"data_dir"`     // default ~/.wall-vault/data
-	ServicesDir      string   `yaml:"services_dir"` // YAML service plugin folder
+	Port             int       `yaml:"port"`                         // default 56243
+	Host             string    `yaml:"host"`                         // default 0.0.0.0
+	AdminToken       string    `yaml:"admin_token"`
+	AdminIPWhitelist []string  `yaml:"admin_ip_whitelist,omitempty"` // IPs/CIDRs allowed to use admin token; empty = unrestricted
+	MasterPass       string    `yaml:"master_password"`
+	DataDir          string    `yaml:"data_dir"`     // default ~/.wall-vault/data
+	ServicesDir      string    `yaml:"services_dir"` // YAML service plugin folder
+	TLS              TLSConfig `yaml:"tls"`
+}
+
+// TLSConfig holds the per-listener TLS settings. When Enabled is false the
+// listener falls back to plain HTTP (current default). Both CertFile and
+// KeyFile must point at PEM files when Enabled is true; the loader does not
+// auto-generate certs — use `wall-vault cert init` + `wall-vault cert issue
+// <hostname>` to provision them under ~/.wall-vault.
+type TLSConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	CertFile string `yaml:"cert_file"` // path to PEM-encoded cert
+	KeyFile  string `yaml:"key_file"`  // path to PEM-encoded private key
 }
 
 // ─── Doctor Config ────────────────────────────────────────────────────────────
@@ -261,6 +274,26 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WV_VAULT_HOST"); v != "" {
 		cfg.Vault.Host = v
+	}
+	// TLS (proxy)
+	if v := os.Getenv("WV_PROXY_TLS_ENABLED"); v == "1" || v == "true" {
+		cfg.Proxy.TLS.Enabled = true
+	}
+	if v := os.Getenv("WV_PROXY_TLS_CERT"); v != "" {
+		cfg.Proxy.TLS.CertFile = v
+	}
+	if v := os.Getenv("WV_PROXY_TLS_KEY"); v != "" {
+		cfg.Proxy.TLS.KeyFile = v
+	}
+	// TLS (vault)
+	if v := os.Getenv("WV_VAULT_TLS_ENABLED"); v == "1" || v == "true" {
+		cfg.Vault.TLS.Enabled = true
+	}
+	if v := os.Getenv("WV_VAULT_TLS_CERT"); v != "" {
+		cfg.Vault.TLS.CertFile = v
+	}
+	if v := os.Getenv("WV_VAULT_TLS_KEY"); v != "" {
+		cfg.Vault.TLS.KeyFile = v
 	}
 	// Windows: auto-set data path based on APPDATA
 	if cfg.Vault.DataDir == "" {

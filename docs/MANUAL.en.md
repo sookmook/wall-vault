@@ -171,10 +171,10 @@ wall-vault start
 
 The following two servers start simultaneously:
 
-- **Proxy** (`http://localhost:56244`) — The intermediary connecting OpenClaw and AI services
-- **Key Vault** (`http://localhost:56243`) — API key management and web dashboard
+- **Proxy** (`https://localhost:56244`) — The intermediary connecting OpenClaw and AI services
+- **Key Vault** (`https://localhost:56243`) — API key management and web dashboard
 
-Open `http://localhost:56243` in your browser to access the dashboard.
+Open `https://localhost:56243` in your browser to access the dashboard.
 
 ---
 
@@ -207,7 +207,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Method 2: Dashboard UI (point and click)
 
-1. Open `http://localhost:56243` in your browser
+1. Open `https://localhost:56243` in your browser
 2. Click the `[+ Add]` button in the top **:key: API Keys** card
 3. Enter the service type, key value, label (a memo name), and daily limit, then save
 
@@ -216,7 +216,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API is a method for programs to exchange data via HTTP. Useful for automated registration via scripts.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer your-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -251,7 +251,7 @@ Open `~/.openclaw/openclaw.json` and add the following:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // vault agent token
         api: "openai-completions",
         models: [
@@ -290,13 +290,13 @@ wall-vault automatically determines which AI service to send the request to base
 If you have tools that use the Google Gemini API directly, just change the URL to wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Or if the tool specifies URLs directly:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Using with the OpenAI SDK (Python)
@@ -307,7 +307,7 @@ You can connect wall-vault to Python code that uses AI. Just change the `base_ur
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # wall-vault manages API keys for you
 )
 
@@ -323,12 +323,12 @@ To change the AI model while wall-vault is already running:
 
 ```bash
 # Change model via direct request to proxy
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # In distributed mode (multi-bot), change on the vault server -> instantly synced via SSE
-curl -X PUT http://localhost:56243/admin/clients/my-bot-id \
+curl -X PUT https://localhost:56243/admin/clients/my-bot-id \
   -H "Authorization: Bearer admin-token" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -338,13 +338,13 @@ curl -X PUT http://localhost:56243/admin/clients/my-bot-id \
 
 ```bash
 # View full list
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # View Google models only
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Search by name (e.g., models containing "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Key models by service:**
@@ -363,7 +363,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Key Vault Dashboard
 
-Access the dashboard by opening `http://localhost:56243` in your browser.
+Access the dashboard by opening `https://localhost:56243` in your browser.
 
 **Screen layout:**
 - **Top bar (sticky)**: Logo, language/theme selector, SSE connection status
@@ -555,7 +555,7 @@ Install **Cline** (ID: `saoudrizwan.claude-dev`) from the VS Code Extension Mark
 Open settings (:gear:) in the Cline sidebar:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://proxy-address:56244/v1`
-  - Same machine: `http://localhost:56244/v1`
+  - Same machine: `https://localhost:56244/v1`
   - Different machine (e.g., Mac Mini): `http://192.168.1.20:56244/v1`
 - **API Key**: Token issued from the vault (copy from agent card)
 - **Model ID**: Model configured in the vault (e.g., `gemini-2.5-flash`)
@@ -585,7 +585,7 @@ When you close VS Code, the agent card on the vault dashboard turns yellow (dela
 
 | Symptom | Cause | Solution |
 |---------|-------|----------|
-| "Connection failed" error in Cline | Proxy not running or wrong address | Check proxy with `curl http://localhost:56244/health` |
+| "Connection failed" error in Cline | Proxy not running or wrong address | Check proxy with `curl https://localhost:56244/health` |
 | Green dot doesn't appear in vault | API key (token) not configured | Click **:zap: Apply Cline Config** button again |
 | Model in Cline footer doesn't change | Cline caches settings | Reload VS Code (`Ctrl+Alt+R`) |
 | Wrong model name displayed | Old bug (fixed in v0.1.16) | Update proxy to v0.1.16 or later |
@@ -655,7 +655,7 @@ wall-vault vault
 Pre-register each bot's information that will connect to the vault server:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer admin-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -840,10 +840,10 @@ wall-vault proxy --port 8080   # Start on a different port
 
 ```bash
 # Check registered key list and status
-curl -H "Authorization: Bearer admin-token" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer admin-token" https://localhost:56243/admin/keys
 
 # Reset key usage counters
-curl -X POST -H "Authorization: Bearer admin-token" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer admin-token" https://localhost:56243/admin/keys/reset
 ```
 
 ### Agent Shows "Not Connected"

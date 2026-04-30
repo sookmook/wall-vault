@@ -175,10 +175,10 @@ wall-vault start
 
 Dua server berikut akan dimulai bersamaan:
 
-- **Proxy** (`http://localhost:56244`) — Perantara yang menghubungkan OpenClaw dan layanan AI
-- **Brankas Kunci** (`http://localhost:56243`) — Manajemen API key dan dashboard web
+- **Proxy** (`https://localhost:56244`) — Perantara yang menghubungkan OpenClaw dan layanan AI
+- **Brankas Kunci** (`https://localhost:56243`) — Manajemen API key dan dashboard web
 
-Buka `http://localhost:56243` di browser untuk langsung melihat dashboard.
+Buka `https://localhost:56243` di browser untuk langsung melihat dashboard.
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Metode 2: Dashboard UI (Klik dengan Mouse)
 
-1. Buka `http://localhost:56243` di browser
+1. Buka `https://localhost:56243` di browser
 2. Klik tombol `[+ Tambah]` di kartu **🔑 API Key** di bagian atas
 3. Masukkan jenis layanan, nilai key, label (nama memo), batas harian, lalu simpan
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API adalah cara program bertukar data melalui HTTP. Berguna untuk pendaftaran otomatis via skrip.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ Buka file `~/.openclaw/openclaw.json` dan tambahkan konten berikut:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // token agen vault
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ Dengan melihat nama model, wall-vault secara otomatis menentukan ke layanan AI m
 Jika Anda memiliki tool yang langsung menggunakan Google Gemini API, cukup ubah alamatnya ke wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Atau untuk tool yang menentukan URL secara langsung:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Penggunaan di OpenAI SDK (Python)
@@ -311,7 +311,7 @@ wall-vault juga bisa dihubungkan dalam kode Python yang menggunakan AI. Cukup ub
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # API key dikelola wall-vault secara otomatis
 )
 
@@ -327,12 +327,12 @@ Untuk mengganti model AI yang digunakan saat wall-vault sudah berjalan:
 
 ```bash
 # Minta langsung ke proxy untuk mengganti model
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # Dalam mode terdistribusi (multi bot), ubah dari server brankas → langsung diterapkan via SSE
-curl -X PUT http://localhost:56243/admin/clients/id-bot-saya \
+curl -X PUT https://localhost:56243/admin/clients/id-bot-saya \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/id-bot-saya \
 
 ```bash
 # Lihat daftar lengkap
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Hanya model Google
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Cari berdasarkan nama (contoh: model yang mengandung "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Ringkasan Model Utama per Layanan:**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Dashboard Brankas Kunci
 
-Buka `http://localhost:56243` di browser untuk melihat dashboard.
+Buka `https://localhost:56243` di browser untuk melihat dashboard.
 
 **Tata Letak Layar:**
 - **Bar atas tetap (topbar)**: Logo, pemilih bahasa/tema, status koneksi SSE
@@ -559,7 +559,7 @@ Instal **Cline** (ID: `saoudrizwan.claude-dev`) dari VS Code Extension Marketpla
 Buka pengaturan (⚙️) di sidebar Cline:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://alamat-proxy:56244/v1`
-  - Jika di mesin yang sama: `http://localhost:56244/v1`
+  - Jika di mesin yang sama: `https://localhost:56244/v1`
   - Jika di mesin lain seperti server mini: `http://192.168.1.20:56244/v1`
 - **API Key**: Token yang diterbitkan dari brankas (salin dari kartu agen)
 - **Model ID**: Model yang diatur di brankas (contoh: `gemini-2.5-flash`)
@@ -589,7 +589,7 @@ Saat VS Code ditutup, di dashboard brankas sekitar **90 detik** kemudian kartu a
 
 | Gejala | Penyebab | Solusi |
 |------|------|------|
-| Error "koneksi gagal" di Cline | Proxy tidak berjalan atau alamat salah | Periksa proxy dengan `curl http://localhost:56244/health` |
+| Error "koneksi gagal" di Cline | Proxy tidak berjalan atau alamat salah | Periksa proxy dengan `curl https://localhost:56244/health` |
 | Titik hijau tidak muncul di brankas | API key (token) belum diatur | Klik tombol **⚡ Terapkan Pengaturan Cline** lagi |
 | Model footer Cline tidak berubah | Cline meng-cache pengaturan | Reload VS Code (`Ctrl+Alt+R`) |
 | Nama model yang salah ditampilkan | Bug lama (diperbaiki di v0.1.16) | Perbarui proxy ke v0.1.16+ |
@@ -659,7 +659,7 @@ wall-vault vault
 Daftarkan informasi setiap bot yang terhubung ke server brankas terlebih dahulu:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # Mulai dengan nomor port lain
 
 ```bash
 # Periksa daftar dan status key terdaftar
-curl -H "Authorization: Bearer token-admin" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys
 
 # Reset counter penggunaan key
-curl -X POST -H "Authorization: Bearer token-admin" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys/reset
 ```
 
 ### Agen Menampilkan "Belum Terhubung"

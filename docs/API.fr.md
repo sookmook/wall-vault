@@ -806,7 +806,7 @@ glm-5:cloud      →  OpenRouter, ID de modèle : glm-5
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "YOUR_AGENT_TOKEN",
         api: "openai-completions",
         models: [
@@ -935,142 +935,142 @@ Cliquez sur le **bouton 🐾** d'une carte agent pour copier automatiquement l'e
 # ─── Proxy ────────────────────────────────────────────────────────────────────
 
 # Vérification de santé
-curl http://localhost:56244/health
+curl https://localhost:56244/health
 
 # Statut
-curl http://localhost:56244/status
+curl https://localhost:56244/status
 
 # Liste des modèles (tous)
-curl http://localhost:56244/api/models
+curl https://localhost:56244/api/models
 
 # Modèles Google uniquement
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Rechercher des modèles gratuits
-curl "http://localhost:56244/api/models?q=alpha"
+curl "https://localhost:56244/api/models?q=alpha"
 
 # Changer de modèle (local)
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service":"google","model":"gemini-2.5-pro"}'
 
 # Recharger la configuration
-curl -X POST http://localhost:56244/reload
+curl -X POST https://localhost:56244/reload
 
 # Appel API Gemini direct
-curl -X POST "http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
+curl -X POST "https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"role":"user","parts":[{"text":"안녕하세요"}]}]}'
 
 # Compatible OpenAI (modèle par défaut)
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # Format OpenClaw provider/model
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/gemini-2.5-flash","messages":[{"role":"user","content":"안녕"}]}'
 
 # Modèle gratuit 1M contexte
-curl -X POST http://localhost:56244/v1/chat/completions \
+curl -X POST https://localhost:56244/v1/chat/completions \
   -H "Authorization: Bearer my-agent-token" \
   -H "Content-Type: application/json" \
   -d '{"model":"wall-vault/hunter-alpha","messages":[{"role":"user","content":"안녕"}]}'
 
 # ─── Coffre-fort de clés (Public) ─────────────────────────────────────────────
 
-curl http://localhost:56243/api/status
-curl http://localhost:56243/api/clients
-curl -s http://localhost:56243/api/events --max-time 3
+curl https://localhost:56243/api/status
+curl https://localhost:56243/api/clients
+curl -s https://localhost:56243/api/events --max-time 3
 
 # ─── Coffre-fort de clés (Admin) ──────────────────────────────────────────────
 
 ADMIN="Authorization: Bearer admin-token"
 
 # Liste des clés
-curl -H "$ADMIN" http://localhost:56243/admin/keys
+curl -H "$ADMIN" https://localhost:56243/admin/keys
 
 # Ajouter une clé Google
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
 
 # Ajouter une clé OpenAI
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openai","key":"sk-...","label":"GPT 키"}'
 
 # Ajouter une clé OpenRouter
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
 
 # Supprimer une clé (diffusion SSE key_deleted)
-curl -X DELETE http://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"
 
 # Réinitialiser l'utilisation quotidienne
-curl -X POST http://localhost:56243/admin/keys/reset -H "$ADMIN"
+curl -X POST https://localhost:56243/admin/keys/reset -H "$ADMIN"
 
 # Liste des clients
-curl -H "$ADMIN" http://localhost:56243/admin/clients
+curl -H "$ADMIN" https://localhost:56243/admin/clients
 
 # Ajouter un client (OpenClaw)
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"bot-a","name":"봇 A","agent_type":"openclaw","work_dir":"~/.openclaw","default_service":"google","default_model":"gemini-2.5-flash"}'
 
 # Changer le modèle d'un client (mise à jour SSE instantanée)
-curl -X PUT http://localhost:56243/admin/clients/bot-a \
+curl -X PUT https://localhost:56243/admin/clients/bot-a \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"default_service":"openrouter","default_model":"wall-vault/hunter-alpha"}'
 
 # Désactiver un client
-curl -X PUT http://localhost:56243/admin/clients/my-bot \
+curl -X PUT https://localhost:56243/admin/clients/my-bot \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":false}'
 
 # Supprimer un client
-curl -X DELETE http://localhost:56243/admin/clients/my-bot -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/clients/my-bot -H "$ADMIN"
 
 # Liste des services
-curl -H "$ADMIN" http://localhost:56243/admin/services
+curl -H "$ADMIN" https://localhost:56243/admin/services
 
 # Définir l'URL locale Ollama (diffusion SSE service_changed)
-curl -X PUT http://localhost:56243/admin/services/ollama \
+curl -X PUT https://localhost:56243/admin/services/ollama \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"local_url":"http://192.168.x.x:11434","enabled":true}'
 
 # Activer le service OpenAI
-curl -X PUT http://localhost:56243/admin/services/openai \
+curl -X PUT https://localhost:56243/admin/services/openai \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"enabled":true}'
 
 # Ajouter un service personnalisé (diffusion SSE service_changed)
-curl -X POST http://localhost:56243/admin/services \
+curl -X POST https://localhost:56243/admin/services \
   -H "$ADMIN" -H "Content-Type: application/json" \
   -d '{"id":"my-llm","name":"사내 LLM","local_url":"http://10.0.0.50:8080","enabled":true}'
 
 # Supprimer un service personnalisé
-curl -X DELETE http://localhost:56243/admin/services/my-llm -H "$ADMIN"
+curl -X DELETE https://localhost:56243/admin/services/my-llm -H "$ADMIN"
 
 # Liste des modèles
-curl -H "$ADMIN" http://localhost:56243/admin/models
-curl -H "$ADMIN" "http://localhost:56243/admin/models?service=openrouter"
-curl -H "$ADMIN" "http://localhost:56243/admin/models?q=hunter"
+curl -H "$ADMIN" https://localhost:56243/admin/models
+curl -H "$ADMIN" "https://localhost:56243/admin/models?service=openrouter"
+curl -H "$ADMIN" "https://localhost:56243/admin/models?q=hunter"
 
 # Statut des proxys (heartbeat)
-curl -H "$ADMIN" http://localhost:56243/admin/proxies
+curl -H "$ADMIN" https://localhost:56243/admin/proxies
 
 # ─── Mode distribué — Proxy → Coffre-fort ────────────────────────────────────
 
 # Obtenir les clés déchiffrées
-curl http://localhost:56243/api/keys \
+curl https://localhost:56243/api/keys \
   -H "Authorization: Bearer your-bot-a-token"
 
 # Envoyer un heartbeat
-curl -X POST http://localhost:56243/api/heartbeat \
+curl -X POST https://localhost:56243/api/heartbeat \
   -H "Authorization: Bearer your-bot-a-token" \
   -H "Content-Type: application/json" \
   -d '{"client_id":"bot-a","version":"v0.1.6.20260314.231308","service":"google","model":"gemini-2.5-flash","sse_connected":true}'

@@ -175,10 +175,10 @@ wall-vault start
 
 Les deux serveurs suivants démarrent simultanément :
 
-- **Proxy** (`http://localhost:56244`) — L'intermédiaire connectant OpenClaw et les services IA
-- **Coffre-fort** (`http://localhost:56243`) — Gestion des clés API et tableau de bord web
+- **Proxy** (`https://localhost:56244`) — L'intermédiaire connectant OpenClaw et les services IA
+- **Coffre-fort** (`https://localhost:56243`) — Gestion des clés API et tableau de bord web
 
-Ouvrez `http://localhost:56243` dans votre navigateur pour accéder au tableau de bord.
+Ouvrez `https://localhost:56243` dans votre navigateur pour accéder au tableau de bord.
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Méthode 2 : Interface du tableau de bord (pointer et cliquer)
 
-1. Ouvrez `http://localhost:56243` dans votre navigateur
+1. Ouvrez `https://localhost:56243` dans votre navigateur
 2. Cliquez sur le bouton `[+ Ajouter]` dans la carte **:key: Clés API** en haut
 3. Entrez le type de service, la valeur de la clé, le libellé (nom mémo) et la limite quotidienne, puis enregistrez
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 L'API REST est une méthode permettant aux programmes d'échanger des données via HTTP. Utile pour l'enregistrement automatisé par script.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ Ouvrez `~/.openclaw/openclaw.json` et ajoutez le contenu suivant :
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // token d'agent du coffre-fort
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ wall-vault détermine automatiquement quel service IA doit recevoir la requête 
 Si vous avez des outils qui utilisent directement l'API Google Gemini, changez simplement l'URL vers wall-vault :
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Ou si l'outil spécifie les URL directement :
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Utilisation avec le SDK OpenAI (Python)
@@ -311,7 +311,7 @@ Vous pouvez connecter wall-vault au code Python qui utilise l'IA. Changez simple
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # wall-vault gère les clés API pour vous
 )
 
@@ -327,12 +327,12 @@ Pour changer le modèle IA pendant que wall-vault est déjà en cours d'exécuti
 
 ```bash
 # Changer le modèle via une requête directe au proxy
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # En mode distribué (multi-bot), changez sur le serveur coffre-fort -> synchronisé instantanément via SSE
-curl -X PUT http://localhost:56243/admin/clients/mon-bot-id \
+curl -X PUT https://localhost:56243/admin/clients/mon-bot-id \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/mon-bot-id \
 
 ```bash
 # Voir la liste complète
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Voir uniquement les modèles Google
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Rechercher par nom (ex : modèles contenant "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Modèles principaux par service :**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Tableau de bord du coffre-fort
 
-Accédez au tableau de bord en ouvrant `http://localhost:56243` dans votre navigateur.
+Accédez au tableau de bord en ouvrant `https://localhost:56243` dans votre navigateur.
 
 **Disposition de l'écran :**
 - **Barre supérieure (fixe)** : Logo, sélecteur de langue/thème, statut de connexion SSE
@@ -559,7 +559,7 @@ Installez **Cline** (ID : `saoudrizwan.claude-dev`) depuis le Marketplace d'exte
 Ouvrez les paramètres (:gear:) dans la barre latérale de Cline :
 - **API Provider** : `OpenAI Compatible`
 - **Base URL** : `http://adresse-proxy:56244/v1`
-  - Même machine : `http://localhost:56244/v1`
+  - Même machine : `https://localhost:56244/v1`
   - Machine différente (ex : Mac Mini) : `http://192.168.1.20:56244/v1`
 - **API Key** : Token émis par le coffre-fort (copier depuis la carte d'agent)
 - **Model ID** : Modèle configuré dans le coffre-fort (ex : `gemini-2.5-flash`)
@@ -589,7 +589,7 @@ Lorsque vous fermez VS Code, la carte d'agent sur le tableau de bord passe en ja
 
 | Symptôme | Cause | Solution |
 |----------|-------|----------|
-| Erreur « Connexion échouée » dans Cline | Proxy non démarré ou mauvaise adresse | Vérifier le proxy avec `curl http://localhost:56244/health` |
+| Erreur « Connexion échouée » dans Cline | Proxy non démarré ou mauvaise adresse | Vérifier le proxy avec `curl https://localhost:56244/health` |
 | Le point vert n'apparaît pas dans le coffre-fort | Clé API (token) non configurée | Cliquer à nouveau sur **:zap: Appliquer config Cline** |
 | Le modèle dans le pied de page Cline ne change pas | Cline met en cache les paramètres | Recharger VS Code (`Ctrl+Alt+R`) |
 | Mauvais nom de modèle affiché | Ancien bug (corrigé dans v0.1.16) | Mettre à jour le proxy vers v0.1.16 ou ultérieur |
@@ -659,7 +659,7 @@ wall-vault vault
 Pré-enregistrez les informations de chaque bot qui se connectera au serveur coffre-fort :
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer token-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # Démarrer sur un port différent
 
 ```bash
 # Vérifier la liste des clés enregistrées et leur statut
-curl -H "Authorization: Bearer token-admin" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys
 
 # Réinitialiser les compteurs d'utilisation des clés
-curl -X POST -H "Authorization: Bearer token-admin" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys/reset
 ```
 
 ### L'agent affiche « Non connecté »

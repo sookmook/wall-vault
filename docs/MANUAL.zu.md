@@ -175,10 +175,10 @@ wall-vault start
 
 Amaseva amabili aqala ngesikhathi esifanayo:
 
-- **I-Proxy** (`http://localhost:56244`) — Ummeleli oxhumanisa i-OpenClaw namasevisi e-AI
-- **I-Key Vault** (`http://localhost:56243`) — Ukuphatha i-API key ne-dashboard yewebhu
+- **I-Proxy** (`https://localhost:56244`) — Ummeleli oxhumanisa i-OpenClaw namasevisi e-AI
+- **I-Key Vault** (`https://localhost:56243`) — Ukuphatha i-API key ne-dashboard yewebhu
 
-Vula `http://localhost:56243` kubhrawuza yakho ukuze ubone i-dashboard ngokushesha.
+Vula `https://localhost:56243` kubhrawuza yakho ukuze ubone i-dashboard ngokushesha.
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Indlela 2: I-UI ye-Dashboard (Cindezela Ngemawusi)
 
-1. Vula `http://localhost:56243` kubhrawuza
+1. Vula `https://localhost:56243` kubhrawuza
 2. Cindezela inkinobho ye-`[+ Engeza]` ekhadini le-**🔑 API Key** ngaphezulu
 3. Faka uhlobo lwesevisi, inani lokhiye, ilebuli (igama lesikhumbuzo), nomkhawulo wansuku langa bese ugcina
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 I-REST API yindlela izinhlelo ezishintshanisa ngayo idatha nge-HTTP. Iwusizo ngokubhaliswa okuzenzakalelayo ngamaskripti.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer ithokheni-yomphathi" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ Vula ifayela `~/.openclaw/openclaw.json` bese wengeza okuqukethwe okulandelayo:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // ithokheni yommeleli we-vault
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ Ngokubheka igama lemodeli, i-wall-vault inquma ngokuzenzakalela yiliphi isevisi 
 Uma unamathuluzi abesebenzisa i-Google Gemini API ngokuqondile, shintsha ikheli kuphela ku-wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Noma uma ithuluzi lakho licacisa i-URL ngokuqondile:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Ukusebenzisa ne-OpenAI SDK (Python)
@@ -311,7 +311,7 @@ Ungaxhuma futhi i-wall-vault kukhodi ye-Python esebenzisa i-AI. Shintsha kuphela
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # i-wall-vault iphatha i-API key ngokuzenzakalela
 )
 
@@ -327,12 +327,12 @@ Ukushintsha imodeli ye-AI ngesikhathi i-wall-vault isisebenza:
 
 ```bash
 # Shintsha imodeli ngokucela i-proxy ngokuqondile
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # Kuyi-mode yokusabalalisa (multi bot), shintsha kuseva ye-vault → ivela ngokushesha nge-SSE
-curl -X PUT http://localhost:56243/admin/clients/id-yebot-yami \
+curl -X PUT https://localhost:56243/admin/clients/id-yebot-yami \
   -H "Authorization: Bearer ithokheni-yomphathi" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/id-yebot-yami \
 
 ```bash
 # Buka uhlu oluphelele
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Buka amamodeli e-Google kuphela
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Sesha ngegama (isibonelo: amamodeli anokuthi "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Isifinyezo Samamodeli Amakhulu Ngesevisi:**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## I-Dashboard ye-Key Vault
 
-Vula `http://localhost:56243` kubhrawuza yakho ukuze ubone i-dashboard.
+Vula `https://localhost:56243` kubhrawuza yakho ukuze ubone i-dashboard.
 
 **Isakhiwo Sesikrini:**
 - **Ibha ephezulu ehleli (topbar)**: Ilogo, isikhethi solimi·sendikimba, isimo sokuxhuma kwe-SSE
@@ -559,7 +559,7 @@ Faka i-**Cline** (ID: `saoudrizwan.claude-dev`) kusuka e-VS Code Extension Marke
 Vula izilungiselelo (⚙️) kubha yesokunxele ye-Cline:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://ikheli-le-proxy:56244/v1`
-  - Imashini efanayo: `http://localhost:56244/v1`
+  - Imashini efanayo: `https://localhost:56244/v1`
   - Enye imashini njenge-mini server: `http://192.168.1.20:56244/v1`
 - **API Key**: Ithokheni etholwe ku-vault (kopisha ekhadini lommeleli)
 - **Model ID**: Imodeli esethwe ku-vault (isibonelo: `gemini-2.5-flash`)
@@ -589,7 +589,7 @@ Uma uvala i-VS Code, ikhadi lommeleli ku-dashboard ye-vault lizoshintsha libe ph
 
 | Isibonakaliso | Imbangela | Isixazululo |
 |------|------|------|
-| Iphutha lokuthi "Ukuxhuma kwehlulekile" ku-Cline | I-proxy ayisebenzi noma ikheli alifanele | Hlola i-proxy nge-`curl http://localhost:56244/health` |
+| Iphutha lokuthi "Ukuxhuma kwehlulekile" ku-Cline | I-proxy ayisebenzi noma ikheli alifanele | Hlola i-proxy nge-`curl https://localhost:56244/health` |
 | Iqhaza eliluhlaza aliveli ku-vault | I-API key (ithokheni) ayisethwanga | Cindezela iqhosha le-**⚡ Sebenzisa Ukusetha kwe-Cline** futhi |
 | Imodeli ezansi kwe-Cline ayishintshi | I-Cline igcina ukusetha ku-cache | Vuselela kabusha i-VS Code (`Ctrl+Alt+R`) |
 | Igama lemodeli elingalungile livela | Iphutha lakudala (lalungiswa ku-v0.1.16) | Buyekeza i-proxy ku-v0.1.16 noma ngaphezulu |
@@ -659,7 +659,7 @@ wall-vault vault
 Bhalisa ngaphambi kwesikhathi ulwazi lwe-bot ngayinye exhumana neseva ye-vault:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer ithokheni-yomphathi" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # Qala ngenombolo yephothi ehlukile
 
 ```bash
 # Hlola uhlu nesimo sokhiye ababhalisiwe
-curl -H "Authorization: Bearer ithokheni-yomphathi" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer ithokheni-yomphathi" https://localhost:56243/admin/keys
 
 # Setha kabusha izibali zokusetshenziwa kokhiye
-curl -X POST -H "Authorization: Bearer ithokheni-yomphathi" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer ithokheni-yomphathi" https://localhost:56243/admin/keys/reset
 ```
 
 ### Uma Ummeleli Evela Njenge-"Ayixhunywanga"

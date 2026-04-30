@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sookmook/wall-vault/cmd/cert"
 	"github.com/sookmook/wall-vault/cmd/doctor"
 	"github.com/sookmook/wall-vault/cmd/proxy"
 	crtk "github.com/sookmook/wall-vault/cmd/rtk"
@@ -70,6 +71,8 @@ func main() {
 		vault.Run(os.Args[2:])
 	case "setup":
 		setup.Run(os.Args[2:])
+	case "cert":
+		cert.Run(os.Args[2:])
 	case "doctor":
 		doctor.Run(os.Args[2:])
 	case "rtk":
@@ -100,9 +103,14 @@ func runAll() {
 	vaultSrv.SetConfigPath("wall-vault.yaml")
 	vaultAddr := fmt.Sprintf("%s:%d", cfg.Vault.Host, cfg.Vault.Port)
 	vaultHTTP := &http.Server{Addr: vaultAddr, Handler: vaultSrv.Handler()}
+	vaultScheme := "http"
+	if cfg.Vault.TLS.Enabled {
+		vaultScheme = "https"
+	}
 	go func() {
-		log.Printf("[vault] 시작 :%d → http://localhost:%d", cfg.Vault.Port, cfg.Vault.Port)
-		if err := vaultHTTP.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf("[vault] 시작 :%d → %s://localhost:%d", cfg.Vault.Port, vaultScheme, cfg.Vault.Port)
+		err := serveHTTP(vaultHTTP, cfg.Vault.TLS)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("[vault] 오류: %v", err)
 		}
 	}()
@@ -111,18 +119,23 @@ func runAll() {
 	proxySrv := iproxy.NewServer(cfg)
 	proxyAddr := fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port)
 	proxyHTTP := &http.Server{Addr: proxyAddr, Handler: proxySrv.Handler()}
+	proxyScheme := "http"
+	if cfg.Proxy.TLS.Enabled {
+		proxyScheme = "https"
+	}
 	go func() {
-		log.Printf("[proxy] 시작 :%d (client=%s, filter=%s)",
-			cfg.Proxy.Port, cfg.Proxy.ClientID, cfg.Proxy.ToolFilter)
-		if err := proxyHTTP.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf("[proxy] 시작 :%d (client=%s, filter=%s, scheme=%s)",
+			cfg.Proxy.Port, cfg.Proxy.ClientID, cfg.Proxy.ToolFilter, proxyScheme)
+		err := serveHTTP(proxyHTTP, cfg.Proxy.TLS)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("[proxy] 오류: %v", err)
 		}
 	}()
 
 	slog.Info("wall-vault running",
 		"version", version,
-		"dashboard", fmt.Sprintf("http://localhost:%d", cfg.Vault.Port),
-		"proxy", fmt.Sprintf("http://localhost:%d", cfg.Proxy.Port),
+		"dashboard", fmt.Sprintf("%s://localhost:%d", vaultScheme, cfg.Vault.Port),
+		"proxy", fmt.Sprintf("%s://localhost:%d", proxyScheme, cfg.Proxy.Port),
 	)
 	log.Printf("Ctrl+C로 종료")
 
@@ -146,6 +159,19 @@ func runAll() {
 	vaultSrv.Stop()
 }
 
+// serveHTTP starts an HTTP listener, switching to TLS when the per-listener
+// config says so. CertFile/KeyFile must already exist; provision them with
+// `wall-vault cert init` + `wall-vault cert issue <hostname>`.
+func serveHTTP(srv *http.Server, tls config.TLSConfig) error {
+	if tls.Enabled {
+		if tls.CertFile == "" || tls.KeyFile == "" {
+			return fmt.Errorf("tls.enabled=true requires tls.cert_file and tls.key_file")
+		}
+		return srv.ListenAndServeTLS(tls.CertFile, tls.KeyFile)
+	}
+	return srv.ListenAndServe()
+}
+
 func printHelp() {
 	fmt.Printf(`wall-vault %s — AI 프록시 + 키 금고
 
@@ -155,6 +181,7 @@ func printHelp() {
   wall-vault proxy [flags]    프록시 서버 단독 실행
   wall-vault vault [flags]    키 금고 서버 단독 실행
   wall-vault doctor [cmd]     헬스체크·자동복구 (fix/deploy)
+  wall-vault cert <cmd>       내부 CA·호스트 인증서 (init/issue/list)
   wall-vault rtk <cmd> [args]  명령 출력 축소 (토큰 절약)
 
 옵션:

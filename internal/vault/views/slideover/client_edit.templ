@@ -35,6 +35,24 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 					}
 				</select>
 			</label>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_runtime") }</span>
+				<select name="runtime">
+					<option value="daemon" selected?={c.Runtime == "" || c.Runtime == "daemon"}>{ i18n.T("opt_runtime_daemon") }</option>
+					<option value="on_demand" selected?={c.Runtime == "on_demand"}>{ i18n.T("opt_runtime_on_demand") }</option>
+				</select>
+				<small class="hint">{ i18n.T("hint_runtime") }</small>
+			</label>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_host") }</span>
+				<input name="host" value={c.Host} placeholder={ i18n.T("ph_host") }/>
+				<small class="hint">{ i18n.T("hint_host") }</small>
+			</label>
+			<label class="wv-field">
+				<span class="wv-field-label">{ i18n.T("f_work_dir") }</span>
+				<input name="work_dir" value={c.WorkDir} placeholder={ i18n.T("ph_workdir") }/>
+				<small class="hint">{ i18n.T("hint_workdir_multi") }</small>
+			</label>
 		}
 
 		@FormSection(i18n.T("sec_routing")) {
@@ -74,16 +92,6 @@ templ ClientEdit(c *ClientVM, services []*ServiceVM) {
 		}
 
 		@FormSection(i18n.T("sec_access")) {
-			<label class="wv-field">
-				<span class="wv-field-label">{ i18n.T("f_work_dir") }</span>
-				<input name="work_dir" value={c.WorkDir} placeholder={ i18n.T("ph_workdir") }/>
-				<small class="hint">{ i18n.T("hint_workdir_multi") }</small>
-			</label>
-			<label class="wv-field">
-				<span class="wv-field-label">{ i18n.T("f_host") }</span>
-				<input name="host" value={c.Host} placeholder={ i18n.T("ph_host") }/>
-				<small class="hint">{ i18n.T("hint_host") }</small>
-			</label>
 			<label class="wv-field">
 				<span class="wv-field-label">{ i18n.T("f_fallback_services") }</span>
 				<input name="fallback_services" value={c.FallbackServices} placeholder={ i18n.T("ph_fallback_services") }/>

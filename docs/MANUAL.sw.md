@@ -138,10 +138,10 @@ wall-vault start
 
 Seva mbili zinaanza wakati huo huo:
 
-- **Proxy** (`http://localhost:56244`) — Wakala anayeunganisha OpenClaw na huduma za AI
-- **Key Vault** (`http://localhost:56243`) — Usimamizi wa API key na dashibodi ya wavuti
+- **Proxy** (`https://localhost:56244`) — Wakala anayeunganisha OpenClaw na huduma za AI
+- **Key Vault** (`https://localhost:56243`) — Usimamizi wa API key na dashibodi ya wavuti
 
-Fungua `http://localhost:56243` kwenye kivinjari chako ili kuona dashibodi mara moja.
+Fungua `https://localhost:56243` kwenye kivinjari chako ili kuona dashibodi mara moja.
 
 ---
 
@@ -174,7 +174,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Njia 2: UI ya Dashibodi (Bonyeza kwa Panya)
 
-1. Fungua `http://localhost:56243` kwenye kivinjari
+1. Fungua `https://localhost:56243` kwenye kivinjari
 2. Bonyeza kitufe cha `[+ Ongeza]` kwenye kadi ya **🔑 API Key** juu
 3. Ingiza aina ya huduma, thamani ya key, lebo (jina la kumbukumbu), na kikomo cha kila siku kisha uhifadhi
 
@@ -183,7 +183,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API ni njia ya programu kubadilishana data kupitia HTTP. Ni muhimu kwa usajili wa kiotomatiki kupitia hati.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer tokeni-ya-msimamizi" \
   -H "Content-Type: application/json" \
   -d '{
@@ -218,7 +218,7 @@ Fungua faili `~/.openclaw/openclaw.json` na uongeze yaliyomo yafuatayo:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // tokeni ya wakala wa vault
         api: "openai-completions",
         models: [
@@ -257,13 +257,13 @@ Kwa kuangalia jina la modeli, wall-vault inaamua kiotomatiki ni huduma gani ya A
 Ikiwa una zana iliyokuwa ikitumia Google Gemini API moja kwa moja, badilisha tu anwani hadi wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Au ikiwa zana yako inabainisha URL moja kwa moja:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Kutumia na OpenAI SDK (Python)
@@ -274,7 +274,7 @@ Unaweza pia kuunganisha wall-vault kwenye msimbo wa Python unaotumia AI. Badilis
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # wall-vault inasimamia API key kiotomatiki
 )
 
@@ -290,12 +290,12 @@ Ili kubadilisha modeli ya AI wakati wall-vault tayari inaendesha:
 
 ```bash
 # Badilisha modeli kwa kuomba moja kwa moja kwa proxy
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # Katika hali ya kusambazwa (multi bot), badilisha kwenye seva ya vault → inajitokeza mara moja kupitia SSE
-curl -X PUT http://localhost:56243/admin/clients/id-ya-bot-yangu \
+curl -X PUT https://localhost:56243/admin/clients/id-ya-bot-yangu \
   -H "Authorization: Bearer tokeni-ya-msimamizi" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -305,13 +305,13 @@ curl -X PUT http://localhost:56243/admin/clients/id-ya-bot-yangu \
 
 ```bash
 # Angalia orodha nzima
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Angalia modeli za Google tu
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Tafuta kwa jina (mfano: modeli zenye "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Muhtasari wa Modeli Kuu kwa Huduma:**
@@ -330,7 +330,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Dashibodi ya Key Vault
 
-Fungua `http://localhost:56243` kwenye kivinjari chako ili kuona dashibodi.
+Fungua `https://localhost:56243` kwenye kivinjari chako ili kuona dashibodi.
 
 **Mpangilio wa Skrini:**
 - **Upau wa juu ulioshikiliwa (topbar)**: Nembo, kichaguzi cha lugha·mandhari, hali ya muunganisho wa SSE
@@ -522,7 +522,7 @@ Funga **Cline** (ID: `saoudrizwan.claude-dev`) kutoka Soko la Nyongeza la VS Cod
 Fungua mipangilio (⚙️) kwenye upau wa kando wa Cline:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://anwani-ya-proxy:56244/v1`
-  - Mashine ile ile: `http://localhost:56244/v1`
+  - Mashine ile ile: `https://localhost:56244/v1`
   - Mashine nyingine kama seva ya mini: `http://192.168.1.20:56244/v1`
 - **API Key**: Tokeni iliyotolewa kutoka vault (nakili kutoka kadi ya wakala)
 - **Model ID**: Modeli iliyowekwa kwenye vault (mfano: `gemini-2.5-flash`)
@@ -552,7 +552,7 @@ Ukifunga VS Code, kadi ya wakala kwenye dashibodi ya vault itageuka njano (imech
 
 | Dalili | Sababu | Suluhisho |
 |------|------|------|
-| Kosa la "Muunganisho umeshindikana" kwenye Cline | Proxy haiendeshwi au anwani si sahihi | Angalia proxy kwa `curl http://localhost:56244/health` |
+| Kosa la "Muunganisho umeshindikana" kwenye Cline | Proxy haiendeshwi au anwani si sahihi | Angalia proxy kwa `curl https://localhost:56244/health` |
 | Nukta ya kijani haionekani kwenye vault | API key (tokeni) haijawekwa | Bonyeza kitufe cha **⚡ Tumia Usanidi wa Cline** tena |
 | Modeli ya kijachini cha Cline haibadiliki | Cline inahifadhi usanidi kwenye cache | Sasisha VS Code upya (`Ctrl+Alt+R`) |
 | Jina lisilo sahihi la modeli linaonyeshwa | Hitilafu ya zamani (iliyorekebishwa v0.1.16) | Sasisha proxy hadi v0.1.16 au zaidi |
@@ -622,7 +622,7 @@ wall-vault vault
 Sajili mapema taarifa za kila bot inayounganishwa na seva ya vault:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer tokeni-ya-msimamizi" \
   -H "Content-Type: application/json" \
   -d '{
@@ -807,10 +807,10 @@ wall-vault proxy --port 8080   # Anza kwa nambari tofauti ya bandari
 
 ```bash
 # Angalia orodha na hali ya key zilizosajiliwa
-curl -H "Authorization: Bearer tokeni-ya-msimamizi" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer tokeni-ya-msimamizi" https://localhost:56243/admin/keys
 
 # Weka upya vihesabio vya matumizi ya key
-curl -X POST -H "Authorization: Bearer tokeni-ya-msimamizi" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer tokeni-ya-msimamizi" https://localhost:56243/admin/keys/reset
 ```
 
 ### Wakati Wakala Anaonyeshwa kama "Haijaunganishwa"

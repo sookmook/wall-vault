@@ -33,6 +33,10 @@ type ClientVM struct {
 	RemoteModel   string
 	LastHeartbeat string // human-readable "3분 전" / "just now"
 	Uptime        string // human-readable uptime "2d 3h" / "15h 22m" / "4m"
+	// Runtime: "daemon" (default) or "on_demand". Drives dot-color logic so
+	// on_demand agents (cokacdir, lambda-style sessions) are not painted as
+	// offline merely because they have no heartbeat in flight.
+	Runtime string
 
 	// ServiceDefaultModel is the PreferredService's configured default_model.
 	// Populated when ModelOverride is empty so the card can render the model

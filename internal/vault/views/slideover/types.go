@@ -37,6 +37,7 @@ type ClientVM struct {
 	Enabled          bool
 	WorkDir          string
 	Host             string // machine hostname for claude-code auto-match
+	Runtime          string // "daemon" (default) or "on_demand" (cokacdir, lambda)
 	FallbackServices string // comma-joined ordered service ids; empty = strict primary-only
 	IPWhitelist      string // comma-joined for single-line form input
 	Avatar           string // current avatar data URI (preview only)

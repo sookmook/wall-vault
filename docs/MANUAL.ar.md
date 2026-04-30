@@ -175,10 +175,10 @@ wall-vault start
 
 يبدأ خادمان في وقت واحد:
 
-- **الوكيل** (`http://localhost:56244`) — وسيط بين OpenClaw وخدمات الذكاء الاصطناعي
-- **خزنة المفاتيح** (`http://localhost:56243`) — إدارة مفاتيح API ولوحة تحكم ويب
+- **الوكيل** (`https://localhost:56244`) — وسيط بين OpenClaw وخدمات الذكاء الاصطناعي
+- **خزنة المفاتيح** (`https://localhost:56243`) — إدارة مفاتيح API ولوحة تحكم ويب
 
-افتح `http://localhost:56243` في المتصفح للوصول إلى لوحة التحكم.
+افتح `https://localhost:56243` في المتصفح للوصول إلى لوحة التحكم.
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### الطريقة 2: واجهة لوحة التحكم (بالنقر بالماوس)
 
-1. افتح `http://localhost:56243` في المتصفح
+1. افتح `https://localhost:56243` في المتصفح
 2. في بطاقة **🔑 مفاتيح API** في الأعلى، انقر زر `[+ إضافة]`
 3. أدخل نوع الخدمة وقيمة المفتاح والتسمية (اسم للمرجع) والحد اليومي، ثم احفظ
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API هي طريقة لتبادل البيانات بين البرامج عبر HTTP. مفيدة للتسجيل التلقائي عبر سكربت.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer رمز_المسؤول" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // رمز وكيل الخزنة
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
 إذا كان لديك أداة تستخدم Google Gemini API مباشرة، فقط غيّر العنوان إلى wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 أو إذا كانت الأداة تحدد URL مباشرة:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### الاستخدام مع OpenAI SDK (Python)
@@ -311,7 +311,7 @@ http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # wall-vault يدير مفاتيح API تلقائياً
 )
 
@@ -327,12 +327,12 @@ response = client.chat.completions.create(
 
 ```bash
 # تغيير النموذج بطلب مباشر للوكيل
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # في الوضع الموزع (متعدد البوتات)، غيّر من خادم الخزنة → ينعكس فوراً عبر SSE
-curl -X PUT http://localhost:56243/admin/clients/معرّف-البوت \
+curl -X PUT https://localhost:56243/admin/clients/معرّف-البوت \
   -H "Authorization: Bearer رمز_المسؤول" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/معرّف-البوت \
 
 ```bash
 # عرض القائمة الكاملة
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # عرض نماذج Google فقط
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # البحث بالاسم (مثال: نماذج تحتوي على "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **ملخص النماذج الرئيسية حسب الخدمة:**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## لوحة تحكم خزنة المفاتيح
 
-افتح `http://localhost:56243` في المتصفح لرؤية لوحة التحكم.
+افتح `https://localhost:56243` في المتصفح لرؤية لوحة التحكم.
 
 **تخطيط الشاشة:**
 - **الشريط العلوي الثابت (topbar)**: الشعار، محدد اللغة/السمة، مؤشر اتصال SSE
@@ -559,7 +559,7 @@ OPENAI_API_KEY=رمز-هذا-الوكيل
 في الشريط الجانبي لـ Cline، افتح الإعدادات (⚙️):
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://عنوان_الوكيل:56244/v1`
-  - على نفس الجهاز: `http://localhost:56244/v1`
+  - على نفس الجهاز: `https://localhost:56244/v1`
   - على جهاز آخر (مثل خادم Mini): `http://192.168.1.20:56244/v1`
 - **API Key**: الرمز الصادر من الخزنة (انسخه من بطاقة الوكيل)
 - **Model ID**: النموذج المُعدّ في الخزنة (مثال: `gemini-2.5-flash`)
@@ -589,7 +589,7 @@ OPENAI_API_KEY=رمز-هذا-الوكيل
 
 | العرض | السبب | الحل |
 |------|------|------|
-| خطأ "فشل الاتصال" في Cline | الوكيل لا يعمل أو العنوان خاطئ | تحقق من الوكيل بـ `curl http://localhost:56244/health` |
+| خطأ "فشل الاتصال" في Cline | الوكيل لا يعمل أو العنوان خاطئ | تحقق من الوكيل بـ `curl https://localhost:56244/health` |
 | النقطة الخضراء لا تظهر في الخزنة | مفتاح API (الرمز) غير مُعدّ | انقر زر **⚡ تطبيق إعدادات Cline** مرة أخرى |
 | نموذج تذييل Cline لا يتغير | Cline يخزّن الإعدادات مؤقتاً | أعد تحميل VS Code (`Ctrl+Alt+R`) |
 | يظهر اسم نموذج خاطئ | خطأ قديم (مصحح في v0.1.16) | حدّث الوكيل إلى v0.1.16 أو أحدث |
@@ -659,7 +659,7 @@ wall-vault vault
 سجّل مسبقاً معلومات كل بوت سيتصل بخادم الخزنة:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer رمز_المسؤول" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # البدء بمنفذ آخر
 
 ```bash
 # التحقق من قائمة المفاتيح المسجلة وحالتها
-curl -H "Authorization: Bearer رمز_المسؤول" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer رمز_المسؤول" https://localhost:56243/admin/keys
 
 # إعادة تعيين عدادات الاستخدام
-curl -X POST -H "Authorization: Bearer رمز_المسؤول" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer رمز_المسؤول" https://localhost:56243/admin/keys/reset
 ```
 
 ### عندما يظهر الوكيل كـ "غير متصل"

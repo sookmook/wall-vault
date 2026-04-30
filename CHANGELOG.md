@@ -8,6 +8,58 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.37] — 2026-05-01
+
+### Added — Security hardening (Phase 1+2+3)
+
+- **Admin endpoint gate.** `PUT /api/config/model`, `POST /reload`,
+  `POST /api/config/think-mode` now require `Authorization: Bearer <proxy
+  vault_token>`. Client tokens are explicitly rejected for these — they
+  mutate proxy-wide state, which a per-client token has no authority over.
+  Fail-closed when `proxy.vault_token` is unset (503).
+- **Proxy gate on `/v1/*`, `/api/models`, `/google/*`.** All AI routing
+  endpoints now require either the proxy's own VaultToken or a
+  vault-registered client token. `/v1/messages` additionally accepts
+  Anthropic-native `x-api-key` and BYO `sk-ant-*` (Claude Code OAuth via
+  NanoClaw). Pre-v0.2.37 the proxy fell back to its own client config when
+  no token was present, which let any LAN-reachable caller use proxy
+  credentials.
+- **Internal CA + per-host certificate tooling.** New `wall-vault cert`
+  subcommand: `init` generates an ECDSA P-256 CA at `~/.wall-vault/ca.{crt,key}`
+  (10-year), `issue <host> [ip…]` mints host certs (5-year, SAN = hostname
+  + localhost + 127.0.0.1 + ::1 + extra IPs), `list` enumerates issued
+  certs. CA never re-signs intermediate CAs (`MaxPathLenZero`).
+- **TLS for proxy + vault listeners.** New `proxy.tls.{enabled,cert_file,
+  key_file}` and `vault.tls.{...}` config blocks plus
+  `WV_PROXY_TLS_ENABLED` / `WV_PROXY_TLS_CERT` / `WV_PROXY_TLS_KEY` (and
+  `WV_VAULT_TLS_*`) environment overrides. Default is plain HTTP for
+  backwards compatibility; the fleet enables TLS by setting the env vars
+  in the systemd / launchd unit.
+- **cokacdir signal-light = solid blue (`#2563eb`).** On-demand agents
+  previously rendered as a hollow ring; now they show as a distinct
+  blue dot, separate from green (active), amber (warn), grey (disabled).
+
+### Notes — Phase 3 fleet rollout caveats
+
+- Each host needs the issued cert/key under `~/.wall-vault/<host>.{crt,key}`
+  and `ca.crt` registered in the OS trust store (Linux:
+  `update-ca-certificates`, macOS: `security add-trusted-cert -d -r
+  trustRoot -k /Library/Keychains/System.keychain`). macOS GUI confirms
+  cannot be bypassed via SSH.
+- Node clients (lab-sns) need `NODE_EXTRA_CA_CERTS` since Node ships its
+  own ca-bundle and ignores the system trust store.
+- macOS `/usr/bin/curl` uses LibreSSL with `/etc/ssl/cert.pem`, not the
+  Keychain — callers must pass `--cacert ~/.wall-vault/ca.crt` explicitly.
+- Python `urllib` and Linux `curl` pick up the system trust automatically
+  once `update-ca-certificates` runs.
+
+### Changed
+
+- `openclaw_sync.go` writes `https://localhost:56244` baseUrls into
+  OpenClaw's `models.json` (was `http://`).
+
+---
+
 ## [0.2.34] — 2026-04-27
 
 ### Fixed

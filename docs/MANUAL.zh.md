@@ -175,10 +175,10 @@ wall-vault start
 
 以下两个服务器同时启动：
 
-- **代理**（`http://localhost:56244`）— 连接 OpenClaw 和 AI 服务的中间人
-- **密钥金库**（`http://localhost:56243`）— API 密钥管理及 Web 仪表盘
+- **代理**（`https://localhost:56244`）— 连接 OpenClaw 和 AI 服务的中间人
+- **密钥金库**（`https://localhost:56243`）— API 密钥管理及 Web 仪表盘
 
-在浏览器中打开 `http://localhost:56243` 即可访问仪表盘。
+在浏览器中打开 `https://localhost:56243` 即可访问仪表盘。
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### 方法 2：仪表盘 UI（鼠标点击）
 
-1. 在浏览器中打开 `http://localhost:56243`
+1. 在浏览器中打开 `https://localhost:56243`
 2. 在顶部 **:key: API 密钥** 卡片中点击 `[+ 添加]` 按钮
 3. 输入服务类型、密钥值、标签（备注名称）和每日限额后保存
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API 是程序之间通过 HTTP 交换数据的方式。适用于通过脚本自动注册。
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer 管理员令牌" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // vault 代理令牌
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ wall-vault 根据模型名自动判断将请求发送到哪个 AI 服务：
 如果已有直接使用 Google Gemini API 的工具，只需将地址改为 wall-vault：
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 或者对于直接指定 URL 的工具：
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### 在 OpenAI SDK（Python）中使用
@@ -311,7 +311,7 @@ http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # API 密钥由 wall-vault 自动管理
 )
 
@@ -327,12 +327,12 @@ response = client.chat.completions.create(
 
 ```bash
 # 直接向代理请求更改模型
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # 分布式模式（多机器人）中在金库服务器更改 -> 通过 SSE 即时同步
-curl -X PUT http://localhost:56243/admin/clients/my-bot-id \
+curl -X PUT https://localhost:56243/admin/clients/my-bot-id \
   -H "Authorization: Bearer 管理员令牌" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/my-bot-id \
 
 ```bash
 # 查看完整列表
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # 仅查看 Google 模型
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # 按名称搜索（例如：包含"claude"的模型）
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **各服务主要模型：**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## 密钥金库仪表盘
 
-在浏览器中打开 `http://localhost:56243` 即可查看仪表盘。
+在浏览器中打开 `https://localhost:56243` 即可查看仪表盘。
 
 **界面布局：**
 - **顶部固定栏（topbar）**：Logo、语言/主题选择器、SSE 连接状态
@@ -559,7 +559,7 @@ OPENAI_API_KEY=此代理的令牌
 在 Cline 侧边栏打开设置（:gear:）：
 - **API Provider**：`OpenAI Compatible`
 - **Base URL**：`http://代理地址:56244/v1`
-  - 同一台机器：`http://localhost:56244/v1`
+  - 同一台机器：`https://localhost:56244/v1`
   - Mac Mini 等其他机器：`http://192.168.1.20:56244/v1`
 - **API Key**：从金库获取的令牌（从代理卡片复制）
 - **Model ID**：在金库中设置的模型（如：`gemini-2.5-flash`）
@@ -589,7 +589,7 @@ OPENAI_API_KEY=此代理的令牌
 
 | 症状 | 原因 | 解决 |
 |------|------|------|
-| Cline 中出现"连接失败"错误 | proxy 未运行或地址错误 | 用 `curl http://localhost:56244/health` 检查 proxy |
+| Cline 中出现"连接失败"错误 | proxy 未运行或地址错误 | 用 `curl https://localhost:56244/health` 检查 proxy |
 | 金库中绿色点不显示 | API 密钥（令牌）未设置 | 再次点击 **:zap: 应用 Cline 配置** 按钮 |
 | Cline 页脚模型不更新 | Cline 缓存了设置 | 重新加载 VS Code（`Ctrl+Alt+R`） |
 | 显示错误的模型名 | 旧版 bug（v0.1.16 已修复） | 将 proxy 更新到 v0.1.16 以上 |
@@ -659,7 +659,7 @@ wall-vault vault
 预先在金库服务器上注册各机器人的信息：
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer 管理员令牌" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # 使用其他端口启动
 
 ```bash
 # 查看已注册的密钥列表和状态
-curl -H "Authorization: Bearer 管理员令牌" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer 管理员令牌" https://localhost:56243/admin/keys
 
 # 重置密钥使用计数器
-curl -X POST -H "Authorization: Bearer 管理员令牌" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer 管理员令牌" https://localhost:56243/admin/keys/reset
 ```
 
 ### 代理显示"未连接"

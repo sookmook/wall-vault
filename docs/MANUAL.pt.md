@@ -175,10 +175,10 @@ wall-vault start
 
 Dois servidores são iniciados simultaneamente:
 
-- **Proxy** (`http://localhost:56244`) — Agente intermediário entre o OpenClaw e os serviços de IA
-- **Cofre de chaves** (`http://localhost:56243`) — Gerenciamento de API keys e dashboard web
+- **Proxy** (`https://localhost:56244`) — Agente intermediário entre o OpenClaw e os serviços de IA
+- **Cofre de chaves** (`https://localhost:56243`) — Gerenciamento de API keys e dashboard web
 
-Abra `http://localhost:56243` no navegador para acessar o dashboard.
+Abra `https://localhost:56243` no navegador para acessar o dashboard.
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Método 2: Dashboard UI (clique com o mouse)
 
-1. Acesse `http://localhost:56243` no navegador
+1. Acesse `https://localhost:56243` no navegador
 2. No card **🔑 API Keys** no topo, clique no botão `[+ Adicionar]`
 3. Insira o tipo de serviço, valor da chave, rótulo (nome para referência) e limite diário, depois salve
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST API é a forma de programas trocarem dados via HTTP. Útil para registro automatizado via script.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer SEU_TOKEN_ADMIN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ Abra o arquivo `~/.openclaw/openclaw.json` e adicione o seguinte:
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // token do agente vault
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ O wall-vault determina automaticamente para qual serviço de IA enviar a solicit
 Se você tem uma ferramenta que usa a API do Google Gemini diretamente, basta alterar o endereço para o wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Ou, se a ferramenta especifica a URL diretamente:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Uso com OpenAI SDK (Python)
@@ -311,7 +311,7 @@ Você pode conectar o wall-vault em código Python que utiliza IA. Basta alterar
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # O wall-vault gerencia as API keys automaticamente
 )
 
@@ -327,12 +327,12 @@ Para alterar o modelo de IA com o wall-vault já em execução:
 
 ```bash
 # Alterar modelo solicitando diretamente ao proxy
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # No modo distribuído (multi-bot), altere no servidor do cofre → refletido instantaneamente via SSE
-curl -X PUT http://localhost:56243/admin/clients/MEU-BOT-ID \
+curl -X PUT https://localhost:56243/admin/clients/MEU-BOT-ID \
   -H "Authorization: Bearer SEU_TOKEN_ADMIN" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/MEU-BOT-ID \
 
 ```bash
 # Ver lista completa
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Ver apenas modelos do Google
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Pesquisar por nome (ex.: modelos contendo "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Resumo dos principais modelos por serviço:**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Dashboard do cofre de chaves
 
-Acesse `http://localhost:56243` no navegador para ver o dashboard.
+Acesse `https://localhost:56243` no navegador para ver o dashboard.
 
 **Layout da tela:**
 - **Barra superior fixa (topbar)**: Logo, seletor de idioma/tema, indicador de conexão SSE
@@ -559,7 +559,7 @@ Instale o **Cline** (ID: `saoudrizwan.claude-dev`) no marketplace de extensões 
 Na barra lateral do Cline, abra configurações (⚙️):
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://ENDEREÇO-DO-PROXY:56244/v1`
-  - Na mesma máquina: `http://localhost:56244/v1`
+  - Na mesma máquina: `https://localhost:56244/v1`
   - Em outra máquina (ex.: servidor Mini): `http://192.168.1.20:56244/v1`
 - **API Key**: Token emitido pelo cofre (copie do card do agente)
 - **Model ID**: Modelo configurado no cofre (ex.: `gemini-2.5-flash`)
@@ -589,7 +589,7 @@ Ao fechar o VS Code, no dashboard do cofre, o card do agente muda para amarelo (
 
 | Sintoma | Causa | Solução |
 |------|------|------|
-| Erro "Falha na conexão" no Cline | Proxy não está em execução ou endereço incorreto | Verifique o proxy com `curl http://localhost:56244/health` |
+| Erro "Falha na conexão" no Cline | Proxy não está em execução ou endereço incorreto | Verifique o proxy com `curl https://localhost:56244/health` |
 | Ponto verde não aparece no cofre | API key (token) não configurada | Clique novamente no botão **⚡ Aplicar config Cline** |
 | Modelo no rodapé do Cline não muda | Cline está com configuração em cache | Recarregue o VS Code (`Ctrl+Alt+R`) |
 | Nome de modelo incorreto exibido | Bug antigo (corrigido no v0.1.16) | Atualize o proxy para v0.1.16 ou superior |
@@ -659,7 +659,7 @@ wall-vault vault
 Registre previamente as informações de cada bot que se conectará ao servidor do cofre:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer SEU_TOKEN_ADMIN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # Iniciar com outro número de porta
 
 ```bash
 # Verificar lista de chaves registradas e status
-curl -H "Authorization: Bearer SEU_TOKEN_ADMIN" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer SEU_TOKEN_ADMIN" https://localhost:56243/admin/keys
 
 # Resetar contadores de uso das chaves
-curl -X POST -H "Authorization: Bearer SEU_TOKEN_ADMIN" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer SEU_TOKEN_ADMIN" https://localhost:56243/admin/keys/reset
 ```
 
 ### Quando o agente aparece como "Desconectado"

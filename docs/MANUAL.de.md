@@ -175,10 +175,10 @@ wall-vault start
 
 Die folgenden zwei Server starten gleichzeitig:
 
-- **Proxy** (`http://localhost:56244`) — Der Vermittler zwischen OpenClaw und KI-Diensten
-- **Schlüsseltresor** (`http://localhost:56243`) — API-Schlüsselverwaltung und Web-Dashboard
+- **Proxy** (`https://localhost:56244`) — Der Vermittler zwischen OpenClaw und KI-Diensten
+- **Schlüsseltresor** (`https://localhost:56243`) — API-Schlüsselverwaltung und Web-Dashboard
 
-Öffnen Sie `http://localhost:56243` in Ihrem Browser, um auf das Dashboard zuzugreifen.
+Öffnen Sie `https://localhost:56243` in Ihrem Browser, um auf das Dashboard zuzugreifen.
 
 ---
 
@@ -211,7 +211,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 
 ### Methode 2: Dashboard-UI (Mausklick)
 
-1. Öffnen Sie `http://localhost:56243` im Browser
+1. Öffnen Sie `https://localhost:56243` im Browser
 2. Klicken Sie im oberen **:key: API-Schlüssel**-Bereich auf `[+ Hinzufügen]`
 3. Geben Sie Servicetyp, Schlüsselwert, Bezeichnung (Memo-Name) und Tageslimit ein und speichern Sie
 
@@ -220,7 +220,7 @@ export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
 REST-API ist eine Methode, mit der Programme Daten über HTTP austauschen. Nützlich für automatisierte Registrierung per Skript.
 
 ```bash
-curl -X POST http://localhost:56243/admin/keys \
+curl -X POST https://localhost:56243/admin/keys \
   -H "Authorization: Bearer admin-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -255,7 +255,7 @@ So konfigurieren Sie OpenClaw, um KI-Dienste über wall-vault zu nutzen.
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",   // Vault-Agent-Token
         api: "openai-completions",
         models: [
@@ -294,13 +294,13 @@ wall-vault bestimmt automatisch anhand des Modellnamens, an welchen KI-Dienst di
 Wenn Sie Tools haben, die die Google Gemini API direkt verwenden, ändern Sie einfach die URL auf wall-vault:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244/google
+export ANTHROPIC_BASE_URL=https://localhost:56244/google
 ```
 
 Oder wenn das Tool URLs direkt angibt:
 
 ```
-http://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
+https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
 ### Verwendung mit dem OpenAI SDK (Python)
@@ -311,7 +311,7 @@ Sie können wall-vault auch mit Python-Code verbinden, der KI nutzt. Ändern Sie
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:56244/v1",
+    base_url="https://localhost:56244/v1",
     api_key="not-needed"  # API-Schlüssel werden von wall-vault verwaltet
 )
 
@@ -327,12 +327,12 @@ Um das KI-Modell zu ändern, während wall-vault bereits läuft:
 
 ```bash
 # Modell direkt über Proxy-Anfrage ändern
-curl -X PUT http://localhost:56244/api/config/model \
+curl -X PUT https://localhost:56244/api/config/model \
   -H "Content-Type: application/json" \
   -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
 
 # Im verteilten Modus (Multi-Bot): Änderung am Tresor-Server -> sofortige Synchronisation via SSE
-curl -X PUT http://localhost:56243/admin/clients/mein-bot-id \
+curl -X PUT https://localhost:56243/admin/clients/mein-bot-id \
   -H "Authorization: Bearer admin-token" \
   -H "Content-Type: application/json" \
   -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
@@ -342,13 +342,13 @@ curl -X PUT http://localhost:56243/admin/clients/mein-bot-id \
 
 ```bash
 # Vollständige Liste anzeigen
-curl http://localhost:56244/api/models | python3 -m json.tool
+curl https://localhost:56244/api/models | python3 -m json.tool
 
 # Nur Google-Modelle anzeigen
-curl "http://localhost:56244/api/models?service=google"
+curl "https://localhost:56244/api/models?service=google"
 
 # Nach Name suchen (z.B. Modelle mit "claude")
-curl "http://localhost:56244/api/models?q=claude"
+curl "https://localhost:56244/api/models?q=claude"
 ```
 
 **Wichtige Modelle nach Service:**
@@ -367,7 +367,7 @@ curl "http://localhost:56244/api/models?q=claude"
 
 ## Schlüsseltresor-Dashboard
 
-Öffnen Sie `http://localhost:56243` in Ihrem Browser, um das Dashboard anzuzeigen.
+Öffnen Sie `https://localhost:56243` in Ihrem Browser, um das Dashboard anzuzeigen.
 
 **Bildschirmaufbau:**
 - **Obere Leiste (fixiert)**: Logo, Sprach-/Theme-Auswahl, SSE-Verbindungsstatus
@@ -559,7 +559,7 @@ Installieren Sie **Cline** (ID: `saoudrizwan.claude-dev`) aus dem VS Code Extens
 Öffnen Sie die Einstellungen (:gear:) in der Cline-Seitenleiste:
 - **API Provider**: `OpenAI Compatible`
 - **Base URL**: `http://proxy-adresse:56244/v1`
-  - Gleicher Rechner: `http://localhost:56244/v1`
+  - Gleicher Rechner: `https://localhost:56244/v1`
   - Anderer Rechner (z.B. Mac Mini): `http://192.168.1.20:56244/v1`
 - **API Key**: Vom Tresor ausgegebenes Token (von der Agentenkarte kopieren)
 - **Model ID**: Im Tresor konfiguriertes Modell (z.B. `gemini-2.5-flash`)
@@ -589,7 +589,7 @@ Wenn Sie VS Code schließen, wird die Agentenkarte im Tresor-Dashboard nach etwa
 
 | Symptom | Ursache | Lösung |
 |---------|--------|--------|
-| "Verbindung fehlgeschlagen"-Fehler in Cline | Proxy nicht gestartet oder falsche Adresse | Proxy mit `curl http://localhost:56244/health` prüfen |
+| "Verbindung fehlgeschlagen"-Fehler in Cline | Proxy nicht gestartet oder falsche Adresse | Proxy mit `curl https://localhost:56244/health` prüfen |
 | Grüner Punkt erscheint nicht im Tresor | API-Schlüssel (Token) nicht konfiguriert | **:zap: Cline-Konfiguration anwenden**-Schaltfläche erneut klicken |
 | Modell in der Cline-Fußzeile ändert sich nicht | Cline speichert Einstellungen im Cache | VS Code neu laden (`Ctrl+Alt+R`) |
 | Falscher Modellname wird angezeigt | Alter Bug (behoben in v0.1.16) | Proxy auf v0.1.16 oder höher aktualisieren |
@@ -659,7 +659,7 @@ wall-vault vault
 Registrieren Sie die Informationen jedes Bots, der sich mit dem Tresor-Server verbinden wird:
 
 ```bash
-curl -X POST http://localhost:56243/admin/clients \
+curl -X POST https://localhost:56243/admin/clients \
   -H "Authorization: Bearer admin-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -844,10 +844,10 @@ wall-vault proxy --port 8080   # Mit einem anderen Port starten
 
 ```bash
 # Registrierte Schlüsselliste und Status prüfen
-curl -H "Authorization: Bearer admin-token" http://localhost:56243/admin/keys
+curl -H "Authorization: Bearer admin-token" https://localhost:56243/admin/keys
 
 # Schlüsselverbrauchszähler zurücksetzen
-curl -X POST -H "Authorization: Bearer admin-token" http://localhost:56243/admin/keys/reset
+curl -X POST -H "Authorization: Bearer admin-token" https://localhost:56243/admin/keys/reset
 ```
 
 ### Agent zeigt "Nicht verbunden" an

@@ -80,9 +80,9 @@ Point any AI client at `http://your-host:56244` and it just works.
 |--------|----------|--------|-------|
 | **OpenClaw** ⭐ | `/google/v1beta/models/...` | Gemini | Built-in — just point to proxy port |
 | **NanoClaw** ⭐ | `/google/v1beta/models/...` | Gemini | Same config format as OpenClaw (`~/.openclaw/openclaw.json`) |
-| **Gemini CLI** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=http://localhost:56244` |
-| **Antigravity IDE** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=http://localhost:56244` |
-| **Claude Code** | `/v1/messages` | Anthropic | `ANTHROPIC_BASE_URL=http://localhost:56244` |
+| **Gemini CLI** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=https://localhost:56244` |
+| **Antigravity IDE** | `/google/v1beta/models/...` | Gemini | `GEMINI_API_BASE_URL=https://localhost:56244` |
+| **Claude Code** | `/v1/messages` | Anthropic | `ANTHROPIC_BASE_URL=https://localhost:56244` |
 | **Cursor** | `/v1/chat/completions` | OpenAI | Set base URL in Cursor settings |
 | **VS Code / Continue** | `/v1/chat/completions` | OpenAI | Set `apiBase` in Continue config |
 | **LM Studio apps** | `/v1/chat/completions` | OpenAI | Any OpenAI-compatible client |
@@ -96,7 +96,7 @@ Point any AI client at `http://your-host:56244` and it just works.
 > Native support is tracked in [google-gemini/gemini-cli#1679](https://github.com/google-gemini/gemini-cli/issues/1679).
 > Once merged, the setup will be one line:
 > ```bash
-> export GOOGLE_GEMINI_BASE_URL=http://localhost:56244
+> export GOOGLE_GEMINI_BASE_URL=https://localhost:56244
 > gemini  # routes through wall-vault → key rotation + fallback
 > ```
 
@@ -127,7 +127,7 @@ Antigravity is Google's agentic AI IDE (similar position to Claude Code). It use
 ```bash
 # If Antigravity respects GEMINI_API_KEY + endpoint env vars:
 export GEMINI_API_KEY=<your-vault-agent-token>
-export GOOGLE_GEMINI_BASE_URL=http://localhost:56244
+export GOOGLE_GEMINI_BASE_URL=https://localhost:56244
 # Then launch Antigravity
 ```
 
@@ -140,7 +140,7 @@ export GOOGLE_GEMINI_BASE_URL=http://localhost:56244
 ### Claude Code Setup
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:56244
+export ANTHROPIC_BASE_URL=https://localhost:56244
 claude  # now routes through wall-vault → Gemini / OpenRouter / Ollama
 ```
 
@@ -153,7 +153,7 @@ claude  # now routes through wall-vault → Gemini / OpenRouter / Ollama
 
 In Cursor **Settings → AI → OpenAI API**:
 ```
-Base URL:  http://localhost:56244
+Base URL:  https://localhost:56244
 API Key:   (any string — wall-vault ignores it)
 Model:     gemini-2.5-flash  (or any model from /v1/models)
 ```
@@ -165,7 +165,7 @@ Same for VS Code + Continue extension:
     "title": "wall-vault",
     "provider": "openai",
     "model": "gemini-2.5-flash",
-    "apiBase": "http://localhost:56244"
+    "apiBase": "https://localhost:56244"
   }]
 }
 ```
@@ -267,7 +267,7 @@ Invoke-WebRequest -Uri `
 .\wall-vault.exe start
 ```
 
-Open `http://localhost:56243` to access the dashboard.
+Open `https://localhost:56243` to access the dashboard.
 
 ---
 
@@ -298,7 +298,7 @@ wall-vault proxy
   models: {
     providers: {
       "wall-vault": {
-        baseUrl: "http://localhost:56244/v1",
+        baseUrl: "https://localhost:56244/v1",
         apiKey: "your-agent-token",
         api: "openai-completions",
         models: [
@@ -714,7 +714,7 @@ Each proxy:
 curl -s http://192.168.x.x:56243/api/events --max-time 10
 
 # Check proxy status (shows SSE connection state)
-curl http://localhost:56244/status
+curl https://localhost:56244/status
 
 # Change model on vault → confirm proxy reflects it within 3s
 curl -X PUT http://192.168.x.x:56243/admin/clients/bot-a \
@@ -722,7 +722,7 @@ curl -X PUT http://192.168.x.x:56243/admin/clients/bot-a \
   -H "Content-Type: application/json" \
   -d '{"default_model":"gemini-2.5-pro"}'
 
-curl http://localhost:56244/status | grep model
+curl https://localhost:56244/status | grep model
 ```
 
 ### Firewall / Port Guide
@@ -978,7 +978,7 @@ wall-vault start   # 프록시 + 키 금고 실행
 
 > 설치 후 `wall-vault` 명령을 찾지 못하면: `export PATH="$HOME/.local/bin:$PATH"`
 
-브라우저에서 `http://localhost:56243` 을 열면 키 금고 대시보드가 나타납니다.
+브라우저에서 `https://localhost:56243` 을 열면 키 금고 대시보드가 나타납니다.
 
 ---
 
@@ -1090,7 +1090,7 @@ VAULT_TOKEN=your-bot-c-token \
 curl -s http://192.168.x.x:56243/api/events --max-time 10
 
 # 프록시 상태 확인 (SSE 연결 포함)
-curl http://localhost:56244/status
+curl https://localhost:56244/status
 
 # 금고에서 모델 변경 → 3초 내 프록시에 반영되는지 확인
 curl -X PUT http://192.168.x.x:56243/admin/clients/bot-a \
@@ -1155,7 +1155,7 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 ./wall-vault setup && ./wall-vault start
 ```
 
-打开 `http://localhost:56243` 即可访问控制面板。
+打开 `https://localhost:56243` 即可访问控制面板。
 
 ---
 
@@ -1186,7 +1186,7 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 ./wall-vault setup && ./wall-vault start
 ```
 
-ブラウザで `http://localhost:56243` を開くとダッシュボードが表示されます。
+ブラウザで `https://localhost:56243` を開くとダッシュボードが表示されます。
 
 ---
 
@@ -1213,7 +1213,7 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 ./wall-vault setup && ./wall-vault start
 ```
 
-Abra `http://localhost:56243` en el navegador.
+Abra `https://localhost:56243` en el navegador.
 
 ---
 
@@ -1240,7 +1240,7 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 ./wall-vault setup && ./wall-vault start
 ```
 
-Ouvrez `http://localhost:56243` dans votre navigateur.
+Ouvrez `https://localhost:56243` dans votre navigateur.
 
 ---
 
@@ -1267,7 +1267,7 @@ curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vau
 ./wall-vault setup && ./wall-vault start
 ```
 
-Öffnen Sie `http://localhost:56243` im Browser.
+Öffnen Sie `https://localhost:56243` im Browser.
 
 ---
 

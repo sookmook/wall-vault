@@ -138,7 +138,7 @@ func AgentCard(c *ClientVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var9 = []any{"dot " + agentDotClass(c.Enabled, c.Online)}
+		var templ_7745c5c3_Var9 = []any{"dot " + agentDotClass(c.Enabled, c.Online, c.Runtime)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -285,13 +285,18 @@ func AgentCard(c *ClientVM) templ.Component {
 	})
 }
 
-func agentDotClass(enabled, online bool) string {
+func agentDotClass(enabled, online bool, runtime string) string {
 	switch {
-	case enabled && online:
-		return "dot-ok"
-	case enabled:
-		return "dot-warn"
-	default:
+	case !enabled:
 		return "dot-off"
+	case online:
+		return "dot-ok"
+	case runtime == "on_demand":
+		// On-demand agents (cokacdir, lambda-style claude-code sessions) wake
+		// only when a message arrives — there is no "process is alive" signal,
+		// so absence of heartbeat is normal idle, not a failure.
+		return "dot-idle"
+	default:
+		return "dot-warn"
 	}
 }

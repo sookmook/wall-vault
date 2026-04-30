@@ -1324,7 +1324,24 @@ func (s *Server) broadcastAgentsSync() {
 	items := make([]map[string]interface{}, 0, len(clients))
 	for _, c := range clients {
 		entry := map[string]interface{}{"id": c.ID}
-		if p, ok := proxyMap[c.ID]; ok {
+		runtime := c.EffectiveRuntime()
+		entry["runtime"] = runtime
+		p, hasProxy := proxyMap[c.ID]
+		if runtime == "on_demand" {
+			// On-demand clients (cokacdir, claude-code sessions) wake only when
+			// a message arrives — heartbeat age is meaningless. Always paint as
+			// idle. Preserve last-seen service/model/version when a proxy record
+			// exists so the dashboard can show what they used last.
+			entry["st"] = "ondemand"
+			if hasProxy {
+				entry["svc"] = p.Service
+				entry["mdl"] = p.Model
+				entry["ver"] = p.Version
+				if !p.StartedAt.IsZero() {
+					entry["sec"] = p.StartedAt.Unix()
+				}
+			}
+		} else if hasProxy {
 			age := now.Sub(p.UpdatedAt)
 			switch {
 			case age < 90*time.Second:

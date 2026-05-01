@@ -551,6 +551,107 @@ func PrintStatus(cfg *config.Config) {
   서비스:       %s
 `, cfg.Proxy.Port, cfg.Proxy.ClientID, cfg.Proxy.ToolFilter,
 		cfg.Vault.Port, strings.Join(cfg.Proxy.Services, ", "))
+
+	fmt.Println()
+	fmt.Println("─── 보안 진단 ───")
+	for _, p := range AuditConfig(cfg) {
+		Printline(p.Level, p.Name, p.Msg)
+	}
+}
+
+// AuditProblem describes a single configuration finding surfaced by the
+// security audit. Level ∈ {"OK","WARN","ERROR","INFO"} maps to Printline
+// colours.
+type AuditProblem struct {
+	Name  string
+	Level string
+	Msg   string
+}
+
+// AuditConfig surfaces the configuration footguns that bite first-time
+// GitHub users: empty admin/proxy tokens after v0.2.37 gating, TLS turned
+// on without cert files in place, master_password missing in standalone
+// mode (so API keys are stored in plaintext). Returns OK lines too so the
+// status report shows what is healthy alongside what is not.
+func AuditConfig(cfg *config.Config) []AuditProblem {
+	out := []AuditProblem{}
+
+	// admin_token — required to lock the dashboard. /setup web flow now
+	// auto-generates this on first boot, but warn anyway so users who
+	// edited the YAML by hand get a hint.
+	if cfg.Vault.AdminToken == "" {
+		out = append(out, AuditProblem{
+			Name:  "admin_token",
+			Level: "WARN",
+			Msg:   "비어 있음 — /setup 웹 페이지를 열면 자동 생성됩니다",
+		})
+	} else {
+		out = append(out, AuditProblem{Name: "admin_token", Level: "OK", Msg: "설정됨"})
+	}
+
+	// proxy.vault_token — required for /v1/* + admin endpoints since
+	// v0.2.37. Without it, /api/config/model etc. fail-closed with 503
+	// and external clients can't call /v1/chat/completions.
+	if cfg.Proxy.VaultToken == "" {
+		out = append(out, AuditProblem{
+			Name:  "proxy.vault_token",
+			Level: "WARN",
+			Msg:   "비어 있음 — /v1/* 게이트 + 관리자 엔드포인트가 막힙니다",
+		})
+	} else {
+		out = append(out, AuditProblem{Name: "proxy.vault_token", Level: "OK", Msg: "설정됨"})
+	}
+
+	// master_password — controls whether keys land on disk in plaintext.
+	if cfg.Mode == "standalone" {
+		if cfg.Vault.MasterPass == "" {
+			out = append(out, AuditProblem{
+				Name:  "master_password",
+				Level: "WARN",
+				Msg:   "비어 있음 — API 키가 평문으로 저장됩니다",
+			})
+		} else {
+			out = append(out, AuditProblem{Name: "master_password", Level: "OK", Msg: "AES-GCM 암호화 활성"})
+		}
+	}
+
+	// TLS — common breakage is enabling tls.enabled without provisioning
+	// the cert files, which makes the listener refuse to start.
+	checkTLS := func(name string, t config.TLSConfig) {
+		if !t.Enabled {
+			out = append(out, AuditProblem{Name: name, Level: "INFO", Msg: "TLS 비활성 (HTTP)"})
+			return
+		}
+		if t.CertFile == "" || t.KeyFile == "" {
+			out = append(out, AuditProblem{
+				Name:  name,
+				Level: "ERROR",
+				Msg:   "tls.enabled=true 이지만 cert_file/key_file 미지정",
+			})
+			return
+		}
+		if _, err := os.Stat(t.CertFile); err != nil {
+			out = append(out, AuditProblem{
+				Name:  name,
+				Level: "ERROR",
+				Msg:   "cert 파일 없음: " + t.CertFile + " (wall-vault cert init/issue 필요)",
+			})
+			return
+		}
+		if _, err := os.Stat(t.KeyFile); err != nil {
+			out = append(out, AuditProblem{
+				Name:  name,
+				Level: "ERROR",
+				Msg:   "key 파일 없음: " + t.KeyFile,
+			})
+			return
+		}
+		out = append(out, AuditProblem{Name: name, Level: "OK", Msg: "TLS 활성 + 인증서 확인"})
+	}
+	checkTLS("vault.tls", cfg.Vault.TLS)
+	checkTLS("proxy.tls", cfg.Proxy.TLS)
+
+	return out
 }
 
 // ─── Util ─────────────────────────────────────────────────────────────────────

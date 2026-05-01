@@ -137,6 +137,19 @@ func runAll() {
 		"dashboard", fmt.Sprintf("%s://localhost:%d", vaultScheme, cfg.Vault.Port),
 		"proxy", fmt.Sprintf("%s://localhost:%d", proxyScheme, cfg.Proxy.Port),
 	)
+	// First-run hint: when admin_token is unset the dashboard redirects
+	// browsers to /setup, but operators staring at the terminal need a
+	// pointer too. Print once at startup so anyone who runs `wall-vault
+	// start` against an empty config knows what to do next.
+	if cfg.Vault.AdminToken == "" {
+		log.Printf("")
+		log.Printf("┌─────────────────────────────────────────────────────────────┐")
+		log.Printf("│ 첫 부팅 감지: 관리자 토큰이 설정되지 않았습니다.            │")
+		log.Printf("│ 같은 머신에서 브라우저로 다음 주소를 열어 초기화하세요:     │")
+		log.Printf("│   %s://localhost:%-5d/setup                            │", vaultScheme, cfg.Vault.Port)
+		log.Printf("└─────────────────────────────────────────────────────────────┘")
+		log.Printf("")
+	}
 	log.Printf("Ctrl+C로 종료")
 
 	quit := make(chan os.Signal, 1)

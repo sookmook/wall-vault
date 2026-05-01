@@ -8,6 +8,44 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.39] — 2026-05-01
+
+### Added — Click-to-claim onboarding
+
+- **Web-based first-run claim.** Fresh installs no longer need `wall-vault
+  setup` ahead of time. The vault dashboard at `/` now redirects browsers
+  to `/setup` when `admin_token` is unset; clicking "초기화 진행" generates
+  `admin_token`, `proxy.vault_token`, and `master_password`, persists them
+  to the loaded config file, and issues a session cookie. Loopback-only on
+  the claim POST so an attacker on the LAN cannot front-run the legitimate
+  operator.
+- **Session cookie auth.** `adminAuth`/`clientAuth` accept either a
+  Bearer token (CLI/API path, unchanged) or a `wv_session` cookie issued
+  by `/login` or `/setup`. Cookies last 12 hours and are wiped on process
+  restart so a stolen cookie cannot outlive the binary that issued it.
+  HTMX requests from the dashboard now ride the cookie automatically.
+- **`/login` page.** Subsequent visits without a session redirect to a
+  password form that takes the admin token. Failed attempts feed the
+  existing per-IP rate limiter (10 fails / 15 min → 429).
+- **`/logout`.** Revokes the cookie and bounces back to `/login`.
+- **Dashboard auth gate on `/`.** Pre-v0.2.39 the unauthenticated GET `/`
+  shipped `admin_token` baked into the HTML meta tag — anyone on the LAN
+  who could reach the dashboard could grab it. `/` now requires either
+  the cookie or the Bearer token before rendering, closing that leak.
+- **`doctor check` security audit.** Surfaces empty `admin_token` /
+  `proxy.vault_token` / `master_password`, plus `tls.enabled=true` with
+  missing cert files. Same lines also rendered by `doctor status`.
+- **Startup hint.** `wall-vault start` against an empty config now logs
+  a banner pointing the operator at `http://localhost:<port>/setup`.
+
+### Changed
+
+- Removed the warning banner about an unset admin token from the vault
+  startup logs — the hint above replaces it and points at the fix
+  instead of just naming the problem.
+
+---
+
 ## [0.2.38] — 2026-04-29
 
 ### Added

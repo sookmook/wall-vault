@@ -64,6 +64,12 @@ func Run(args []string) {
 		} else {
 			idoctor.Printline("OK", "nanoclaw-env", detail)
 		}
+		// security audit — surfaces empty admin/proxy tokens, missing TLS
+		// cert files, etc. so first-time GitHub users see what's missing
+		// before they ever hit a 401 or a startup failure.
+		for _, p := range idoctor.AuditConfig(cfg) {
+			idoctor.Printline(p.Level, p.Name, p.Msg)
+		}
 
 	case "fix", "--fix":
 		if err := idoctor.Fix(cfg); err != nil {

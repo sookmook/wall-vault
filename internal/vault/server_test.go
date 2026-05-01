@@ -471,6 +471,7 @@ func TestVaultDashboard(t *testing.T) {
 	defer cleanup()
 
 	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer test-admin")
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 
@@ -635,6 +636,9 @@ func TestDashboardHomeContainsServicesAndAgents(t *testing.T) {
 		t.Fatalf("AddClient: %v", err)
 	}
 	req := httptest.NewRequest("GET", "/", nil)
+	// GET / now redirects unauthenticated callers to /login (since v0.2.39).
+	// Pass the admin Bearer to land on the dashboard render path.
+	req.Header.Set("Authorization", "Bearer test-admin")
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 	body := w.Body.String()

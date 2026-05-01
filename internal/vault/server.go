@@ -88,6 +88,12 @@ type Server struct {
 	sseTicketsMu sync.Mutex
 	sseTickets   map[string]time.Time
 
+	// sessions: browser session cookies issued by /setup (first-run claim)
+	// and /login. Lets adminAuth/clientAuth accept a cookie as an alternative
+	// to a Bearer token so dashboard users don't have to paste their token
+	// into every request.
+	sessions *sessionStore
+
 	// Background goroutine lifecycle. Closed by Stop() so startDailyReset and
 	// startStatusTicker can exit cleanly during graceful shutdown — without it
 	// systemd stop would tear the process down mid-write of vault.json.
@@ -116,13 +122,9 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			cfg.Lang = st.Lang
 		}
 	}
-	if cfg.Vault.AdminToken == "" {
-		log.Println("[WARNING] ======================================================")
-		log.Println("[WARNING]  No admin token configured.")
-		log.Println("[WARNING]  All admin endpoints are UNPROTECTED.")
-		log.Println("[WARNING]  Set admin_token in config to secure the vault.")
-		log.Println("[WARNING] ======================================================")
-	}
+	// Pre-v0.2.39 we logged a multi-line "admin endpoints UNPROTECTED"
+	// warning here. main.go now prints a more useful hint pointing at
+	// /setup, so keep this constructor quiet.
 	srv := &Server{
 		cfg:        cfg,
 		store:      store,
@@ -131,6 +133,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		startedAt:  time.Now(),
 		limiter:    newAuthLimiter(),
 		sseTickets: make(map[string]time.Time),
+		sessions:   newSessionStore(),
 		stopCh:     make(chan struct{}),
 	}
 	// send full state to every new SSE client (handles reconnect sync)
@@ -153,6 +156,11 @@ func (s *Server) Stop() {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+
+	// public — auth flow (claim, login, logout)
+	mux.HandleFunc("/setup", s.handleSetup)
+	mux.HandleFunc("/login", s.handleLogin)
+	mux.HandleFunc("/logout", s.handleLogout)
 
 	// public
 	mux.HandleFunc("/health", s.handleHealth)
@@ -249,6 +257,13 @@ func (s *Server) adminAuth(next http.HandlerFunc) http.HandlerFunc {
 			jsonError(w, "admin ip not allowed", http.StatusForbidden)
 			return
 		}
+		// Browser sessions ride a cookie issued by /login or /setup so
+		// dashboard users don't have to expose the admin token in every
+		// HTMX request. CLI/API callers continue to use Bearer.
+		if s.hasValidSession(r) {
+			next(w, r)
+			return
+		}
 		token := bearerToken(r)
 		if !secureCompare(token, s.cfg.Vault.AdminToken) {
 			s.limiter.record(ip)
@@ -271,6 +286,12 @@ func bearerToken(r *http.Request) string {
 func (s *Server) clientAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.Vault.AdminToken == "" {
+			next(w, r)
+			return
+		}
+		// Browser session cookie counts as admin-equivalent here too —
+		// /api/keys etc. are admin-tier reads.
+		if s.hasValidSession(r) {
 			next(w, r)
 			return
 		}
@@ -1452,6 +1473,23 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
+	}
+
+	// First-run + auth gating. Pre-v0.2.39 the dashboard was open to anyone
+	// on the LAN and shipped admin_token in the HTML. Now: unconfigured
+	// instances send the operator to /setup; configured instances require
+	// either a session cookie (browser) or a Bearer token (CLI). Bearer is
+	// kept for back-compat with API callers that still hit GET /.
+	if s.cfg.Vault.AdminToken == "" {
+		http.Redirect(w, r, "/setup", http.StatusSeeOther)
+		return
+	}
+	if !s.hasValidSession(r) {
+		token := bearerToken(r)
+		if !secureCompare(token, s.cfg.Vault.AdminToken) {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 	}
 
 	settings := s.store.GetSettings()

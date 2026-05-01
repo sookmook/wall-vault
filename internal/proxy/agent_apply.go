@@ -303,12 +303,30 @@ func findClaudeSettingsPaths() []string {
 // applyOpenClawConfig writes wall-vault proxy settings into ~/.openclaw/openclaw.json.
 // Updates models.providers.custom (baseUrl + apiKey) and agents.defaults.model.primary.
 // Returns the resolved openclaw.json path on success.
+//
+// Version awareness: detectOpenClawVersion() reads the local OpenClaw
+// package.json so the writer can adapt when a future release forks the
+// config schema. Every 2026.x release tested so far shares schemaTag()=v1
+// and the same write path; the version is logged + written to
+// meta.lastTouchedVersion for diagnostics.
 func applyOpenClawConfig(baseURL, model, token string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("cannot determine home directory: %w", err)
 	}
 	path := filepath.Join(home, ".openclaw", "openclaw.json")
+	version := detectOpenClawVersion()
+	log.Printf("[agent-apply] openclaw version=%s path=%s", version.describe(), path)
+	switch version.schemaTag() {
+	case "v1":
+		// fall through — every reachable version uses the v1 writer below.
+	default:
+		// Defensive: an unknown schemaTag should still attempt the v1 write
+		// rather than refusing — the operator can always edit by hand if
+		// the schema actually diverges in a way we haven't taught yet.
+		log.Printf("[agent-apply] openclaw schema %q unrecognised, falling back to v1 writer",
+			version.schemaTag())
+	}
 
 	cfg := map[string]interface{}{}
 	if data, err := os.ReadFile(path); err == nil {
@@ -407,6 +425,10 @@ func applyOpenClawConfig(baseURL, model, token string) (string, error) {
 		cfg["meta"] = meta
 	}
 	meta["lastTouchedAt"] = time.Now().UTC().Format(time.RFC3339)
+	if version.Raw != "" {
+		meta["lastTouchedVersion"] = version.Raw
+		meta["lastTouchedSchema"] = version.schemaTag()
+	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return "", fmt.Errorf("failed to create .openclaw directory: %w", err)

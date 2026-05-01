@@ -10,6 +10,29 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ## [0.2.39] — 2026-05-01
 
+### Added — OpenClaw version-aware config writes
+
+- **`internal/proxy/openclaw_version.go`** — detects the local OpenClaw
+  install via `package.json` (search order: ~/.npm-global, /usr/lib,
+  /usr/local/lib, /opt/homebrew/lib), parses CalVer (year.month.patch),
+  and exposes a `schemaTag()` so future config-schema forks plug into
+  `applyOpenClawConfig` without rewiring the dispatcher.
+- **`agent_apply.go`** — logs detected version on every apply
+  (`[agent-apply] openclaw version=2026.4.29 (schema=v1)`) and writes
+  `meta.lastTouchedVersion` + `meta.lastTouchedSchema` into
+  `~/.openclaw/openclaw.json` so an operator grepping the file later
+  knows which writer touched it last. Today every reachable version
+  shares schema=v1 so the actual write path is unchanged; the scaffold
+  is in place for the day OpenClaw breaks the providers layout.
+- Tests for parser + gte() + schemaTag() invariant.
+
+Note: the gateway-restart failures users reported on motoko/mini after
+`openclaw update` to 2026.4.29 are unrelated to wall-vault — research
+confirmed the providers schema is unchanged; the failures are
+OpenClaw's own lifecycle bugs (stale PID holding port 56242 on mini,
+health-probe race on motoko). Recovery is operator-side: stop the
+stale gateway, retry update.
+
 ### Added — Click-to-claim onboarding
 
 - **Web-based first-run claim.** Fresh installs no longer need `wall-vault

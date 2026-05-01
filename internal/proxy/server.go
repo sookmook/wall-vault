@@ -417,7 +417,7 @@ func (s *Server) lookupTokenConfigDetailed(token string) (*tokenCacheEntry, toke
 		return nil, tokenLookupVaultError
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := internalHTTPClient(3 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, tokenLookupVaultUnreachable
@@ -513,7 +513,7 @@ func (s *Server) syncFromVault() {
 	if s.cfg.Proxy.VaultToken != "" {
 		req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := internalHTTPClient(10 * time.Second).Do(req)
 	if err != nil {
 		log.Printf("[sync] 금고 연결 실패: %v", err)
 		return
@@ -642,7 +642,7 @@ func (s *Server) syncAllowedServices() error {
 	if s.cfg.Proxy.VaultToken != "" {
 		req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := internalHTTPClient(5 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -1016,7 +1016,7 @@ func (s *Server) pushConfigToVault(service, model string) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := internalHTTPClient(5 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("[config] vault 동기화 실패: %v", err)

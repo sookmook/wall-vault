@@ -308,7 +308,7 @@ func (km *KeyManager) SyncFromVault() error {
 		req.Header.Set("Authorization", "Bearer "+km.token)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := internalHTTPClient(5 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("금고 키 조회 실패: %w", err)

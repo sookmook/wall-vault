@@ -212,7 +212,7 @@ func (s *Server) sendHeartbeat() {
 		req.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := internalHTTPClient(5 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("[heartbeat] 전송 실패: %v", err)

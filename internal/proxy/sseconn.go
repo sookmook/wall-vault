@@ -106,7 +106,11 @@ func (c *SSEClient) connect() error {
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	// SSE keeps the connection open indefinitely so the timeout has to be
+	// long enough not to tear down a healthy stream — Timeout=0 disables
+	// the per-request deadline. Trust still goes through internalRoots so
+	// the wall-vault CA is honoured when vault.tls.enabled=true.
+	resp, err := internalHTTPClient(0).Do(req)
 	if err != nil {
 		return err
 	}

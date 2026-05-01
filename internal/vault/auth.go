@@ -284,19 +284,19 @@ func (s *Server) renderSetupPage(w http.ResponseWriter, r *http.Request, errMsg 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if s.cfg.Vault.AdminToken != "" {
 		_, _ = w.Write([]byte(authPage("이미 초기화됨", `
-<p>이 wall-vault 인스턴스는 이미 초기화되어 있습니다.</p>
+<p>이 벽금고 인스턴스는 이미 초기화되어 있습니다.</p>
 <p><a href="/login">로그인 페이지로 이동</a></p>`)))
 		return
 	}
 	if !isLoopback(r) {
 		_, _ = w.Write([]byte(authPage("초기화는 localhost 에서", `
-<p>처음 사용을 시작하시려면 wall-vault 가 실행 중인 머신에서
+<p>처음 사용을 시작하시려면 벽금고/프록시가 실행 중인 머신에서
 직접 <code>http://localhost:`+fmt.Sprintf("%d", s.cfg.Vault.Port)+`/setup</code> 을 여세요.</p>
 <p>외부 IP 에서의 첫 클레임은 보안상 차단됩니다.</p>`)))
 		return
 	}
 	body := `
-<p>wall-vault 첫 부팅입니다. 아래 버튼을 누르면:</p>
+<p>벽금고/프록시 첫 부팅입니다. 아래 버튼을 누르면:</p>
 <ul>
 <li>관리자 토큰 (<code>admin_token</code>) 자동 생성</li>
 <li>프록시 인증 토큰 (<code>proxy.vault_token</code>) 자동 생성</li>
@@ -310,7 +310,7 @@ func (s *Server) renderSetupPage(w http.ResponseWriter, r *http.Request, errMsg 
 	if errMsg != "" {
 		body = `<p class="err">` + html.EscapeString(errMsg) + `</p>` + body
 	}
-	_, _ = w.Write([]byte(authPage("wall-vault 초기 설정", body)))
+	_, _ = w.Write([]byte(authPage("벽금고 초기 설정", body)))
 }
 
 func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, errMsg string) {
@@ -325,7 +325,7 @@ func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, errMsg 
 	if errMsg != "" {
 		body = `<p class="err">` + html.EscapeString(errMsg) + `</p>` + body
 	}
-	_, _ = w.Write([]byte(authPage("wall-vault 로그인", body)))
+	_, _ = w.Write([]byte(authPage("벽금고 로그인", body)))
 }
 
 // authPage wraps body HTML in a minimal page chrome shared between /setup

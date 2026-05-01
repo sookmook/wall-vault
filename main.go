@@ -186,7 +186,7 @@ func serveHTTP(srv *http.Server, tls config.TLSConfig) error {
 }
 
 func printHelp() {
-	fmt.Printf(`wall-vault %s — AI 프록시 + 키 금고
+	fmt.Printf(`벽금고/프록시 %s — AI 프록시 + 키 금고
 
 사용법:
   wall-vault setup            대화형 설치 마법사 (처음 시작)

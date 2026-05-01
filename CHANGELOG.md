@@ -8,6 +8,22 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.38] — 2026-04-29
+
+### Added
+
+- **`wall-vault cert install-trust` subcommand.** Detects current OS
+  (Linux/macOS/Windows) and registers `~/.wall-vault/ca.crt` into the
+  system trust store: Linux installs to `/usr/local/share/ca-certificates/`
+  + `update-ca-certificates`, macOS uses `security add-trusted-cert -d -r
+  trustRoot -k /Library/Keychains/System.keychain`, Windows uses `certutil
+  -addstore -f Root`. Linux/macOS auto-prepend `sudo` when not root;
+  Windows must run from an elevated prompt. Replaces the per-OS manual
+  install instructions that previously had to be run by hand on each
+  machine.
+
+---
+
 ## [0.2.37] — 2026-05-01
 
 ### Added — Security hardening (Phase 1+2+3)

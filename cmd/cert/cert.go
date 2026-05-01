@@ -16,7 +16,9 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -47,6 +49,11 @@ func Run(args []string) {
 			fmt.Fprintf(os.Stderr, "cert list 실패: %v\n", err)
 			os.Exit(1)
 		}
+	case "install-trust":
+		if err := cmdInstallTrust(args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "cert install-trust 실패: %v\n", err)
+			os.Exit(1)
+		}
 	case "help", "--help", "-h":
 		printHelp()
 	default:
@@ -63,6 +70,7 @@ func printHelp() {
   wall-vault cert init                  새 내부 CA 생성 (~/.wall-vault/ca.{crt,key})
   wall-vault cert issue <hostname>      호스트 인증서 발급 (SAN에 hostname/IP/localhost)
   wall-vault cert list                  발급된 인증서 목록
+  wall-vault cert install-trust         현 머신의 OS trust store 에 ca.crt 등록 (Linux/macOS/Windows)
 
 옵션:
   --dir <path>                          출력 디렉터리 (기본: ~/.wall-vault)
@@ -352,6 +360,100 @@ func randomSerial() (*big.Int, error) {
 		return nil, fmt.Errorf("serial: %w", err)
 	}
 	return n, nil
+}
+
+// cmdInstallTrust registers ~/.wall-vault/ca.crt into the current machine's
+// OS trust store. Requires root/admin; if not elevated, falls back to invoking
+// sudo (Linux/macOS) so the OS prompts the operator for a password. Windows
+// has no in-process elevation path here — the user must rerun from an elevated
+// prompt.
+func cmdInstallTrust(args []string) error {
+	dirOverride, _, _, _, err := parseFlags(args)
+	if err != nil {
+		return err
+	}
+	dir, err := certDir(dirOverride)
+	if err != nil {
+		return err
+	}
+	caPath := filepath.Join(dir, "ca.crt")
+	if _, err := os.Stat(caPath); err != nil {
+		return fmt.Errorf("CA cert not found at %s (run `wall-vault cert init` first)", caPath)
+	}
+
+	switch runtime.GOOS {
+	case "linux":
+		return installTrustLinux(caPath)
+	case "darwin":
+		return installTrustDarwin(caPath)
+	case "windows":
+		return installTrustWindows(caPath)
+	default:
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	}
+}
+
+func installTrustLinux(caPath string) error {
+	const dst = "/usr/local/share/ca-certificates/wall-vault-ca.crt"
+	fmt.Printf("Linux trust store 등록: %s → %s\n", caPath, dst)
+	cmds := [][]string{
+		{"install", "-m", "0644", caPath, dst},
+		{"update-ca-certificates"},
+	}
+	for _, c := range cmds {
+		if err := runMaybeSudo(c); err != nil {
+			return err
+		}
+	}
+	fmt.Println("✓ 등록 완료. 새 셸/프로세스부터 신뢰됩니다.")
+	return nil
+}
+
+func installTrustDarwin(caPath string) error {
+	fmt.Printf("macOS System keychain 등록: %s\n", caPath)
+	fmt.Println("  (관리자 GUI 다이얼로그가 뜰 수 있습니다)")
+	cmd := []string{
+		"security", "add-trusted-cert",
+		"-d", "-r", "trustRoot",
+		"-k", "/Library/Keychains/System.keychain",
+		caPath,
+	}
+	if err := runMaybeSudo(cmd); err != nil {
+		return err
+	}
+	fmt.Println("✓ 등록 완료. Safari/Chrome/Go 는 즉시 신뢰합니다.")
+	fmt.Println("  주의: LibreSSL curl(/usr/bin/curl) 은 Keychain 을 무시하므로 --cacert 필요.")
+	return nil
+}
+
+func installTrustWindows(caPath string) error {
+	fmt.Printf("Windows LocalMachine\\Root 등록: %s\n", caPath)
+	c := exec.Command("certutil", "-addstore", "-f", "Root", caPath)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("certutil 실패 (관리자 권한 PowerShell/cmd 에서 다시 실행): %w", err)
+	}
+	fmt.Println("✓ 등록 완료. Edge/Chrome/Node(NODE_EXTRA_CA_CERTS 불필요)·.NET 은 즉시 신뢰합니다.")
+	return nil
+}
+
+// runMaybeSudo runs argv directly if euid==0, otherwise prepends sudo so the
+// operator gets the standard password prompt on the controlling terminal.
+func runMaybeSudo(argv []string) error {
+	var c *exec.Cmd
+	if os.Geteuid() == 0 {
+		c = exec.Command(argv[0], argv[1:]...)
+	} else {
+		c = exec.Command("sudo", argv...)
+	}
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("%s 실패: %w", argv[0], err)
+	}
+	return nil
 }
 
 // extraIPs parses any positional args that look like IPv4/IPv6 literals into

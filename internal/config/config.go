@@ -68,6 +68,12 @@ type VaultConfig struct {
 	DataDir          string    `yaml:"data_dir"`     // default ~/.wall-vault/data
 	ServicesDir      string    `yaml:"services_dir"` // YAML service plugin folder
 	TLS              TLSConfig `yaml:"tls"`
+	// BootstrapPort runs a tiny plain-HTTP listener that serves only ca.crt
+	// + an install help page. This breaks the catch-22 where new clients
+	// need the CA to speak HTTPS to vault but the CA itself is only on
+	// HTTPS. CA is public-info; the listener exposes nothing else. Set to
+	// 0 to disable. Default 56247.
+	BootstrapPort int `yaml:"bootstrap_port"`
 }
 
 // TLSConfig holds the per-listener TLS settings. When Enabled is false the
@@ -133,10 +139,11 @@ func Default() *Config {
 			OllamaNumCtx: 8192,
 		},
 		Vault: VaultConfig{
-			Port:        56243,
-			Host:        "",
-			DataDir:     filepath.Join(home, ".wall-vault", "data"),
-			ServicesDir: filepath.Join(home, ".wall-vault", "services"),
+			Port:          56243,
+			Host:          "",
+			DataDir:       filepath.Join(home, ".wall-vault", "data"),
+			ServicesDir:   filepath.Join(home, ".wall-vault", "services"),
+			BootstrapPort: 56247,
 		},
 		Doctor: DoctorConfig{
 			Interval: 5 * time.Minute,
@@ -313,6 +320,12 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WV_VAULT_TLS_KEY"); v != "" {
 		cfg.Vault.TLS.KeyFile = v
+	}
+	// Bootstrap (plain-HTTP CA distribution) port. Set to 0 to disable.
+	if v := os.Getenv("WV_VAULT_BOOTSTRAP_PORT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 65535 {
+			cfg.Vault.BootstrapPort = n
+		}
 	}
 	// Ollama tuning — env vars win so operators can hot-tune without rewriting
 	// YAML. Empty/zero values fall back to whatever the YAML or Default()

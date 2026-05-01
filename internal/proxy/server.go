@@ -363,13 +363,37 @@ func (s *Server) refreshClientAct(clientID string) {
 // lookupTokenConfig: resolve a Bearer token to {service, model} via vault's /api/token/config.
 // Results are cached for 5 seconds to avoid per-request vault calls.
 // Returns nil if vault URL is not configured or the token is not found.
+// tokenLookupReason categorises why a token lookup failed, so callers can
+// emit specific 401/503 messages instead of the old generic "invalid token"
+// — the latter conflated "client not registered", "vault unreachable", and
+// "everything fine but the token literally isn't in the registry", which made
+// 401 triage frustrating (see board #43 from 바비2호 wasting time on IP
+// whitelist when the cause was actually vault-side).
+type tokenLookupReason int
+
+const (
+	tokenLookupOK              tokenLookupReason = iota // entry returned
+	tokenLookupNotRegistered                            // vault explicitly returned 4xx
+	tokenLookupVaultUnreachable                         // network / dial / timeout
+	tokenLookupVaultError                               // vault 5xx or malformed response
+	tokenLookupSkipped                                  // empty config (vault_url unset) — caller should fall back
+)
+
 func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
+	entry, _ := s.lookupTokenConfigDetailed(token)
+	return entry
+}
+
+// lookupTokenConfigDetailed wraps lookupTokenConfig with a reason code so
+// auth middlewares can pick a precise error message. Cache hits are reported
+// as tokenLookupOK; misses / errors carry the actual cause.
+func (s *Server) lookupTokenConfigDetailed(token string) (*tokenCacheEntry, tokenLookupReason) {
 	if s.cfg.Proxy.VaultURL == "" || token == "" {
-		return nil
+		return nil, tokenLookupSkipped
 	}
 	// skip our own proxy token (it is already applied via s.service/s.model)
 	if token == s.cfg.Proxy.VaultToken {
-		return nil
+		return nil, tokenLookupSkipped
 	}
 
 	s.tokenCacheMu.RLock()
@@ -383,24 +407,27 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 			}
 			s.clientActMu.Unlock()
 		}
-		return e
+		return e, tokenLookupOK
 	}
 	s.tokenCacheMu.RUnlock()
 
 	// fetch from vault
 	req, err := http.NewRequest("GET", s.cfg.Proxy.VaultURL+"/api/token/config", nil)
 	if err != nil {
-		return nil
+		return nil, tokenLookupVaultError
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil
+		return nil, tokenLookupVaultUnreachable
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden {
+		return nil, tokenLookupNotRegistered
+	}
 	if resp.StatusCode != http.StatusOK {
-		return nil
+		return nil, tokenLookupVaultError
 	}
 
 	var result struct {
@@ -411,7 +438,7 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 		AllowedServices  []string `json:"allowed_services,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil
+		return nil, tokenLookupVaultError
 	}
 
 	entry := &tokenCacheEntry{
@@ -453,7 +480,7 @@ func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
 	}
 	s.tokenCache[token] = entry
 	s.tokenCacheMu.Unlock()
-	return entry
+	return entry, tokenLookupOK
 }
 
 // tokenCacheMaxSize bounds the in-memory token→config cache. The periodic
@@ -844,10 +871,11 @@ func (s *Server) requireProxyToken(w http.ResponseWriter, r *http.Request) bool 
 	if s.cfg.Proxy.VaultToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) == 1 {
 		return true
 	}
-	if entry := s.lookupTokenConfig(token); entry != nil {
+	entry, reason := s.lookupTokenConfigDetailed(token)
+	if entry != nil {
 		return true
 	}
-	jsonError(w, "invalid token", http.StatusUnauthorized)
+	tokenAuthFail(w, reason, s.cfg.Proxy.VaultToken != "")
 	return false
 }
 
@@ -874,11 +902,40 @@ func (s *Server) requireAnthropicToken(w http.ResponseWriter, r *http.Request) b
 	if s.cfg.Proxy.VaultToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) == 1 {
 		return true
 	}
-	if entry := s.lookupTokenConfig(token); entry != nil {
+	entry, reason := s.lookupTokenConfigDetailed(token)
+	if entry != nil {
 		return true
 	}
-	jsonError(w, "invalid token", http.StatusUnauthorized)
+	tokenAuthFail(w, reason, s.cfg.Proxy.VaultToken != "")
 	return false
+}
+
+// tokenAuthFail emits a 401 (or 503 when the cause is "vault unreachable")
+// with a message that names the actual reason instead of the historic
+// catch-all "invalid token". Operators triaging a 401 can immediately tell
+// whether the token is unknown to vault, vault itself is down, or the
+// proxy's own vault_token is what mismatched.
+func tokenAuthFail(w http.ResponseWriter, reason tokenLookupReason, proxyTokenConfigured bool) {
+	switch reason {
+	case tokenLookupNotRegistered:
+		jsonError(w, "token not registered with vault — register the client and reuse its token", http.StatusUnauthorized)
+	case tokenLookupVaultUnreachable:
+		jsonError(w, "vault unreachable — check proxy.vault_url and that the vault listener is up", http.StatusServiceUnavailable)
+	case tokenLookupVaultError:
+		jsonError(w, "vault returned an unexpected response — check vault logs", http.StatusBadGateway)
+	case tokenLookupSkipped:
+		// Either vault_url is unset or the caller used the proxy's own token
+		// and that token mismatched (we never reached vault). Differentiate
+		// so operators don't waste time inspecting vault when the issue is
+		// actually proxy.vault_token.
+		if proxyTokenConfigured {
+			jsonError(w, "proxy.vault_token mismatch (no vault fallback configured)", http.StatusUnauthorized)
+		} else {
+			jsonError(w, "no auth configured (proxy.vault_token unset and proxy.vault_url empty)", http.StatusServiceUnavailable)
+		}
+	default:
+		jsonError(w, "invalid token", http.StatusUnauthorized)
+	}
 }
 
 // requireAdminToken authenticates a request to a privileged proxy endpoint

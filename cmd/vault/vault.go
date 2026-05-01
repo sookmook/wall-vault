@@ -76,8 +76,32 @@ func runVault(cfg *config.Config, cfgPath string) {
 		}
 	}()
 
+	// Bootstrap (plain-HTTP CA distribution) — runs alongside the main
+	// vault listener so distributed-mode hosts (mini in our fleet) that
+	// invoke `wall-vault vault` directly via launchd / systemd still get
+	// the listener. main.go's runAll() also handles this for `wall-vault
+	// start`; both call sites are mandatory because operators stick to
+	// whichever subcommand their service unit was templated against.
+	var bootstrapHTTP *http.Server
+	if cfg.Vault.BootstrapPort > 0 {
+		caPath := ivault.ResolveCAPath("")
+		bootstrapAddr := ivault.BootstrapAddr(cfg)
+		bootstrapHTTP = ivault.NewBootstrapServer(bootstrapAddr, caPath)
+		go func() {
+			log.Printf("[bootstrap] 시작 :%d (plain-HTTP, CA distribution only)", cfg.Vault.BootstrapPort)
+			ivault.LogStartupHint(bootstrapAddr)
+			err := bootstrapHTTP.ListenAndServe()
+			if err != nil && err != http.ErrServerClosed {
+				log.Printf("[bootstrap] 오류 (계속 진행): %v", err)
+			}
+		}()
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("[vault] 종료 중...")
+	if bootstrapHTTP != nil {
+		_ = bootstrapHTTP.Close()
+	}
 }

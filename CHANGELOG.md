@@ -8,6 +8,35 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.41] — 2026-05-01
+
+### Added — CA bootstrap listener + token-auth diagnostic messages
+
+- **Plain-HTTP bootstrap listener (default :56247).** Breaks the catch-22
+  where new clients need the wall-vault CA to speak HTTPS to the main
+  vault listener but the CA itself was only reachable behind that HTTPS.
+  Listener serves only `/ca.crt` (PEM download), `/` (per-OS install
+  instructions for Linux/macOS/Windows + Python `SSL_CERT_FILE` /
+  Node.js `NODE_EXTRA_CA_CERTS` snippets), and `/health`. CA cert is
+  public information by design — exposing it without auth is safe.
+  Disable with `vault.bootstrap_port: 0` (or `WV_VAULT_BOOTSTRAP_PORT=0`).
+- **`tokenAuthFail` replaces the catch-all `"invalid token"` 401.**
+  `requireProxyToken` and `requireAnthropicToken` now distinguish:
+  - 401 `"token not registered with vault"` — vault returned 401/403/404
+  - 503 `"vault unreachable"` — network / dial / timeout
+  - 502 `"vault returned an unexpected response"` — vault 5xx or
+    malformed JSON
+  - 401 `"proxy.vault_token mismatch"` — proxy token configured but
+    didn't match (no vault fallback)
+  - 503 `"no auth configured"` — neither proxy.vault_token nor
+    proxy.vault_url set
+  Real ops cost prompted this — board #43 documented operators chasing
+  IP whitelist for an hour when the cause was a stale token cache.
+- Tests: bootstrap handler routes (ca.crt + index + 404 hint), CA path
+  resolution fallback chain, every tokenAuthFail branch's wire-format.
+
+---
+
 ## [0.2.40] — 2026-05-01
 
 ### Added — Ollama latency reduction

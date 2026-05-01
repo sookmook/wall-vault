@@ -115,6 +115,27 @@ func runAll() {
 		}
 	}()
 
+	// start bootstrap listener (plain-HTTP CA distribution) when configured.
+	// This breaks the catch-22 where new clients need the CA to speak HTTPS
+	// to vault but the CA itself is only behind that HTTPS. CA is public-info
+	// so plain HTTP is fine; everything secret stays on the main HTTPS port.
+	var bootstrapHTTP *http.Server
+	if cfg.Vault.BootstrapPort > 0 {
+		caPath := ivault.ResolveCAPath("")
+		bootstrapAddr := ivault.BootstrapAddr(cfg)
+		bootstrapHTTP = ivault.NewBootstrapServer(bootstrapAddr, caPath)
+		go func() {
+			log.Printf("[bootstrap] 시작 :%d (plain-HTTP, CA distribution only)", cfg.Vault.BootstrapPort)
+			ivault.LogStartupHint(bootstrapAddr)
+			err := bootstrapHTTP.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				// Log but don't fatal — main vault listener is the load-bearing
+				// one; bootstrap is convenience.
+				log.Printf("[bootstrap] 오류 (계속 진행): %v", err)
+			}
+		}()
+	}
+
 	// start proxy
 	proxySrv := iproxy.NewServer(cfg)
 	proxyAddr := fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port)
@@ -167,6 +188,11 @@ func runAll() {
 	}
 	if err := vaultHTTP.Shutdown(ctx); err != nil {
 		slog.Warn("vault http shutdown", "err", err)
+	}
+	if bootstrapHTTP != nil {
+		if err := bootstrapHTTP.Shutdown(ctx); err != nil {
+			slog.Warn("bootstrap http shutdown", "err", err)
+		}
 	}
 	proxySrv.Stop()
 	vaultSrv.Stop()

@@ -118,6 +118,12 @@ type Server struct {
 	tokenCache      map[string]*tokenCacheEntry // Bearer token → client model config
 	clientActMu     sync.Mutex
 	clientActs      map[string]*clientAct // clientID → last-seen activity (for heartbeat reporting)
+	// ollamaHTTP is a long-lived client used for every callOllama. Reusing
+	// the underlying transport keeps idle TCP/keepalive connections to
+	// :11434 warm so we save a few ms per call (TLS isn't in play locally,
+	// but the syscall + handshake cost still adds up under sustained
+	// traffic). Built once in NewServer.
+	ollamaHTTP *http.Client
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -150,6 +156,19 @@ func NewServer(cfg *config.Config) *Server {
 
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
 	s.filter = NewToolFilter(FilterMode(cfg.Proxy.ToolFilter), cfg.Proxy.AllowedTools)
+	// Dedicated long-lived Ollama HTTP client. The 10-minute timeout is the
+	// same generous bound the inline client used; the Transport tuning is
+	// new — without it every callOllama spun up a fresh client whose
+	// connection went straight to TIME_WAIT after the response, defeating
+	// HTTP keep-alive.
+	s.ollamaHTTP = &http.Client{
+		Timeout: 10 * time.Minute,
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     120 * time.Second,
+		},
+	}
 
 	// initialize hooks manager
 	shellCmds := map[hooks.EventType]string{
@@ -1913,18 +1932,30 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// Pin think so thinking-capable models do not silently consume num_predict
 	// on hidden reasoning. vault reasoning_mode=true → think=true, default → false.
 	oaiReq.Think = &reasoning
+	// Tell Ollama how long to keep the model resident after this response.
+	// Recent Ollama (>=0.3.x) honours top-level keep_alive on the OpenAI
+	// compat endpoint; older versions silently ignore it. Empty config means
+	// "stay on Ollama's own default" — we don't second-guess the operator.
+	if ka := s.cfg.Proxy.OllamaKeepAlive; ka != "" {
+		oaiReq.KeepAlive = &ka
+	}
+	// Forward NumCtx through Ollama's options bag when configured. NumPredict
+	// stays in the standard MaxTokens path. Ollama's OpenAI compat layer
+	// passes through unknown top-level fields to the runtime where supported;
+	// older versions ignore — same no-regression rationale as keep_alive.
+	if n := s.cfg.Proxy.OllamaNumCtx; n > 0 {
+		nc := n
+		oaiReq.Options = &OllamaOptions{NumCtx: &nc}
+	}
 	data, _ := json.Marshal(oaiReq)
 
-	// Ollama is a local service: inference can take several minutes for large models.
-	// Use a dedicated client with no hard timeout so generation is never cut off.
-	// Connection errors (server not running) still surface immediately.
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/v1/chat/completions", bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("Ollama 요청 생성 실패: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	ollamaClient := &http.Client{Timeout: 10 * time.Minute} // generous timeout for local inference
-	resp, err := ollamaClient.Do(httpReq)
+	// Reuse the long-lived Ollama client — see Server.ollamaHTTP for why.
+	resp, err := s.ollamaHTTP.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("Ollama 연결 실패 (%s): %w", ollamaURL, err)
 	}

@@ -110,6 +110,19 @@ type OpenAIRequest struct {
 	// memory across requests until the daemon hangs. Forcing think=false on
 	// every call mirrors `ollama run --think=false`.
 	Think *bool `json:"think,omitempty"`
+	// KeepAlive is an Ollama-specific extension on /v1/chat/completions that
+	// controls how long the model stays resident in RAM after the response.
+	// "30m" means thirty minutes idle before unload, "-1" means forever, "0"
+	// means unload immediately. Default Ollama behaviour is 5 minutes, which
+	// causes 80-100s cold reloads on the 27B fleet model when calls are
+	// sparse. Pointer so the field stays out of the wire format when empty.
+	// Recent Ollama (>=0.3.x) honours this on the OpenAI compat endpoint;
+	// older versions silently ignore — no regression either way.
+	KeepAlive *string `json:"keep_alive,omitempty"`
+	// Options carries Ollama-native options (NumCtx, NumPredict, etc.) when
+	// the upstream is Ollama. OpenAI / Anthropic / Google ignore the field;
+	// Ollama's OpenAI compat layer forwards it to the runtime when present.
+	Options *OllamaOptions `json:"options,omitempty"`
 }
 
 type OpenAIMessage struct {
@@ -377,6 +390,10 @@ type OllamaRequest struct {
 type OllamaOptions struct {
 	Temperature float64 `json:"temperature,omitempty"`
 	NumPredict  int     `json:"num_predict,omitempty"`
+	// NumCtx pins the context window. Ollama's default is 2048 which truncates
+	// long Korean conversations; pointer so the field is only emitted when set
+	// (omitempty would also drop legitimate zero, but NumCtx=0 is meaningless).
+	NumCtx *int `json:"num_ctx,omitempty"`
 }
 
 type OllamaResponse struct {

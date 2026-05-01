@@ -8,6 +8,37 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.40] — 2026-05-01
+
+### Added — Ollama latency reduction
+
+- **`keep_alive` on every Ollama call (default 30m).** Ollama's own default
+  unloads the model after 5 minutes idle, which on the 27B fleet model on
+  mini meant every call separated by more than 5 minutes paid an 80-113s
+  cold reload. The proxy now sends `keep_alive=30m` on every Ollama
+  request so the model stays warm between sparse calls. Tunable via
+  `WV_OLLAMA_KEEP_ALIVE` (e.g. `-1` for forever, `10m` for tighter RAM,
+  `0` to disable). Recent Ollama (>=0.3.x) honours top-level keep_alive
+  on the OpenAI compat endpoint; older versions silently ignore — no
+  regression either way.
+- **`num_ctx` (default 8192).** Pin Ollama's context window so long
+  Korean conversations + tool-call payloads don't get truncated by the
+  2048-token built-in default. Tunable via `WV_OLLAMA_NUM_CTX`.
+- **HTTP connection pooling for Ollama.** Pre-v0.2.40 every callOllama
+  built a fresh `http.Client` whose connection died straight to TIME_WAIT
+  after the response. The proxy now keeps one long-lived client with
+  `MaxIdleConns=10`, `MaxIdleConnsPerHost=10`, `IdleConnTimeout=120s`
+  per Server instance, saving the syscall+handshake cost on every
+  follow-up request.
+- Tests cover the JSON wire-format invariants (keep_alive/num_ctx
+  appear when set, are absent when nil) and env-var override behaviour.
+
+Note: timeout was already 600s (10 min) in `internal/proxy/server.go` —
+the user's "raise to 600s" intuition was right but the lever was already
+pulled. The actual bottleneck was the missing keep_alive hint.
+
+---
+
 ## [0.2.39] — 2026-05-01
 
 ### Added — OpenClaw version-aware config writes

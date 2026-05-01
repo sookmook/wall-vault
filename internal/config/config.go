@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -44,6 +45,16 @@ type ProxyConfig struct {
 	// on hosts where hostname detection is unreliable (WSL, renamed boxes).
 	ClaudeCodeClientID string    `yaml:"claude_code_client_id"`
 	TLS                TLSConfig `yaml:"tls"`
+	// OllamaKeepAlive controls how long Ollama keeps the model loaded after a
+	// response. "30m" means thirty minutes idle before unload; "-1" never
+	// unloads; "0" unloads immediately. Default Ollama behaviour is 5 minutes,
+	// which causes 80-100s cold reloads on the 27B fleet model when calls are
+	// sparse. Empty string leaves Ollama on its own default.
+	OllamaKeepAlive string `yaml:"ollama_keep_alive"`
+	// OllamaNumCtx pins the Ollama context window. Default Ollama (2048) is
+	// too small for long Korean conversations; 8192 is a reasonable starting
+	// point. Zero = leave Ollama default in place.
+	OllamaNumCtx int `yaml:"ollama_num_ctx"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -111,7 +122,15 @@ func Default() *Config {
 			// (qwen3.6:27b ≈ 80s, gemma4:26b ≈ 6m) blow past anything shorter,
 			// causing every minute-cron caller to disconnect mid-load and trigger
 			// the cold-start loop seen on mini.
-			Timeout:    300 * time.Second,
+			Timeout: 300 * time.Second,
+			// Keep the 27B fleet model warm for 30 minutes after each call so
+			// sparse traffic doesn't pay the 80-113s cold-reload tax on every
+			// request. Operators with tight RAM can override via WV_OLLAMA_KEEP_ALIVE.
+			OllamaKeepAlive: "30m",
+			// 8K context covers long Korean conversations + tool-call payloads
+			// without spilling into the 27B model's slow path. Override via
+			// WV_OLLAMA_NUM_CTX or per-host config.
+			OllamaNumCtx: 8192,
 		},
 		Vault: VaultConfig{
 			Port:        56243,
@@ -294,6 +313,17 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WV_VAULT_TLS_KEY"); v != "" {
 		cfg.Vault.TLS.KeyFile = v
+	}
+	// Ollama tuning — env vars win so operators can hot-tune without rewriting
+	// YAML. Empty/zero values fall back to whatever the YAML or Default()
+	// already set.
+	if v := os.Getenv("WV_OLLAMA_KEEP_ALIVE"); v != "" {
+		cfg.Proxy.OllamaKeepAlive = v
+	}
+	if v := os.Getenv("WV_OLLAMA_NUM_CTX"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Proxy.OllamaNumCtx = n
+		}
 	}
 	// Windows: auto-set data path based on APPDATA
 	if cfg.Vault.DataDir == "" {

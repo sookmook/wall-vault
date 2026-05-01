@@ -1,6 +1,10 @@
 package layouts
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
 
 // LangOption represents a selectable locale in the header dropdown.
 type LangOption struct {
@@ -22,18 +26,13 @@ type HeaderVM struct {
 	StartedAt    int64
 }
 
-var themeOptions = []struct {
-	Code  string
-	Label string
-}{
-	{"light", "☀️ Light"},
-	{"dark", "🌙 Dark"},
-	{"cherry", "🌸 Cherry"},
-	{"ocean", "🌊 Ocean"},
-	{"gold", "🥇 Gold"},
-	{"autumn", "🍁 Autumn"},
-	{"winter", "❄️ Winter"},
-}
+// themeCodes lists the dashboard themes in display order. Labels render
+// through i18n.T("theme_<code>") so non-English locales (started with the
+// header dropdown still showing English when ko was selected) stay
+// translated end-to-end.
+var themeCodes = []string{"light", "dark", "cherry", "ocean", "gold", "autumn", "winter"}
+
+func themeLabel(code string) string { return i18n.T("theme_" + code) }
 
 templ Header(vm *HeaderVM) {
 	<header class="topbar" data-wv-started={ fmt.Sprint(vm.StartedAt) }>
@@ -52,8 +51,8 @@ templ Header(vm *HeaderVM) {
 			<label class="switcher">
 				<span class="switcher-icon">🎨</span>
 				<select id="theme-select" onchange="wvSetTheme(this.value)">
-					for _, t := range themeOptions {
-						<option value={ t.Code } selected?={ t.Code == vm.CurrentTheme }>{ t.Label }</option>
+					for _, code := range themeCodes {
+						<option value={ code } selected?={ code == vm.CurrentTheme }>{ themeLabel(code) }</option>
 					}
 				</select>
 			</label>

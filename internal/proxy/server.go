@@ -331,6 +331,13 @@ func NewServer(cfg *config.Config) *Server {
 		s.registry.Refresh(cfg.Proxy.Services, models.ServiceURLs{"ollama": ollamaURL}, nil)
 	}()
 
+	// Sanitize ~/.openclaw/openclaw.json once at boot. OpenClaw 2026.4.29
+	// rejects model entries with empty `id`, which historically slipped
+	// past pre-guard versions of applyOpenClawConfig — we observed the
+	// raspi gateway crash-loop on 2026-05-01 from a single such entry.
+	// No-op for hosts that don't run OpenClaw (most of the fleet).
+	runStartupSanitize()
+
 	return s
 }
 

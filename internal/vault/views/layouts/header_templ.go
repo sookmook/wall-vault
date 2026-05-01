@@ -8,7 +8,11 @@ package layouts
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/sookmook/wall-vault/internal/i18n"
+)
 
 // LangOption represents a selectable locale in the header dropdown.
 type LangOption struct {
@@ -30,18 +34,13 @@ type HeaderVM struct {
 	StartedAt    int64
 }
 
-var themeOptions = []struct {
-	Code  string
-	Label string
-}{
-	{"light", "☀️ Light"},
-	{"dark", "🌙 Dark"},
-	{"cherry", "🌸 Cherry"},
-	{"ocean", "🌊 Ocean"},
-	{"gold", "🥇 Gold"},
-	{"autumn", "🍁 Autumn"},
-	{"winter", "❄️ Winter"},
-}
+// themeCodes lists the dashboard themes in display order. Labels render
+// through i18n.T("theme_<code>") so non-English locales (started with the
+// header dropdown still showing English when ko was selected) stay
+// translated end-to-end.
+var themeCodes = []string{"light", "dark", "cherry", "ocean", "gold", "autumn", "winter"}
+
+func themeLabel(code string) string { return i18n.T("theme_" + code) }
 
 func Header(vm *HeaderVM) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -68,7 +67,7 @@ func Header(vm *HeaderVM) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(vm.StartedAt))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 39, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 38, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -81,7 +80,7 @@ func Header(vm *HeaderVM) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 43, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 42, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -94,7 +93,7 @@ func Header(vm *HeaderVM) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Subtitle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 44, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 43, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -107,7 +106,7 @@ func Header(vm *HeaderVM) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Version)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 44, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 43, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -117,15 +116,15 @@ func Header(vm *HeaderVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, t := range themeOptions {
+		for _, code := range themeCodes {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(t.Code)
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(code)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 56, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 55, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -135,7 +134,7 @@ func Header(vm *HeaderVM) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if t.Code == vm.CurrentTheme {
+			if code == vm.CurrentTheme {
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" selected")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -146,9 +145,9 @@ func Header(vm *HeaderVM) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(t.Label)
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(themeLabel(code))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 56, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 55, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -171,7 +170,7 @@ func Header(vm *HeaderVM) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(l.Code)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 64, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 63, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -194,7 +193,7 @@ func Header(vm *HeaderVM) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(l.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 64, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/vault/views/layouts/header.templ`, Line: 63, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {

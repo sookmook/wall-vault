@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/i18n"
 )
 
 // BootstrapHandler builds the plain-HTTP handler used by NewBootstrapServer.
@@ -60,9 +61,25 @@ func BootstrapHandler(caPath string) http.Handler {
 		}
 		host := r.Host // includes port
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(bootstrapIndexHTML(host)))
+		_, _ = w.Write([]byte(bootstrapIndexHTML(host, bootstrapLang(r))))
 	})
 	return mux
+}
+
+// bootstrapLang picks the UI locale for the index page. Honours an explicit
+// ?lang override for operators sharing the URL, then the browser's
+// Accept-Language list, falling back to English so non-Korean visitors
+// don't get an unintended Korean page.
+func bootstrapLang(r *http.Request) string {
+	if v := r.URL.Query().Get("lang"); v != "" && i18nSupported(v) {
+		return v
+	}
+	if al := r.Header.Get("Accept-Language"); al != "" {
+		if code := matchAcceptLanguage(al); code != "" {
+			return code
+		}
+	}
+	return "en"
 }
 
 // NewBootstrapServer returns an *http.Server pre-wired to BootstrapHandler.
@@ -122,11 +139,16 @@ func BootstrapAddr(cfg *config.Config) string {
 // install-trust`, but here we hand them to the user copy-pasteable so the
 // flow works on machines that don't have the wall-vault binary (e.g. a
 // Windows RDP host that just needs to trust the CA in Chrome).
-func bootstrapIndexHTML(host string) string {
+//
+// The lang argument is the i18n locale for prose strings — code/CLI
+// commands stay verbatim across languages since they're literal tokens
+// the user types.
+func bootstrapIndexHTML(host, lang string) string {
 	dl := "http://" + host + "/ca.crt"
 	dlEsc := html.EscapeString(dl)
+	t := func(key string) string { return html.EscapeString(i18n.TFor(lang, key)) }
 	return `<!DOCTYPE html>
-<html lang="ko">
+<html lang="` + html.EscapeString(lang) + `">
 <head>
 <meta charset="utf-8"/>
 <title>wall-vault CA bootstrap</title>
@@ -143,38 +165,38 @@ a{color:#2563eb;}
 </style>
 </head>
 <body>
-<h1>wall-vault CA — 신뢰 저장소 등록</h1>
-<p>이 페이지는 평문 HTTP 로 노출되는 부트스트랩 페이지입니다. CA 인증서 자체는 공개 정보라 인증 없이 다운로드할 수 있도록 의도적으로 열어둔 경로입니다.</p>
+<h1>` + t("bs_title") + `</h1>
+<p>` + t("bs_intro") + `</p>
 
-<p><a class="dl" href="/ca.crt" download="wall-vault-ca.crt">📥 ca.crt 다운로드</a></p>
-<p>또는 명령줄에서: <code>curl -O ` + dlEsc + `</code></p>
+<p><a class="dl" href="/ca.crt" download="wall-vault-ca.crt">` + t("bs_download_btn") + `</a></p>
+<p>` + t("bs_or_cmd") + ` <code>curl -O ` + dlEsc + `</code></p>
 
-<h2>Linux (Debian/Ubuntu)</h2>
+<h2>` + t("bs_h_linux") + `</h2>
 <pre>sudo cp ca.crt /usr/local/share/ca-certificates/wall-vault-ca.crt
 sudo update-ca-certificates</pre>
 
-<h2>macOS</h2>
+<h2>` + t("bs_h_macos") + `</h2>
 <pre>sudo security add-trusted-cert -d -r trustRoot \
   -k /Library/Keychains/System.keychain ca.crt</pre>
-<p>키체인 다이얼로그가 뜨면 관리자 비밀번호 입력.</p>
+<p>` + t("bs_macos_note") + `</p>
 
-<h2>Windows (관리자 PowerShell)</h2>
+<h2>` + t("bs_h_windows_admin") + `</h2>
 <pre>certutil -addstore -f Root .\ca.crt</pre>
-<p>관리자 권한이 없으면 사용자 저장소만:</p>
+<p>` + t("bs_windows_user_note") + `</p>
 <pre>certutil -user -addstore -f Root .\ca.crt</pre>
 
-<h2>Python / OpenAI SDK / requests / httpx</h2>
-<p>시스템 신뢰 저장소 대신 환경변수로 지정:</p>
+<h2>` + t("bs_h_python") + `</h2>
+<p>` + t("bs_python_intro") + `</p>
 <pre>export SSL_CERT_FILE=/path/to/ca.crt</pre>
 
-<h2>Node.js</h2>
+<h2>` + t("bs_h_node") + `</h2>
 <pre>export NODE_EXTRA_CA_CERTS=/path/to/ca.crt</pre>
 
-<h2>wall-vault 바이너리가 깔린 머신</h2>
-<p>위 단계를 자동으로 처리:</p>
+<h2>` + t("bs_h_wallvault") + `</h2>
+<p>` + t("bs_wallvault_intro") + `</p>
 <pre>wall-vault cert install-trust</pre>
 
-<p class="warn">⚠️ 이 부트스트랩 listener 는 평문 HTTP 로 ca.crt 만 노출합니다. admin token, API 키 등 일체의 비밀은 메인 HTTPS 리스너 (포트 56243) 에서만 제공됩니다.</p>
+<p class="warn">` + t("bs_warn") + `</p>
 </body>
 </html>`
 }

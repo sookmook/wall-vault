@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/i18n"
 )
 
 const (
@@ -244,8 +245,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.renderLoginPage(w, r, "")
 	case http.MethodPost:
+		lang := s.authLang(r)
 		if err := r.ParseForm(); err != nil {
-			s.renderLoginPage(w, r, "form parse error")
+			s.renderLoginPage(w, r, i18n.TFor(lang, "auth_err_form"))
 			return
 		}
 		ip := realIP(r)
@@ -256,7 +258,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimSpace(r.PostForm.Get("token"))
 		if !secureCompare(token, s.cfg.Vault.AdminToken) {
 			s.limiter.record(ip)
-			s.renderLoginPage(w, r, "invalid token")
+			s.renderLoginPage(w, r, i18n.TFor(lang, "auth_err_invalid_token"))
 			return
 		}
 		if err := s.setSessionCookie(w, r); err != nil {
@@ -280,52 +282,68 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 // ─── HTML pages (inline so we don't depend on templ regeneration) ────────────
 
+// authLang picks the locale for an unauthenticated auth page. Sessionless
+// callers don't carry the dashboard's lang cookie yet, so we honour
+// (1) the URL ?lang=xx override (lets the operator force a locale),
+// (2) the browser's Accept-Language preferences,
+// (3) the server's configured default.
+func (s *Server) authLang(r *http.Request) string {
+	if v := r.URL.Query().Get("lang"); v != "" && i18nSupported(v) {
+		return v
+	}
+	if al := r.Header.Get("Accept-Language"); al != "" {
+		if code := matchAcceptLanguage(al); code != "" {
+			return code
+		}
+	}
+	return s.currentLang()
+}
+
 func (s *Server) renderSetupPage(w http.ResponseWriter, r *http.Request, errMsg string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	lang := s.authLang(r)
 	if s.cfg.Vault.AdminToken != "" {
-		_, _ = w.Write([]byte(authPage("이미 초기화됨", `
-<p>이 벽금고 인스턴스는 이미 초기화되어 있습니다.</p>
-<p><a href="/login">로그인 페이지로 이동</a></p>`)))
+		body := `<p>` + html.EscapeString(i18n.TFor(lang, "auth_already_body")) + `</p>` +
+			`<p><a href="/login">` + html.EscapeString(i18n.TFor(lang, "auth_already_login_link")) + `</a></p>`
+		_, _ = w.Write([]byte(authPage(i18n.TFor(lang, "auth_already_title"), body)))
 		return
 	}
 	if !isLoopback(r) {
-		_, _ = w.Write([]byte(authPage("초기화는 localhost 에서", `
-<p>처음 사용을 시작하시려면 벽금고/프록시가 실행 중인 머신에서
-직접 <code>http://localhost:`+fmt.Sprintf("%d", s.cfg.Vault.Port)+`/setup</code> 을 여세요.</p>
-<p>외부 IP 에서의 첫 클레임은 보안상 차단됩니다.</p>`)))
+		setupURL := fmt.Sprintf("http://localhost:%d/setup", s.cfg.Vault.Port)
+		body := `<p>` + html.EscapeString(i18n.TFor(lang, "auth_loopback_body")) + ` <code>` + html.EscapeString(setupURL) + `</code></p>` +
+			`<p>` + html.EscapeString(i18n.TFor(lang, "auth_loopback_warn")) + `</p>`
+		_, _ = w.Write([]byte(authPage(i18n.TFor(lang, "auth_loopback_title"), body)))
 		return
 	}
-	body := `
-<p>벽금고/프록시 첫 부팅입니다. 아래 버튼을 누르면:</p>
+	body := `<p>` + html.EscapeString(i18n.TFor(lang, "auth_setup_intro")) + `</p>
 <ul>
-<li>관리자 토큰 (<code>admin_token</code>) 자동 생성</li>
-<li>프록시 인증 토큰 (<code>proxy.vault_token</code>) 자동 생성</li>
-<li>API 키 암호화 비밀번호 (<code>master_password</code>) 자동 생성</li>
-<li>위 값들을 설정 파일에 안전하게 저장</li>
-<li>이 브라우저에 세션 쿠키 발급 → 대시보드 진입</li>
+<li>` + html.EscapeString(i18n.TFor(lang, "auth_setup_b1")) + `</li>
+<li>` + html.EscapeString(i18n.TFor(lang, "auth_setup_b2")) + `</li>
+<li>` + html.EscapeString(i18n.TFor(lang, "auth_setup_b3")) + `</li>
+<li>` + html.EscapeString(i18n.TFor(lang, "auth_setup_b4")) + `</li>
+<li>` + html.EscapeString(i18n.TFor(lang, "auth_setup_b5")) + `</li>
 </ul>
 <form method="POST" action="/setup">
-<button type="submit">초기화 진행</button>
+<button type="submit">` + html.EscapeString(i18n.TFor(lang, "auth_setup_button")) + `</button>
 </form>`
 	if errMsg != "" {
 		body = `<p class="err">` + html.EscapeString(errMsg) + `</p>` + body
 	}
-	_, _ = w.Write([]byte(authPage("벽금고 초기 설정", body)))
+	_, _ = w.Write([]byte(authPage(i18n.TFor(lang, "auth_setup_title"), body)))
 }
 
 func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, errMsg string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	body := `
-<p>관리자 토큰을 입력하세요. 토큰은 첫 부팅 후 대시보드의 "API 토큰" 카드 또는
-설정 파일 (<code>vault.admin_token</code>) 에서 확인할 수 있습니다.</p>
+	lang := s.authLang(r)
+	body := `<p>` + html.EscapeString(i18n.TFor(lang, "auth_login_intro")) + `</p>
 <form method="POST" action="/login">
-<input type="password" name="token" autocomplete="current-password" required autofocus placeholder="admin_token"/>
-<button type="submit">로그인</button>
+<input type="password" name="token" autocomplete="current-password" required autofocus placeholder="` + html.EscapeString(i18n.TFor(lang, "auth_login_field_ph")) + `"/>
+<button type="submit">` + html.EscapeString(i18n.TFor(lang, "auth_login_submit")) + `</button>
 </form>`
 	if errMsg != "" {
 		body = `<p class="err">` + html.EscapeString(errMsg) + `</p>` + body
 	}
-	_, _ = w.Write([]byte(authPage("벽금고 로그인", body)))
+	_, _ = w.Write([]byte(authPage(i18n.TFor(lang, "auth_login_title"), body)))
 }
 
 // authPage wraps body HTML in a minimal page chrome shared between /setup

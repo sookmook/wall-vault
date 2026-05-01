@@ -8,6 +8,32 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.42] — 2026-05-01
+
+### Added
+
+- **OpenClaw config sanitizer.** `internal/proxy/openclaw_sanitize.go`
+  filters empty-id model entries (`models.providers.<provider>.models[]`)
+  from `~/.openclaw/openclaw.json` so OpenClaw 2026.4.29's stricter
+  schema validation doesn't crash-loop the gateway. Fires once at proxy
+  boot (no-op for hosts without OpenClaw) and is also exposed as
+  `wall-vault doctor sanitize-openclaw`. Backs up the original to
+  `*.bak.sanitize` before rewriting; only writes when something actually
+  changes so clean configs see no churn. Triggered by raspi observation
+  on 2026-05-01: a single empty-id entry left over from a pre-v0.2.32
+  applyOpenClawConfig caller crash-looped the gateway after restart.
+- **17-language i18n on auth + bootstrap pages.** `/setup`, `/login`,
+  the bootstrap CA-distribution index page, and the dashboard header's
+  theme dropdown all now route every prose string through `i18n.TFor`.
+  Lang resolution honours `?lang=xx` override → `Accept-Language` →
+  server default. Adds a small `lang_match.go` helper that parses the
+  q-weighted Accept-Language list. New keys (`auth_*`, `bs_*`,
+  `theme_*`) ship in all 17 locales (ko, en, ja, zh, es, de, fr, pt,
+  id, th, hi, ar, mn, ne, sw, zu, ha) — code tokens and proper nouns
+  stay verbatim in every locale.
+
+---
+
 ## [0.2.41] — 2026-05-01
 
 ### Added — CA bootstrap listener + token-auth diagnostic messages

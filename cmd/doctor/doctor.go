@@ -8,6 +8,7 @@ import (
 
 	"github.com/sookmook/wall-vault/internal/config"
 	idoctor "github.com/sookmook/wall-vault/internal/doctor"
+	iproxy "github.com/sookmook/wall-vault/internal/proxy"
 )
 
 // Run: wall-vault doctor [check|fix|status|all|deploy]
@@ -93,6 +94,18 @@ func Run(args []string) {
 			os.Exit(1)
 		}
 		fmt.Printf("[fix-nanoclaw] ✓ ANTHROPIC_BASE_URL=http://localhost:%d 설정 완료\n", cfg.Proxy.Port)
+
+	case "sanitize-openclaw":
+		summary, err := iproxy.SanitizeOpenClawConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[sanitize-openclaw] 오류: %v\n", err)
+			os.Exit(1)
+		}
+		if summary == "" {
+			fmt.Println("[sanitize-openclaw] ✓ ~/.openclaw/openclaw.json 깨끗함 (또는 OpenClaw 미설치)")
+		} else {
+			fmt.Printf("[sanitize-openclaw] ✓ %s\n", summary)
+		}
 
 	case "status":
 		idoctor.PrintStatus(cfg)

@@ -240,6 +240,15 @@ func NewServer(cfg *config.Config) *Server {
 			}
 			if mdl != "" {
 				s.model = mdl
+			} else if svc != "" {
+				// Vault soft-cleared the override (operator picked "(use
+				// service default)" in dashboard). Fill from the new
+				// service's default_model so downstream sync writers
+				// (OpenClaw, cline, EconoWorld) propagate a coherent
+				// model id matching what dispatch will actually route.
+				if def := s.serviceDefaults[svc]; def != "" {
+					s.model = def
+				}
 			}
 			newSvc, newMdl := s.service, s.model
 			s.mu.Unlock()
@@ -252,27 +261,25 @@ func NewServer(cfg *config.Config) *Server {
 			}
 		}, func(clientID, agentType, svc, mdl string) {
 			// Foreign client model changed in vault — update local agent config if applicable.
+			// When mdl is empty (operator picked "(use service default)") fall back to
+			// the new service's default_model so the local config writers propagate
+			// a coherent model id matching what dispatch will actually route.
+			effective := mdl
+			if effective == "" && svc != "" {
+				s.mu.RLock()
+				effective = s.serviceDefaults[svc]
+				s.mu.RUnlock()
+			}
 			switch agentType {
 			case "cline":
-				if mdl != "" {
-					go updateClineModel(mdl)
+				if effective != "" {
+					go updateClineModel(effective)
 				}
 			case "claude-code":
-				if mdl != "" {
-					go updateClaudeCodeModel(mdl)
+				if effective != "" {
+					go updateClaudeCodeModel(effective)
 				}
 			case "econoworld":
-				// When mdl is empty (vault soft-cleared a stale override on a service
-				// switch, or user explicitly picked "(서비스 기본 사용)"), fall back to
-				// the new service's default_model so ai_config.json stays consistent
-				// with what /status surfaces. Without this, ai_config.json keeps the
-				// previous override and drifts from the proxy's actual routing.
-				effective := mdl
-				if effective == "" && svc != "" {
-					s.mu.RLock()
-					effective = s.serviceDefaults[svc]
-					s.mu.RUnlock()
-				}
 				if effective != "" {
 					go updateEconoWorldModel(effective)
 				}
@@ -955,6 +962,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 // (resolved via lookupTokenConfig with a 5s cache). Writes 401 and returns
 // false on rejection.
 func (s *Server) requireProxyToken(w http.ResponseWriter, r *http.Request) bool {
+	s.substituteSelfManagedSentinel(r)
 	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {
 		jsonError(w, "Authorization header required", http.StatusUnauthorized)
@@ -998,6 +1006,7 @@ func safePrefix(s string, n int) string {
 // credential proxy) — those are forwarded upstream by the handler and so are
 // trusted as long as they are present.
 func (s *Server) requireAnthropicToken(w http.ResponseWriter, r *http.Request) bool {
+	s.substituteSelfManagedSentinel(r)
 	var token string
 	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 		token = strings.TrimPrefix(auth, "Bearer ")
@@ -2464,6 +2473,29 @@ func parseProviderModel(svc, mdl string) (string, string) {
 // guard against given the parser sits on the request hot path.
 const maxParseProviderDepth = 8
 
+// oaiCompatServices: backends that speak OpenAI /v1/chat/completions and
+// publish models in path-style ids (publisher/model). Their publisher segment
+// frequently collides with native service names (google/, qwen/, anthropic/),
+// so parseProviderModelDepth uses this single set for both directions:
+//   - caller chose one as svc → honour it regardless of the body model's prefix
+//   - caller wrote one as the model prefix → route to that backend
+//
+// New OAI-compat plugin yamls only need to be added here to inherit both
+// behaviours. Was previously enumerated in three places (two case-by-case
+// `if` blocks per backend plus the dispatch case label); now one source.
+var oaiCompatServices = map[string]struct{}{
+	"lmstudio":      {},
+	"vllm":          {},
+	"llamacpp":      {},
+	"tgwui":         {},
+	"localai":       {},
+	"jan":           {},
+	"koboldcpp":     {},
+	"tabbyapi":      {},
+	"mlx-server":    {},
+	"litellm-proxy": {},
+}
+
 func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 	if depth >= maxParseProviderDepth {
 		return svc, mdl
@@ -2507,15 +2539,24 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 	if svc == "openrouter" && prefix != "openrouter" && prefix != "ollama" {
 		return "openrouter", mdl
 	}
-	// LM Studio's model IDs are path-style ("publisher/model") and the
-	// publisher segment frequently collides with another service's name
-	// (google/, qwen/, anthropic/, microsoft/, …). When the caller explicitly
-	// chose lmstudio, never re-route to the publisher's native handler —
-	// surfaced when an EconoWorld request to lmstudio carrying default
-	// "google/gemma-4-26b-a4b" got hijacked into the Google service handler
-	// and 502'd with "모델 없음".
-	if svc == "lmstudio" && prefix != "lmstudio" && prefix != "ollama" {
-		return "lmstudio", mdl
+	// OAI-compat backends (LM Studio / vLLM / llama.cpp / tgwui / LocalAI /
+	// Jan / koboldcpp / tabbyapi / mlx-server / litellm-proxy) publish models
+	// in path-style ids (publisher/model). Their publisher segment frequently
+	// collides with another service's name (google/, qwen/, anthropic/, …),
+	// so when the caller explicitly chose one of these the parser must honour
+	// that choice and not re-route based on the prefix segment. Was previously
+	// duplicated as case-by-case if blocks per backend; consolidating into a
+	// single set keeps it in lockstep with the dispatch case below.
+	if _, oai := oaiCompatServices[svc]; oai && prefix != svc && prefix != "ollama" {
+		return svc, mdl
+	}
+	// Prefix-as-OAI-compat: caller wrote "lmstudio/qwen3.6-27b" (or any other
+	// OAI-compat backend's id as the prefix) — route to that backend. The
+	// full mdl (e.g. "lmstudio/qwen/qwen3.6-27b") flows on so callLocalService's
+	// own one-segment prefix stripper drops only the leading "lmstudio/",
+	// preserving "qwen/qwen3.6-27b" for LM Studio / vLLM / llama.cpp.
+	if _, oai := oaiCompatServices[prefix]; oai {
+		return prefix, mdl
 	}
 
 	switch prefix {
@@ -2526,21 +2567,6 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 		return "google", mdl
 	case "ollama":
 		return "ollama", bare
-
-	// ── OpenAI-compat local backends (callLocalService) ──────────────────────
-	// Every backend here speaks /v1/chat/completions. New backends added via
-	// plugin yaml only need to be listed here so the "<id>/<model>" form
-	// addresses them; the actual transport (URL, auth, TLS) is read from
-	// the plugin yaml at dispatch time.
-	//
-	// We return the full mdl (e.g. "lmstudio/qwen/qwen3.6-27b") rather than
-	// bare so callLocalService's own provider-prefix stripper drops only
-	// the leading "lmstudio/" — preserving the "qwen/qwen3.6-27b" form
-	// that LM Studio / vLLM / llama.cpp expect for org-scoped model ids.
-	case "lmstudio", "vllm", "llamacpp",
-		"tgwui", "localai", "jan", "koboldcpp",
-		"tabbyapi", "mlx-server", "litellm-proxy":
-		return prefix, mdl
 
 	// ── OpenAI direct ────────────────────────────────────────────────────────
 	case "openai":

@@ -83,6 +83,15 @@ type ProxyConfig struct {
 	// written into EconoWorld's ai_config.json. EconoWorld may ignore the
 	// field; presence is harmless. Zero = field omitted.
 	EconoWorldRequestTimeout int `yaml:"econoworld_request_timeout"`
+
+	// TokenSentinelFallback, when true, lets a loopback caller present a
+	// well-known sentinel ("proxy-managed", "dummy", "") in its Bearer
+	// header and have the proxy substitute its own VaultToken. This rescues
+	// agents (notably OpenClaw on a host whose heal pass has not finalised
+	// the token rewrite yet) from a hard 401 dead-end without giving up
+	// vault-side authn for non-loopback callers. Default off — operators
+	// opt in per host with WV_TOKEN_SENTINEL_FALLBACK=1.
+	TokenSentinelFallback bool `yaml:"token_sentinel_fallback"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -407,6 +416,14 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WV_ECONOWORLD_REQUEST_TIMEOUT"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			cfg.Proxy.EconoWorldRequestTimeout = n
+		}
+	}
+	if v := os.Getenv("WV_TOKEN_SENTINEL_FALLBACK"); v != "" {
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "1", "true", "yes", "on":
+			cfg.Proxy.TokenSentinelFallback = true
+		case "0", "false", "no", "off":
+			cfg.Proxy.TokenSentinelFallback = false
 		}
 	}
 	// Windows: auto-set data path based on APPDATA

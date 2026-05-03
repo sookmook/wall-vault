@@ -8,6 +8,43 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.58] — 2026-05-03
+
+### Added
+
+- **Self-managed sentinel token substitute (loopback only, opt-in).**
+  Fresh agent installs frequently ship with a placeholder token like
+  `proxy-managed` or `dummy` in their config (OpenClaw's
+  `models.providers.custom.apiKey`, NanoClaw's equivalent) and rely on
+  the proxy's heal pass to rewrite the field to the real `VaultToken`.
+  When the heal hadn't yet run — for example, a freshly installed
+  client whose gateway started before the proxy's first heal cycle —
+  every request from that client was a hard 401 dead-end. The proxy
+  now recognises these sentinels at the request boundary and, when the
+  operator sets `WV_TOKEN_SENTINEL_FALLBACK=1` and the caller is on the
+  loopback interface, substitutes the proxy's own `VaultToken` so the
+  request can resolve normally. Both `Authorization: Bearer …` and
+  Anthropic-style `x-api-key` headers are covered. Loopback is the
+  security boundary: only a process already on the same host can use
+  these sentinels, which matches the trust level local agents already
+  enjoy via filesystem access to the same config. New env knob:
+  `WV_TOKEN_SENTINEL_FALLBACK` (default off).
+
+### Changed
+
+- **Provider-prefix hijack policy consolidated into a single set.**
+  The list of OpenAI-compatible backends that publish path-style model
+  ids (`publisher/model`) was previously enumerated in three places
+  (two case-by-case `if` blocks per backend in
+  `parseProviderModelDepth`, plus the dispatch case label). It is now
+  one source of truth — `oaiCompatServices` — used for both directions
+  of the parser: caller chose one of these as `svc` (honour the choice
+  regardless of the body model's prefix), and caller wrote one of
+  these as the model prefix (route to that backend). Adding a new
+  OAI-compat plugin yaml only needs that single set updated.
+
+---
+
 ## [0.2.57] — 2026-05-03
 
 ### Fixed

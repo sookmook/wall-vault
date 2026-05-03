@@ -88,3 +88,53 @@ func TestParseProviderModel_BarePromotion(t *testing.T) {
 		})
 	}
 }
+
+// TestParseProviderModel_OAICompatMatrix exercises the oaiCompatServices set
+// for the two directions the parser uses it: (a) caller chose an OAI-compat
+// backend as svc — model prefix must not hijack the route to a native handler;
+// (b) caller wrote an OAI-compat backend as the model prefix — route must land
+// on that backend regardless of the original svc. Ollama prefix is the one
+// documented escape hatch (operator-wired Modelfile aliases).
+func TestParseProviderModel_OAICompatMatrix(t *testing.T) {
+	backends := []string{
+		"lmstudio", "vllm", "llamacpp", "tgwui", "localai",
+		"jan", "koboldcpp", "tabbyapi", "mlx-server", "litellm-proxy",
+	}
+	prefixes := []string{"google", "anthropic", "qwen", "meta-llama", "openai"}
+
+	for _, b := range backends {
+		for _, p := range prefixes {
+			mdl := p + "/some-model-7b"
+
+			// (a) svc=backend + foreign prefix → svc honoured (no hijack).
+			t.Run(b+"/svc_keeps_"+p, func(t *testing.T) {
+				gotSvc, gotMdl := parseProviderModel(b, mdl)
+				if gotSvc != b || gotMdl != mdl {
+					t.Errorf("parseProviderModel(%q,%q) = (%q,%q), want (%q,%q)",
+						b, mdl, gotSvc, gotMdl, b, mdl)
+				}
+			})
+
+			// (b) svc=ollama + backend prefix → routes to backend.
+			pmdl := b + "/some-model-7b"
+			t.Run(b+"/prefix_routes_from_ollama", func(t *testing.T) {
+				gotSvc, gotMdl := parseProviderModel("ollama", pmdl)
+				if gotSvc != b || gotMdl != pmdl {
+					t.Errorf("parseProviderModel(%q,%q) = (%q,%q), want (%q,%q)",
+						"ollama", pmdl, gotSvc, gotMdl, b, pmdl)
+				}
+			})
+		}
+
+		// Documented escape: svc=backend + ollama/* prefix bypasses honour-svc.
+		// Caller's "ollama/qwen3.6:27b" still lands on ollama even when svc was
+		// pinned to an OAI-compat backend (matches the ollama-bypass clause).
+		t.Run(b+"/ollama_prefix_bypass", func(t *testing.T) {
+			gotSvc, gotMdl := parseProviderModel(b, "ollama/qwen3.6:27b")
+			if gotSvc != "ollama" || gotMdl != "qwen3.6:27b" {
+				t.Errorf("parseProviderModel(%q, ollama/qwen3.6:27b) = (%q,%q), want (ollama, qwen3.6:27b)",
+					b, gotSvc, gotMdl)
+			}
+		})
+	}
+}

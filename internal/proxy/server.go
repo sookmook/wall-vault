@@ -1960,6 +1960,14 @@ func (s *Server) dispatchWithChain(ctx context.Context, primary, model string, f
 					"model":   targetModel,
 				})
 			}
+			if dispatchTraceEnabled() {
+				reason := "primary"
+				if !isPrimary {
+					reason = "fallback"
+				}
+				log.Printf("[dispatch] requested=%s/%s resolved=%s/%s reason=%s",
+					primary, model, svc, targetModel, reason)
+			}
 			return result, nil
 		}
 		log.Printf("[proxy] %s (%s) failed: %v", svc, targetModel, err)

@@ -8,6 +8,20 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.60] — 2026-05-04
+
+### Added
+
+- **Dispatch trace logging (opt-in).** `dispatchWithChain` now emits a
+  single-line `[dispatch] requested=<svc>/<mdl> resolved=<svc>/<mdl>
+  reason=<primary|fallback>` log on each successful dispatch when
+  `WV_DISPATCH_TRACE=1` is set. Designed for live diagnosis of
+  routing decisions (which service the call actually landed on, and
+  whether a fallback fired) without grepping multiple log lines.
+  Off by default — production hosts pay no log-volume cost.
+
+---
+
 ## [0.2.59] — 2026-05-04
 
 ### Added

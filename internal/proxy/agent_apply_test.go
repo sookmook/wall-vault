@@ -85,6 +85,171 @@ func TestUpdateEconoWorldModelAt_NoOpenAICompatSectionIsSilent(t *testing.T) {
 	}
 }
 
+func TestApplyEconoWorldConfig_WritesNewRobustnessFields(t *testing.T) {
+	// Fresh bootstrap into an empty workdir must surface stream,
+	// request_timeout_seconds and the configured max_tokens floor.
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "analyzer"), 0755); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	path, err := applyEconoWorldConfig("http://127.0.0.1:56245/v1", "m1", "tok", tmp, 8192, true, 300)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["max_tokens"].(float64) != 8192 {
+		t.Fatalf("max_tokens = %v, want 8192", compat["max_tokens"])
+	}
+	if compat["stream"] != true {
+		t.Fatalf("stream = %v, want true", compat["stream"])
+	}
+	if compat["request_timeout_seconds"].(float64) != 300 {
+		t.Fatalf("request_timeout_seconds = %v, want 300", compat["request_timeout_seconds"])
+	}
+}
+
+func TestApplyEconoWorldConfig_PreservesOperatorTunedValues(t *testing.T) {
+	// An operator who set custom values must not have them clobbered when
+	// /agent/apply runs again — only newly-missing fields should be filled.
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "analyzer"), 0755); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	pre := `{
+	  "provider": "openai_compatible",
+	  "openai_compatible": {
+	    "base_url": "http://old/v1",
+	    "max_tokens": 16000,
+	    "stream": false,
+	    "request_timeout_seconds": 120
+	  }
+	}`
+	path := filepath.Join(tmp, "analyzer", "ai_config.json")
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if _, err := applyEconoWorldConfig("http://new/v1", "m2", "tok", tmp, 8192, true, 300); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	var got map[string]interface{}
+	data, _ := os.ReadFile(path)
+	_ = json.Unmarshal(data, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["max_tokens"].(float64) != 16000 {
+		t.Fatalf("max_tokens overwritten: %v", compat["max_tokens"])
+	}
+	if compat["stream"] != false {
+		t.Fatalf("stream overwritten: %v", compat["stream"])
+	}
+	if compat["request_timeout_seconds"].(float64) != 120 {
+		t.Fatalf("request_timeout overwritten: %v", compat["request_timeout_seconds"])
+	}
+	if compat["base_url"] != "http://new/v1" {
+		t.Fatalf("base_url should always update: %v", compat["base_url"])
+	}
+}
+
+func TestHealEconoWorldConfigAt_RewritesLocalProxyURL(t *testing.T) {
+	// Same-host base_url (https://localhost:56244/v1) must be rewritten
+	// to the loopback companion when localBaseOrigin is set; the path
+	// suffix must survive the rewrite.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"openai_compatible","openai_compatible":{"base_url":"https://localhost:56244/v1"}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := healEconoWorldConfigAt(path, "http://127.0.0.1:56245", 0, false, 0); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["base_url"] != "http://127.0.0.1:56245/v1" {
+		t.Fatalf("base_url = %v, want loopback rewrite with /v1 suffix", compat["base_url"])
+	}
+}
+
+func TestHealEconoWorldConfigAt_LeavesExternalURLAlone(t *testing.T) {
+	// A LAN base_url (192.168.x.x or any non-localhost host) must never
+	// be rewritten — same-host loopback would be wrong for that caller.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"openai_compatible","openai_compatible":{"base_url":"https://<internal-host>:56244/v1"}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := healEconoWorldConfigAt(path, "http://127.0.0.1:56245", 0, false, 0); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["base_url"] != "https://<internal-host>:56244/v1" {
+		t.Fatalf("external base_url rewritten: %v", compat["base_url"])
+	}
+}
+
+func TestHealEconoWorldConfigAt_FillsMissingFields(t *testing.T) {
+	// Old bootstraps lack stream / request_timeout_seconds and have the
+	// legacy max_tokens=4096. Heal should fill missing fields and bump
+	// the legacy 4096 floor when configured higher.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"openai_compatible","openai_compatible":{"base_url":"http://x","max_tokens":4096}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := healEconoWorldConfigAt(path, "", 8192, true, 300); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["stream"] != true {
+		t.Fatalf("stream not filled: %v", compat["stream"])
+	}
+	if compat["request_timeout_seconds"].(float64) != 300 {
+		t.Fatalf("request_timeout not filled: %v", compat["request_timeout_seconds"])
+	}
+	if compat["max_tokens"].(float64) != 8192 {
+		t.Fatalf("legacy 4096 not bumped: %v", compat["max_tokens"])
+	}
+}
+
+func TestHealEconoWorldConfigAt_PreservesNonLegacyMaxTokens(t *testing.T) {
+	// max_tokens that is anything other than the legacy 4096 must be
+	// left alone — operator may have tuned it deliberately to 16000 etc.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"openai_compatible","openai_compatible":{"base_url":"http://x","max_tokens":16000}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := healEconoWorldConfigAt(path, "", 8192, false, 0); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["max_tokens"].(float64) != 16000 {
+		t.Fatalf("operator value bumped: %v", compat["max_tokens"])
+	}
+}
+
+func TestHealEconoWorldConfigAt_MissingFileIsSilent(t *testing.T) {
+	if err := healEconoWorldConfigAt(filepath.Join(t.TempDir(), "nope.json"), "http://127.0.0.1:56245", 8192, true, 300); err != nil {
+		t.Fatalf("missing file should be silent, got %v", err)
+	}
+}
+
 func TestUpdateEconoWorldModel_EmptyModelIsNoop(t *testing.T) {
 	// The SSE callback passes "" when a client clears its model_override;
 	// that path must not clobber the ai_config.json model (it should keep

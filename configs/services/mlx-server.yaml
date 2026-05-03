@@ -1,0 +1,24 @@
+# mlx_lm.server (https://github.com/ml-explore/mlx-examples) — Apple
+# Silicon MLX inference server with OpenAI-compat API. Default port 8080.
+# Run with:  python -m mlx_lm.server --model <hf-id> --host 0.0.0.0 --port 8080
+id: mlx-server
+name: MLX Server (Apple Silicon)
+enabled: false
+
+default_url: http://localhost:8080
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: false
+
+concurrency:
+  max: 1
+  queue_size: 8
+  wait_notify: true

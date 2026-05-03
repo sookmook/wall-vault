@@ -1,0 +1,19 @@
+# Jan (https://jan.ai/) — desktop LLM client with built-in OpenAI-compat
+# server (Cortex backend). Default API port 1337.
+id: jan
+name: Jan
+enabled: false
+
+default_url: http://localhost:1337
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true

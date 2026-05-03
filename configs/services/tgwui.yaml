@@ -1,0 +1,25 @@
+# text-generation-webui by oobabooga
+# (https://github.com/oobabooga/text-generation-webui).
+# Launch with --api flag to enable the OpenAI-compat extension on :5000.
+id: tgwui
+name: text-generation-webui
+enabled: false
+
+default_url: http://localhost:5000
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+
+concurrency:
+  max: 1
+  queue_size: 10
+  wait_notify: true

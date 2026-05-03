@@ -8,6 +8,511 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.57] — 2026-05-03
+
+### Fixed
+
+- **Dashboard "use service default" now actually applies on dispatch.**
+  Previously, picking "(use service default)" in a client's edit panel
+  cleared `entry.model` in vault, but the proxy's request-handling path
+  still let the request body's `model` win — so a client whose
+  `ai_config.json` carried a stale model id silently bypassed the
+  operator's dashboard knob. Now, when a token-resolved client has an
+  empty `default_model` and a non-empty `default_service`, the proxy
+  forces the request body's model to the service-level
+  `serviceDefaults[svc]`. Surfaced when an OAI-compat client kept
+  a stale path-style model id in its body even after the operator
+  switched the LM Studio service default to a different model. Both
+  the OpenAI-compat and Anthropic dispatch paths apply the same
+  fallback.
+- **LM Studio model ids stop getting hijacked into other services'
+  handlers.** LM Studio publishes models as `publisher/model-id`
+  (e.g. `google/gemma-4-26b-a4b`, `qwen/qwen3.6-27b`,
+  `anthropic/claude-…`), which collided with the proxy's existing
+  `provider/...` parsing — a request to `lmstudio` carrying
+  `google/gemma-4-26b-a4b` was force-routed into the native Google
+  service and 502'd with `모델 없음`. Now, when the caller explicitly
+  chose `lmstudio`, the publisher prefix is honoured as part of the
+  model id and the request stays on lmstudio (mirrors the existing
+  OpenRouter exemption).
+- **LM Studio Qwen3 inline `/no_think` token now mirrors the ollama
+  path.** LM Studio's `/v1/chat/completions` silently ignores the
+  top-level `think` field, same as ollama, so Qwen3 burns
+  `max_tokens` on hidden reasoning when reasoning is off in vault. The
+  inline `/no_think` marker is appended to the last user message — but
+  only when `serviceID=="lmstudio"` and the model id starts with
+  `qwen3*`, so other OAI-compat backends (vllm/llamacpp/…) whose jinja
+  templates may not strip the marker are not affected.
+- **`<script id="wv-i18n-data">` no longer ships a literal
+  `@templ.Raw(...)` to the browser.** templ's parser does not evaluate
+  expressions inside raw text elements like `<script>`, so the JSON
+  blob expression was emitted verbatim into the page; the bootstrap
+  parser then caught the JSON.parse error and left `WV_I18N` as `{}`,
+  which made every JS-side i18n key (optgroup labels, model dropdown
+  placeholder, etc.) fall through to the English literal even in
+  Korean mode. The whole `<script>` element is now emitted via
+  `@templ.Raw("<script…>" + I18nJSONBlob(lang) + "</script>")`.
+- **`I18nJSONBlob` is no longer dropped from non-`js` builds.** The
+  helper lived in `i18n_js.go`, which Go interprets as a `GOARCH=js`
+  filename suffix and quietly excludes from every other build target —
+  the function was missing entirely from the linux/darwin/windows
+  binaries and the `wv-i18n-data` blob would have been broken even
+  with the templ fix above. Renamed to `i18n_jsdata.go`.
+
+### Added
+
+- **EconoWorld ai_config.json gains stream / request_timeout_seconds
+  fields and a configurable max_tokens floor.** The previous bootstrap
+  hard-coded `max_tokens=4096`, which truncated long Korean analyses
+  mid-sentence, and never wrote a `stream` flag — so the openai-compat
+  client paid the full ollama cold-load latency as a single silent wait
+  before getting any output. New `ProxyConfig.EconoWorldMaxTokens`
+  (default 8192), `EconoWorldStream` (default true), and
+  `EconoWorldRequestTimeout` (default 300s) are written on bootstrap
+  and survive subsequent `/agent/apply` calls — operator-tuned values
+  in the file are never clobbered. Override per host with
+  `WV_ECONOWORLD_MAX_TOKENS` / `WV_ECONOWORLD_STREAM` /
+  `WV_ECONOWORLD_REQUEST_TIMEOUT`.
+- **Boot heal pass for EconoWorld config.** Mirrors the OpenClaw heal
+  added in v0.2.51-54: at proxy startup, any same-host (localhost /
+  127.0.0.1) `base_url` in `analyzer/ai_config.json` is rewritten to
+  the loopback plain-HTTP companion when one is enabled, sidestepping
+  the self-signed-CA trust problem the same way OpenClaw does. Heal
+  also fills missing `stream` / `request_timeout_seconds` fields and
+  bumps the legacy `max_tokens=4096` to the configured floor; any
+  other operator value is left alone. External (LAN) `base_url`s are
+  never touched. Hosts without an EconoWorld install no-op silently.
+  Set `WV_ECONOWORLD_HEAL_DISABLE=1` to skip the heal entirely.
+
+## [0.2.56] — 2026-05-03
+
+### Fixed
+
+- **Heal pass relaxes the gateway's channel-stale threshold to 60
+  minutes.** Mini gateway 2026-05-03 spent the night in a 300-second
+  SIGTERM-restart loop that survived even after v0.2.55 aligned
+  active-memory's model: every five minutes the gateway logged
+  `[gateway] signal SIGTERM received` and launchd brought it back up.
+  Tracing schema docs revealed
+  `gateway.channelStaleEventThresholdMinutes` — "How many minutes a
+  connected channel can go without provider-proven transport activity
+  before the health monitor treats it as a stale socket." With the
+  threshold left short (effectively the 5-minute health-check
+  interval), an idle telegram bot triggered restarts the moment a
+  human paused typing. Boot heal now floors the value at 60 minutes,
+  preserving OpenClaw's failure-detection logic for sockets that
+  genuinely die while letting quiet bots stay connected. Idempotent —
+  operator settings of 60+ are left alone.
+
+---
+
+## [0.2.55] — 2026-05-02
+
+### Fixed
+
+- **Heal pass aligns active-memory plugin model with the agent's
+  primary.** Mini gateway 2026-05-02 was caught in a 300-second
+  SIGTERM-restart loop: OpenClaw's `active-memory` plugin shipped
+  with `model: custom/gemini-2.5-flash-lite`, but the host's vault
+  has no google credentials in its services list, so every plugin
+  tick failed to dispatch (`No callable tools remain after resolving
+  explicit tool allowlist`). The gateway's health-monitor reads that
+  failure as an unhealthy signal and SIGTERMs itself; launchd
+  restarts; 300s later the same fail; restart again — every
+  in-flight TUI/Telegram turn dies with the gateway.
+
+  Boot heal now walks `plugins.entries.active-memory.config.model` and
+  rewrites it to match `agents.defaults.model.primary` whenever the
+  two diverge. Idempotent: change the agent primary and the plugin
+  resyncs on next boot. No-op when active-memory isn't configured or
+  when the agent has no primary set, so we never materialize plugin
+  config the operator deliberately left empty.
+
+---
+
+## [0.2.54] — 2026-05-02
+
+### Added
+
+- **Loopback-only plain-HTTP companion listener for the proxy.** When
+  `Proxy.TLS.Enabled` is true and `Proxy.PlainPort` is non-zero
+  (default `56245`, env `WV_PROXY_PLAIN_PORT`), wall-vault binds a
+  second HTTP server to `127.0.0.1:<PlainPort>` with TLS off and the
+  exact same handler. Same-host clients that cannot honour the proxy's
+  self-signed CA — most pressingly OpenClaw, whose macOS daemon
+  rewrites `NODE_EXTRA_CA_CERTS` from the operator's value to
+  `/etc/ssl/cert.pem` at spawn ((operator host, earlier)), but the same class
+  of issue exists on any client that uses the system trust store
+  exclusively — now have a path to the proxy that doesn't depend on
+  trust-store configuration. LAN callers (other fleet machines using
+  `ca.crt`) continue to use the TLS listener untouched, and the
+  loopback bind keeps the vault token's exposure inside the same OS
+  user's loopback interface (same trust boundary as a Unix socket).
+  Set `WV_PROXY_PLAIN_PORT=0` to disable.
+
+### Fixed
+
+- **Heal pass routes same-host OpenClaw to the plain companion when
+  one is active.** When the proxy boots with the plain companion
+  enabled, `runStartupOpenClawHeal` rewrites
+  `models.providers.{custom,anthropic,google}.baseUrl` from
+  `https://localhost:56244...` to `http://127.0.0.1:56245...` on both
+  `~/.openclaw/openclaw.json` and every per-agent
+  `~/.openclaw/agents/<id>/agent/models.json` cache. Without the
+  companion (TLS off, or plain port disabled) the heal preserves its
+  v0.2.51 behaviour and leaves any localhost URL alone. Operators
+  running OpenClaw on the same host as wall-vault no longer have to
+  install the wall-vault CA into their system trust store, and the
+  fix is OS- and client-agnostic — the `request.tls.ca` heal
+  (v0.2.53) is kept around as a hint for clients that do honour it,
+  but the plain companion is the load-bearing path.
+
+---
+
+## [0.2.53] — 2026-05-02
+
+### Fixed
+
+- **Heal pass also writes provider-level `request.tls.ca`.** Mini
+  gateway 2026-05-02 surfaced the next layer of breakage after the
+  v0.2.52 `data:` chunk fix: TUI and Telegram dispatches still failed
+  with `Connection error`, and `wall-vault-proxy.err` revealed the real
+  cause — `http: TLS handshake error from 127.0.0.1: EOF`. The
+  OpenClaw daemon wrapper rewrites `NODE_EXTRA_CA_CERTS` from the
+  plist value (`~/.wall-vault/ca.crt`) to the system bundle
+  (`/etc/ssl/cert.pem`) before spawning the gateway Node process, and
+  the gateway also sets `NODE_USE_SYSTEM_CA=1`. Our self-signed CA is
+  in neither place, so every embedded fetch to the proxy hits the
+  system trust store, fails verification, and surfaces as the generic
+  `Connection error` from undici.
+
+  Boot heal now writes the proxy's CA bundle path into
+  `models.providers.{custom,anthropic,google}.request.tls.ca` on both
+  the main `openclaw.json` and every per-agent cache. OpenClaw reads
+  that field directly from config and threads it into the per-provider
+  fetch's TLS connect options, bypassing the env-rewriting behaviour
+  entirely. The bundle is discovered alongside the proxy's TLS cert
+  (`<dir-of-Proxy.TLS.CertFile>/ca.crt`); when the file isn't there
+  (HTTP-only deployments, missing companion bundle), heal silently
+  skips the TLS-CA write and otherwise behaves identically.
+
+  Operator-set sibling TLS fields (`request.tls.serverName`,
+  `request.tls.cert`, etc.) are preserved — the heal only adds/updates
+  the `ca` key.
+
+---
+
+## [0.2.52] — 2026-05-02
+
+### Fixed
+
+- **Stream early-flush emits a parsable `data:` chunk instead of an SSE
+  comment.** v0.2.49 wrote `: warming up` and `: keepalive` comment
+  frames to defeat first-byte timeouts; raw `fetch` accepted them but
+  the OpenAI Node SDK that OpenClaw embeds rejected the stream as
+  `Connection error` ~14s into the call ((operator host, earlier) gateway
+  gateway.err.log: 4× retry / lane durationMs ≈ 75s — TUI and
+  Telegram dispatches both failed before any data could arrive). The
+  SDK seems to require the first frame to be a parsable `data:` chunk
+  before it considers the stream live. v0.2.52 ships a stable empty-
+  delta no-op chunk (`data: {"id":"chatcmpl-warmup",...,
+  "choices":[{"index":0,"delta":{},"finish_reason":null}]}`) for both
+  the early-flush frame and the keepalive ticks. Empty deltas merge to
+  the empty string and are treated as no-ops by well-behaved SSE
+  consumers, but they count as real frames for the SDK's stream-start
+  and idle counters.
+
+  Tick interval reduced from 15s to **8s** — still well below typical
+  60s+ idle timeouts, but short enough that even a 14s SDK quirk gets
+  two frames before tripping.
+
+---
+
+## [0.2.51] — 2026-05-02
+
+### Fixed
+
+- **Heal pass also normalizes the per-agent provider cache.** OpenClaw
+  maintains a parallel provider config at
+  `~/.openclaw/agents/<id>/agent/models.json` — same providers section
+  as the main `openclaw.json` but at the top level (no
+  `models.providers` wrapper) — and consults it during embedded-agent
+  dispatch. On hosts upgraded from pre-v0.2.37 the cache lags the main
+  config: even after `healOpenClawConfig` rewrites
+  `baseUrl=https://...` and `apiKey=<vault token>` on the main file,
+  the cache still holds `baseUrl=http://localhost:56244/v1` +
+  `apiKey="dummy"` + `authHeader=false` (observed (operator host, earlier)).
+  Every embedded dispatch then either fails the TLS handshake
+  (HTTP→HTTPS mismatch on the local proxy) or trips the post-v0.2.39
+  token-auth gate before reaching an LLM, and OpenClaw silently
+  rotates to a fallback model that is not even present locally.
+
+  Boot heal now sweeps every per-agent cache it finds and applies the
+  same normalization pass (baseUrl + apiKey + authHeader) using a new
+  strict `forceExactBaseURL` helper that, unlike the existing
+  `forceLocalhostBaseURL`, also rewrites local-proxy URLs that
+  disagree on scheme — so `http://localhost:56244/v1` is healed to
+  `https://localhost:56244/v1` when wall-vault is running over TLS.
+  The main `openclaw.json` heal keeps its existing behaviour
+  (rewrites only non-localhost URLs) so we don't accidentally flip a
+  deliberately-HTTP localhost setup on standalone hosts.
+
+  Third-party providers in the cache (e.g. native ollama) are
+  untouched, same rationale as the main heal — we only normalize
+  providers known to be wall-vault-fronted.
+
+---
+
+## [0.2.50] — 2026-05-02
+
+### Added
+
+- **"Remember this device" toggle on the login page.** The dashboard
+  login form now carries a toggle switch (`이 기기 기억하기 (30일)`)
+  that, when enabled, issues an HMAC-signed long-lived session cookie
+  instead of the default 12-hour in-memory session. The cookie value
+  is `<expiryUnix>.<hmacHex>` where the HMAC key is the admin token
+  itself, so it survives process restarts (no server-side store
+  required) and rotating the admin token instantly invalidates every
+  outstanding remember cookie — the only revocation path, by design.
+  Plain non-remember sessions keep the existing 12-hour in-memory
+  behaviour. The toggle is i18n'd across all 17 supported locales.
+
+  Operators no longer have to re-paste the admin token after every
+  binary restart or 12-hour wall clock — tick the toggle once per
+  trusted browser and the dashboard stays logged in for 30 days.
+
+---
+
+## [0.2.49] — 2026-05-02
+
+### Fixed
+
+- **SSE early-flush for `stream:true` /v1/chat/completions.** When an
+  upstream local model takes 60-180s on a cold/large prompt (e.g.
+  qwen3.6:27b prompt-eval on a fresh process), the proxy used to hold
+  the wire silent until the upstream returned, which caused
+  first-byte-timeout-bound callers — most notably OpenClaw embedded
+  agents (~75s default) — to abort the request well before any data
+  was produced. From v0.2.49 the proxy now commits status 200 + SSE
+  headers and emits a `: warming up` comment frame *before* dispatch
+  starts, then runs a 15s `: keepalive` ticker until the first real
+  chunk is ready. SSE comments (lines starting with `:`) are ignored
+  by parsers but reset the client's idle timer, so OpenClaw and any
+  other SSE consumer waits for the full upstream latency without
+  aborting.
+
+  Error path: when dispatch fails after the early-flush, the proxy
+  emits the error as a final SSE chunk + `data: [DONE]` instead of
+  trying to switch to a JSON 502 (whose status would already be
+  committed). Non-stream callers (`stream:false`) are unaffected — the
+  early-flush block only runs when the request asked for streaming.
+
+---
+
+## [0.2.47] — 2026-05-02
+
+### Added
+
+- **Heal pass also normalizes provider apiKey + authHeader.** The boot
+  heal in `internal/proxy/openclaw_sync.go` now writes the proxy's own
+  vault token into `models.providers.{custom,anthropic,google}.apiKey`
+  and forces `authHeader: true` whenever the existing values look
+  pre-v0.2.37 (literal `"dummy"` / `"proxy-managed"` / empty + the
+  default `authHeader: false`). Triggered by raspi + motoko
+  2026-05-02: both still carried `apiKey: "dummy"` from a year-old
+  install, so every OpenClaw → wall-vault call after the v0.2.39
+  token-auth gate landed surfaced as `401 token not registered with
+  vault`. With this heal, a stale config self-corrects on next proxy
+  boot — operators don't need to know what changed or run `agent apply`
+  by hand.
+
+  Third-party providers (anything outside the wall-vault-fronted
+  custom/anthropic/google trio) are left untouched — we don't know
+  their auth scheme.
+
+  No-op when `cfg.Proxy.VaultToken` is empty (standalone mode without
+  vault), so the auth heal can't blank a working apiKey.
+
+---
+
+## [0.2.46] — 2026-05-02
+
+### Added
+
+- **Heal pass also normalizes the `google` provider.**
+  `normalizeOpenClawProviders` now runs the same upstream-host →
+  localhost rewrite on `models.providers.google.baseUrl` that v0.2.43
+  introduced for `custom` and `anthropic`. Triggered by motoko
+  2026-05-02: the google provider had `http://<internal-host>:11434/v1`
+  written into its baseUrl slot — an ollama URL accidentally landed in
+  the google provider — so every OpenClaw call addressed
+  `custom/gemini-2.5-flash` (which `parseProviderModel` correctly
+  routed to the google provider) ended up on ollama and 404'd with
+  `model 'gemini-2.5-flash' not found`. Heal forces it back to
+  `https://localhost:56244` (OpenClaw appends its own `/google/v1beta`
+  path).
+
+---
+
+## [0.2.45] — 2026-05-02
+
+### Added
+
+- **`doctor fix-trust` — auto-inject the wall-vault internal CA into
+  local AI agent runtimes.** A new doctor subcommand walks every known
+  agent supervisor on the host (systemd `--user` units on Linux,
+  launchd plists on macOS) and writes a `wall-vault-trust.conf`
+  drop-in (Linux) or `EnvironmentVariables` entry (macOS) that sets
+  `NODE_EXTRA_CA_CERTS=~/.wall-vault/ca.crt`. After the agent is
+  bounced, its Node process trusts the wall-vault HTTPS endpoint
+  natively — no `NODE_TLS_REJECT_UNAUTHORIZED=0`, no system-wide cert
+  install, no TLS downgrade.
+
+  Covers OpenClaw gateway, Claude Code, Cline today; new agents are a
+  one-line addition to `knownAgents` in
+  `internal/doctor/fix_trust.go`. Skips silently when an agent's unit
+  isn't present on the current host (most fleet members), so the same
+  command is safe to run on every machine.
+
+  Triggered by (operator host, earlier): OpenClaw failed every LLM call with
+  `network connection error` because Node could not validate the
+  self-signed wall-vault cert. The right fix could not be a
+  systemd-level `WV_PROXY_TLS_ENABLED=0` override (which weakens TLS
+  on shared infrastructure); it had to be a generic "teach the local
+  agent to trust the local CA" path that any third-party deployment
+  could reuse without touching their OS trust store.
+
+- **Auto-trust on first setup.** `wall-vault setup` now calls
+  `doctor.FixTrust` after writing the config and prints the per-agent
+  result. A fresh install therefore configures the agent trust as part
+  of the standard setup flow — operators don't have to know
+  `fix-trust` exists.
+
+- **`doctor all` includes fix-trust.** The catch-all health command
+  runs the trust pass at the end so periodic doctoring keeps agents'
+  drop-ins current after a CA rotation.
+
+---
+
+## [0.2.44] — 2026-05-01
+
+### Added
+
+- **Generalized local LLM dispatch via plugin yaml.** The
+  `internal/config/services.go` `ServicePlugin` schema (which already
+  carried `auth`, `endpoints`, `request_format`, etc. but was never
+  consulted by the dispatch path) is now wired into
+  `internal/proxy/server.go` `callLocalService`. Every OpenAI-compat
+  local backend — LM Studio, vLLM, llama.cpp, text-generation-webui,
+  LocalAI, Jan, KoboldCpp, TabbyAPI, mlx_lm.server, LiteLLM proxy, and
+  *another wall-vault instance running in hub mode* — flows through one
+  code path; the per-backend differences are declared in yaml.
+
+  New schema fields:
+  - `default_url` — fallback URL when the SSE-distributed
+    `serviceURLs[id]` hasn't been populated yet (handy for fresh
+    machines / standalone hosts).
+  - `default_model` — fallback model id with the same semantics.
+  - `tls_internal_ca` — when `true`, outbound calls use the proxy's
+    `internalHTTPClient`, which trusts `~/.wall-vault/ca.crt`. Lets a
+    client reach a self-signed wall-vault hub over HTTPS without
+    OS-level CA installation.
+  - `auth.type: bearer` — adds `Authorization: Bearer <vault_token>`
+    using the proxy's already-resolved vault token.
+
+  Backward compat: every existing plugin yaml without the new fields
+  loads unchanged and behaves exactly as before. Plugin-less hosts
+  (no `~/.wall-vault/services/`) keep the pre-v0.2.44 dispatch path.
+
+  Resolution rules (top wins):
+  1. Plugin `default_url` beats vault-distributed `serviceURLs[id]`.
+     A plugin yaml is the operator's explicit local override; without
+     this rule a vault default URL pointing at an unreachable
+     localhost backend (e.g. LM Studio listening on 127.0.0.1 on a
+     different host) silently masks the operator's hub plugin.
+  2. A plugin with `enabled: true` whose id is not yet in
+     `proxy.services` is auto-appended at boot, so an installed
+     plugin actually gets dispatched to (otherwise the service-list
+     gate would reject it before reaching `callLocalService`).
+  3. `parseProviderModel` returns the full `<id>/<rest>` model string
+     (not just the bare tail) for every local backend, so org-scoped
+     ids like `qwen/qwen3.6-27b` survive the prefix-stripper inside
+     `callLocalService`. New backend prefixes (`lmstudio`, `vllm`,
+     `llamacpp`, `tgwui`, `localai`, `jan`, `koboldcpp`, `tabbyapi`,
+     `mlx-server`, `litellm-proxy`) all share the same path.
+
+- **Reference plugin yamls under `configs/services/`.** Added 9 new
+  examples + 1 commented hub template (`wall-vault-hub.yaml.example`),
+  all `enabled: false` so they sit dormant until an operator copies
+  them into `~/.wall-vault/services/` and flips the flag. Covers the
+  major OpenAI-compat local backends in current use (2026-05).
+
+- **Plain-HTTP-to-remote-host warning at boot.** A plugin whose
+  `default_url` or `endpoints.generate` resolves to a non-localhost
+  host with `http://` scheme produces a single
+  `[plugin] warn: <id> url=… reaches remote host over plain HTTP …`
+  log line. Local hosts (`localhost`, `127.0.0.1`, `::1`,
+  `*.local`, `*.localhost`) are exempt — an http LM Studio on the
+  same machine is the normal case.
+
+### Triggered by
+
+- (operator host, earlier) incident: telegram bot couldn't reach LM Studio
+  because the vault-distributed service URL `http://<internal-host>:1234`
+  pointed at LM Studio's localhost-only listener on a different
+  machine, with no path through the mini's wall-vault hub. The fix
+  could not be a hardcoded raspi/mini IP edit; it had to be a generic
+  "client wall-vault forwards to hub wall-vault" pattern that any
+  third-party deployment (cloud GPU box + laptop, office LM Studio +
+  N seats, etc.) could reuse without code changes. v0.2.44 makes that
+  pattern a one-line plugin yaml.
+
+---
+
+## [0.2.43] — 2026-05-01
+
+### Added
+
+- **OpenClaw config heal pass at boot.** `internal/proxy/openclaw_sync.go`
+  now ships `healOpenClawConfig` (runs once at proxy startup alongside
+  the existing sanitize pass) plus a stronger `updateOpenClawJSON`
+  steady-state writer. Both share three normalization rules:
+  1. `models.providers.{custom,anthropic}.baseUrl` is forced back to
+     `https://localhost:56244{,/v1}` whenever it points at any non-local
+     host. This catches stale configs where an upstream URL was written
+     directly into OpenClaw and the proxy was being bypassed entirely
+     ((operator host, earlier): `http://<internal-host>:11434/v1` written into
+     `providers.custom.baseUrl`, breaking auth and routing for every
+     non-ollama service).
+  2. `models[]` entries with empty `id`, dangling-name (e.g.
+     `"openrouter / "`), or duplicate `id` within the same provider are
+     pruned. The raspi snapshot carried 11 entries with identical
+     `id="qwen3.6:27b"` and differing names, which collapsed OpenClaw's
+     model selector into a single resolvable model and surfaced as the
+     `Model "custom/" could not be resolved` log spam.
+  3. `agents.defaults.model.primary` is rewritten when it holds a
+     dangling `"<provider>/"` reference ((operator host, earlier): SSE
+     config_change wrote `primary="custom/"` and OpenClaw rejected
+     every gateway start with `Invalid model reference: custom/`). The
+     first usable entry from `fallbacks` takes the primary slot; if no
+     usable fallback exists, the primary key is removed so OpenClaw
+     falls back to its own default resolution.
+  4. Sanitize pass (empty-id dropper) still runs first so heal sees a
+     pre-cleaned input.
+
+- **Empty-model SSE guard.** `updateOpenClawJSON` now returns early
+  when `model == ""`. A vault soft-clear or pre-resolution
+  config_change used to fire with empty model, materialize
+  `primary="<service>/"`, and break OpenClaw's model selector until
+  the next non-empty change arrived (often hours later, after the
+  next user-driven model switch).
+
+  No-op for hosts without `~/.openclaw/openclaw.json` (most fleet
+  members). Writes the file only when something actually changes.
+
+---
+
 ## [0.2.42] — 2026-05-01
 
 ### Added
@@ -437,7 +942,7 @@ stale gateway, retry update.
   `preferred_service` is `ollama` was therefore forwarded to ollama as-is,
   producing a 404 from ollama (it does not host google models) and a noisy
   cascade of downstream errors visible in voice_api logs as
-  `entity.parse.failed` (post #38, "mini 카드 로그 진단 — LLM/TTS 흐름").
+  `entity.parse.failed` (<separate incident>, "mini 카드 로그 진단 — LLM/TTS 흐름").
 
   v0.2.28 adds `inferServiceFromBareModel` and consults it whenever the model
   name has no `/`. Mapping rules:
@@ -505,7 +1010,7 @@ stale gateway, retry update.
     model, req)` is kept as a convenience wrapper that forwards `nil`
     for the chain (= strict primary-only).
 
-  Surfaced by 바비2호 post #36 — an econoworld-token call to
+  Surfaced by earlier reviewer feedback — an econoworld-token call to
   `qwen3.6:27b` returned `google/gemini-3.1-flash-lite-preview`.
 
 - **Restored per-call `AgentOffset + FallbackJitter` on local-inference
@@ -544,7 +1049,7 @@ stale gateway, retry update.
   still used the vault-provided `127.0.0.1`, producing `connection
   refused` and a silent fallback to the cloud chain. New order:
   `WV_OLLAMA_URL` env > `OLLAMA_URL` env > vault `serviceURLs` >
-  `http://localhost:11434`. Surfaced by post #36 ("바비2호 →
+  `http://localhost:11434`. Surfaced by <separate incident> ("earlier reviewer →
   야마이 클로드 라우팅 문의"): an econoworld-token call to
   `qwen3.6:27b` was returning `google/gemini-3.1-flash-lite-preview`
   because jaksooni's proxy could not reach its env-pinned Ollama.
@@ -746,7 +1251,7 @@ stale gateway, retry update.
   dashboard `preferred_service` had been changed to `ollama` would
   still ship its old legacy `default_service=openrouter` to every
   proxy's `syncFromVault`, yielding `[sync] 설정 로드: openrouter/`
-  and a silent service–model mismatch. EconoWorld (바비2호) and other
+  and a silent service–model mismatch. EconoWorld (earlier reviewer) and other
   hosts whose proxies had migrated their config to canonical fields
   were trapped in the 6–10 minute fallback timeout loop this caused.
 - **`ollamaURL()` prefers vault-synced URL over environment / default**:
@@ -756,7 +1261,7 @@ stale gateway, retry update.
   straight to `http://localhost:11434` on hosts with no local Ollama,
   producing `dial tcp 127.0.0.1:11434: connect: connection refused`
   even though the vault had published the correct fleet URL
-  (`http://192.168.1.20:11434`). Env vars still work as explicit
+  (`http://<internal-host>:11434`). Env vars still work as explicit
   overrides when no `ollama` service entry is registered in vault.
 
 ---
@@ -1176,8 +1681,8 @@ deployments can move off v0.2.16 in one step.
   token (`TOKEN=…`) was committed in the v0.2 implementation plan.
   Replaced with `<ADMIN_TOKEN>` placeholder.
 - **Redacted concrete LAN IPs from committed examples**: replaced
-  deployment-specific addresses with generic `192.168.1.10` /
-  `192.168.1.20` across 17 locale JSON files, 2 test files, 17
+  deployment-specific addresses with generic `<internal-host>` /
+  `<internal-host>` across 17 locale JSON files, 2 test files, 17
   MANUAL translations, and the plan doc.
 - **Redacted Telegram bot usernames**: replaced 3 real bot usernames
   in the plan doc with `@<bot>` placeholders.

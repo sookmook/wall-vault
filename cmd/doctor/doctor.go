@@ -26,6 +26,7 @@ func Run(args []string) {
   check           상태 확인만 (기본)
   fix             자동 복구 실행 (프로세스 + proxy_enabled 수정)
   fix-services    vault 서비스 proxy_enabled 자동 활성화
+  fix-trust       OpenClaw / Claude Code / Cline 등이 wall-vault CA 신뢰하도록 unit drop-in 생성
   fix-nanoclaw    ~/nanoclaw/.env ANTHROPIC_BASE_URL 수정
   status          상세 보고서
   all             확인 후 필요시 복구
@@ -95,6 +96,12 @@ func Run(args []string) {
 		}
 		fmt.Printf("[fix-nanoclaw] ✓ ANTHROPIC_BASE_URL=http://localhost:%d 설정 완료\n", cfg.Proxy.Port)
 
+	case "fix-trust":
+		results := idoctor.FixTrust(cfg)
+		for _, r := range results {
+			idoctor.Printline(r.Level, r.ID, r.Msg)
+		}
+
 	case "sanitize-openclaw":
 		summary, err := iproxy.SanitizeOpenClawConfig()
 		if err != nil {
@@ -137,6 +144,13 @@ func Run(args []string) {
 		}
 		// always try to fix services (no-op when all is well)
 		_ = idoctor.FixVaultServices(cfg)
+
+		// Teach local AI agents (OpenClaw, Claude Code, Cline) to trust
+		// the wall-vault internal CA. Idempotent — already-trusting
+		// agents print OK with no file write.
+		for _, r := range idoctor.FixTrust(cfg) {
+			idoctor.Printline(r.Level, r.ID, r.Msg)
+		}
 
 	case "deploy":
 		deployCmd := "systemd"

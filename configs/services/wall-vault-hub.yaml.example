@@ -1,0 +1,49 @@
+# wall-vault hub topology — use another wall-vault instance as a backend.
+#
+# Drop this file into ~/.wall-vault/services/wall-vault-hub.yaml on a
+# client machine. The hub is wherever your beefy box runs LM Studio /
+# vLLM / a real GPU; the client just forwards every local-LLM call there.
+#
+# - default_url MUST be HTTPS (wall-vault listens https on port 56244 by
+#   default). Plain HTTP to a remote host triggers a [plugin] warn at
+#   boot and would also send your bearer token in the clear.
+#
+# - tls_internal_ca: true tells this proxy to trust the wall-vault
+#   internal CA (~/.wall-vault/ca.crt) when verifying the hub's
+#   certificate. Without it, a self-signed hub cert would fail TLS
+#   verification unless the OS trust store has been updated by hand.
+#
+# - auth.type: bearer fills Authorization: Bearer <vault_token> from
+#   this proxy's existing vault credentials. The hub's wall-vault treats
+#   it the same way as any other registered client.
+#
+# - id can be anything — it just needs to match the service name your
+#   primary/fallback chain refers to. Pick "lmstudio" if the hub's
+#   downstream is LM Studio so existing OpenClaw configs keep working
+#   without any UI changes.
+id: lmstudio                                   # rename to match your client/topology
+name: Hub Wall-Vault → LM Studio
+enabled: false                                  # set true once default_url is right
+
+default_url: https://hub.your-domain.example:56244
+default_model: ""                               # leave empty unless you want to pin one
+
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: bearer
+tls_internal_ca: true
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+  auth_required: true
+
+concurrency:
+  max: 4
+  queue_size: 32
+  wait_notify: false

@@ -114,6 +114,19 @@ func runProxy(cfg *config.Config) {
 		}
 	}()
 
+	// Loopback-only plain-HTTP companion when TLS is on (see ProxyConfig.PlainPort).
+	if cfg.Proxy.TLS.Enabled && cfg.Proxy.PlainPort > 0 {
+		plainAddr := fmt.Sprintf("127.0.0.1:%d", cfg.Proxy.PlainPort)
+		plainSrv := &http.Server{Addr: plainAddr, Handler: srv.Handler()}
+		go func() {
+			log.Printf("[proxy] plain-HTTP companion 시작 :%d (loopback only)", cfg.Proxy.PlainPort)
+			err := plainSrv.ListenAndServe()
+			if err != nil && err != http.ErrServerClosed {
+				log.Printf("[proxy] plain-HTTP companion 오류 (계속 진행): %v", err)
+			}
+		}()
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

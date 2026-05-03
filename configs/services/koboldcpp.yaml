@@ -1,0 +1,23 @@
+# KoboldCpp (https://github.com/LostRuins/koboldcpp) — single-binary
+# LLM server with OpenAI-compat endpoint. Default port 5001.
+id: koboldcpp
+name: KoboldCpp
+enabled: false
+
+default_url: http://localhost:5001
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: false
+
+concurrency:
+  max: 1
+  queue_size: 8
+  wait_notify: true

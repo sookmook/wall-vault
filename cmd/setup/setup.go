@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/sookmook/wall-vault/internal/config"
+	"github.com/sookmook/wall-vault/internal/doctor"
 	"github.com/sookmook/wall-vault/internal/i18n"
 	"github.com/sookmook/wall-vault/internal/models"
 )
@@ -150,6 +151,21 @@ func Run(_ []string) {
 	fmt.Println()
 	fmt.Println("✅ " + i18n.T("setup_done"))
 	fmt.Printf("   파일: %s\n", absPath)
+
+	// Best-effort: teach any locally-installed AI agent (OpenClaw,
+	// Claude Code, Cline) to trust the wall-vault internal CA so its
+	// HTTPS calls into the proxy succeed without manual cert install.
+	// Idempotent and safe — agents that don't exist on this host print
+	// SKIP and nothing is written. Surface the per-agent results inline
+	// so the operator sees what got configured.
+	if results := doctor.FixTrust(cfg); len(results) > 0 {
+		fmt.Println()
+		fmt.Println("AI 에이전트 신뢰 설정 / Agent CA trust:")
+		for _, r := range results {
+			doctor.Printline(r.Level, r.ID, r.Msg)
+		}
+	}
+
 	fmt.Println()
 	fmt.Println("다음 단계 / Next steps:")
 	if useGoogle {

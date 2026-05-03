@@ -7,7 +7,7 @@ templ Base(theme, lang, title, adminToken string, inner templ.Component) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width,initial-scale=1"/>
 			<meta name="wv-admin-token" content={ adminToken }/>
-			<script id="wv-i18n-data" type="application/json">@templ.Raw(I18nJSONBlob(lang))</script>
+			@templ.Raw("<script id=\"wv-i18n-data\" type=\"application/json\">" + I18nJSONBlob(lang) + "</script>")
 			<title>{ title }</title>
 			<link rel="icon" href="/logo"/>
 			<script src="https://unpkg.com/htmx.org@1.9.12"></script>

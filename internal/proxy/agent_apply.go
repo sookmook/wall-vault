@@ -77,7 +77,7 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 	case "nanoclaw":
 		path, err = applyNanoclawConfig(body.BaseURL, body.Model, token)
 	case "econoworld":
-		path, err = applyEconoWorldConfig(body.BaseURL, body.Model, token, body.WorkDir)
+		path, err = applyEconoWorldConfig(body.BaseURL, body.Model, token, body.WorkDir, s.cfg.Proxy.EconoWorldMaxTokens, s.cfg.Proxy.EconoWorldStream, s.cfg.Proxy.EconoWorldRequestTimeout)
 	default:
 		jsonError(w, "unsupported agentType: "+body.AgentType, http.StatusBadRequest)
 		return
@@ -540,7 +540,7 @@ func (s *Server) isValidAgentToken(token string) bool {
 // drive paths are converted to their WSL mount equivalents. When none of the
 // candidates exist the first listed candidate (or the hard-coded default) is
 // used so the resulting error clearly points at the missing directory.
-func applyEconoWorldConfig(baseURL, model, token, workDir string) (string, error) {
+func applyEconoWorldConfig(baseURL, model, token, workDir string, maxTokens int, stream bool, requestTimeout int) (string, error) {
 	dir := resolveEconoWorldDir(workDir)
 	path := filepath.Join(dir, "analyzer", "ai_config.json")
 
@@ -560,8 +560,22 @@ func applyEconoWorldConfig(baseURL, model, token, workDir string) (string, error
 	if model != "" {
 		compat["model"] = model
 	}
+	// Robustness fields below all use the "fill if absent" pattern so
+	// operator-tuned values survive a re-bootstrap. maxTokens=0 means "skip
+	// even on first write" so a deployment that genuinely wants the
+	// EconoWorld default does not get an unwanted floor.
 	if _, ok := compat["max_tokens"]; !ok {
-		compat["max_tokens"] = 4096
+		if maxTokens > 0 {
+			compat["max_tokens"] = maxTokens
+		} else {
+			compat["max_tokens"] = 4096
+		}
+	}
+	if _, ok := compat["stream"]; !ok {
+		compat["stream"] = stream
+	}
+	if _, ok := compat["request_timeout_seconds"]; !ok && requestTimeout > 0 {
+		compat["request_timeout_seconds"] = requestTimeout
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -614,6 +628,134 @@ func updateEconoWorldModelAt(path, model string) error {
 	}
 	compat["model"] = model
 	return writeJSON(path, cfg)
+}
+
+// healEconoWorldConfig idempotently fixes a stale EconoWorld ai_config.json
+// at startup. Three things can drift between bootstrap and runtime:
+//
+//  1. base_url points at https://localhost:56244/v1 but TLS trust on the
+//     EconoWorld host is broken — the loopback plain-HTTP companion
+//     (http://127.0.0.1:<plain_port>) sidesteps it. Heal only rewrites
+//     same-host (localhost / 127.0.0.1) URLs; external base_urls are
+//     never touched, so a remote EconoWorld pointed at our LAN address
+//     keeps working.
+//  2. stream / request_timeout_seconds were never written because the
+//     bootstrap predates v0.2.57. Heal fills them in once.
+//  3. max_tokens=4096 from the old hard-coded floor truncates Korean
+//     analyses; if the configured floor is higher and the file value is
+//     exactly 4096, bump it. Any other value (operator-tuned) is kept.
+//
+// Hosts without an EconoWorld install get a silent skip — the file does
+// not exist, the function returns immediately. localBaseOrigin "" disables
+// the URL rewrite leg; the field-fill leg still runs.
+func healEconoWorldConfig(localBaseOrigin string, maxTokens int, stream bool, requestTimeout int) {
+	dir := resolveEconoWorldDir("")
+	path := filepath.Join(dir, "analyzer", "ai_config.json")
+	if err := healEconoWorldConfigAt(path, localBaseOrigin, maxTokens, stream, requestTimeout); err != nil {
+		log.Printf("[econoworld-heal] %s: %v", path, err)
+	}
+}
+
+// healEconoWorldConfigAt is the path-taking core of healEconoWorldConfig,
+// split out so it can be unit-tested against a temp directory. Returns nil
+// for missing files (silent skip) and for the no-change case so callers
+// can log only on parse / write failures.
+func healEconoWorldConfigAt(path, localBaseOrigin string, maxTokens int, stream bool, requestTimeout int) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse: %w", err)
+	}
+	compat, _ := cfg["openai_compatible"].(map[string]interface{})
+	if compat == nil {
+		return nil // not yet bootstrapped — /agent/apply will handle it
+	}
+	changed := false
+
+	// Leg 1 — same-host URL rewrite. Preserve the path suffix (typically
+	// /v1) so we don't drop client-required path components.
+	if localBaseOrigin != "" {
+		if cur, _ := compat["base_url"].(string); cur != "" && isLocalProxyBaseURL(cur) {
+			suffix := pathSuffixAfterAuthority(cur)
+			want := strings.TrimRight(localBaseOrigin, "/") + suffix
+			if cur != want {
+				compat["base_url"] = want
+				changed = true
+			}
+		}
+	}
+
+	// Leg 2 — fill missing robustness fields. Operator-set values stay.
+	if _, ok := compat["stream"]; !ok {
+		compat["stream"] = stream
+		changed = true
+	}
+	if _, ok := compat["request_timeout_seconds"]; !ok && requestTimeout > 0 {
+		compat["request_timeout_seconds"] = requestTimeout
+		changed = true
+	}
+	// Leg 3 — only the legacy 4096 default is replaced. Numbers reach us
+	// as float64 after json.Unmarshal so cover both forms.
+	if maxTokens > 0 {
+		switch v := compat["max_tokens"].(type) {
+		case float64:
+			if int(v) == 4096 && maxTokens != 4096 {
+				compat["max_tokens"] = maxTokens
+				changed = true
+			}
+		case int:
+			if v == 4096 && maxTokens != 4096 {
+				compat["max_tokens"] = maxTokens
+				changed = true
+			}
+		}
+	}
+
+	if !changed {
+		return nil
+	}
+	if err := writeJSON(path, cfg); err != nil {
+		return fmt.Errorf("write: %w", err)
+	}
+	log.Printf("[econoworld-heal] normalized %s", path)
+	return nil
+}
+
+// pathSuffixAfterAuthority returns the URL portion starting at the first
+// "/" after "scheme://host[:port]". Empty string when no path component
+// is present. Used by healEconoWorldConfig to keep the original /v1 (or
+// any other suffix) when rewriting just the origin.
+func pathSuffixAfterAuthority(u string) string {
+	for _, scheme := range []string{"http://", "https://"} {
+		if strings.HasPrefix(u, scheme) {
+			rest := u[len(scheme):]
+			if i := strings.Index(rest, "/"); i >= 0 {
+				return rest[i:]
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// runStartupEconoWorldHeal mirrors runStartupOpenClawHeal: fires once
+// shortly after boot in a goroutine so a slow disk doesn't delay startup.
+// Disabled (no goroutine) when WV_ECONOWORLD_HEAL_DISABLE is truthy so
+// operators can fully opt out without recompiling.
+func runStartupEconoWorldHeal(localBaseOrigin string, maxTokens int, stream bool, requestTimeout int) {
+	if v := os.Getenv("WV_ECONOWORLD_HEAL_DISABLE"); v == "1" || strings.EqualFold(v, "true") {
+		return
+	}
+	go func() {
+		time.Sleep(900 * time.Millisecond)
+		healEconoWorldConfig(localBaseOrigin, maxTokens, stream, requestTimeout)
+	}()
 }
 
 // resolveEconoWorldDir returns the first candidate POSIX directory whose

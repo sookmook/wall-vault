@@ -1,0 +1,29 @@
+# llama.cpp HTTP server (https://github.com/ggerganov/llama.cpp).
+# Run with: ./llama-server -m <gguf-path> --host 0.0.0.0 --port 8080
+# OpenAI compat endpoint lives at /v1.
+id: llamacpp
+name: llama.cpp
+enabled: false
+
+default_url: http://localhost:8080
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: false
+
+concurrency:
+  max: 1
+  queue_size: 10
+  wait_notify: true
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp server not responding"

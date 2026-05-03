@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -45,6 +46,18 @@ type ProxyConfig struct {
 	// on hosts where hostname detection is unreliable (WSL, renamed boxes).
 	ClaudeCodeClientID string    `yaml:"claude_code_client_id"`
 	TLS                TLSConfig `yaml:"tls"`
+	// PlainPort runs an additional plain-HTTP listener bound to loopback
+	// only (127.0.0.1) when TLS is enabled, so same-host clients that
+	// cannot be coerced into trusting the proxy's self-signed CA can still
+	// reach it. Triggered by (operator host, earlier): OpenClaw's macOS daemon
+	// rewrites NODE_EXTRA_CA_CERTS to /etc/ssl/cert.pem at spawn,
+	// dropping any operator-provided CA hint, so every embedded fetch to
+	// the TLS listener fails handshake. The plain listener bypasses the
+	// trust problem entirely while keeping the TLS listener for LAN
+	// callers (other fleet machines using ca.crt). 0 disables. Default
+	// 56245. Ignored when TLS.Enabled is false (the main listener is
+	// already plain HTTP in that case).
+	PlainPort int `yaml:"plain_port"`
 	// OllamaKeepAlive controls how long Ollama keeps the model loaded after a
 	// response. "30m" means thirty minutes idle before unload; "-1" never
 	// unloads; "0" unloads immediately. Default Ollama behaviour is 5 minutes,
@@ -55,6 +68,21 @@ type ProxyConfig struct {
 	// too small for long Korean conversations; 8192 is a reasonable starting
 	// point. Zero = leave Ollama default in place.
 	OllamaNumCtx int `yaml:"ollama_num_ctx"`
+	// EconoWorldMaxTokens is the default max_tokens written into a freshly
+	// bootstrapped EconoWorld ai_config.json. The previous hard-coded 4096
+	// truncated long Korean analyses mid-sentence. Existing values in the
+	// file are preserved — this only fills in when the field is missing.
+	EconoWorldMaxTokens int `yaml:"econoworld_max_tokens"`
+	// EconoWorldStream toggles `stream:true` in EconoWorld's ai_config.json.
+	// True is safer when EconoWorld's openai_compatible client supports
+	// streaming — partial output keeps appearing instead of waiting for the
+	// whole response, hiding ollama prompt-eval latency. Existing values
+	// are preserved.
+	EconoWorldStream bool `yaml:"econoworld_stream"`
+	// EconoWorldRequestTimeout (seconds) is the default request_timeout_seconds
+	// written into EconoWorld's ai_config.json. EconoWorld may ignore the
+	// field; presence is harmless. Zero = field omitted.
+	EconoWorldRequestTimeout int `yaml:"econoworld_request_timeout"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -137,6 +165,19 @@ func Default() *Config {
 			// without spilling into the 27B model's slow path. Override via
 			// WV_OLLAMA_NUM_CTX or per-host config.
 			OllamaNumCtx: 8192,
+			// EconoWorld defaults — see ProxyConfig docs above. The previous
+			// hard-coded 4096 max_tokens cut Korean analyses mid-output; 8192
+			// is the new floor. Streaming is on by default so cold-load latency
+			// surfaces as gradually arriving tokens rather than a long silence
+			// followed by a wall of text. 300s timeout matches the proxy's
+			// upstream cold-start budget.
+			EconoWorldMaxTokens:      8192,
+			EconoWorldStream:         true,
+			EconoWorldRequestTimeout: 300,
+			// Loopback-only plain HTTP companion. Disabled (0) when TLS is
+			// off; activated when TLS is on so same-host clients that
+			// cannot honour our CA still have a path in.
+			PlainPort: 56245,
 		},
 		Vault: VaultConfig{
 			Port:          56243,
@@ -327,6 +368,13 @@ func applyEnv(cfg *Config) {
 			cfg.Vault.BootstrapPort = n
 		}
 	}
+	// Loopback-only plain HTTP companion port for the proxy (see
+	// ProxyConfig.PlainPort docs). Set to 0 to disable.
+	if v := os.Getenv("WV_PROXY_PLAIN_PORT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 65535 {
+			cfg.Proxy.PlainPort = n
+		}
+	}
 	// Ollama tuning — env vars win so operators can hot-tune without rewriting
 	// YAML. Empty/zero values fall back to whatever the YAML or Default()
 	// already set.
@@ -336,6 +384,29 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WV_OLLAMA_NUM_CTX"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.Proxy.OllamaNumCtx = n
+		}
+	}
+	// EconoWorld ai_config.json defaults — env wins over YAML so an operator
+	// can hot-tune without redeploy. See ProxyConfig docs for semantics.
+	if v := os.Getenv("WV_ECONOWORLD_MAX_TOKENS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Proxy.EconoWorldMaxTokens = n
+		}
+	}
+	if v := os.Getenv("WV_ECONOWORLD_STREAM"); v != "" {
+		// Accept the usual truthy / falsy spellings. Anything unrecognised
+		// leaves the existing value alone — silently ignoring typos beats
+		// flipping the flag the operator did not intend.
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "1", "true", "yes", "on":
+			cfg.Proxy.EconoWorldStream = true
+		case "0", "false", "no", "off":
+			cfg.Proxy.EconoWorldStream = false
+		}
+	}
+	if v := os.Getenv("WV_ECONOWORLD_REQUEST_TIMEOUT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Proxy.EconoWorldRequestTimeout = n
 		}
 	}
 	// Windows: auto-set data path based on APPDATA

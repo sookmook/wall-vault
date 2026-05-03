@@ -9,7 +9,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -124,6 +126,12 @@ type Server struct {
 	// but the syscall + handshake cost still adds up under sustained
 	// traffic). Built once in NewServer.
 	ollamaHTTP *http.Client
+
+	// pluginByID indexes cfg.Plugins by service id so the dispatch path
+	// can look up auth / TLS / default_url settings in O(1). Empty map
+	// when no plugin yamls are present — every existing call site keeps
+	// working unchanged.
+	pluginByID map[string]*config.ServicePlugin
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -152,6 +160,46 @@ func NewServer(cfg *config.Config) *Server {
 			"vllm":     make(chan struct{}, 1),
 		},
 		stopCh: make(chan struct{}),
+	}
+
+	// Index plugin yamls by service id. The plugin schema in
+	// internal/config/services.go carries auth / tls_internal_ca /
+	// default_url / default_model, which the dispatch path consults below
+	// when calling a service whose backend is "another wall-vault" or any
+	// non-default OpenAI-compat local LLM (LM Studio, vLLM, llama.cpp,
+	// LocalAI, Jan, KoboldCpp, TabbyAPI, mlx_lm.server, LiteLLM, etc.).
+	// A plugin with an empty/missing auth.type and tls_internal_ca=false
+	// reproduces the pre-v0.2.44 behaviour exactly.
+	if len(cfg.Plugins) > 0 {
+		s.pluginByID = make(map[string]*config.ServicePlugin, len(cfg.Plugins))
+		for i := range cfg.Plugins {
+			s.pluginByID[cfg.Plugins[i].ID] = &cfg.Plugins[i]
+		}
+		// A plugin yaml with enabled=true is the operator's declaration
+		// that this proxy can handle that service. Append the id to
+		// cfg.Proxy.Services if absent so the dispatcher actually picks
+		// the service up — without this, an installed plugin would sit
+		// inert because cfg.Proxy.Services (default: google/openrouter/
+		// ollama) gates which services dispatch_v2 even tries.
+		known := map[string]bool{}
+		for _, id := range cfg.Proxy.Services {
+			known[id] = true
+		}
+		for _, p := range cfg.Plugins {
+			if p.Enabled && !known[p.ID] {
+				cfg.Proxy.Services = append(cfg.Proxy.Services, p.ID)
+				known[p.ID] = true
+			}
+		}
+		// Surface plugin URLs that look like a misconfiguration (a remote
+		// host reached over plain HTTP — for any wall-vault-style backend
+		// this should be HTTPS so the bearer token isn't sent in the
+		// clear). One log line per offending plugin at boot; no fatal
+		// behaviour because the operator may legitimately be running a
+		// behind-the-firewall http-only test backend.
+		for _, p := range cfg.Plugins {
+			warnIfPluginURLLooksRemoteHTTP(p)
+		}
 	}
 
 	s.keyMgr = NewKeyManager(cfg.Proxy.VaultURL, cfg.Proxy.VaultToken, cfg.Proxy.ClientID)
@@ -338,6 +386,48 @@ func NewServer(cfg *config.Config) *Server {
 	// No-op for hosts that don't run OpenClaw (most of the fleet).
 	runStartupSanitize()
 
+	// Heal stale provider settings once at boot. The sanitize pass above
+	// only removes empty-id entries; the heal pass forces baseUrls back
+	// to localhost and prunes duplicate / dangling-name entries. Same
+	// raspi root cause: an external host got written into providers.custom
+	// and providers.anthropic.baseUrl, bypassing the proxy entirely.
+	// CA bundle location: alongside the proxy TLS cert as `ca.crt`. The
+	// heal pass writes it into models.providers.<id>.request.tls.ca for
+	// any operator-configured client that does honour that hint.
+	caBundlePath := ""
+	if cfg.Proxy.TLS.CertFile != "" {
+		candidate := filepath.Join(filepath.Dir(cfg.Proxy.TLS.CertFile), "ca.crt")
+		if _, err := os.Stat(candidate); err == nil {
+			caBundlePath = candidate
+		}
+	}
+	// Same-host clients that can't be coerced into trusting the proxy's
+	// self-signed CA ((operator host, earlier): OpenClaw's macOS daemon rewrites
+	// NODE_EXTRA_CA_CERTS to /etc/ssl/cert.pem at spawn, dropping any
+	// operator-provided CA hint) use a loopback-only plain-HTTP
+	// companion listener instead — OpenClaw never sees TLS, so the
+	// trust problem disappears. Heal pass routes any same-host
+	// OpenClaw config to that port. LAN callers keep using the TLS
+	// listener with ca.crt. localBaseURL is empty when TLS is off (no
+	// companion needed) or when the operator disabled it.
+	localBaseOrigin := ""
+	if cfg.Proxy.TLS.Enabled && cfg.Proxy.PlainPort > 0 {
+		// Origin only (no /v1 path) — providerHealURLs appends /v1 for
+		// the OpenAI-compat custom provider and leaves the bare origin
+		// for anthropic / google.
+		localBaseOrigin = fmt.Sprintf("http://127.0.0.1:%d", cfg.Proxy.PlainPort)
+	}
+	runStartupOpenClawHeal(cfg.Proxy.VaultToken, caBundlePath, localBaseOrigin)
+	// Same loopback-companion benefit applies to EconoWorld's
+	// analyzer/ai_config.json on hosts that have it. Hosts without an
+	// EconoWorld install no-op silently.
+	runStartupEconoWorldHeal(
+		localBaseOrigin,
+		cfg.Proxy.EconoWorldMaxTokens,
+		cfg.Proxy.EconoWorldStream,
+		cfg.Proxy.EconoWorldRequestTimeout,
+	)
+
 	return s
 }
 
@@ -374,7 +464,7 @@ func (s *Server) refreshClientAct(clientID string) {
 // emit specific 401/503 messages instead of the old generic "invalid token"
 // — the latter conflated "client not registered", "vault unreachable", and
 // "everything fine but the token literally isn't in the registry", which made
-// 401 triage frustrating (see board #43 from 바비2호 wasting time on IP
+// 401 triage frustrating (see earlier reviewer feedback wasting time on IP
 // whitelist when the cause was actually vault-side).
 type tokenLookupReason int
 
@@ -697,7 +787,7 @@ func (s *Server) syncAllowedServices() error {
 //   vault service config  >  WV_OLLAMA_URL / OLLAMA_URL env  >  localhost default
 //
 // Before v0.2.19 env vars won out even when vault had a real fleet URL
-// (e.g. http://192.168.0.6:11434), which meant any proxy that started before
+// (e.g. http://<internal-host>:11434), which meant any proxy that started before
 // its syncAllowedServices goroutine finished would fall straight through to
 // the localhost default — producing "connection refused" on hosts with no
 // local Ollama. vault-side config is now the primary source of truth; env
@@ -882,8 +972,24 @@ func (s *Server) requireProxyToken(w http.ResponseWriter, r *http.Request) bool 
 	if entry != nil {
 		return true
 	}
+	// Temporary diagnostic for the <internal incident> 401 storm
+	// where the operator's openclaw.json apiKey looked correct but
+	// token-auth still rejected. Logs lengths + 4-char prefix of the
+	// incoming token vs. the proxy's own VaultToken so the divergence
+	// is visible without writing the full secret to the journal.
+	log.Printf("[token-auth] reject reason=%d recv=%s+%d vault=%s+%d",
+		reason, safePrefix(token, 4), len(token),
+		safePrefix(s.cfg.Proxy.VaultToken, 4), len(s.cfg.Proxy.VaultToken))
 	tokenAuthFail(w, reason, s.cfg.Proxy.VaultToken != "")
 	return false
+}
+
+// safePrefix returns up to n characters of s, never panicking on short input.
+func safePrefix(s string, n int) string {
+	if len(s) < n {
+		return s
+	}
+	return s[:n]
 }
 
 // requireAnthropicToken authenticates a request to /v1/messages. Accepts the
@@ -1136,6 +1242,74 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	}
 	s.filter.FilterOpenAI(&oaiReq)
 
+	// Stream early-flush: when the caller asked for stream=true we commit
+	// status 200 + SSE headers and emit a valid empty-delta `data:` chunk
+	// *before* starting the upstream LLM call. Without this, dispatch can
+	// take 60-180s on a cold/large local model (qwen3.6:27b prompt eval)
+	// and the caller's first-byte timeout fires before any data is
+	// written.
+	//
+	// v0.2.49 used a `: warming up` SSE comment frame here; raw fetch
+	// accepted it but the OpenAI Node SDK that OpenClaw embeds rejected
+	// the stream as "Connection error" ~14s in (<internal incident>
+	// gateway.err.log: 4× retry / lane durationMs ≈ 75s). The SDK seems
+	// to require the first frame to be a parsable `data:` chunk before it
+	// considers the stream live. Keepalive frames are the same — empty
+	// `delta:{}` with finish_reason:null, treated as no-op by every
+	// well-behaved SSE consumer (delta merge produces no content) but
+	// counts as a real frame for the SDK's stream-start / idle counters.
+	//
+	// Interval is 8s (was 15s) — still well below typical 60s+ idle
+	// timeouts but short enough that even a 14s SDK quirk gets two
+	// frames before tripping. The actual response chunks are produced
+	// below the dispatch call. On dispatch error we surface the error
+	// as an SSE chunk + [DONE] (status is already committed).
+	var (
+		keepaliveStop chan struct{}
+		keepaliveDone chan struct{}
+		stopOnce      sync.Once
+	)
+	stopKeepalive := func() {
+		stopOnce.Do(func() {
+			if keepaliveStop != nil {
+				close(keepaliveStop)
+			}
+			if keepaliveDone != nil {
+				<-keepaliveDone
+			}
+		})
+	}
+	const keepaliveFrame = `data: {"id":"chatcmpl-warmup","object":"chat.completion.chunk","model":"warmup","choices":[{"index":0,"delta":{},"finish_reason":null}]}` + "\n\n"
+	if oaiReq.Stream {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("X-Accel-Buffering", "no")
+		w.WriteHeader(http.StatusOK)
+		if f, ok := w.(http.Flusher); ok {
+			fmt.Fprint(w, keepaliveFrame)
+			f.Flush()
+			keepaliveStop = make(chan struct{})
+			keepaliveDone = make(chan struct{})
+			go func(stop <-chan struct{}, done chan<- struct{}) {
+				defer close(done)
+				ticker := time.NewTicker(8 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-stop:
+						return
+					case <-r.Context().Done():
+						return
+					case <-ticker.C:
+						fmt.Fprint(w, keepaliveFrame)
+						f.Flush()
+					}
+				}
+			}(keepaliveStop, keepaliveDone)
+			defer stopKeepalive()
+		}
+	}
+
 	// Resolution order for (service, model) — most-specific source wins:
 	//   1. Vault-side token override (entry.service / entry.model)
 	//      → operator's enforcement on a specific client. Final.
@@ -1147,7 +1321,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	// Pre-v0.2.27 the proxy's default was layered ABOVE the request body, so
 	// a token-auth'd client whose model_override is empty would get the
 	// proxy's own model regardless of what they typed in the request — the
-	// pattern that hit 바비2호 in post #36, where an econoworld token route
+	// pattern that hit earlier reviewer feedback, where an econoworld token route
 	// to mini9's proxy (s.model="anthropic/claude-opus-4-7") swallowed the
 	// requested "qwen3.6:27b".
 	mdl := oaiReq.Model
@@ -1171,6 +1345,20 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 			}
 			if entry.model != "" {
 				mdl = entry.model
+			} else if svc != "" {
+				// Vault explicitly cleared the client's model override (or
+				// the operator picked "(서비스 기본 사용)" in dashboard).
+				// Honour that intent by forcing the service-level default —
+				// the alternative ("request body's model wins") silently
+				// bypasses the dashboard knob. Surfaced when an OAI-compat
+				// client kept a stale path-style model id in its
+				// ai_config.json even after the operator switched the LM
+				// Studio service default to a different model.
+				s.mu.RLock()
+				if def := s.serviceDefaults[svc]; def != "" {
+					mdl = def
+				}
+				s.mu.RUnlock()
 			}
 			fallbackChain = entry.fallbackServices
 		}
@@ -1202,9 +1390,32 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	geminiReq := OpenAIToGemini(&oaiReq)
 	dispatchRes, err := s.dispatchWithChain(r.Context(), svc, mdl, fallbackChain, geminiReq)
 	if err != nil {
+		// When stream early-flush already committed status 200, we cannot
+		// switch to a JSON 502 response — emit the error as a final SSE
+		// chunk + [DONE] so the caller's stream parser can surface it.
+		if keepaliveStop != nil {
+			stopKeepalive()
+			if f, ok := w.(http.Flusher); ok {
+				errChunk := map[string]interface{}{
+					"id":      "chatcmpl-proxy",
+					"object":  "chat.completion.chunk",
+					"model":   mdl,
+					"choices": []map[string]interface{}{{"index": 0, "delta": map[string]string{"content": "[wall-vault: " + err.Error() + "]"}, "finish_reason": "stop"}},
+				}
+				if b, mErr := json.Marshal(errChunk); mErr == nil {
+					fmt.Fprintf(w, "data: %s\n\n", b)
+				}
+				fmt.Fprint(w, "data: [DONE]\n\n")
+				f.Flush()
+			}
+			return
+		}
 		jsonError(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	// Stop keepalive before writing real response chunks to avoid racy
+	// concurrent Write/Flush against the same ResponseWriter.
+	stopKeepalive()
 	geminiResp := dispatchRes.Response
 	// Reflect the actual service/model used — may differ from the requested
 	// pair when dispatch fell back to another provider (see DispatchResult).
@@ -1215,7 +1426,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 		svc = dispatchRes.UsedService
 	}
 	// Surface routing decisions to the caller via response headers so downstream
-	// agents (post #36 etc.) can react to silent provider switches without
+	// agents (<separate incident> etc.) can react to silent provider switches without
 	// having to compare the response body's model field against the request.
 	w.Header().Set("X-WV-Used-Service", svc)
 	w.Header().Set("X-WV-Used-Model", mdl)
@@ -1435,6 +1646,20 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request) {
 			}
 			if entry.model != "" {
 				mdl = entry.model
+			} else if svc != "" {
+				// Vault explicitly cleared the client's model override (or
+				// the operator picked "(서비스 기본 사용)" in dashboard).
+				// Honour that intent by forcing the service-level default —
+				// the alternative ("request body's model wins") silently
+				// bypasses the dashboard knob. Surfaced when an OAI-compat
+				// client kept a stale path-style model id in its
+				// ai_config.json even after the operator switched the LM
+				// Studio service default to a different model.
+				s.mu.RLock()
+				if def := s.serviceDefaults[svc]; def != "" {
+					mdl = def
+				}
+				s.mu.RUnlock()
 			}
 			fallbackChain = entry.fallbackServices
 		}
@@ -1644,7 +1869,7 @@ type DispatchResult struct {
 //
 // The previous behaviour (auto-fallback through s.cfg.Proxy.Services with the
 // destination service's default_model) was removed in v0.2.27 — it surfaced as
-// 바비2호 post #36 where a qwen3.6:27b request returned google/gemini-flash
+// <earlier incident> where a qwen3.6:27b request returned google/gemini-flash
 // because Ollama was unreachable and dispatch silently swapped the model.
 // Now the operator sets FallbackServices explicitly per client when fallback
 // is desired; default is strict.
@@ -1996,6 +2221,22 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// Pin think so thinking-capable models do not silently consume num_predict
 	// on hidden reasoning. vault reasoning_mode=true → think=true, default → false.
 	oaiReq.Think = &reasoning
+	// Ollama's OpenAI-compat /v1/chat/completions endpoint silently ignores
+	// the top-level `think` field — confirmed (operator host, earlier) where the same
+	// request that returns "Hello!" via native /api/chat with think:false
+	// returns an empty content + multi-minute hidden reasoning via /v1.
+	// Qwen3 family honours an inline `/no_think` token in the user message,
+	// so when reasoning is off we append it to the last user message. Only
+	// applied to qwen3* model ids — other families (gemma, llama, etc.)
+	// would treat the literal text as input and pollute the response.
+	if !reasoning && strings.HasPrefix(strings.ToLower(model), "qwen3") {
+		for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
+			if oaiReq.Messages[i].Role == "user" {
+				oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
+				break
+			}
+		}
+	}
 	// Tell Ollama how long to keep the model resident after this response.
 	// Recent Ollama (>=0.3.x) honours top-level keep_alive on the OpenAI
 	// compat endpoint; older versions silently ignore it. Empty config means
@@ -2041,12 +2282,36 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	return OpenAIRespToGemini(&oaiResp), nil
 }
 
-// callLocalService: generic OpenAI-compatible local server (LM Studio, vLLM, etc.)
-// Generic OpenAI-compatible local server handler.
+// callLocalService: generic OpenAI-compatible local server. Used for every
+// non-cloud backend that speaks /v1/chat/completions — LM Studio, vLLM,
+// llama.cpp, text-generation-webui, LocalAI, Jan, KoboldCpp, TabbyAPI,
+// mlx_lm.server, LiteLLM proxy, *and another wall-vault instance running
+// in hub mode*. The transport-level differences (TLS trust, bearer auth,
+// default URL) are read from the per-service plugin yaml so the same code
+// path serves every backend without if/else hardcoding.
 func (s *Server) callLocalService(ctx context.Context, serviceID, model string, req *GeminiRequest) (*GeminiResponse, error) {
-	s.mu.RLock()
-	baseURL := s.serviceURLs[serviceID]
-	s.mu.RUnlock()
+	plugin := s.pluginByID[serviceID]
+
+	// URL resolution priority (highest first):
+	//   1. plugin.DefaultURL — an operator-installed plugin yaml is an
+	//      explicit local override and must beat any vault-distributed
+	//      URL. The hub-topology pattern (point a client at a remote
+	//      wall-vault hub) only works if this layer wins; otherwise
+	//      vault's default LM Studio / ollama URL — which assumes a
+	//      single-host install — silently overrides and the hub plugin
+	//      becomes inert.
+	//   2. SSE-distributed serviceURLs[id] — vault's centrally managed
+	//      default for this service.
+	//   3. Built-in fallbacks for the few historic services. New
+	//      backends should ship a plugin yaml with default_url instead.
+	var baseURL string
+	if plugin != nil && plugin.DefaultURL != "" {
+		baseURL = plugin.DefaultURL
+	} else {
+		s.mu.RLock()
+		baseURL = s.serviceURLs[serviceID]
+		s.mu.RUnlock()
+	}
 	if baseURL == "" {
 		defaults := map[string]string{"lmstudio": "http://localhost:1234", "vllm": "http://localhost:8000"}
 		baseURL = defaults[serviceID]
@@ -2091,6 +2356,20 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 	s.mu.RUnlock()
 	oaiReq.Reasoning = reasoning
 	oaiReq.Think = &reasoning
+	// Qwen3 family also honours an inline `/no_think` token under LM Studio's
+	// jinja template, same rationale as the ollama path: the `think` field
+	// gets silently ignored on /v1, and without the inline token the model
+	// burns max_tokens on hidden reasoning. Scoped to serviceID=="lmstudio"
+	// so other OAI-compat backends (vllm/llamacpp/…) whose templates may not
+	// strip the marker do not echo the literal token in the response.
+	if !reasoning && serviceID == "lmstudio" && strings.HasPrefix(strings.ToLower(model), "qwen3") {
+		for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
+			if oaiReq.Messages[i].Role == "user" {
+				oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
+				break
+			}
+		}
+	}
 	data, _ := json.Marshal(oaiReq)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
@@ -2098,7 +2377,24 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 		return nil, fmt.Errorf("%s 요청 생성 실패: %w", serviceID, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 10 * time.Minute}
+	// Plugin-driven auth: a plugin yaml with auth.type=bearer means this
+	// backend expects an Authorization: Bearer <token> header. The token
+	// source is the proxy's vault_token — same secret already used to
+	// authenticate this proxy to its vault, which a remote wall-vault
+	// running in hub mode treats as the caller's identity.
+	if plugin != nil && plugin.Auth.Type == "bearer" && s.cfg.Proxy.VaultToken != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
+	}
+	// Plugin-driven TLS trust: a plugin yaml with tls_internal_ca=true
+	// uses internalHTTPClient so the wall-vault internal CA is trusted.
+	// This lets a hub backend present a self-signed cert without the
+	// caller having to install the CA into the OS trust store.
+	var client *http.Client
+	if plugin != nil && plugin.TLSInternalCA {
+		client = internalHTTPClient(10 * time.Minute)
+	} else {
+		client = &http.Client{Timeout: 10 * time.Minute}
+	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("%s 연결 실패 (%s): %w", serviceID, baseURL, err)
@@ -2183,8 +2479,21 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 		// the bare name itself — a request like {"model": "gemini-2.5-flash"}
 		// addressed to a client whose preferred_service is ollama would
 		// otherwise be force-routed to ollama and 404 with "model not found",
-		// because ollama does not host google models. Surfaced by post #38.
+		// because ollama does not host google models. Surfaced by <separate incident>.
 		if inferred := inferServiceFromBareModel(mdl); inferred != "" && inferred != svc {
+			// Suppress the "colon ⇒ ollama" hijack when the caller has
+			// already chosen a non-ollama service: an EconoWorld client
+			// whose ai_config.json carries model="qwen3.6:27b" but whose
+			// vault-side default_service was deliberately moved to lmstudio
+			// must still land on lmstudio ((operator host, earlier) incident — the
+			// hijack force-routed the call into a dead ollama and the
+			// operator's explicit lmstudio choice was silently ignored).
+			// The <separate incident> cure (gemini-* misrouted to ollama) survives
+			// because cloud-service inferences (anthropic / google / openai)
+			// fall through to the unconditional return below.
+			if inferred == "ollama" && svc != "" && svc != "ollama" {
+				return svc, mdl
+			}
 			return inferred, mdl
 		}
 		return svc, mdl
@@ -2198,6 +2507,16 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 	if svc == "openrouter" && prefix != "openrouter" && prefix != "ollama" {
 		return "openrouter", mdl
 	}
+	// LM Studio's model IDs are path-style ("publisher/model") and the
+	// publisher segment frequently collides with another service's name
+	// (google/, qwen/, anthropic/, microsoft/, …). When the caller explicitly
+	// chose lmstudio, never re-route to the publisher's native handler —
+	// surfaced when an EconoWorld request to lmstudio carrying default
+	// "google/gemma-4-26b-a4b" got hijacked into the Google service handler
+	// and 502'd with "모델 없음".
+	if svc == "lmstudio" && prefix != "lmstudio" && prefix != "ollama" {
+		return "lmstudio", mdl
+	}
 
 	switch prefix {
 	// ── Native handlers ──────────────────────────────────────────────────────
@@ -2207,6 +2526,21 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 		return "google", mdl
 	case "ollama":
 		return "ollama", bare
+
+	// ── OpenAI-compat local backends (callLocalService) ──────────────────────
+	// Every backend here speaks /v1/chat/completions. New backends added via
+	// plugin yaml only need to be listed here so the "<id>/<model>" form
+	// addresses them; the actual transport (URL, auth, TLS) is read from
+	// the plugin yaml at dispatch time.
+	//
+	// We return the full mdl (e.g. "lmstudio/qwen/qwen3.6-27b") rather than
+	// bare so callLocalService's own provider-prefix stripper drops only
+	// the leading "lmstudio/" — preserving the "qwen/qwen3.6-27b" form
+	// that LM Studio / vLLM / llama.cpp expect for org-scoped model ids.
+	case "lmstudio", "vllm", "llamacpp",
+		"tgwui", "localai", "jan", "koboldcpp",
+		"tabbyapi", "mlx-server", "litellm-proxy":
+		return prefix, mdl
 
 	// ── OpenAI direct ────────────────────────────────────────────────────────
 	case "openai":
@@ -2285,7 +2619,7 @@ func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {
 //   - gpt-*  /  o1*  /  o3*  /  o4*  →  openai
 //   - everything else           →  ""             (caller's choice stands)
 //
-// Introduced in v0.2.28 after post #38: a request for "gemini-2.5-flash"
+// Introduced in v0.2.28 after <separate incident>: a request for "gemini-2.5-flash"
 // arrived at a client whose preferred_service was ollama and was forwarded
 // to ollama unchanged, producing a 404 from ollama and a noisy cascade of
 // downstream errors. The cure isn't to override preferred_service for every
@@ -2336,6 +2670,43 @@ func stripControlTokens(s string) string {
 
 // onFallback: called when dispatch succeeds on a service other than the requested one.
 // Updates s.service/s.model so the next heartbeat, vault UI, and openclaw TUI reflect reality.
+// warnIfPluginURLLooksRemoteHTTP emits a single startup log line when a
+// service plugin's default_url (or generate endpoint) points at a non-local
+// host over plain HTTP. That combination almost always means the operator
+// pasted a remote backend URL but forgot the "s" in "https://" — sending
+// any bearer token in the clear, and (for self-signed wall-vault hubs)
+// guaranteeing a TLS handshake error on the first request anyway.
+//
+// Local hosts (localhost, 127.0.0.1, ::1, *.local) are exempt: an http://
+// LM Studio / ollama / llama.cpp on the same machine is the normal case
+// and warning about it would be noise.
+func warnIfPluginURLLooksRemoteHTTP(p config.ServicePlugin) {
+	candidates := []string{p.DefaultURL, p.Endpoints.Generate}
+	for _, raw := range candidates {
+		if raw == "" {
+			continue
+		}
+		u, err := url.Parse(raw)
+		if err != nil || u == nil {
+			continue
+		}
+		if u.Scheme != "http" {
+			continue
+		}
+		host := u.Hostname()
+		if host == "" || host == "localhost" || host == "127.0.0.1" || host == "::1" {
+			continue
+		}
+		if strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".localhost") {
+			continue
+		}
+		log.Printf("[plugin] warn: %s url=%s reaches remote host over plain HTTP — "+
+			"use https:// (set tls_internal_ca: true if the backend is a "+
+			"self-signed wall-vault hub)", p.ID, raw)
+		return
+	}
+}
+
 func extractModelFromPath(path string) string {
 	prefix := "/google/v1beta/models/"
 	if !strings.HasPrefix(path, prefix) {

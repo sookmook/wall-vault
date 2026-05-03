@@ -1,0 +1,35 @@
+# LM Studio (https://lmstudio.ai/) — local OpenAI-compat server.
+#
+# Default listen on 127.0.0.1:1234. To accept calls from other machines,
+# enable "Serve on Local Network" in LM Studio's UI; the URL becomes
+# http://<host>:1234. For remote access prefer routing through a wall-vault
+# hub (see wall-vault-hub.yaml.example) so the bearer-protected HTTPS
+# endpoint is the only thing exposed beyond localhost.
+id: lmstudio
+name: LM Studio
+enabled: false
+
+default_url: http://localhost:1234
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+  auto_detect_url: true
+
+concurrency:
+  max: 1
+  queue_size: 10
+  wait_notify: true
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "LM Studio not responding"

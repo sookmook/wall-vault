@@ -1,0 +1,30 @@
+# vLLM (https://github.com/vllm-project/vllm) — high-throughput OpenAI-
+# compat server. Defaults to 0.0.0.0:8000. Run with:
+#   python -m vllm.entrypoints.openai.api_server --model <hf-model>
+id: vllm
+name: vLLM
+enabled: false
+
+default_url: http://localhost:8000
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+
+concurrency:
+  max: 4
+  queue_size: 32
+  wait_notify: false
+
+error_codes:
+  503:
+    cooldown: 2m
+    message: "vLLM not responding"

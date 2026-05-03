@@ -25,7 +25,9 @@ package vault
 // is purely an additional accept path for browser sessions.
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"html"
@@ -33,6 +35,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,8 +45,9 @@ import (
 )
 
 const (
-	sessionCookieName = "wv_session"
-	sessionTTL        = 12 * time.Hour
+	sessionCookieName  = "wv_session"
+	sessionTTL         = 12 * time.Hour
+	rememberSessionTTL = 30 * 24 * time.Hour
 )
 
 // sessionStore is an in-memory map of session id → expiry. Cleared on restart,
@@ -104,17 +108,75 @@ func (s *sessionStore) revoke(id string) {
 }
 
 // hasValidSession returns true if the request carries a session cookie that
-// matches a live entry in the in-memory store. Used by adminAuth/clientAuth
-// as an alternative to Bearer.
+// matches a live entry in the in-memory store, OR a valid HMAC-signed
+// "remember this device" cookie. Used by adminAuth/clientAuth as an
+// alternative to Bearer.
 func (s *Server) hasValidSession(r *http.Request) bool {
-	if s.sessions == nil {
-		return false
-	}
 	c, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		return false
 	}
+	// HMAC-signed remember cookies always contain a "." separating the
+	// expiry from the signature; plain in-memory session ids are pure hex
+	// so they cannot collide with this format.
+	if strings.Contains(c.Value, ".") {
+		return s.validRememberCookie(c.Value)
+	}
+	if s.sessions == nil {
+		return false
+	}
 	return s.sessions.valid(c.Value)
+}
+
+// signRememberCookie produces an HMAC-signed cookie value of the form
+// `<expiryUnix>.<hexHmac>`. The HMAC key is the admin token, so changing the
+// admin token instantly invalidates every outstanding remember cookie — that
+// is the only revocation path (there is no server-side store of remember
+// cookies, by design: a stolen value cannot survive an admin-token rotation).
+func (s *Server) signRememberCookie(expiry int64) string {
+	msg := strconv.FormatInt(expiry, 10)
+	mac := hmac.New(sha256.New, []byte(s.cfg.Vault.AdminToken))
+	mac.Write([]byte(msg))
+	return msg + "." + hex.EncodeToString(mac.Sum(nil))
+}
+
+// validRememberCookie verifies an HMAC-signed remember cookie and checks its
+// embedded expiry. Returns false on any malformed input — never panic.
+func (s *Server) validRememberCookie(val string) bool {
+	if s.cfg.Vault.AdminToken == "" {
+		return false
+	}
+	dot := strings.IndexByte(val, '.')
+	if dot <= 0 || dot == len(val)-1 {
+		return false
+	}
+	expiry, err := strconv.ParseInt(val[:dot], 10, 64)
+	if err != nil {
+		return false
+	}
+	if time.Now().Unix() > expiry {
+		return false
+	}
+	expected := s.signRememberCookie(expiry)
+	return hmac.Equal([]byte(val), []byte(expected))
+}
+
+// setRememberCookie writes a long-lived HMAC-signed cookie that survives
+// process restarts. Used when the operator ticked the "remember this device"
+// toggle on the login page.
+func (s *Server) setRememberCookie(w http.ResponseWriter, r *http.Request) {
+	expiry := time.Now().Add(rememberSessionTTL).Unix()
+	val := s.signRememberCookie(expiry)
+	secure := r.TLS != nil
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    val,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		Expires:  time.Unix(expiry, 0),
+	})
 }
 
 // setSessionCookie issues a fresh session id and writes it back to the
@@ -261,7 +323,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			s.renderLoginPage(w, r, i18n.TFor(lang, "auth_err_invalid_token"))
 			return
 		}
-		if err := s.setSessionCookie(w, r); err != nil {
+		if r.PostForm.Get("remember") != "" {
+			s.setRememberCookie(w, r)
+		} else if err := s.setSessionCookie(w, r); err != nil {
 			http.Error(w, "session error", http.StatusInternalServerError)
 			return
 		}
@@ -338,6 +402,11 @@ func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, errMsg 
 	body := `<p>` + html.EscapeString(i18n.TFor(lang, "auth_login_intro")) + `</p>
 <form method="POST" action="/login">
 <input type="password" name="token" autocomplete="current-password" required autofocus placeholder="` + html.EscapeString(i18n.TFor(lang, "auth_login_field_ph")) + `"/>
+<label class="toggle">
+  <input type="checkbox" name="remember" value="1"/>
+  <span class="slider"></span>
+  <span class="toggle-label">` + html.EscapeString(i18n.TFor(lang, "auth_login_remember")) + `</span>
+</label>
 <button type="submit">` + html.EscapeString(i18n.TFor(lang, "auth_login_submit")) + `</button>
 </form>`
 	if errMsg != "" {
@@ -364,6 +433,14 @@ h1{margin:0 0 16px;font-size:20px;}
 ul{padding-left:18px;}
 code{background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:90%;}
 input[type=password]{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:6px;margin:8px 0;box-sizing:border-box;}
+.toggle{display:inline-flex;align-items:center;gap:10px;margin:12px 0 16px;cursor:pointer;user-select:none;}
+.toggle input{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
+.toggle .slider{position:relative;flex:0 0 auto;width:36px;height:20px;background:#cbd5e1;border-radius:10px;transition:background .15s;}
+.toggle .slider::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.15);transition:left .15s;}
+.toggle input:checked + .slider{background:#2563eb;}
+.toggle input:checked + .slider::after{left:18px;}
+.toggle input:focus-visible + .slider{outline:2px solid #2563eb;outline-offset:2px;}
+.toggle-label{font-size:14px;color:#374151;}
 button{background:#2563eb;color:#fff;border:0;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer;}
 button:hover{background:#1d4ed8;}
 .err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:6px;}

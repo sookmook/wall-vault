@@ -153,6 +153,26 @@ func runAll() {
 		}
 	}()
 
+	// Loopback-only plain-HTTP companion for same-host clients that
+	// can't honour the proxy's self-signed CA. Only spins up when TLS
+	// is enabled on the main listener; without TLS the main port is
+	// already plain HTTP and there's nothing to bypass. Bound to
+	// 127.0.0.1 unconditionally — never reachable from the LAN, so the
+	// vault token traversing it stays inside the same OS user's
+	// loopback interface (same trust boundary as a Unix socket).
+	var proxyPlainHTTP *http.Server
+	if cfg.Proxy.TLS.Enabled && cfg.Proxy.PlainPort > 0 {
+		plainAddr := fmt.Sprintf("127.0.0.1:%d", cfg.Proxy.PlainPort)
+		proxyPlainHTTP = &http.Server{Addr: plainAddr, Handler: proxySrv.Handler()}
+		go func() {
+			log.Printf("[proxy] plain-HTTP companion 시작 :%d (loopback only)", cfg.Proxy.PlainPort)
+			err := proxyPlainHTTP.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("[proxy] plain-HTTP companion 오류 (계속 진행): %v", err)
+			}
+		}()
+	}
+
 	slog.Info("wall-vault running",
 		"version", version,
 		"dashboard", fmt.Sprintf("%s://localhost:%d", vaultScheme, cfg.Vault.Port),
@@ -192,6 +212,11 @@ func runAll() {
 	if bootstrapHTTP != nil {
 		if err := bootstrapHTTP.Shutdown(ctx); err != nil {
 			slog.Warn("bootstrap http shutdown", "err", err)
+		}
+	}
+	if proxyPlainHTTP != nil {
+		if err := proxyPlainHTTP.Shutdown(ctx); err != nil {
+			slog.Warn("proxy plain http shutdown", "err", err)
 		}
 	}
 	proxySrv.Stop()

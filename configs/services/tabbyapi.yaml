@@ -1,0 +1,29 @@
+# TabbyAPI (https://github.com/theroyallab/tabbyAPI) — exllamav2-based
+# OpenAI-compat server. Default port 5000. Requires bearer auth by
+# default; the API key is configured in TabbyAPI's config.yml.
+#
+# Set the API key in this proxy's vault as the "tabbyapi" service token,
+# or wire it through environment / vault and update auth.type below.
+id: tabbyapi
+name: TabbyAPI
+enabled: false
+
+default_url: http://localhost:5000
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: bearer
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+  auth_required: true
+
+concurrency:
+  max: 1
+  queue_size: 8
+  wait_notify: true

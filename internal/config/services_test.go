@@ -88,6 +88,82 @@ func TestPluginByID(t *testing.T) {
 	}
 }
 
+func TestLoadPlugins_NewSchemaFields(t *testing.T) {
+	dir := t.TempDir()
+	hubYAML := `
+id: wall-vault-hub
+name: Hub Wall-Vault
+enabled: true
+request_format: openai
+default_url: https://hub.example:56244
+default_model: qwen3.6:27b
+tls_internal_ca: true
+auth:
+  type: bearer
+endpoints:
+  generate: /v1/chat/completions
+`
+	if err := os.WriteFile(filepath.Join(dir, "hub.yaml"), []byte(hubYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+	plugins, err := LoadPlugins(dir)
+	if err != nil {
+		t.Fatalf("LoadPlugins error: %v", err)
+	}
+	if len(plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(plugins))
+	}
+	p := plugins[0]
+	if p.ID != "wall-vault-hub" {
+		t.Errorf("id = %q", p.ID)
+	}
+	if !p.TLSInternalCA {
+		t.Errorf("expected tls_internal_ca=true, got false")
+	}
+	if p.Auth.Type != "bearer" {
+		t.Errorf("auth.type = %q, want bearer", p.Auth.Type)
+	}
+	if p.DefaultURL != "https://hub.example:56244" {
+		t.Errorf("default_url = %q", p.DefaultURL)
+	}
+	if p.DefaultModel != "qwen3.6:27b" {
+		t.Errorf("default_model = %q", p.DefaultModel)
+	}
+}
+
+func TestLoadPlugins_BackwardCompat(t *testing.T) {
+	// A plugin yaml without any of the new fields must still load and
+	// behave the same as before — implicit Compat=openai_chat_completions,
+	// Auth.Type=none, TLSInternalCA=false.
+	dir := t.TempDir()
+	legacyYAML := `
+id: legacy
+name: Legacy Service
+enabled: true
+request_format: openai
+endpoints:
+  generate: http://localhost:9999/v1/chat/completions
+`
+	os.WriteFile(filepath.Join(dir, "legacy.yaml"), []byte(legacyYAML), 0644)
+	plugins, err := LoadPlugins(dir)
+	if err != nil {
+		t.Fatalf("LoadPlugins error: %v", err)
+	}
+	if len(plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(plugins))
+	}
+	p := plugins[0]
+	if p.TLSInternalCA {
+		t.Errorf("legacy plugin should default tls_internal_ca=false")
+	}
+	if p.Auth.Type != "" {
+		t.Errorf("legacy auth.type should be empty (=none), got %q", p.Auth.Type)
+	}
+	if p.DefaultURL != "" {
+		t.Errorf("legacy default_url should be empty, got %q", p.DefaultURL)
+	}
+}
+
 func TestLoadPlugins_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	// valid plugin

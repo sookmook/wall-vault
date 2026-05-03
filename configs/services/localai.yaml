@@ -1,0 +1,24 @@
+# LocalAI (https://github.com/mudler/LocalAI) — drop-in OpenAI replacement
+# supporting many GGUF / GGML model families. Default port 8080.
+id: localai
+name: LocalAI
+enabled: false
+
+default_url: http://localhost:8080
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+
+concurrency:
+  max: 2
+  queue_size: 16
+  wait_notify: false

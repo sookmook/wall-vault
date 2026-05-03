@@ -1,0 +1,26 @@
+# LiteLLM proxy (https://github.com/BerriAI/litellm) — unifying gateway
+# in front of many model providers, OpenAI-compat at /v1. Default port
+# 4000; bearer auth controlled by master_key in LiteLLM's own config.
+id: litellm-proxy
+name: LiteLLM Proxy
+enabled: false
+
+default_url: http://localhost:4000
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: bearer
+
+request_format: openai
+
+model_fetch:
+  enabled: true
+  dynamic: true
+  auth_required: true
+
+concurrency:
+  max: 4
+  queue_size: 32
+  wait_notify: false

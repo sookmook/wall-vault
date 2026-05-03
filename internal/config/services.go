@@ -26,6 +26,22 @@ type ServicePlugin struct {
 	Headers       ServiceHeaders         `yaml:"headers"`
 	Concurrency   ServiceConcurrency     `yaml:"concurrency"`
 	FallbackOnly  bool                   `yaml:"fallback_only"`
+
+	// TLSInternalCA: when true, outbound calls use the proxy's
+	// internalHTTPClient — i.e. the ~/.wall-vault/ca.crt is added to the
+	// trust pool so a self-signed wall-vault HTTPS endpoint can be reached
+	// without OS-level CA installation. Set this for a plugin that points
+	// at another wall-vault instance ("hub" topology).
+	TLSInternalCA bool `yaml:"tls_internal_ca"`
+
+	// DefaultURL: optional fallback URL used when no SSE-distributed URL
+	// has been resolved for this service yet. Lets a plugin file alone
+	// describe a working backend without needing the vault to push a URL.
+	DefaultURL string `yaml:"default_url"`
+
+	// DefaultModel: optional model id used when neither the request nor
+	// the SSE-distributed default supplies one.
+	DefaultModel string `yaml:"default_model"`
 }
 
 type ServiceEndpoints struct {

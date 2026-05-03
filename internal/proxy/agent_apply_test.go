@@ -279,3 +279,57 @@ func TestUpdateEconoWorldModel_EmptyModelIsNoop(t *testing.T) {
 	_ = infoBefore
 	_ = infoAfter
 }
+
+func TestEconoWorldDirCache_RoundTrip(t *testing.T) {
+	// Reset between sub-cases — the cache is package-global.
+	defer econoWorldDirCache.Store(nil)
+	econoWorldDirCache.Store(nil)
+	t.Setenv("WV_ECONOWORLD_WORKDIR_CACHE_DISABLE", "")
+
+	if got := cachedEconoWorldDir(); got != "" {
+		t.Fatalf("empty cache should return empty, got %q", got)
+	}
+	setCachedEconoWorldDir("/tmp/econoworld-x")
+	if got := cachedEconoWorldDir(); got != "/tmp/econoworld-x" {
+		t.Fatalf("cache round-trip: got %q, want %q", got, "/tmp/econoworld-x")
+	}
+	// Empty input must be a no-op so a probe call can't blank a real dir.
+	setCachedEconoWorldDir("")
+	if got := cachedEconoWorldDir(); got != "/tmp/econoworld-x" {
+		t.Fatalf("empty set cleared cache: got %q", got)
+	}
+}
+
+func TestEconoWorldDirCache_DisableEnvSkips(t *testing.T) {
+	defer econoWorldDirCache.Store(nil)
+	econoWorldDirCache.Store(nil)
+	t.Setenv("WV_ECONOWORLD_WORKDIR_CACHE_DISABLE", "1")
+
+	setCachedEconoWorldDir("/tmp/econoworld-y")
+	if got := cachedEconoWorldDir(); got != "" {
+		t.Fatalf("env disable: cachedEconoWorldDir should return empty, got %q", got)
+	}
+}
+
+func TestApplyEconoWorldConfig_PopulatesDirCache(t *testing.T) {
+	// /agent/apply must seed the cache so a subsequent SSE-driven model
+	// refresh hits the same workDir the operator pinned via the dashboard,
+	// not the resolveEconoWorldDir("") fallback.
+	defer econoWorldDirCache.Store(nil)
+	econoWorldDirCache.Store(nil)
+	t.Setenv("WV_ECONOWORLD_WORKDIR_CACHE_DISABLE", "")
+
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "analyzer"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if _, err := applyEconoWorldConfig(
+		"http://127.0.0.1:56244/v1", "google/gemma-4-26b-a4b", "tok",
+		tmp, 8192, true, 300,
+	); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if got := cachedEconoWorldDir(); got != tmp {
+		t.Fatalf("apply did not seed cache: got %q, want %q", got, tmp)
+	}
+}

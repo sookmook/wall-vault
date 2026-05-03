@@ -8,6 +8,31 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.59] — 2026-05-04
+
+### Added
+
+- **EconoWorld workDir cache (process-local).** /agent/apply now seeds
+  an `atomic.Pointer[string]` cache with the resolved EconoWorld
+  install dir, so subsequent SSE-driven `updateEconoWorldModel` calls
+  and `runStartupEconoWorldHeal` operate on exactly the directory the
+  operator pinned via the dashboard's `work_dir` field rather than the
+  hard-coded fallback list. Hosts whose install lives outside the
+  fallback list now stay in lockstep with the dashboard. Disable knob:
+  `WV_ECONOWORLD_WORKDIR_CACHE_DISABLE=1`.
+
+### Changed
+
+- **wslHomeCandidates extracted as a single helper.**
+  `findClineDataDir` and `findClaudeSettingsPaths` previously
+  enumerated the same three-source candidate list (`$HOME`,
+  `$USERPROFILE`-as-WSL, `/mnt/c/Users/*`) inline. The order and
+  filtering rules had begun to drift between the two; consolidated
+  into one helper so adding a fourth root or tightening the filter
+  is a single edit.
+
+---
+
 ## [0.2.58] — 2026-05-03
 
 ### Added

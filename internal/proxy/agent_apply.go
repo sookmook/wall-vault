@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -132,31 +133,12 @@ func applyClineConfig(baseURL, model, token string) (string, error) {
 //  2. WSL mount from $USERPROFILE — e.g. /mnt/c/Users/<windows-user>/.cline/data
 //  3. Scan /mnt/c/Users/*/        — WSL fallback when $USERPROFILE is unset
 func findClineDataDir() (string, error) {
-	var candidates []string
-
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".cline", "data"))
-	}
-	if up := os.Getenv("USERPROFILE"); up != "" {
-		if wsl := windowsPathToWSL(up); wsl != "" {
-			candidates = append(candidates, filepath.Join(wsl, ".cline", "data"))
-		}
-	}
-	if entries, err := os.ReadDir("/mnt/c/Users"); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() || e.Name() == "Public" || strings.HasPrefix(e.Name(), ".") {
-				continue
-			}
-			candidates = append(candidates, filepath.Join("/mnt/c/Users", e.Name(), ".cline", "data"))
-		}
-	}
-
+	candidates := wslHomeCandidates(".cline", "data")
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
 			return c, nil
 		}
 	}
-
 	tried := strings.Join(candidates, "\n  ")
 	if tried == "" {
 		tried = "(none found)"
@@ -278,24 +260,7 @@ func isClaudeModel(model string) bool {
 
 // findClaudeSettingsPaths returns all candidate paths for Claude Code's settings.json.
 func findClaudeSettingsPaths() []string {
-	var paths []string
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, ".claude", "settings.json"))
-	}
-	if up := os.Getenv("USERPROFILE"); up != "" {
-		if wsl := windowsPathToWSL(up); wsl != "" {
-			paths = append(paths, filepath.Join(wsl, ".claude", "settings.json"))
-		}
-	}
-	if entries, err := os.ReadDir("/mnt/c/Users"); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() || e.Name() == "Public" || strings.HasPrefix(e.Name(), ".") {
-				continue
-			}
-			paths = append(paths, filepath.Join("/mnt/c/Users", e.Name(), ".claude", "settings.json"))
-		}
-	}
-	return paths
+	return wslHomeCandidates(".claude", "settings.json")
 }
 
 // ── OpenClaw / NanoClaw ───────────────────────────────────────────────────────
@@ -529,6 +494,40 @@ func (s *Server) isValidAgentToken(token string) bool {
 
 // ── EconoWorld ────────────────────────────────────────────────────────────────
 
+// econoWorldDirCache remembers the workDir an /agent/apply call resolved to,
+// so SSE-driven model refreshes and startup heals operate on exactly the
+// directory the operator pinned via the dashboard's work_dir field. Without
+// this cache, updateEconoWorldModel and healEconoWorldConfig fall back to
+// resolveEconoWorldDir(""), which only inspects the hard-coded default
+// candidate list — when the install lives outside that list, the cache is
+// what keeps SSE refreshes pointed at the same file /agent/apply just wrote.
+//
+// The cache is process-local (not persisted) so a proxy restart re-learns
+// the dir on the next /agent/apply, and the heal path's resolveEconoWorldDir("")
+// fallback handles the gap before the first apply lands.
+var econoWorldDirCache atomic.Pointer[string]
+
+func setCachedEconoWorldDir(dir string) {
+	if dir == "" {
+		return
+	}
+	if v := os.Getenv("WV_ECONOWORLD_WORKDIR_CACHE_DISABLE"); v == "1" || strings.EqualFold(v, "true") {
+		return
+	}
+	d := dir
+	econoWorldDirCache.Store(&d)
+}
+
+func cachedEconoWorldDir() string {
+	if v := os.Getenv("WV_ECONOWORLD_WORKDIR_CACHE_DISABLE"); v == "1" || strings.EqualFold(v, "true") {
+		return ""
+	}
+	if p := econoWorldDirCache.Load(); p != nil {
+		return *p
+	}
+	return ""
+}
+
 // applyEconoWorldConfig writes wall-vault proxy settings into EconoWorld's
 // analyzer/ai_config.json. The existing multi-provider structure is preserved;
 // we flip `provider` to "openai_compatible" and populate that section with the
@@ -542,6 +541,7 @@ func (s *Server) isValidAgentToken(token string) bool {
 // used so the resulting error clearly points at the missing directory.
 func applyEconoWorldConfig(baseURL, model, token, workDir string, maxTokens int, stream bool, requestTimeout int) (string, error) {
 	dir := resolveEconoWorldDir(workDir)
+	setCachedEconoWorldDir(dir)
 	path := filepath.Join(dir, "analyzer", "ai_config.json")
 
 	cfg := map[string]interface{}{}
@@ -596,7 +596,10 @@ func updateEconoWorldModel(model string) {
 	if model == "" {
 		return
 	}
-	dir := resolveEconoWorldDir("")
+	dir := cachedEconoWorldDir()
+	if dir == "" {
+		dir = resolveEconoWorldDir("")
+	}
 	path := filepath.Join(dir, "analyzer", "ai_config.json")
 	if err := updateEconoWorldModelAt(path, model); err != nil {
 		log.Printf("[econoworld] updateModel failed: %v", err)
@@ -649,7 +652,10 @@ func updateEconoWorldModelAt(path, model string) error {
 // not exist, the function returns immediately. localBaseOrigin "" disables
 // the URL rewrite leg; the field-fill leg still runs.
 func healEconoWorldConfig(localBaseOrigin string, maxTokens int, stream bool, requestTimeout int) {
-	dir := resolveEconoWorldDir("")
+	dir := cachedEconoWorldDir()
+	if dir == "" {
+		dir = resolveEconoWorldDir("")
+	}
 	path := filepath.Join(dir, "analyzer", "ai_config.json")
 	if err := healEconoWorldConfigAt(path, localBaseOrigin, maxTokens, stream, requestTimeout); err != nil {
 		log.Printf("[econoworld-heal] %s: %v", path, err)
@@ -803,6 +809,40 @@ func splitEconoWorldDirs(workDir string) []string {
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
+
+// wslHomeCandidates returns the list of plausible per-user roots for an
+// agent that may live in either the WSL native home or under a Windows user
+// profile reachable via /mnt/c/Users/<name>. The relative path components
+// are appended to each root. Search order:
+//
+//  1. $HOME (Linux / macOS / WSL native)
+//  2. WSL mount of $USERPROFILE (when running inside WSL with the env set)
+//  3. Each /mnt/c/Users/<entry>/ dir, skipping Public and hidden entries
+//
+// When findClineDataDir / findClaudeSettingsPaths used to enumerate this
+// list inline, the order and filtering rules drifted between callers;
+// keeping it in one place removes the drift and makes adding a fourth root
+// (e.g. /mnt/d/Users) a single edit.
+func wslHomeCandidates(rel ...string) []string {
+	var out []string
+	if home, err := os.UserHomeDir(); err == nil {
+		out = append(out, filepath.Join(append([]string{home}, rel...)...))
+	}
+	if up := os.Getenv("USERPROFILE"); up != "" {
+		if wsl := windowsPathToWSL(up); wsl != "" {
+			out = append(out, filepath.Join(append([]string{wsl}, rel...)...))
+		}
+	}
+	if entries, err := os.ReadDir("/mnt/c/Users"); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() || e.Name() == "Public" || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			out = append(out, filepath.Join(append([]string{"/mnt/c/Users", e.Name()}, rel...)...))
+		}
+	}
+	return out
+}
 
 // windowsPathToWSL converts a Windows-style path (C:\Users\foo) to a WSL mount path (/mnt/c/Users/foo).
 func windowsPathToWSL(winPath string) string {

@@ -1396,6 +1396,29 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	// "anthropic/claude-opus-4-6"). Parse and route accordingly.
 	svc, mdl = parseProviderModel(svc, mdl)
 
+	// OAI-compat stream passthrough — gated. When enabled, callers that
+	// asked for stream:true and resolved to one of the OAI-compat services
+	// pipe backend SSE chunks straight through. Stream-mode callers do
+	// NOT consult the fallback chain (see spec §3.3).
+	if oaiReq.Stream && s.cfg.Proxy.OAIStreamForward {
+		if _, ok := oaiCompatServices[svc]; ok {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+			w.Header().Set("X-Accel-Buffering", "no")
+			flusher, _ := w.(http.Flusher)
+			// The keepalive goroutine started above for the buffered path is
+			// irrelevant here — the real backend stream provides natural
+			// keepalives. stopKeepalive is always defined as a closure and
+			// guards keepaliveStop internally, so direct call is safe.
+			stopKeepalive()
+			if err := s.streamLocalService(r.Context(), w, flusher, svc, mdl, &oaiReq); err != nil {
+				writeOpenAIErrorChunk(w, flusher, err)
+			}
+			return
+		}
+	}
+
 	geminiReq := OpenAIToGemini(&oaiReq)
 	dispatchRes, err := s.dispatchWithChain(r.Context(), svc, mdl, fallbackChain, geminiReq)
 	if err != nil {

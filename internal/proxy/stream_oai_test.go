@@ -255,6 +255,40 @@ func TestStreamLocalService_MidStreamAbort_EmitsSyntheticFinishPlusDONE(t *testi
 	_ = responseChan // suppress unused warning
 }
 
+// Header-idempotence: the handler is allowed to set SSE headers
+// before calling streamLocalService; the function must not emit
+// duplicate Content-Type entries.
+func TestStreamLocalService_HeaderIdempotence(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		f, _ := w.(http.Flusher)
+		fmt.Fprintln(w, `data: [DONE]`)
+		fmt.Fprintln(w)
+		if f != nil {
+			f.Flush()
+		}
+	}))
+	defer mock.Close()
+
+	s := newTestServerWithBackend(t, "lmstudio", mock.URL)
+	rec := httptest.NewRecorder()
+	rec.Header().Set("Content-Type", "text/event-stream") // pre-set by hypothetical handler
+	rec.Header().Set("Cache-Control", "no-cache")
+
+	oaiReq := &OpenAIRequest{
+		Model: "x", Stream: true,
+		Messages: []OpenAIMessage{{Role: "user", Content: "x"}},
+	}
+	if err := s.streamLocalService(context.Background(), rec, nil, "lmstudio", "x", oaiReq); err != nil {
+		t.Fatalf("streamLocalService: %v", err)
+	}
+	got := rec.Header().Values("Content-Type")
+	if len(got) != 1 {
+		t.Errorf("Content-Type set %d times, want 1: %v", len(got), got)
+	}
+}
+
 func TestStreamLocalService_CallerDisconnect_ReturnsNil(t *testing.T) {
 	// Backend sends chunks continuously, blocking with no final [DONE].
 	// The caller context is cancelled while streamLocalService is blocked

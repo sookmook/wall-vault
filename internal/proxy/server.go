@@ -2361,9 +2361,15 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 		}
 	}
 
-	// Strip provider prefix from model (e.g. "google/gemma-4-26b-a4b" → "gemma-4-26b-a4b")
-	if i := strings.Index(model, "/"); i >= 0 {
-		model = model[i+1:]
+	// Strip provider prefix from model (e.g. "google/gemma-4-26b-a4b" → "gemma-4-26b-a4b").
+	// Skipped for hub-topology plugins (preserve_model_id: true) — the receiving
+	// wall-vault needs the publisher prefix for correct service routing, and a
+	// bare "gemma-…" arriving at a hub triggers inferServiceFromBareModel's
+	// google promotion path, which then 502s out as "Google: 모델 없음 (…)".
+	if plugin == nil || !plugin.PreserveModelID {
+		if i := strings.Index(model, "/"); i >= 0 {
+			model = model[i+1:]
+		}
 	}
 
 	oaiReq := GeminiToOpenAI(model, req)

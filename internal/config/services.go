@@ -42,6 +42,15 @@ type ServicePlugin struct {
 	// DefaultModel: optional model id used when neither the request nor
 	// the SSE-distributed default supplies one.
 	DefaultModel string `yaml:"default_model"`
+
+	// PreserveModelID: when true, callLocalService skips its leading
+	// "publisher/" prefix-strip step and forwards the model id verbatim.
+	// Set this on a hub-topology plugin (default_url pointing at another
+	// wall-vault instance) so the receiving wall-vault still has the
+	// publisher prefix it needs to route correctly — without it, a
+	// "google/gemma-…" id arrives at the hub as a bare "gemma-…" and
+	// inferServiceFromBareModel misroutes it to the native Google handler.
+	PreserveModelID bool `yaml:"preserve_model_id"`
 }
 
 type ServiceEndpoints struct {

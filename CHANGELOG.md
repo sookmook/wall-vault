@@ -8,6 +8,26 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.61] — 2026-05-04
+
+### Fixed
+
+- **Hub-topology lmstudio plugin no longer drops the publisher
+  prefix on the way out.** With a hub-mode plugin yaml (default_url
+  pointing at another wall-vault) callLocalService used to forward
+  the model id through its leading-prefix-strip step — so a request
+  for "google/gemma-4-26b-a4b" arrived at the receiving wall-vault
+  as a bare "gemma-4-26b-a4b". The hub then ran
+  inferServiceFromBareModel on it, recognised the gemma- prefix as
+  Google's family, and dispatched to the native Google handler,
+  which 502'd with "Google: 모델 없음 (gemma-4-26b-a4b)". Symptom on
+  raspi: telegram replies stopped landing because OpenClaw → raspi
+  wall-vault → mini wall-vault hub all 502'd before reaching mini's
+  LM Studio. New plugin field `preserve_model_id: true` opts out of
+  the strip; raspi's lmstudio.yaml now sets it.
+
+---
+
 ## [0.2.60] — 2026-05-04
 
 ### Added

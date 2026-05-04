@@ -98,6 +98,7 @@ request_format: openai
 default_url: https://hub.example:56244
 default_model: qwen3.6:27b
 tls_internal_ca: true
+preserve_model_id: true
 auth:
   type: bearer
 endpoints:
@@ -128,6 +129,9 @@ endpoints:
 	}
 	if p.DefaultModel != "qwen3.6:27b" {
 		t.Errorf("default_model = %q", p.DefaultModel)
+	}
+	if !p.PreserveModelID {
+		t.Errorf("expected preserve_model_id=true, got false")
 	}
 }
 

@@ -384,6 +384,178 @@ func writeOpenAIErrorChunk(w io.Writer, f http.Flusher, err error) {
 	}
 }
 
+// streamLocalService dispatches an OpenAI-compatible chat completion
+// request to a local backend in oaiCompatServices with stream:true,
+// and pipes each SSE line straight back to the caller's ResponseWriter
+// without buffering. Returns nil on a clean stream termination (DONE
+// seen) or the error that aborted it.
+//
+// Mirrors callLocalService for everything except the buffering
+// strategy: same baseURL/plugin resolution, same auth header decision
+// (plugin.Auth.Type == "bearer"), same TLS trust decision
+// (plugin.TLSInternalCA → internalHTTPClient), same per-service
+// semaphore (s.localSems[serviceID]), same request-body mutations
+// (Reasoning/Think and the qwen3 inline /no_think tag).
+func (s *Server) streamLocalService(
+	ctx context.Context,
+	w http.ResponseWriter,
+	flusher http.Flusher,
+	serviceID string,
+	model string,
+	oaiReq *OpenAIRequest,
+) error {
+	// Mirror callLocalService's URL resolution priority.
+	plugin := s.pluginByID[serviceID]
+	var baseURL string
+	if plugin != nil && plugin.DefaultURL != "" {
+		baseURL = plugin.DefaultURL
+	} else {
+		s.mu.RLock()
+		baseURL = s.serviceURLs[serviceID]
+		s.mu.RUnlock()
+	}
+	if baseURL == "" {
+		defaults := map[string]string{"lmstudio": "http://localhost:1234", "vllm": "http://localhost:8000"}
+		baseURL = defaults[serviceID]
+	}
+	if baseURL == "" {
+		return fmt.Errorf("%s: URL 미설정", serviceID)
+	}
+
+	// Per-service semaphore — same fleet-time-distribution shape as
+	// callLocalService and streamOllama. Streaming callers queue
+	// behind in-flight non-stream callers; that's intentional.
+	if sem, ok := s.localSems[serviceID]; ok {
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	// Strip publisher prefix when the plugin is path-style hub mode
+	// without preserve_model_id — same rule callLocalService uses.
+	sentModel := model
+	if plugin == nil || !plugin.PreserveModelID {
+		if i := strings.Index(sentModel, "/"); i >= 0 {
+			sentModel = sentModel[i+1:]
+		}
+	}
+
+	// Apply the same per-request mutations as callLocalService so the
+	// only field that diverges between paths is Stream.
+	s.mu.RLock()
+	reasoning := s.serviceReasoning[serviceID]
+	s.mu.RUnlock()
+	oaiReq.Model = sentModel
+	oaiReq.Stream = true
+	oaiReq.Reasoning = reasoning
+	oaiReq.Think = &reasoning
+	if !reasoning && serviceID == "lmstudio" && strings.HasPrefix(strings.ToLower(sentModel), "qwen3") {
+		for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
+			if oaiReq.Messages[i].Role == "user" {
+				oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
+				break
+			}
+		}
+	}
+
+	data, _ := json.Marshal(oaiReq)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("%s: stream request build: %w", serviceID, err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-stream")
+	if plugin != nil && plugin.Auth.Type == "bearer" && s.cfg.Proxy.VaultToken != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
+	}
+
+	var client *http.Client
+	if plugin != nil && plugin.TLSInternalCA {
+		client = internalHTTPClient(10 * time.Minute)
+	} else {
+		client = &http.Client{Timeout: 10 * time.Minute}
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("%s: stream connect: %w", serviceID, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("%s: stream status %d: %s", serviceID, resp.StatusCode, string(body))
+	}
+
+	// Caller-side SSE headers (idempotent — handler may have set them).
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	// Larger token buffer — tool-call chunks and reasoning emits can
+	// exceed Scanner's default 64 KB.
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	sawDone := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			fmt.Fprint(w, "\n")
+			if flusher != nil {
+				flusher.Flush()
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "data: [DONE]") {
+			fmt.Fprint(w, "data: [DONE]\n\n")
+			if flusher != nil {
+				flusher.Flush()
+			}
+			sawDone = true
+			break
+		}
+		rewritten := rewriteOpenAIChunkModel(line, model)
+		fmt.Fprint(w, rewritten+"\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		if ctx.Err() != nil {
+			return nil // caller disconnect; not an error from our POV
+		}
+		return fmt.Errorf("%s: stream read: %w", serviceID, scanErr)
+	}
+	if !sawDone {
+		// Backend closed without DONE — emit synthetic finish chunk +
+		// DONE so caller's parser terminates cleanly.
+		finishChunk := map[string]interface{}{
+			"id":     "chatcmpl-proxy",
+			"object": "chat.completion.chunk",
+			"model":  model,
+			"choices": []map[string]interface{}{{
+				"index":         0,
+				"delta":         map[string]interface{}{},
+				"finish_reason": "length",
+			}},
+		}
+		if b, mErr := json.Marshal(finishChunk); mErr == nil {
+			fmt.Fprintf(w, "data: %s\n\n", b)
+		}
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	return nil
+}
+
 // rewriteOpenAIChunkModel parses an SSE data line, replaces the chunk's
 // model field with mdl, and returns the re-marshalled line. Lines
 // that are not parseable JSON, are the [DONE] terminator, or do not

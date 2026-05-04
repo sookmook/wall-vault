@@ -2,11 +2,36 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/sookmook/wall-vault/internal/config"
 )
+
+// newTestServerWithBackend builds a Server with the minimum fields
+// streamLocalService consults: serviceURLs[svc] points at the mock,
+// localSems has a slot, pluginByID is nil-mapped (no plugin = no
+// hub auth, no TLS internal CA, no PreserveModelID), serviceReasoning
+// is empty (= reasoning off but no inline-tag triggers because we
+// don't pass a qwen3 prefix in this test).
+func newTestServerWithBackend(t *testing.T, svc, baseURL string) *Server {
+	t.Helper()
+	cfg := &config.Config{}
+	s := &Server{
+		cfg:              cfg,
+		serviceURLs:      map[string]string{svc: baseURL},
+		serviceReasoning: map[string]bool{},
+		localSems:        map[string]chan struct{}{svc: make(chan struct{}, 1)},
+		pluginByID:       map[string]*config.ServicePlugin{},
+	}
+	return s
+}
 
 func TestWriteOpenAIErrorChunk_EmitsChunkPlusDONE(t *testing.T) {
 	var buf bytes.Buffer
@@ -81,5 +106,67 @@ func TestRewriteOpenAIChunkModel_RewritesGenericObjectsWithObjectKey(t *testing.
 	// future-introduced tighter check is wanted, narrow there.
 	if !strings.Contains(out, `"model":"qwen"`) {
 		t.Errorf("model not rewritten on generic object: %q", out)
+	}
+}
+
+func TestStreamLocalService_HappyPath_PipesChunksAndRewritesModel(t *testing.T) {
+	// Mock backend that emits 3 content chunks + DONE in OpenAI SSE shape.
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the proxy sent stream:true to the backend.
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode req body: %v", err)
+		}
+		if body["stream"] != true {
+			t.Errorf("backend received stream=%v, want true", body["stream"])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		f, _ := w.(http.Flusher)
+		for _, c := range []string{
+			`data: {"id":"x","object":"chat.completion.chunk","model":"backend-id","choices":[{"index":0,"delta":{"role":"assistant"}}]}`,
+			`data: {"id":"x","object":"chat.completion.chunk","model":"backend-id","choices":[{"index":0,"delta":{"content":"Hello"}}]}`,
+			`data: {"id":"x","object":"chat.completion.chunk","model":"backend-id","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":"stop"}]}`,
+			`data: [DONE]`,
+		} {
+			fmt.Fprintln(w, c)
+			fmt.Fprintln(w) // SSE event delimiter
+			if f != nil {
+				f.Flush()
+			}
+		}
+	}))
+	defer mock.Close()
+
+	s := newTestServerWithBackend(t, "lmstudio", mock.URL)
+
+	// Caller-side ResponseWriter
+	rec := httptest.NewRecorder()
+	flusher := http.Flusher(nil) // recorder isn't a Flusher — that's fine for this test
+	oaiReq := &OpenAIRequest{
+		Model:    "qwen/qwen3.6-27b",
+		Stream:   true,
+		Messages: []OpenAIMessage{{Role: "user", Content: "say hi"}},
+	}
+	err := s.streamLocalService(context.Background(), rec, flusher, "lmstudio", "qwen/qwen3.6-27b", oaiReq)
+	if err != nil {
+		t.Fatalf("streamLocalService: %v", err)
+	}
+
+	got := rec.Body.String()
+	if !strings.Contains(got, `"content":"Hello"`) {
+		t.Errorf("first content chunk missing: %q", got)
+	}
+	if !strings.Contains(got, `"content":" world"`) {
+		t.Errorf("second content chunk missing: %q", got)
+	}
+	if !strings.Contains(got, `"model":"qwen/qwen3.6-27b"`) {
+		t.Errorf("model rewrite missing — caller should see resolved id, not backend id: %q", got)
+	}
+	if strings.Contains(got, `"model":"backend-id"`) {
+		t.Errorf("backend-id leaked through: %q", got)
+	}
+	if !strings.HasSuffix(strings.TrimRight(got, "\n"), "data: [DONE]") {
+		t.Errorf("missing trailing DONE: %q", got)
 	}
 }

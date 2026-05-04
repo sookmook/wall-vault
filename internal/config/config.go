@@ -92,6 +92,14 @@ type ProxyConfig struct {
 	// vault-side authn for non-loopback callers. Default off — operators
 	// opt in per host with WV_TOKEN_SENTINEL_FALLBACK=1.
 	TokenSentinelFallback bool `yaml:"token_sentinel_fallback"`
+	// OAIStreamForward toggles real backend stream passthrough for
+	// oaiCompatServices clients. When off (default) the OpenAI-compatible
+	// handler keeps its v0.2.61 fake-chunk replay behaviour. When on, a
+	// caller's stream:true triggers a streamLocalService call that pipes
+	// backend SSE chunks through with no aggregate buffering. Stream-mode
+	// callers do NOT consult the fallback chain — see
+	// docs/superpowers/specs/2026-05-04-oai-stream-passthrough-design.md §3.3.
+	OAIStreamForward bool `yaml:"oai_stream_forward"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -424,6 +432,13 @@ func applyEnv(cfg *Config) {
 			cfg.Proxy.TokenSentinelFallback = true
 		case "0", "false", "no", "off":
 			cfg.Proxy.TokenSentinelFallback = false
+		}
+	}
+	if v := os.Getenv("WV_OAI_STREAM_FORWARD"); v != "" {
+		if v == "1" || strings.EqualFold(v, "true") {
+			cfg.Proxy.OAIStreamForward = true
+		} else {
+			cfg.Proxy.OAIStreamForward = false
 		}
 	}
 	// Windows: auto-set data path based on APPDATA

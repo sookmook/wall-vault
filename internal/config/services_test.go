@@ -183,3 +183,28 @@ func TestLoadPlugins_InvalidYAML(t *testing.T) {
 		t.Fatalf("유효한 플러그인 1개 기대, got %d", len(plugins))
 	}
 }
+
+func TestApplyEnv_OAIStreamForward(t *testing.T) {
+	tests := []struct {
+		env  string
+		want bool
+	}{
+		{"1", true},
+		{"true", true},
+		{"TRUE", true},
+		{"True", true},
+		{"0", false},
+		{"false", false},
+		{"", false}, // unset
+	}
+	for _, tc := range tests {
+		t.Run(tc.env, func(t *testing.T) {
+			t.Setenv("WV_OAI_STREAM_FORWARD", tc.env)
+			cfg := Default()
+			applyEnv(cfg)
+			if cfg.Proxy.OAIStreamForward != tc.want {
+				t.Errorf("env=%q want=%v got=%v", tc.env, tc.want, cfg.Proxy.OAIStreamForward)
+			}
+		})
+	}
+}

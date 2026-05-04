@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sookmook/wall-vault/internal/config"
 )
@@ -168,5 +169,144 @@ func TestStreamLocalService_HappyPath_PipesChunksAndRewritesModel(t *testing.T) 
 	}
 	if !strings.HasSuffix(strings.TrimRight(got, "\n"), "data: [DONE]") {
 		t.Errorf("missing trailing DONE: %q", got)
+	}
+}
+
+func TestStreamLocalService_Non200_ReturnsError(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":"bad model"}`)
+	}))
+	defer mock.Close()
+
+	s := newTestServerWithBackend(t, "lmstudio", mock.URL)
+	rec := httptest.NewRecorder()
+	oaiReq := &OpenAIRequest{
+		Model:    "anything",
+		Stream:   true,
+		Messages: []OpenAIMessage{{Role: "user", Content: "x"}},
+	}
+	err := s.streamLocalService(context.Background(), rec, nil, "lmstudio", "anything", oaiReq)
+	if err == nil {
+		t.Fatal("expected error for backend 400, got nil")
+	}
+	if !strings.Contains(err.Error(), "400") {
+		t.Errorf("error should mention status 400: %v", err)
+	}
+	if !strings.Contains(err.Error(), "bad model") {
+		t.Errorf("error should include backend body: %v", err)
+	}
+
+	// The function must NOT have written anything to the caller's
+	// ResponseWriter before the failure was detected — the caller
+	// expects to handle the error itself (typically via writeOpenAIErrorChunk).
+	if rec.Body.Len() != 0 {
+		t.Errorf("expected no body writes on pre-200 failure, got %q", rec.Body.String())
+	}
+}
+
+func TestStreamLocalService_MidStreamAbort_EmitsSyntheticFinishPlusDONE(t *testing.T) {
+	// Simulate backend that emits one chunk then silently closes the stream
+	// (no hijack needed; just close the response body early).
+	// The scanner will see EOF as the end of valid events, and since
+	// we never sent [DONE], the function should emit synthetic finish + DONE.
+	responseChan := make(chan string, 10)
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		f, _ := w.(http.Flusher)
+		// Write one chunk.
+		fmt.Fprintln(w, `data: {"id":"x","object":"chat.completion.chunk","model":"backend-id","choices":[{"index":0,"delta":{"content":"partial"}}]}`)
+		fmt.Fprintln(w)
+		if f != nil {
+			f.Flush()
+		}
+		// Close the body by ending the handler without sending [DONE].
+		// This causes the scanner on the client side to receive EOF.
+	}))
+	defer mock.Close()
+
+	s := newTestServerWithBackend(t, "lmstudio", mock.URL)
+	rec := httptest.NewRecorder()
+	oaiReq := &OpenAIRequest{
+		Model:    "qwen/qwen3.6-27b",
+		Stream:   true,
+		Messages: []OpenAIMessage{{Role: "user", Content: "x"}},
+	}
+	err := s.streamLocalService(context.Background(), rec, nil, "lmstudio", "qwen/qwen3.6-27b", oaiReq)
+	// Mid-stream close-without-DONE: the scanner hits EOF, which is not an
+	// error condition (sawDone==false triggers synthetic finish logic).
+	// The function emits a synthetic finish_reason="stop" chunk + DONE,
+	// then returns nil.
+	if err != nil {
+		t.Fatalf("streamLocalService unexpected error: %v", err)
+	}
+
+	got := rec.Body.String()
+	if !strings.Contains(got, `"content":"partial"`) {
+		t.Errorf("partial content lost: %q", got)
+	}
+	if !strings.Contains(got, `"finish_reason":"stop"`) {
+		t.Errorf("synthetic finish chunk missing: %q", got)
+	}
+	if !strings.HasSuffix(strings.TrimRight(got, "\n"), "data: [DONE]") {
+		t.Errorf("missing DONE: %q", got)
+	}
+	_ = responseChan // suppress unused warning
+}
+
+func TestStreamLocalService_CallerDisconnect_ReturnsNil(t *testing.T) {
+	// Backend sends chunks continuously, blocking with no final [DONE].
+	// The caller context is cancelled while streamLocalService is blocked
+	// reading. This causes scanner.Err() to return an error, and since
+	// ctx.Err() != nil, the function returns nil (caller disconnect).
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		f, _ := w.(http.Flusher)
+		// Send one chunk.
+		fmt.Fprintln(w, `data: {"id":"x","object":"chat.completion.chunk","model":"backend-id","choices":[{"index":0,"delta":{"content":"first"}}]}`)
+		fmt.Fprintln(w)
+		if f != nil {
+			f.Flush()
+		}
+		// Block until the request context is cancelled.
+		<-r.Context().Done()
+	}))
+	defer mock.Close()
+
+	s := newTestServerWithBackend(t, "lmstudio", mock.URL)
+	rec := httptest.NewRecorder()
+	ctx, cancel := context.WithCancel(context.Background())
+	oaiReq := &OpenAIRequest{
+		Model:    "qwen/qwen3.6-27b",
+		Stream:   true,
+		Messages: []OpenAIMessage{{Role: "user", Content: "x"}},
+	}
+
+	// Cancel after a delay long enough for the HTTP handshake and first chunk
+	// to be processed. streamLocalService will block in scanner.Scan()
+	// waiting for the next chunk, which never comes because the context
+	// is cancelled.
+	go func() {
+		// This delay is long enough that by the time we cancel, the function
+		// has definitely started the scanner loop and is reading chunks.
+		select {
+		case <-time.After(100 * time.Millisecond):
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	err := s.streamLocalService(ctx, rec, nil, "lmstudio", "qwen/qwen3.6-27b", oaiReq)
+
+	// When the request context is cancelled mid-stream, scanner.Err()
+	// will be non-nil, but ctx.Err() will also be non-nil, so the
+	// function returns nil (line 541-542 of stream.go).
+	if err != nil {
+		t.Fatalf("caller disconnect should return nil, got %v", err)
+	}
+	if !strings.Contains(rec.Body.String(), `"content":"first"`) {
+		t.Errorf("first chunk should have been delivered before cancel: %q", rec.Body.String())
 	}
 }

@@ -61,9 +61,9 @@ func TestRewriteOpenAIChunkModel_PassesThroughDoneAndUnparseable(t *testing.T) {
 	cases := []string{
 		`data: [DONE]`,
 		`data: not-json-at-all`,
-		``,                  // empty line
-		`: keepalive`,       // SSE comment
-		`event: ping`,       // non-data SSE field
+		``,            // empty line
+		`: keepalive`, // SSE comment
+		`event: ping`, // non-data SSE field
 	}
 	for _, in := range cases {
 		out := rewriteOpenAIChunkModel(in, "anything")
@@ -73,7 +73,7 @@ func TestRewriteOpenAIChunkModel_PassesThroughDoneAndUnparseable(t *testing.T) {
 	}
 }
 
-func TestRewriteOpenAIChunkModel_LeavesNonChunkObjectsAlone(t *testing.T) {
+func TestRewriteOpenAIChunkModel_RewritesGenericObjectsWithObjectKey(t *testing.T) {
 	in := `data: {"object":"some.other.thing","model":"x"}`
 	out := rewriteOpenAIChunkModel(in, "qwen")
 	// Non chat.completion.chunk objects should also be rewritten — we

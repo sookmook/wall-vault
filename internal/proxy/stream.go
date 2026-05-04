@@ -406,6 +406,8 @@ func rewriteOpenAIChunkModel(line, mdl string) string {
 		return line
 	}
 	chunk["model"] = mdl
+	// Note: Marshal of a map alphabetises keys; OpenAI SSE clients
+	// parse JSON shape, not byte order, so this is benign.
 	b, err := json.Marshal(chunk)
 	if err != nil {
 		return line

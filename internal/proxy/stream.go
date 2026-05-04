@@ -383,3 +383,32 @@ func writeOpenAIErrorChunk(w io.Writer, f http.Flusher, err error) {
 		f.Flush()
 	}
 }
+
+// rewriteOpenAIChunkModel parses an SSE data line, replaces the chunk's
+// model field with mdl, and returns the re-marshalled line. Lines
+// that are not parseable JSON, are the [DONE] terminator, or do not
+// have an "object" key are returned verbatim — defensive for backends
+// that emit non-standard event types we don't want to silently drop.
+func rewriteOpenAIChunkModel(line, mdl string) string {
+	const prefix = "data: "
+	if !strings.HasPrefix(line, prefix) {
+		return line
+	}
+	payload := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+	if payload == "[DONE]" || payload == "" {
+		return line
+	}
+	var chunk map[string]interface{}
+	if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+		return line
+	}
+	if _, hasObject := chunk["object"]; !hasObject {
+		return line
+	}
+	chunk["model"] = mdl
+	b, err := json.Marshal(chunk)
+	if err != nil {
+		return line
+	}
+	return prefix + string(b)
+}

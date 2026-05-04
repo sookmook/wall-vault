@@ -422,6 +422,17 @@ func (s *Server) streamLocalService(
 		return fmt.Errorf("%s: URL 미설정", serviceID)
 	}
 
+	// Fleet time distribution — same AgentOffset + FallbackJitter as
+	// callLocalService and streamOllama. Restored in v0.2.27. See timing.go.
+	if d := AgentOffset(s.cfg.Proxy.ClientID, localAgentOffsetMs) +
+		FallbackJitter(localFallbackJitterMs); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
 	// Per-service semaphore — same fleet-time-distribution shape as
 	// callLocalService and streamOllama. Streaming callers queue
 	// behind in-flight non-stream callers; that's intentional.
@@ -542,7 +553,7 @@ func (s *Server) streamLocalService(
 			"choices": []map[string]interface{}{{
 				"index":         0,
 				"delta":         map[string]interface{}{},
-				"finish_reason": "length",
+				"finish_reason": "stop",
 			}},
 		}
 		if b, mErr := json.Marshal(finishChunk); mErr == nil {

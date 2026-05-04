@@ -1402,10 +1402,12 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	// NOT consult the fallback chain (see spec §3.3).
 	if oaiReq.Stream && s.cfg.Proxy.OAIStreamForward {
 		if _, ok := oaiCompatServices[svc]; ok {
-			w.Header().Set("Content-Type", "text/event-stream")
-			w.Header().Set("Cache-Control", "no-cache")
-			w.Header().Set("Connection", "keep-alive")
-			w.Header().Set("X-Accel-Buffering", "no")
+			// SSE headers were already committed by the early-flush block
+			// above (line ~1293-1295). streamLocalService's internal
+			// idempotence guard handles the case where this gate is
+			// reached without that commit. Connection: keep-alive remains
+			// intentionally unset — the early-flush block does not set it
+			// and adding it post-WriteHeader is dead.
 			flusher, _ := w.(http.Flusher)
 			// The keepalive goroutine started above for the buffered path is
 			// irrelevant here — the real backend stream provides natural

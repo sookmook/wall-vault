@@ -8,6 +8,26 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.62] — 2026-05-04
+
+### Added
+
+- **OAI-compat backend stream passthrough (opt-in).** A caller's
+  `stream:true` against `/v1/chat/completions` now triggers a real
+  backend stream forward when `WV_OAI_STREAM_FORWARD=1` is set and
+  the resolved service is in the OAI-compat set (lmstudio, vllm,
+  llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server,
+  litellm-proxy). Backend SSE chunks pipe straight to the caller
+  with no aggregate buffering, and the chunk's `model` field is
+  rewritten to the caller-resolved id so hub-mode topologies
+  remain transparent. Stream-mode callers do NOT consult the
+  fallback chain — design tradeoff documented in the spec at
+  `docs/superpowers/specs/2026-05-04-oai-stream-passthrough-design.md`.
+  Default off; existing v0.2.61 fake-chunk replay path stays
+  unchanged when the flag is off.
+
+---
+
 ## [0.2.61] — 2026-05-04
 
 ### Fixed

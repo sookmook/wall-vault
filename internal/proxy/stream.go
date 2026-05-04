@@ -357,13 +357,14 @@ func writeGeminiErrorChunk(w io.Writer, f http.Flusher, err error) {
 	}
 }
 
-// writeOAIErrorChunk emits a single OAI chat.completion.chunk SSE
-// event carrying the error message in choices[0].delta.content,
-// then a DONE terminator. Mirrors writeGeminiErrorChunk for OAI shape.
-// Used when streamLocalService aborts before or during the upstream
-// stream so a stream-mode caller still sees a valid SSE termination
-// instead of a half-open connection.
-func writeOAIErrorChunk(w io.Writer, f http.Flusher, err error) {
+// writeOpenAIErrorChunk emits a single OpenAI chat.completion.chunk
+// SSE event carrying the error message in choices[0].delta.content,
+// then a DONE terminator. Mirrors writeGeminiErrorChunk for the
+// OpenAI-compatible response shape. Used when an OpenAI-compatible
+// streaming dispatch aborts after SSE headers have been committed,
+// so the caller still sees a valid SSE termination instead of a
+// half-open connection.
+func writeOpenAIErrorChunk(w io.Writer, f http.Flusher, err error) {
 	chunk := map[string]interface{}{
 		"id":     "chatcmpl-proxy",
 		"object": "chat.completion.chunk",

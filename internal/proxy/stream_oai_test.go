@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-func TestWriteOAIErrorChunk_EmitsChunkPlusDONE(t *testing.T) {
+func TestWriteOpenAIErrorChunk_EmitsChunkPlusDONE(t *testing.T) {
 	var buf bytes.Buffer
-	writeOAIErrorChunk(&buf, nil, errors.New("backend exploded"))
+	writeOpenAIErrorChunk(&buf, nil, errors.New("backend exploded"))
 
 	got := buf.String()
 	if !strings.Contains(got, "data: [DONE]\n\n") {

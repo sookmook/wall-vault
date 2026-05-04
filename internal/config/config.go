@@ -435,9 +435,13 @@ func applyEnv(cfg *Config) {
 		}
 	}
 	if v := os.Getenv("WV_OAI_STREAM_FORWARD"); v != "" {
-		if v == "1" || strings.EqualFold(v, "true") {
+		// Accept the usual truthy / falsy spellings. Anything unrecognised
+		// leaves the existing value alone — silently ignoring typos beats
+		// flipping the flag the operator did not intend.
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "1", "true", "yes", "on":
 			cfg.Proxy.OAIStreamForward = true
-		} else {
+		case "0", "false", "no", "off":
 			cfg.Proxy.OAIStreamForward = false
 		}
 	}

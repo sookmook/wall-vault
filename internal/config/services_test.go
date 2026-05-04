@@ -193,9 +193,15 @@ func TestApplyEnv_OAIStreamForward(t *testing.T) {
 		{"true", true},
 		{"TRUE", true},
 		{"True", true},
+		{"yes", true},
+		{"on", true},
+		{" true ", true},    // whitespace-padded
 		{"0", false},
 		{"false", false},
-		{"", false}, // unset
+		{"no", false},
+		{"off", false},
+		{"", false},      // unset
+		{"ture", false},  // typo — unrecognised, leaves default
 	}
 	for _, tc := range tests {
 		t.Run(tc.env, func(t *testing.T) {

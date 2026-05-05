@@ -8,6 +8,29 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.67] — 2026-05-05
+
+EconoWorld config heal now also normalizes a `provider` field that has
+been flipped back to `"ollama"`. The `/agent/apply` pass writes
+`"openai_compatible"` so wall-vault stays in the dispatch path, but a
+manual edit (or a third-party tool that rewrites `ai_config.json`) can
+flip the value back, which routes every analyzer call straight to the
+upstream backend with whatever model the file lists. Boot-time heal now
+flips it back so wall-vault stays the single dispatch point — model and
+key choices then come from the dashboard / vault, not the file.
+
+### Changed
+
+- `healEconoWorldConfigAt` (boot-time `runStartupEconoWorldHeal`) gains
+  a fourth normalize leg: when `provider == "ollama"` and the
+  `openai_compatible` section is already present, the provider is
+  rewritten to `"openai_compatible"`. Other provider values
+  (`anthropic`, `openai`, `google`, etc.) and unbootstrapped files
+  (no `openai_compatible` section yet) are untouched, so operators
+  running EconoWorld outside the wall-vault setup are not affected.
+
+---
+
 ## [0.2.66] — 2026-05-05
 
 Raises the proxy's own upstream-call timeout to 10 minutes for local

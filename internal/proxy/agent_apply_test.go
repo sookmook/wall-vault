@@ -250,6 +250,50 @@ func TestHealEconoWorldConfigAt_MissingFileIsSilent(t *testing.T) {
 	}
 }
 
+func TestHealEconoWorldConfigAt_NormalizesOllamaProviderToOpenAICompat(t *testing.T) {
+	// A manual edit (or a third-party tool that rewrites ai_config.json)
+	// can flip provider back to "ollama", routing every analyzer call past
+	// wall-vault and straight to the upstream backend. Heal should restore
+	// "openai_compatible" so wall-vault stays in the dispatch path.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"ollama","openai_compatible":{"base_url":"http://x","model":"y"}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := healEconoWorldConfigAt(path, "", 0, false, 0); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	if got["provider"] != "openai_compatible" {
+		t.Fatalf("provider = %v, want openai_compatible", got["provider"])
+	}
+}
+
+func TestHealEconoWorldConfigAt_LeavesOtherProvidersAlone(t *testing.T) {
+	// Operators may legitimately set provider to "anthropic" / "openai" /
+	// "google" etc. when running EconoWorld outside our wall-vault setup.
+	// Heal must only normalize the specific "ollama" → "openai_compatible"
+	// case; every other provider value stays untouched.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"anthropic","openai_compatible":{"base_url":"http://x"}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := healEconoWorldConfigAt(path, "", 0, false, 0); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	var got map[string]interface{}
+	_ = json.Unmarshal(data, &got)
+	if got["provider"] != "anthropic" {
+		t.Fatalf("provider = %v, want anthropic preserved", got["provider"])
+	}
+}
+
 func TestUpdateEconoWorldModel_EmptyModelIsNoop(t *testing.T) {
 	// The SSE callback passes "" when a client clears its model_override;
 	// that path must not clobber the ai_config.json model (it should keep

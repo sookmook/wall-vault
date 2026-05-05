@@ -723,6 +723,21 @@ func healEconoWorldConfigAt(path, localBaseOrigin string, maxTokens int, stream 
 		}
 	}
 
+	// Leg 4 — provider normalize. /agent/apply writes "openai_compatible"
+	// unconditionally so wall-vault stays in the dispatch path, but a manual
+	// edit (or a third-party tool that rewrites the file) can flip provider
+	// back to "ollama", which routes every analyzer call straight to the
+	// upstream backend with whatever model the file lists. Flipping it back
+	// to "openai_compatible" restores wall-vault as the single dispatch
+	// point — model and key choices then come from the dashboard / vault.
+	// Only acts when the openai_compatible section is already present (i.e.
+	// the file has been bootstrapped at least once); otherwise heal returns
+	// up at the compat == nil check before reaching this leg.
+	if prov, _ := cfg["provider"].(string); prov == "ollama" {
+		cfg["provider"] = "openai_compatible"
+		changed = true
+	}
+
 	if !changed {
 		return nil
 	}

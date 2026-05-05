@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **Hifadhi ya funguo za API + AI proxy katika faili moja la Go.**

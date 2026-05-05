@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **API 密钥保险库 + AI 代理,合二为一的 Go 单文件程序。**

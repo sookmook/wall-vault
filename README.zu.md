@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **Indawo yokugcina okhiye be-API + AI proxy ku-Go binary eyodwa.**

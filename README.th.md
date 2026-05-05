@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **คลังเก็บคีย์ API + AI proxy ในไบนารี Go เดียว**

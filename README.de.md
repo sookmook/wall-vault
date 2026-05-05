@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **API-Schlüssel-Tresor + KI-Proxy in einer einzigen Go-Binärdatei.**

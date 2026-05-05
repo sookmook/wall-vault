@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **단일 Go 바이너리에 담긴 API 키 금고 + AI 프록시.**

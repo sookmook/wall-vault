@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="wall-vault" width="200">
+</p>
+
 # wall-vault
 
 > **Ma'aji na maɓallin API + AI proxy a cikin binary ɗaya na Go.**

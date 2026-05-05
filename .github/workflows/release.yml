@@ -25,7 +25,7 @@ jobs:
 
       - name: Generate templ
         run: |
-          go install github.com/a-h/templ/cmd/templ@latest
+          go install github.com/a-h/templ/cmd/templ@v0.2.747
           templ generate ./internal/vault/views/...
 
       - name: Run tests

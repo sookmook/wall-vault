@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="wall-vault" width="200">
+  <img src="docs/logo.png" alt="wall-vault" width="800">
 </p>
 
 # wall-vault

@@ -180,11 +180,15 @@ func Default() *Config {
 			ClientID:   "local",
 			ToolFilter: "strip_all",
 			Services:   []string{"google", "openrouter", "ollama"},
-			// 5-minute upstream timeout — local Ollama cold-starts on 27B+ models
-			// (qwen3.6:27b ≈ 80s, gemma4:26b ≈ 6m) blow past anything shorter,
-			// causing every minute-cron caller to disconnect mid-load and trigger
-			// the cold-start loop seen on mini.
-			Timeout: 300 * time.Second,
+			// 10-minute upstream timeout — the local-call budget. 27B
+			// reasoning-class models on Apple Silicon can take 80-113s for
+			// cold-load alone; the reasoning pass on a long-form turn can
+			// push total wall-clock past 4 minutes. Anything shorter made
+			// the bot's main lane fire context-cancel mid-stream, drop the
+			// outbound chat reply, and re-arm the health-monitor restart
+			// loop. 600s is the bot-side deadline operators should align
+			// with.
+			Timeout: 600 * time.Second,
 			// Keep the 27B fleet model warm for 30 minutes after each call so
 			// sparse traffic doesn't pay the 80-113s cold-reload tax on every
 			// request. Operators with tight RAM can override via WV_OLLAMA_KEEP_ALIVE.
@@ -197,11 +201,11 @@ func Default() *Config {
 			// hard-coded 4096 max_tokens cut Korean analyses mid-output; 8192
 			// is the new floor. Streaming is on by default so cold-load latency
 			// surfaces as gradually arriving tokens rather than a long silence
-			// followed by a wall of text. 300s timeout matches the proxy's
-			// upstream cold-start budget.
+			// followed by a wall of text. 600s timeout matches the local-call
+			// budget shared with Proxy.Timeout.
 			EconoWorldMaxTokens:      8192,
 			EconoWorldStream:         true,
-			EconoWorldRequestTimeout: 300,
+			EconoWorldRequestTimeout: 600,
 			// Loopback-only plain HTTP companion. Disabled (0) when TLS is
 			// off; activated when TLS is on so same-host clients that
 			// cannot honour our CA still have a path in.

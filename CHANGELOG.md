@@ -8,6 +8,37 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.66] — 2026-05-05
+
+Raises the proxy's own upstream-call timeout to 10 minutes for local
+backends. Note: this release deliberately does not touch
+`active-memory.config.timeoutMs` — the plugin's schema rejects values
+above the documented ceiling, and an earlier attempt to widen it (in an
+unpublished v0.2.65 build) caused the plugin to fail validation, drop
+out of the loaded plugin set, and trigger the very gateway-restart loop
+the change was meant to prevent.
+
+### Changed
+
+- `proxy.timeout` default raised from 300s to 600s. Cold-loading large
+  reasoning-class local models on Apple Silicon can take 80-113 seconds
+  before the first token, and a long-form turn can push total wall-clock
+  past four minutes. The previous five-minute ceiling worked for warm
+  calls but cut every cold turn that hit a reasoning-class model. This
+  is purely the wall-vault HTTP client's deadline for upstream calls and
+  does not touch any bot-side timeout.
+- `EconoWorldRequestTimeout` default raised from 300s to 600s for parity
+  with the new local-call budget.
+
+### Not changed (and why)
+
+- `plugins.entries.active-memory.config.timeoutMs` is left to whatever
+  the operator and OpenClaw schema agree on (currently 120000ms). Bot-side
+  LLM-call timeouts must be solved bot-side, not by reaching into a
+  plugin's schema-validated config from the proxy.
+
+---
+
 ## [0.2.64] — 2026-05-05
 
 Documentation rewrite + repository sanitisation pass. No proxy or vault

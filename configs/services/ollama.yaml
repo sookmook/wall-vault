@@ -14,6 +14,16 @@ auth:
 
 request_format: ollama
 
+# Ollama's /v1 OpenAI-compat layer silently ignores the top-level
+# `think:false` field, but qwen3-family models honour the inline
+# "/no_think" marker in the user message. Without it, dispatch would
+# burn max_tokens on hidden reasoning whenever a qwen3 model is used
+# with reasoning disabled. Other model families (gemma / llama / …)
+# do not match the qwen3 prefix, so the marker is never appended for
+# them. Set false if a future Ollama release adds proper /v1 think
+# handling and the inline tag would be redundant.
+inline_no_think_for_qwen3: true
+
 # 모델 자동 조회 (Ollama 서버에서 실시간 조회)
 model_fetch:
   enabled: true

@@ -70,7 +70,11 @@ func Run(_ []string) {
 
 	useGoogle := askYN("Google Gemini", false)
 	useOpenRouter := askYN("OpenRouter", false)
+	useAnthropic := askYN("Anthropic (Claude)", false)
+	useOpenAI := askYN("OpenAI", false)
 	useOllama := askYN("Ollama (로컬/local)", true)
+	useLMStudio := askYN("LM Studio (로컬/local)", false)
+	useVLLM := askYN("vLLM (로컬/local)", false)
 
 	cfg.Proxy.Services = []string{}
 	if useGoogle {
@@ -79,8 +83,20 @@ func Run(_ []string) {
 	if useOpenRouter {
 		cfg.Proxy.Services = append(cfg.Proxy.Services, "openrouter")
 	}
+	if useAnthropic {
+		cfg.Proxy.Services = append(cfg.Proxy.Services, "anthropic")
+	}
+	if useOpenAI {
+		cfg.Proxy.Services = append(cfg.Proxy.Services, "openai")
+	}
 	if useOllama {
 		cfg.Proxy.Services = append(cfg.Proxy.Services, "ollama")
+	}
+	if useLMStudio {
+		cfg.Proxy.Services = append(cfg.Proxy.Services, "lmstudio")
+	}
+	if useVLLM {
+		cfg.Proxy.Services = append(cfg.Proxy.Services, "vllm")
 	}
 	if len(cfg.Proxy.Services) == 0 {
 		cfg.Proxy.Services = []string{"ollama"}
@@ -168,19 +184,44 @@ func Run(_ []string) {
 
 	fmt.Println()
 	fmt.Println("다음 단계 / Next steps:")
+	step := 1
 	if useGoogle {
-		fmt.Println("  1. Google API 키:")
+		fmt.Printf("  %d. Google API 키 / API key:\n", step)
 		fmt.Println("       export WV_KEY_GOOGLE=AIzaSy...")
-		fmt.Println("     또는 대시보드 → 🔑 API 키 추가")
+		fmt.Println("     또는 대시보드 / or via dashboard → 🔑 API 키 추가")
+		step++
 	}
 	if useOpenRouter {
-		fmt.Println("  1. OpenRouter API 키:")
+		fmt.Printf("  %d. OpenRouter API 키:\n", step)
 		fmt.Println("       export WV_KEY_OPENROUTER=sk-or-...")
+		step++
 	}
-	fmt.Println("  2. wall-vault start")
-	fmt.Printf("  3. 대시보드: http://localhost:%d\n", cfg.Vault.Port)
+	if useAnthropic {
+		fmt.Printf("  %d. Anthropic API 키:\n", step)
+		fmt.Println("       export WV_KEY_ANTHROPIC=sk-ant-...")
+		step++
+	}
+	if useOpenAI {
+		fmt.Printf("  %d. OpenAI API 키:\n", step)
+		fmt.Println("       export WV_KEY_OPENAI=sk-...")
+		step++
+	}
+	if useLMStudio {
+		fmt.Printf("  %d. LM Studio: launch the app, enable \"Serve on Local Network\".\n", step)
+		fmt.Println("     Default URL: http://localhost:1234 — change with WV_LMSTUDIO_URL.")
+		step++
+	}
+	if useVLLM {
+		fmt.Printf("  %d. vLLM: start with `vllm serve <model>` (default port 8000).\n", step)
+		fmt.Println("     Override URL with WV_VLLM_URL=http://host:port if not on localhost.")
+		step++
+	}
+	fmt.Printf("  %d. wall-vault start\n", step)
+	step++
+	fmt.Printf("  %d. 대시보드 / dashboard: http://localhost:%d\n", step, cfg.Vault.Port)
+	step++
 	if cfg.Vault.AdminToken != "" {
-		fmt.Printf("  4. 관리자 토큰: %s\n", cfg.Vault.AdminToken)
+		fmt.Printf("  %d. 관리자 토큰 / admin token: %s\n", step, cfg.Vault.AdminToken)
 	}
 }
 

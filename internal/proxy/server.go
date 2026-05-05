@@ -190,6 +190,17 @@ func NewServer(cfg *config.Config) *Server {
 				cfg.Proxy.Services = append(cfg.Proxy.Services, p.ID)
 				known[p.ID] = true
 			}
+			// Auto-register OAI-compat plugins so parseProviderModelDepth
+			// and dispatch handle "publisher/model" routing without a Go-side
+			// edit. RequestFormat default is "openai" because the historic
+			// behaviour predates the field; only explicit non-openai shapes
+			// (gemini / ollama / raw) are excluded.
+			if p.Enabled {
+				switch p.RequestFormat {
+				case "", "openai":
+					registerOAICompatPlugin(p.ID)
+				}
+			}
 		}
 		// Surface plugin URLs that look like a misconfiguration (a remote
 		// host reached over plain HTTP — for any wall-vault-style backend
@@ -257,7 +268,7 @@ func NewServer(cfg *config.Config) *Server {
 					"service": newSvc,
 					"model":   newMdl,
 				})
-				go updateOpenClawJSON(newSvc, newMdl)
+				go updateOpenClawJSON(newSvc, newMdl, s.defaultProxyOrigin())
 			}
 		}, func(clientID, agentType, svc, mdl string) {
 			// Foreign client model changed in vault — update local agent config if applicable.
@@ -424,7 +435,8 @@ func NewServer(cfg *config.Config) *Server {
 		// for anthropic / google.
 		localBaseOrigin = fmt.Sprintf("http://127.0.0.1:%d", cfg.Proxy.PlainPort)
 	}
-	runStartupOpenClawHeal(cfg.Proxy.VaultToken, caBundlePath, localBaseOrigin)
+	defaultOrigin := DefaultProxyOrigin(cfg.Proxy.Port, cfg.Proxy.TLS.Enabled)
+	runStartupOpenClawHeal(cfg.Proxy.VaultToken, caBundlePath, localBaseOrigin, defaultOrigin)
 	// Same loopback-companion benefit applies to EconoWorld's
 	// analyzer/ai_config.json on hosts that have it. Hosts without an
 	// EconoWorld install no-op silently.
@@ -436,6 +448,119 @@ func NewServer(cfg *config.Config) *Server {
 	)
 
 	return s
+}
+
+// defaultProxyOrigin returns the origin every config writer should target on
+// this proxy: scheme + localhost + the operator's chosen port. Used by
+// updateOpenClawJSON / agent_apply / setup wizard generators so the canonical
+// "where do clients reach us" answer comes from one place instead of
+// duplicated `https://localhost:56244` literals scattered through the code.
+func (s *Server) defaultProxyOrigin() string {
+	return DefaultProxyOrigin(s.cfg.Proxy.Port, s.cfg.Proxy.TLS.Enabled)
+}
+
+// resolveLocalServiceURL returns the base URL the proxy should target for
+// an OpenAI-compatible local backend. Resolution order, highest first:
+//
+//  1. `WV_<ID>_URL` env var (e.g. WV_LMSTUDIO_URL=http://workstation:1234)
+//     so an operator can hot-tune the URL without editing yaml.
+//  2. plugin.DefaultURL — explicit per-plugin override from yaml.
+//  3. s.serviceURLs[id] — vault-distributed SSE default.
+//  4. Built-in fallbacks for the historic three (lmstudio / vllm / llamacpp).
+//
+// Returns the empty string when nothing produces a URL — callers must
+// detect that and surface a config error rather than dialling "".
+func (s *Server) resolveLocalServiceURL(serviceID string) string {
+	if serviceID == "" {
+		return ""
+	}
+	envName := "WV_" + strings.ToUpper(strings.ReplaceAll(serviceID, "-", "_")) + "_URL"
+	if v := strings.TrimSpace(os.Getenv(envName)); v != "" {
+		return v
+	}
+	if plugin := s.pluginByID[serviceID]; plugin != nil && plugin.DefaultURL != "" {
+		return plugin.DefaultURL
+	}
+	s.mu.RLock()
+	url := s.serviceURLs[serviceID]
+	s.mu.RUnlock()
+	if url != "" {
+		return url
+	}
+	defaults := map[string]string{
+		"lmstudio": "http://localhost:1234",
+		"vllm":     "http://localhost:8000",
+		"llamacpp": "http://localhost:8080",
+	}
+	return defaults[serviceID]
+}
+
+// applyQwen3NoThinkSuffix appends the "/no_think" inline directive to the
+// last user-role message in oaiReq when reasoning is disabled, the model
+// is a qwen3 variant, and the target backend is known to honour the
+// inline marker. Centralises the rule previously duplicated in callOllama,
+// callLocalService, and the streaming variants.
+//
+// Backends opt in either via:
+//   - native built-ins: serviceID == "ollama" || serviceID == "lmstudio"
+//   - plugin yaml: inline_no_think_for_qwen3: true
+//
+// Any other backend silently no-ops (the marker would echo back as
+// literal text in the response).
+func (s *Server) applyQwen3NoThinkSuffix(oaiReq *OpenAIRequest, serviceID, model string, reasoning bool) {
+	if reasoning {
+		return
+	}
+	if !strings.HasPrefix(strings.ToLower(model), "qwen3") {
+		return
+	}
+	allowed := false
+	switch serviceID {
+	case "ollama", "lmstudio":
+		allowed = true
+	default:
+		if plugin := s.pluginByID[serviceID]; plugin != nil && plugin.InlineNoThinkForQwen3 {
+			allowed = true
+		}
+	}
+	if !allowed {
+		return
+	}
+	for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
+		if oaiReq.Messages[i].Role == "user" {
+			oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
+			break
+		}
+	}
+}
+
+// serviceNeedsKey reports whether dispatch should consult keyMgr for the
+// given service before attempting a call. Cloud services with rotated
+// upstream API keys return true; local backends (ollama / lmstudio / vllm
+// / llamacpp) and plugin-defined services whose auth.type is "" / "none"
+// / "bearer" return false because they either have no upstream credential
+// or use this proxy's own vault token rather than rotated cloud keys.
+//
+// Replaces the previous hardcoded `svc != "ollama" && svc != "lmstudio" && …`
+// chain so a plugin can opt out of the keyMgr gate via its yaml without
+// requiring a Go-side edit.
+func (s *Server) serviceNeedsKey(svc string) bool {
+	switch svc {
+	case "ollama", "lmstudio", "vllm", "llamacpp":
+		return false
+	case "google", "openrouter", "openai", "anthropic":
+		return true
+	}
+	if plugin := s.pluginByID[svc]; plugin != nil {
+		switch plugin.Auth.Type {
+		case "", "none", "bearer":
+			return false
+		}
+		return true
+	}
+	// Unknown service id: conservatively skip the keyMgr gate so the
+	// switch in dispatchWithChain can return a clearer error.
+	return false
 }
 
 // Stop signals all background goroutines to exit. Safe to call multiple times
@@ -699,7 +824,7 @@ func (s *Server) syncFromVault() {
 			log.Printf("[sync] 설정 로드: %s/%s  override=%q  fallback=%v",
 				c.DefaultService, c.DefaultModel, c.ModelOverride, c.FallbackServices)
 			if newSvc != oldSvc || newMdl != oldMdl {
-				go updateOpenClawJSON(newSvc, newMdl)
+				go updateOpenClawJSON(newSvc, newMdl, s.defaultProxyOrigin())
 			}
 		}
 	}
@@ -1118,7 +1243,7 @@ func (s *Server) handleConfigModel(w http.ResponseWriter, r *http.Request) {
 			"service": newSvc,
 			"model":   newMdl,
 		})
-		go updateOpenClawJSON(newSvc, newMdl)
+		go updateOpenClawJSON(newSvc, newMdl, s.defaultProxyOrigin())
 	}
 	jsonOK(w, map[string]string{"status": "ok", "service": newSvc, "model": newMdl})
 }
@@ -1933,9 +2058,10 @@ func (s *Server) dispatchWithChain(ctx context.Context, primary, model string, f
 		isPrimary := i == 0
 		// Fast-skip cloud services whose keys are all on cooldown or exhausted
 		// — prevents dispatch from spending seconds on retries that will re-hit
-		// 429/402. Local services (ollama/lmstudio/vllm/llamacpp) carry no keys.
-		needsKey := svc != "ollama" && svc != "lmstudio" && svc != "vllm" && svc != "llamacpp"
-		if needsKey && !s.keyMgr.CanServe(svc) {
+		// 429/402. Local services and plugin-defined backends with non-key auth
+		// (bearer to vault token / none) skip the keyMgr gate via
+		// serviceNeedsKey.
+		if s.serviceNeedsKey(svc) && !s.keyMgr.CanServe(svc) {
 			log.Printf("[proxy] %s skip: 전체 쿨다운 또는 등록된 키 없음", svc)
 			err := fmt.Errorf("서비스 '%s' 전체 쿨다운", svc)
 			if isPrimary {
@@ -1969,7 +2095,22 @@ func (s *Server) dispatchWithChain(ctx context.Context, primary, model string, f
 		case "lmstudio", "vllm", "llamacpp":
 			resp, err = s.callLocalService(ctx, svc, targetModel, req)
 		default:
-			err = fmt.Errorf("unknown service: %s", svc)
+			// Plugin-defined service: route by the plugin's declared
+			// request_format. The empty default is treated as openai-compat
+			// because that's the shape >90 % of community plugins ship
+			// (LM Studio / vLLM / llama.cpp / Jan / Kobold / TabbyAPI / …).
+			// A drop-in plugin file is therefore enough to teach dispatch
+			// about a new backend — no Go-side switch edit required.
+			if plugin := s.pluginByID[svc]; plugin != nil {
+				switch plugin.RequestFormat {
+				case "", "openai":
+					resp, err = s.callLocalService(ctx, svc, targetModel, req)
+				default:
+					err = fmt.Errorf("plugin %q: dispatch only supports request_format 'openai' (got %q)", svc, plugin.RequestFormat)
+				}
+			} else {
+				err = fmt.Errorf("unknown service: %s (no plugin registered for this id)", svc)
+			}
 		}
 		if err == nil {
 			result := &DispatchResult{Response: resp, UsedService: svc, UsedModel: targetModel}
@@ -2267,18 +2408,10 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// the top-level `think` field — confirmed (operator host, earlier) where the same
 	// request that returns "Hello!" via native /api/chat with think:false
 	// returns an empty content + multi-minute hidden reasoning via /v1.
-	// Qwen3 family honours an inline `/no_think` token in the user message,
-	// so when reasoning is off we append it to the last user message. Only
-	// applied to qwen3* model ids — other families (gemma, llama, etc.)
-	// would treat the literal text as input and pollute the response.
-	if !reasoning && strings.HasPrefix(strings.ToLower(model), "qwen3") {
-		for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
-			if oaiReq.Messages[i].Role == "user" {
-				oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
-				break
-			}
-		}
-	}
+	// applyQwen3NoThinkSuffix encapsulates the qwen3-family inline `/no_think`
+	// rule — opt-in per backend (ollama/lmstudio + plugin yaml flag) so other
+	// families don't echo the literal text into the response.
+	s.applyQwen3NoThinkSuffix(oaiReq, "ollama", model, reasoning)
 	// Tell Ollama how long to keep the model resident after this response.
 	// Recent Ollama (>=0.3.x) honours top-level keep_alive on the OpenAI
 	// compat endpoint; older versions silently ignore it. Empty config means
@@ -2334,30 +2467,9 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 func (s *Server) callLocalService(ctx context.Context, serviceID, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	plugin := s.pluginByID[serviceID]
 
-	// URL resolution priority (highest first):
-	//   1. plugin.DefaultURL — an operator-installed plugin yaml is an
-	//      explicit local override and must beat any vault-distributed
-	//      URL. The hub-topology pattern (point a client at a remote
-	//      wall-vault hub) only works if this layer wins; otherwise
-	//      vault's default LM Studio / ollama URL — which assumes a
-	//      single-host install — silently overrides and the hub plugin
-	//      becomes inert.
-	//   2. SSE-distributed serviceURLs[id] — vault's centrally managed
-	//      default for this service.
-	//   3. Built-in fallbacks for the few historic services. New
-	//      backends should ship a plugin yaml with default_url instead.
-	var baseURL string
-	if plugin != nil && plugin.DefaultURL != "" {
-		baseURL = plugin.DefaultURL
-	} else {
-		s.mu.RLock()
-		baseURL = s.serviceURLs[serviceID]
-		s.mu.RUnlock()
-	}
-	if baseURL == "" {
-		defaults := map[string]string{"lmstudio": "http://localhost:1234", "vllm": "http://localhost:8000"}
-		baseURL = defaults[serviceID]
-	}
+	// URL resolution: env var > plugin.DefaultURL > vault SSE > built-in
+	// default. See resolveLocalServiceURL for rationale.
+	baseURL := s.resolveLocalServiceURL(serviceID)
 	if baseURL == "" {
 		return nil, fmt.Errorf("%s: URL 미설정", serviceID)
 	}
@@ -2404,20 +2516,12 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 	s.mu.RUnlock()
 	oaiReq.Reasoning = reasoning
 	oaiReq.Think = &reasoning
-	// Qwen3 family also honours an inline `/no_think` token under LM Studio's
-	// jinja template, same rationale as the ollama path: the `think` field
-	// gets silently ignored on /v1, and without the inline token the model
-	// burns max_tokens on hidden reasoning. Scoped to serviceID=="lmstudio"
-	// so other OAI-compat backends (vllm/llamacpp/…) whose templates may not
-	// strip the marker do not echo the literal token in the response.
-	if !reasoning && serviceID == "lmstudio" && strings.HasPrefix(strings.ToLower(model), "qwen3") {
-		for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
-			if oaiReq.Messages[i].Role == "user" {
-				oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
-				break
-			}
-		}
-	}
+	// Qwen3 family also honours an inline `/no_think` token. applyQwen3NoThinkSuffix
+	// covers both the historic native LM Studio opt-in and any plugin yaml
+	// that sets inline_no_think_for_qwen3 — so vllm/llamacpp/jan/koboldcpp/…
+	// can opt in via yaml without a Go-side switch edit, and backends whose
+	// templates don't strip the marker stay safe by default.
+	s.applyQwen3NoThinkSuffix(oaiReq, serviceID, model, reasoning)
 	data, _ := json.Marshal(oaiReq)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
@@ -2519,9 +2623,11 @@ const maxParseProviderDepth = 8
 //   - caller chose one as svc → honour it regardless of the body model's prefix
 //   - caller wrote one as the model prefix → route to that backend
 //
-// New OAI-compat plugin yamls only need to be added here to inherit both
-// behaviours. Was previously enumerated in three places (two case-by-case
-// `if` blocks per backend plus the dispatch case label); now one source.
+// Default entries cover the most common community OAI-compat backends out
+// of the box. Operator-installed plugin yamls with request_format=="openai"
+// (or unset, since "" defaults to openai-compat in dispatch) are merged in
+// at server boot via registerOAICompatPlugin so a drop-in plugin file is
+// enough — no Go edit required for new backends.
 var oaiCompatServices = map[string]struct{}{
 	"lmstudio":      {},
 	"vllm":          {},
@@ -2533,6 +2639,25 @@ var oaiCompatServices = map[string]struct{}{
 	"tabbyapi":      {},
 	"mlx-server":    {},
 	"litellm-proxy": {},
+}
+
+// oaiCompatServicesMu guards oaiCompatServices on the boot-time merge from
+// plugin yamls. Reads are not synchronised (the map is treated as
+// immutable after Server.New finishes), but the merge writes happen from
+// init goroutines so a mutex prevents Go's race detector from flagging
+// the construction phase. Production traffic only reads.
+var oaiCompatServicesMu sync.Mutex
+
+// registerOAICompatPlugin adds a plugin id to oaiCompatServices so
+// parseProviderModelDepth and the dispatch path treat it as
+// OpenAI-compatible without requiring a Go-side edit. Idempotent.
+func registerOAICompatPlugin(id string) {
+	if id == "" {
+		return
+	}
+	oaiCompatServicesMu.Lock()
+	oaiCompatServices[id] = struct{}{}
+	oaiCompatServicesMu.Unlock()
 }
 
 func parseProviderModelDepth(svc, mdl string, depth int) (string, string) {

@@ -212,8 +212,8 @@ func TestUpdateOpenClawJSON_EmptyModelIsNoop(t *testing.T) {
 	// We can't easily exercise the full function (it touches $HOME), but
 	// the guard sits at the top so a smoke check is enough — the call must
 	// not panic and must return immediately when model is empty.
-	updateOpenClawJSON("custom", "")
-	updateOpenClawJSON("anthropic", "")
+	updateOpenClawJSON("custom", "", "")
+	updateOpenClawJSON("anthropic", "", "")
 	// no assertion: the test passes as long as we returned without
 	// touching the filesystem (an attempt to read $HOME/.openclaw with
 	// empty model would print a [openclaw-sync] log line, which we'd see
@@ -283,7 +283,7 @@ func TestNormalizeProviderAuth_NoTokenSkips(t *testing.T) {
 			"providers": providers,
 		},
 	}
-	if normalizeOpenClawProviders(cfg, "", "", "") {
+	if normalizeOpenClawProviders(cfg, "", "", "", "") {
 		// Other heal rules might still fire; the auth-specific check is
 		// that the apiKey wasn't blanked.
 	}
@@ -305,7 +305,7 @@ func TestNormalizeOpenClawProviders_GoogleStaleUpstream(t *testing.T) {
 			},
 		},
 	}
-	if !normalizeOpenClawProviders(cfg, "", "", "") {
+	if !normalizeOpenClawProviders(cfg, "", "", "", "") {
 		t.Fatal("expected change=true for upstream baseUrl on google")
 	}
 	got := cfg["models"].(map[string]interface{})["providers"].(map[string]interface{})["google"].(map[string]interface{})["baseUrl"]
@@ -339,7 +339,7 @@ func TestNormalizeOpenClawProviders_RaspiSnapshot(t *testing.T) {
 			},
 		},
 	}
-	if !normalizeOpenClawProviders(cfg, "", "", "") {
+	if !normalizeOpenClawProviders(cfg, "", "", "", "") {
 		t.Fatal("expected change=true for broken raspi snapshot")
 	}
 	provs := cfg["models"].(map[string]interface{})["providers"].(map[string]interface{})
@@ -385,7 +385,7 @@ func TestHealAgentSpecificModels_RewritesStaleCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	healAgentSpecificModels("real-vault-token", "", "")
+	healAgentSpecificModels("real-vault-token", "", "", "")
 
 	out, err := os.ReadFile(path)
 	if err != nil {
@@ -439,7 +439,7 @@ func TestHealAgentSpecificModels_NoChangeWhenAlreadyCorrect(t *testing.T) {
 	}
 	st0, _ = os.Stat(path)
 
-	healAgentSpecificModels("real-vault-token", "", "")
+	healAgentSpecificModels("real-vault-token", "", "", "")
 
 	st1, err := os.Stat(path)
 	if err != nil {
@@ -454,7 +454,7 @@ func TestHealAgentSpecificModels_MissingDirIsNoop(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	// No ~/.openclaw/agents/ at all — heal must not panic or error.
-	healAgentSpecificModels("token", "", "")
+	healAgentSpecificModels("token", "", "", "")
 }
 
 func TestNormalizeProviderTLSCA_WritesNewCA(t *testing.T) {
@@ -527,13 +527,23 @@ func TestNormalizeProviderTLSCA_SkipsThirdPartyProviders(t *testing.T) {
 }
 
 func TestProviderHealURLs(t *testing.T) {
-	c, a, g := providerHealURLs("")
+	c, a, g := providerHealURLs("", "")
 	if c != "https://localhost:56244/v1" || a != "https://localhost:56244" || g != "https://localhost:56244" {
-		t.Errorf("default targets wrong: %s | %s | %s", c, a, g)
+		t.Errorf("legacy fallback targets wrong: %s | %s | %s", c, a, g)
 	}
-	c, a, g = providerHealURLs("http://127.0.0.1:56245")
+	c, a, g = providerHealURLs("http://127.0.0.1:56245", "")
 	if c != "http://127.0.0.1:56245/v1" || a != "http://127.0.0.1:56245" || g != "http://127.0.0.1:56245" {
 		t.Errorf("plain-companion targets wrong: %s | %s | %s", c, a, g)
+	}
+	// Operator-configured port flows through when no companion is set.
+	c, a, g = providerHealURLs("", "http://localhost:7777")
+	if c != "http://localhost:7777/v1" || a != "http://localhost:7777" || g != "http://localhost:7777" {
+		t.Errorf("custom-port targets wrong: %s | %s | %s", c, a, g)
+	}
+	// Companion still wins over default when both are set.
+	c, a, g = providerHealURLs("http://127.0.0.1:56245", "http://localhost:7777")
+	if c != "http://127.0.0.1:56245/v1" || a != "http://127.0.0.1:56245" || g != "http://127.0.0.1:56245" {
+		t.Errorf("companion priority wrong: %s | %s | %s", c, a, g)
 	}
 }
 
@@ -548,7 +558,7 @@ func TestNormalizeOpenClawProviders_PlainCompanionRewritesHttpsLocalhost(t *test
 			},
 		},
 	}
-	if !normalizeOpenClawProviders(cfg, "", "", "http://127.0.0.1:56245") {
+	if !normalizeOpenClawProviders(cfg, "", "", "http://127.0.0.1:56245", "") {
 		t.Fatal("expected change=true to switch to plain companion")
 	}
 	provs := cfg["models"].(map[string]interface{})["providers"].(map[string]interface{})
@@ -572,7 +582,7 @@ func TestNormalizeOpenClawProviders_NoCompanionLeavesHttpsLocalhostAlone(t *test
 		// would otherwise flip changed=true on every cfg without a gateway block.
 		"gateway": map[string]interface{}{"channelStaleEventThresholdMinutes": float64(120)},
 	}
-	if normalizeOpenClawProviders(cfg, "", "", "") {
+	if normalizeOpenClawProviders(cfg, "", "", "", "") {
 		t.Fatal("expected change=false when no companion configured and base is already correct")
 	}
 }

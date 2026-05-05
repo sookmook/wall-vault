@@ -8,6 +8,99 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.63] — 2026-05-05
+
+External-user usability hardening pass. Three diagnostic agents flagged
+several places where wall-vault assumed a single-operator deployment;
+this release fixes the ones that block a fresh non-default install.
+
+### Added
+
+- **`proxy.anthropic_fallback_model` config / `WV_ANTHROPIC_FALLBACK_MODEL`
+  env var.** Opt-in rewrite when an anthropic dispatch arrives with a
+  non-Claude model id. Empty (default) makes dispatch return an error
+  instead — silent rewrites burned upstream credits on a model the
+  caller never asked for. Operators who relied on the v0.2.62-and-earlier
+  silent rewrite to `claude-haiku-4-5-20251001` can opt back in by
+  setting this field.
+- **Per-plugin `inline_no_think_for_qwen3` yaml field.** Backends
+  whose chat template strips the qwen3-family `/no_think` inline
+  marker (LM Studio's jinja, Ollama's /v1 layer) opt in via yaml.
+  Replaces three duplicated copies of the rule that previously
+  were scoped to hardcoded `serviceID == "lmstudio"` and only
+  worked for backends the Go switch already knew about.
+- **`WV_LMSTUDIO_URL` / `WV_VLLM_URL` / `WV_LLAMACPP_URL` env vars.**
+  Operator-side override of the local backend URL without editing a
+  plugin yaml. Resolution order is now env > plugin.DefaultURL >
+  vault SSE > built-in default; env wins so a fleet operator can
+  hot-swap the backend host without redeploying yamls.
+- **`DefaultProxyOrigin(port, tlsEnabled)` helper.** Single source of
+  truth for the canonical `scheme://localhost:<port>` origin
+  configuration writers (openclaw_sync, agent_apply, setup) target.
+  Replaces ~7 duplicated `https://localhost:56244` literals.
+- **Plugin-driven dispatch + stream extension.** A plugin yaml with
+  `request_format: openai` (or unset) is now picked up by
+  `dispatchWithChain` and the Gemini-stream handler without
+  requiring a Go-side `case` edit. New OAI-compat backends drop in
+  as a yaml file.
+- **OpenAI `reasoning_content` fallback in response converters.**
+  Reasoning-only responses (qwen3.6 / deepseek-r1 / gpt-o1 family
+  on backends that emit only `reasoning_content` and leave `content`
+  empty) now surface the chain-of-thought as the response text
+  instead of returning an empty string. Applies to both the
+  non-stream (`OpenAIRespToGemini`) and stream (`streamOpenRouter`,
+  `streamPluginAsGemini`) paths.
+- **README TLS / cert setup section.** `wall-vault cert init` →
+  `cert issue $(hostname)` → `cert install-trust` → enable TLS via
+  env vars. Documents the loopback-only HTTP companion port and the
+  http-vs-https tradeoff explicitly so a fresh installer doesn't
+  read every `https://localhost:56244` example as the only mode.
+- **README full config reference.** All YAML fields under
+  `proxy:` / `vault:` / `doctor:` / `hooks:` listed with defaults +
+  inline comments, plus all `WV_*` env vars in the env-var table.
+  Was missing 16+ fields previously.
+- **setup wizard now offers Anthropic / OpenAI / LM Studio / vLLM.**
+  Previously asked only Google / OpenRouter / Ollama. Each option
+  prints its corresponding env-var setup hint at the end.
+
+### Changed
+
+- **`openclaw_sync.go` no longer hardcodes `https://localhost:56244`.**
+  `updateOpenClawJSON`, `healOpenClawConfig`, `healAgentSpecificModels`,
+  `runStartupOpenClawHeal`, and `providerHealURLs` now take a
+  `defaultOrigin string` arg derived from `cfg.Proxy.Port` and
+  `cfg.Proxy.TLS.Enabled`. An operator who moves the proxy off port
+  56244 or disables TLS no longer has the openclaw.json heal pass
+  silently rewrite their config back to the wrong origin.
+- **`dispatchWithChain` switch + `oaiCompatServices` set generalised.**
+  The 6-case switch falls through to `callLocalService` when the
+  service id matches an enabled plugin yaml; the OAI-compat set is
+  merged with all `request_format: openai` plugins at boot. Both
+  changes mean a drop-in plugin yaml is enough — no Go edit
+  required for new backends.
+- **`serviceNeedsKey` replaces `svc != "ollama" && …` chain.** Plugin
+  yamls with `auth.type: none` / `bearer` / `""` skip the keyMgr
+  cooldown gate the same way the historic local backends do.
+- **Local backend URL resolution unified into `resolveLocalServiceURL`.**
+  `callLocalService` / `streamLocalService` / `streamPluginAsGemini`
+  share the same lookup path so future tweaks land in one place.
+
+### Removed
+
+- **Footer link to `sookmook.org` and `sookmook@gmail.com`.** The
+  vault dashboard footer now shows only the wall-vault GitHub link.
+  The author's personal contact details no longer appear on every
+  external operator's install.
+
+### Notes
+
+- Anthropic silent rewrite is a behaviour change: any deployment
+  that depended on the proxy quietly switching a non-Claude id to
+  `claude-haiku-4-5-20251001` must set `proxy.anthropic_fallback_model`
+  (or `WV_ANTHROPIC_FALLBACK_MODEL`) to opt back in.
+
+---
+
 ## [0.2.62] — 2026-05-04
 
 ### Added

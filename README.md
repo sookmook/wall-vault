@@ -267,7 +267,39 @@ Invoke-WebRequest -Uri `
 .\wall-vault.exe start
 ```
 
-Open `https://localhost:56243` to access the dashboard.
+Open `http://localhost:56243` (or `https://...` once TLS is on — see below) to access the dashboard.
+
+---
+
+## TLS Setup (recommended)
+
+By default `wall-vault setup` writes a config without TLS — both listeners answer plain HTTP. The example URLs further down use `https://localhost:56244` because most agents (OpenClaw, Claude Code, Cursor) want a single TLS-fronted endpoint that won't break if you later move the proxy. To match those examples, enable TLS once with the bundled CA:
+
+```bash
+# 1. Create the wall-vault internal CA (one time, lives in ~/.wall-vault/ca.{crt,key})
+wall-vault cert init
+
+# 2. Issue a host certificate for THIS machine (SANs include hostname + localhost + LAN IPs)
+wall-vault cert issue $(hostname)
+
+# 3. Trust the CA in this machine's OS keychain so browsers and clients accept it
+wall-vault cert install-trust
+
+# 4. Switch the proxy / vault listeners to TLS
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+wall-vault start
+```
+
+Same-host clients that can't honour the wall-vault CA (notably OpenClaw's bundled Node runtime, which rewrites `NODE_EXTRA_CA_CERTS` on spawn) still reach the proxy through a loopback-only plain-HTTP companion on `127.0.0.1:56245` — wall-vault enables it automatically when TLS is on.
+
+If you'd rather stay on plain HTTP, leave the config as-is and replace `https://` with `http://` in every client example below. Both schemes work; the difference is just which port answers a TLS handshake.
+
+For other machines on your LAN: copy `~/.wall-vault/ca.crt` over and run `wall-vault cert install-trust --ca <path>` there too.
 
 ---
 
@@ -474,18 +506,55 @@ theme: cherry      # light | dark | gold | cherry | ocean | autumn | winter
 
 proxy:
   port: 56244
+  host: ""                   # default: 127.0.0.1 standalone, 0.0.0.0 distributed
   client_id: my-bot
   vault_url: ""              # distributed mode: http://vault-server:56243
   vault_token: ""            # distributed mode: client token
   tool_filter: strip_all     # strip_all | whitelist | passthrough
+  allowed_tools: []          # whitelist mode: tool names to permit
   services: [google, openrouter, ollama]
-  timeout: 60s
+  timeout: 300s              # upstream call deadline (cold-start tolerance)
+  avatar: ""                 # path under ~/.openclaw/ for the proxy's avatar
+  claude_code_client_id: ""  # pin claude-code → vault client mapping
+  tls:
+    enabled: false           # off → plain HTTP listener
+    cert_file: ""            # PEM cert path (use `wall-vault cert issue`)
+    key_file: ""              # PEM key path
+  plain_port: 56245          # loopback-only HTTP companion when TLS is on
+  ollama_keep_alive: "30m"   # keep model resident; "-1" never unload
+  ollama_num_ctx: 8192       # Ollama context window override
+  econoworld_max_tokens: 8192
+  econoworld_stream: true
+  econoworld_request_timeout: 300
+  token_sentinel_fallback: false  # loopback callers can present "proxy-managed"
+  oai_stream_forward: false  # real backend SSE passthrough for oaiCompat clients
+  anthropic_fallback_model: ""    # opt-in rewrite for non-Claude on anthropic
 
 vault:
   port: 56243
+  host: ""                   # default mirrors proxy.host
   admin_token: ""            # empty = no auth (local dev only)
-  master_password: ""        # API key encryption password
+  admin_ip_whitelist: []     # CIDRs allowed to use admin token; empty = unrestricted
+  master_password: ""        # API key encryption password (AES-GCM)
   data_dir: ~/.wall-vault/data
+  services_dir: ~/.wall-vault/services
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+  bootstrap_port: 56247      # plain-HTTP listener that serves only ca.crt
+
+doctor:
+  interval: 5m
+  auto_fix: true
+  log_file: /tmp/wall-vault-doctor.log
+
+hooks:
+  on_model_change: ""        # shell command (env: SERVICE, MODEL)
+  on_key_exhausted: ""
+  on_service_down: ""
+  on_doctor_fix: ""
+  openclaw_socket: ""        # OpenClaw TUI Unix socket path
 ```
 
 ### Environment Variables
@@ -495,14 +564,33 @@ vault:
 | `WV_LANG` | Language code |
 | `WV_THEME` | Theme name |
 | `WV_PROXY_PORT` | Proxy port override |
+| `WV_PROXY_HOST` | Proxy listen address override |
 | `WV_VAULT_PORT` | Vault port override |
+| `WV_VAULT_HOST` | Vault listen address override |
 | `WV_VAULT_URL` | Key vault URL (distributed mode) |
 | `WV_VAULT_TOKEN` | Proxy auth token |
 | `WV_ADMIN_TOKEN` | Admin token |
 | `WV_MASTER_PASS` | Encryption master password |
 | `WV_KEY_GOOGLE` | Google API key (comma-separated for multiple) |
 | `WV_KEY_OPENROUTER` | OpenRouter API key |
-| `WV_AVATAR` | Proxy avatar file path (relative to `~/.openclaw/`, e.g. `workspace/avatars/avatar.png`) |
+| `WV_KEY_ANTHROPIC` | Anthropic API key |
+| `WV_KEY_OPENAI` | OpenAI API key |
+| `WV_AVATAR` | Proxy avatar file path (relative to `~/.openclaw/`) |
+| `WV_TOOL_FILTER` | Override `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | Override `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `1`/`true` to enable proxy TLS |
+| `WV_PROXY_TLS_CERT` / `WV_PROXY_TLS_KEY` | Proxy TLS PEM paths |
+| `WV_VAULT_TLS_ENABLED` | `1`/`true` to enable vault TLS |
+| `WV_VAULT_TLS_CERT` / `WV_VAULT_TLS_KEY` | Vault TLS PEM paths |
+| `WV_VAULT_BOOTSTRAP_PORT` | Plain-HTTP CA bootstrap listener (`0` to disable) |
+| `WV_PROXY_PLAIN_PORT` | Loopback HTTP companion port (`0` to disable) |
+| `WV_OLLAMA_KEEP_ALIVE` | Override `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | Override `proxy.ollama_num_ctx` |
+| `WV_ECONOWORLD_MAX_TOKENS` / `WV_ECONOWORLD_STREAM` / `WV_ECONOWORLD_REQUEST_TIMEOUT` | EconoWorld defaults |
+| `WV_TOKEN_SENTINEL_FALLBACK` | Loopback "proxy-managed" sentinel substitution |
+| `WV_OAI_STREAM_FORWARD` | OpenAI-compat real backend SSE passthrough |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | Opt-in non-Claude rewrite on anthropic dispatch |
+| `WV_LMSTUDIO_URL` / `WV_VLLM_URL` / `WV_LLAMACPP_URL` | Per-backend URL override (when no plugin yaml) |
 
 ---
 

@@ -19,6 +19,15 @@ auth:
 
 request_format: openai
 
+# LM Studio's jinja chat template strips the literal "/no_think" tag
+# before applying it as a generation hint, which is the qwen3-family's
+# documented way to disable reasoning. The /v1 layer ignores the
+# top-level `think:false` field, so without the inline marker the model
+# burns max_tokens on hidden reasoning. Opt out here if your local LM
+# Studio version stops stripping the marker (it would then echo the
+# literal text in the response).
+inline_no_think_for_qwen3: true
+
 model_fetch:
   enabled: true
   dynamic: true

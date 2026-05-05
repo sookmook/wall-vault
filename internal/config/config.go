@@ -100,6 +100,17 @@ type ProxyConfig struct {
 	// callers do NOT consult the fallback chain — see
 	// docs/superpowers/specs/2026-05-04-oai-stream-passthrough-design.md §3.3.
 	OAIStreamForward bool `yaml:"oai_stream_forward"`
+
+	// AnthropicFallbackModel: when an anthropic dispatch arrives with a
+	// non-Claude model id, the proxy uses this id instead. Empty (default)
+	// makes dispatch return an error so the misrouting surfaces immediately.
+	// Pre-v0.2.62 wall-vault silently rewrote any non-Claude id to
+	// claude-haiku-4-5-20251001, which hid bugs (a fleet host that lost
+	// vault keys would invisibly burn Anthropic credits on a model the
+	// operator never asked for). Operators who relied on the historic
+	// behaviour can opt back in by setting this to "claude-haiku-4-5-20251001"
+	// or whichever Claude id their account is provisioned for.
+	AnthropicFallbackModel string `yaml:"anthropic_fallback_model"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -433,6 +444,9 @@ func applyEnv(cfg *Config) {
 		case "0", "false", "no", "off":
 			cfg.Proxy.TokenSentinelFallback = false
 		}
+	}
+	if v := os.Getenv("WV_ANTHROPIC_FALLBACK_MODEL"); v != "" {
+		cfg.Proxy.AnthropicFallbackModel = strings.TrimSpace(v)
 	}
 	if v := os.Getenv("WV_OAI_STREAM_FORWARD"); v != "" {
 		// Accept the usual truthy / falsy spellings. Anything unrecognised

@@ -71,6 +71,18 @@ func (s *Server) handleGeminiStream(w http.ResponseWriter, r *http.Request) {
 	case "ollama":
 		s.streamOllama(r.Context(), w, flusher, mdl, &req)
 	default:
+		// Plugin-defined OAI-compat backends (lmstudio / vllm / llamacpp /
+		// jan / kobold / tabbyapi / etc.) get streamed via the same
+		// OAI-SSE→Gemini-SSE bridge as openrouter, so a Gemini-style
+		// caller (streamGenerateContent) can reach any OAI-compat plugin
+		// without needing a Go-side switch case per backend.
+		if plugin := s.pluginByID[svc]; plugin != nil {
+			switch plugin.RequestFormat {
+			case "", "openai":
+				s.streamPluginAsGemini(r.Context(), w, flusher, svc, mdl, &req)
+				return
+			}
+		}
 		writeGeminiErrorChunk(w, flusher, fmt.Errorf("서비스 미지원: %s", svc))
 	}
 }
@@ -191,7 +203,18 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 		}
 
 		delta := chunk.Choices[0].Delta
-		if delta == nil || delta.Content == "" {
+		text := ""
+		if delta != nil {
+			text = delta.Content
+			// Reasoning-model fallback (see OpenAIRespToGemini): some
+			// backends only emit reasoning_content per chunk while content
+			// stays empty until the very last delta. Surface those chunks
+			// so the caller sees progress instead of a long silent gap.
+			if text == "" && delta.ReasoningContent != "" {
+				text = delta.ReasoningContent
+			}
+		}
+		if text == "" {
 			continue
 		}
 
@@ -200,7 +223,7 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 				{
 					Content: GeminiContent{
 						Role:  "model",
-						Parts: []GeminiPart{{Text: delta.Content}},
+						Parts: []GeminiPart{{Text: text}},
 					},
 					FinishReason: strings.ToUpper(chunk.Choices[0].FinishReason),
 				},
@@ -217,6 +240,140 @@ func (s *Server) streamOpenRouter(w http.ResponseWriter, f http.Flusher, model s
 		totalTokens = 1 // minimum 1 per request when API does not report usage
 	}
 	s.keyMgr.RecordSuccess(key, totalTokens)
+}
+
+// ─── Plugin OAI-compat → Gemini SSE Bridge ───────────────────────────────────
+
+// streamPluginAsGemini streams from a plugin-defined OAI-compat backend
+// (lmstudio / vllm / llamacpp / jan / etc.) and reformats each chunk into
+// Gemini's SSE shape. Mirrors streamOpenRouter's transcoding logic but
+// substitutes baseURL/auth/TLS from the plugin yaml so any drop-in plugin
+// participates without a Go edit.
+//
+// Returns silently on success and emits a single error chunk on any
+// failure path (matches streamOpenRouter's error contract).
+func (s *Server) streamPluginAsGemini(ctx context.Context, w http.ResponseWriter, f http.Flusher, serviceID, model string, req *GeminiRequest) {
+	plugin := s.pluginByID[serviceID]
+	if plugin == nil {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("plugin %s not registered", serviceID))
+		return
+	}
+
+	// URL resolution shared with callLocalService.
+	baseURL := s.resolveLocalServiceURL(serviceID)
+	if baseURL == "" {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: URL 미설정", serviceID))
+		return
+	}
+
+	// Per-service semaphore — same shape as streamOllama / callLocalService.
+	if sem, ok := s.localSems[serviceID]; ok {
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+		case <-ctx.Done():
+			writeGeminiErrorChunk(w, f, ctx.Err())
+			return
+		}
+	}
+
+	// Strip "publisher/" prefix unless the hub-style plugin says preserve.
+	sentModel := model
+	if !plugin.PreserveModelID {
+		if i := strings.Index(sentModel, "/"); i >= 0 {
+			sentModel = sentModel[i+1:]
+		}
+	}
+
+	oaiReq := GeminiToOpenAI(sentModel, req)
+	oaiReq.Stream = true
+	s.mu.RLock()
+	reasoning := s.serviceReasoning[serviceID]
+	s.mu.RUnlock()
+	oaiReq.Reasoning = reasoning
+	oaiReq.Think = &reasoning
+	s.applyQwen3NoThinkSuffix(oaiReq, serviceID, sentModel, reasoning)
+
+	data, err := json.Marshal(oaiReq)
+	if err != nil {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: marshal: %w", serviceID, err))
+		return
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
+	if err != nil {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: stream request build: %w", serviceID, err))
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-stream")
+	if plugin.Auth.Type == "bearer" && s.cfg.Proxy.VaultToken != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
+	}
+
+	var client *http.Client
+	if plugin.TLSInternalCA {
+		client = internalHTTPClient(10 * time.Minute)
+	} else {
+		client = &http.Client{Timeout: 10 * time.Minute}
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: stream connect: %w", serviceID, err))
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: stream status %d", serviceID, resp.StatusCode))
+		return
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		payload := strings.TrimPrefix(line, "data: ")
+		if payload == "[DONE]" {
+			break
+		}
+		var chunk OpenAIResponse
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			continue
+		}
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		delta := chunk.Choices[0].Delta
+		text := ""
+		if delta != nil {
+			text = delta.Content
+			if text == "" && delta.ReasoningContent != "" {
+				text = delta.ReasoningContent
+			}
+		}
+		if text == "" {
+			continue
+		}
+		geminiChunk := GeminiResponse{
+			Candidates: []GeminiCandidate{{
+				Content: GeminiContent{
+					Role:  "model",
+					Parts: []GeminiPart{{Text: text}},
+				},
+				FinishReason: strings.ToUpper(chunk.Choices[0].FinishReason),
+			}},
+		}
+		chunkData, _ := json.Marshal(geminiChunk)
+		fmt.Fprintf(w, "data: %s\n\n", chunkData)
+		if f != nil {
+			f.Flush()
+		}
+	}
 }
 
 // ─── Ollama Streaming ─────────────────────────────────────────────────────────
@@ -404,20 +561,9 @@ func (s *Server) streamLocalService(
 	model string,
 	oaiReq *OpenAIRequest,
 ) error {
-	// Mirror callLocalService's URL resolution priority.
 	plugin := s.pluginByID[serviceID]
-	var baseURL string
-	if plugin != nil && plugin.DefaultURL != "" {
-		baseURL = plugin.DefaultURL
-	} else {
-		s.mu.RLock()
-		baseURL = s.serviceURLs[serviceID]
-		s.mu.RUnlock()
-	}
-	if baseURL == "" {
-		defaults := map[string]string{"lmstudio": "http://localhost:1234", "vllm": "http://localhost:8000"}
-		baseURL = defaults[serviceID]
-	}
+	// URL resolution shared with callLocalService.
+	baseURL := s.resolveLocalServiceURL(serviceID)
 	if baseURL == "" {
 		return fmt.Errorf("%s: URL 미설정", serviceID)
 	}
@@ -463,14 +609,7 @@ func (s *Server) streamLocalService(
 	oaiReq.Stream = true
 	oaiReq.Reasoning = reasoning
 	oaiReq.Think = &reasoning
-	if !reasoning && serviceID == "lmstudio" && strings.HasPrefix(strings.ToLower(sentModel), "qwen3") {
-		for i := len(oaiReq.Messages) - 1; i >= 0; i-- {
-			if oaiReq.Messages[i].Role == "user" {
-				oaiReq.Messages[i].Content = strings.TrimRight(oaiReq.Messages[i].Content, " \n") + " /no_think"
-				break
-			}
-		}
-	}
+	s.applyQwen3NoThinkSuffix(oaiReq, serviceID, sentModel, reasoning)
 
 	data, _ := json.Marshal(oaiReq)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))

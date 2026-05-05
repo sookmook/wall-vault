@@ -46,7 +46,7 @@ func Footer(vm *FooterVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span> <span class=\"sep\">·</span> <a href=\"https://github.com/sookmook/wall-vault\" target=\"_blank\" rel=\"noopener\">github.com/sookmook/wall-vault</a> <span class=\"sep\">·</span> <a href=\"https://sookmook.org/\" target=\"_blank\" rel=\"noopener\">sookmook.org</a> <span class=\"sep\">·</span> <a href=\"mailto:sookmook@gmail.com\">sookmook@gmail.com</a></footer>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span> <span class=\"sep\">·</span> <a href=\"https://github.com/sookmook/wall-vault\" target=\"_blank\" rel=\"noopener\">github.com/sookmook/wall-vault</a></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

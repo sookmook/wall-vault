@@ -132,9 +132,18 @@ type OpenAIMessage struct {
 	// image_url) when the client sent content in OpenAI's multi-part form.
 	// Not serialized — only used inbound for OpenAIToGemini multimodal mapping.
 	RawContent json.RawMessage `json:"-"`
-	ToolCalls  json.RawMessage `json:"tool_calls,omitempty"`
-	ToolCallID string          `json:"tool_call_id,omitempty"`
-	Name       string          `json:"name,omitempty"`
+	// ReasoningContent carries the chain-of-thought emitted by reasoning
+	// models (qwen3.6, deepseek-r1, gpt-o1 family, gemma-r1, gemini-3-pro
+	// when reasoning is on, …). Many backends put the visible answer in
+	// Content and the hidden chain-of-thought in ReasoningContent; some
+	// (notably qwen3.6 via /v1) emit only ReasoningContent and leave
+	// Content empty, which previously surfaced as a blank response. The
+	// response converters fall back to ReasoningContent when Content is
+	// empty so the caller at least sees the model's actual output.
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        json.RawMessage `json:"tool_calls,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
+	Name             string          `json:"name,omitempty"`
 }
 
 // MarshalJSON emits the multi-part `content` array when RawContent is set
@@ -193,11 +202,12 @@ func (m OpenAIMessage) MarshalJSON() ([]byte, error) {
 // OpenAI spec allows both; many clients (including OpenClaw) use the array form.
 func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Role       string          `json:"role"`
-		Content    json.RawMessage `json:"content"`
-		ToolCalls  json.RawMessage `json:"tool_calls"`
-		ToolCallID string          `json:"tool_call_id"`
-		Name       string          `json:"name"`
+		Role             string          `json:"role"`
+		Content          json.RawMessage `json:"content"`
+		ReasoningContent string          `json:"reasoning_content"`
+		ToolCalls        json.RawMessage `json:"tool_calls"`
+		ToolCallID       string          `json:"tool_call_id"`
+		Name             string          `json:"name"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -209,6 +219,7 @@ func (m *OpenAIMessage) UnmarshalJSON(data []byte) error {
 	if isJSONArray(raw.Content) {
 		m.RawContent = raw.Content
 	}
+	m.ReasoningContent = raw.ReasoningContent
 	m.ToolCalls = raw.ToolCalls
 	m.ToolCallID = raw.ToolCallID
 	m.Name = raw.Name

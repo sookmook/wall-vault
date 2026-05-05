@@ -51,6 +51,15 @@ type ServicePlugin struct {
 	// "google/gemma-…" id arrives at the hub as a bare "gemma-…" and
 	// inferServiceFromBareModel misroutes it to the native Google handler.
 	PreserveModelID bool `yaml:"preserve_model_id"`
+
+	// InlineNoThinkForQwen3: opt-in to appending "/no_think" to the last
+	// user turn when reasoning is disabled and the request targets a
+	// qwen3-family model. Necessary on backends whose /v1 compat layer
+	// silently ignores the top-level `think:false` field but whose
+	// chat template honours the inline marker (LM Studio's jinja, Ollama's
+	// OpenAI-compat layer). Other backends typically echo the literal
+	// text back, so this stays opt-in per plugin yaml.
+	InlineNoThinkForQwen3 bool `yaml:"inline_no_think_for_qwen3"`
 }
 
 type ServiceEndpoints struct {

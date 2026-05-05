@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -143,13 +144,38 @@ func injectModelToTUI(primaryModel string) {
 	}
 }
 
+// DefaultProxyOrigin returns the canonical origin (`scheme://localhost:<port>`)
+// other components should write into config files when no plain-HTTP companion
+// is configured. Honours the operator's proxy.port + proxy.tls.enabled rather
+// than the previous hardcoded `https://localhost:56244`, which silently broke
+// any install that moved the proxy to a non-default port.
+func DefaultProxyOrigin(port int, tlsEnabled bool) string {
+	if port <= 0 {
+		port = 56244
+	}
+	scheme := "http"
+	if tlsEnabled {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://localhost:%d", scheme, port)
+}
+
 // updateOpenClawJSON: 모델 변경 시 ~/.openclaw/openclaw.json 갱신 후 게이트웨이 통보.
 //
 // Supports openclaw.json v2026.3.12+ format:
 //
 //	models.providers.<name>.api = "openai-completions"
 //	models.providers.<name>.models[].{id, name, reasoning, input, contextWindow, maxTokens}
-func updateOpenClawJSON(service, model string) {
+//
+// defaultOrigin is the origin (e.g. `https://localhost:56244` or
+// `http://localhost:7777`) heal writes into provider baseUrl fields when no
+// plain-HTTP companion is in play. Empty string falls back to the legacy
+// `https://localhost:56244` for backwards compatibility with callers that
+// still don't pass it through.
+func updateOpenClawJSON(service, model, defaultOrigin string) {
+	if defaultOrigin == "" {
+		defaultOrigin = "https://localhost:56244"
+	}
 	// Early-return on an empty model: the SSE config_change path can fire
 	// before the vault has resolved a model for this client (or after a
 	// soft-clear), and writing primary="<service>/" produces an unresolvable
@@ -228,7 +254,7 @@ func updateOpenClawJSON(service, model string) {
 		antProv, _ := providers["anthropic"].(map[string]interface{})
 		if antProv == nil {
 			antProv = map[string]interface{}{
-				"baseUrl": "https://localhost:56244",
+				"baseUrl": defaultOrigin,
 				"apiKey":  "proxy-managed",
 			}
 			providers["anthropic"] = antProv
@@ -240,7 +266,7 @@ func updateOpenClawJSON(service, model string) {
 		// http://<internal-host>:11434, which bypasses the proxy entirely
 		// and breaks routing/auth for any provider but ollama.
 		if bu, _ := antProv["baseUrl"].(string); !isLocalProxyBaseURL(bu) {
-			antProv["baseUrl"] = "https://localhost:56244"
+			antProv["baseUrl"] = defaultOrigin
 			changed = true
 		}
 		// Add model entry if missing.
@@ -268,7 +294,7 @@ func updateOpenClawJSON(service, model string) {
 		custom, _ := providers["custom"].(map[string]interface{})
 		if custom == nil {
 			custom = map[string]interface{}{
-				"baseUrl":    "https://localhost:56244/v1",
+				"baseUrl":    defaultOrigin + "/v1",
 				"apiKey":     "proxy-managed",
 				"api":        "openai-completions",
 				"authHeader": false,
@@ -287,14 +313,15 @@ func updateOpenClawJSON(service, model string) {
 		// upstream host ((operator host, earlier): http://<internal-host>:11434/v1
 		// directly to ollama, bypassing the proxy).
 		if bu, _ := custom["baseUrl"].(string); bu != "" && !isLocalProxyBaseURL(bu) {
-			custom["baseUrl"] = "https://localhost:56244/v1"
+			custom["baseUrl"] = defaultOrigin + "/v1"
 			changed = true
 		}
-		// Migrate legacy Gemini path to the OpenAI-compat path. (Pre-dates
-		// the upstream-IP guard above; left in place because a localhost
-		// /google/v1beta URL passes the isLocalProxyBaseURL check.)
+		// Migrate legacy Gemini path to the OpenAI-compat path. The hardcoded
+		// 56244 string is intentional here — it matches the historic value
+		// every prior release wrote, so older configs migrate forward
+		// regardless of the operator's current port choice.
 		if bu, _ := custom["baseUrl"].(string); bu == "https://localhost:56244/google/v1beta" {
-			custom["baseUrl"] = "https://localhost:56244/v1"
+			custom["baseUrl"] = defaultOrigin + "/v1"
 			changed = true
 		}
 
@@ -441,7 +468,7 @@ func pruneStaleModelsAcross(providers map[string]interface{}) bool {
 // Steady-state SSE config_change (updateOpenClawJSON) keeps things in sync
 // once a model change actually happens; this boot-time pass guarantees a
 // stale config is corrected even when no model change ever fires.
-func healOpenClawConfig(vaultToken, caBundlePath, localBaseOrigin string) {
+func healOpenClawConfig(vaultToken, caBundlePath, localBaseOrigin, defaultOrigin string) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return
@@ -455,7 +482,7 @@ func healOpenClawConfig(vaultToken, caBundlePath, localBaseOrigin string) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return
 	}
-	if !normalizeOpenClawProviders(cfg, vaultToken, caBundlePath, localBaseOrigin) {
+	if !normalizeOpenClawProviders(cfg, vaultToken, caBundlePath, localBaseOrigin, defaultOrigin) {
 		return
 	}
 	if err := writeJSON(path, cfg); err != nil {
@@ -471,7 +498,7 @@ func healOpenClawConfig(vaultToken, caBundlePath, localBaseOrigin string) {
 // must not be a dangling "<provider>/" reference, and provider apiKey /
 // authHeader must reflect the proxy's actual vault token (when one is
 // known). Returns true when any change was applied.
-func normalizeOpenClawProviders(cfg map[string]interface{}, vaultToken, caBundlePath, localBaseOrigin string) bool {
+func normalizeOpenClawProviders(cfg map[string]interface{}, vaultToken, caBundlePath, localBaseOrigin, defaultOrigin string) bool {
 	modelsSection, ok := cfg["models"].(map[string]interface{})
 	if !ok {
 		return false
@@ -480,7 +507,7 @@ func normalizeOpenClawProviders(cfg map[string]interface{}, vaultToken, caBundle
 	if !ok {
 		return false
 	}
-	customURL, anthropicURL, googleURL := providerHealURLs(localBaseOrigin)
+	customURL, anthropicURL, googleURL := providerHealURLs(localBaseOrigin, defaultOrigin)
 	changed := false
 	// When the plain-HTTP companion is active (localBaseOrigin set) we use
 	// forceExactBaseURL so existing https://localhost: targets get rewritten
@@ -785,7 +812,7 @@ func forceExactBaseURL(providers map[string]interface{}, name, want string) bool
 // v0.2.39 token-auth gate before reaching an LLM, and OpenClaw silently
 // rotates to a fallback model that is not present locally. Heal rewrites
 // the same fields the main pass touches, idempotently.
-func healAgentSpecificModels(vaultToken, caBundlePath, localBaseOrigin string) {
+func healAgentSpecificModels(vaultToken, caBundlePath, localBaseOrigin, defaultOrigin string) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return
@@ -812,7 +839,7 @@ func healAgentSpecificModels(vaultToken, caBundlePath, localBaseOrigin string) {
 		if !ok {
 			continue
 		}
-		customURL, anthropicURL, googleURL := providerHealURLs(localBaseOrigin)
+		customURL, anthropicURL, googleURL := providerHealURLs(localBaseOrigin, defaultOrigin)
 		changed := false
 		if forceExactBaseURL(providers, "custom", customURL) {
 			changed = true
@@ -857,20 +884,26 @@ func healAgentSpecificModels(vaultToken, caBundlePath, localBaseOrigin string) {
 // fronted provider's baseUrl to this origin so same-host clients dodge
 // the self-signed-cert trust problem entirely. Empty preserves the
 // existing https://localhost:56244 targets.
-func runStartupOpenClawHeal(vaultToken, caBundlePath, localBaseOrigin string) {
+func runStartupOpenClawHeal(vaultToken, caBundlePath, localBaseOrigin, defaultOrigin string) {
 	go func() {
 		time.Sleep(750 * time.Millisecond)
-		healOpenClawConfig(vaultToken, caBundlePath, localBaseOrigin)
-		healAgentSpecificModels(vaultToken, caBundlePath, localBaseOrigin)
+		healOpenClawConfig(vaultToken, caBundlePath, localBaseOrigin, defaultOrigin)
+		healAgentSpecificModels(vaultToken, caBundlePath, localBaseOrigin, defaultOrigin)
 	}()
 }
 
 // providerHealURLs returns the per-provider baseUrl heal targets,
 // switching to the plain-HTTP companion origin when localBaseOrigin is
-// set. Default origin matches the v0.2.43+ behaviour
-// (https://localhost:56244).
-func providerHealURLs(localBaseOrigin string) (custom, anthropic, google string) {
-	origin := "https://localhost:56244"
+// set. defaultOrigin is the operator-configured proxy origin (scheme +
+// host + port) used when no companion is in play; an empty defaultOrigin
+// preserves the legacy v0.2.43 fallback (`https://localhost:56244`) so
+// callers that haven't been wired through to the new signature still
+// produce a sensible URL.
+func providerHealURLs(localBaseOrigin, defaultOrigin string) (custom, anthropic, google string) {
+	origin := defaultOrigin
+	if origin == "" {
+		origin = "https://localhost:56244"
+	}
 	if localBaseOrigin != "" {
 		origin = localBaseOrigin
 	}

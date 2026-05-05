@@ -406,10 +406,21 @@ func OpenAIRespToGemini(resp *OpenAIResponse) *GeminiResponse {
 		if reason == "" {
 			reason = "STOP"
 		}
+		// Reasoning-model fallback: qwen3.6, deepseek-r1, gpt-o1 family,
+		// and others sometimes emit only chain-of-thought in
+		// reasoning_content and leave content empty. Returning the empty
+		// string would surface as "AI 응답이 비어 들어왔습니다" downstream
+		// even though the backend produced output. Fall back to the
+		// reasoning text so the caller sees something useful and can
+		// decide whether to strip the chain-of-thought.
+		text := c.Message.Content
+		if text == "" && c.Message.ReasoningContent != "" {
+			text = c.Message.ReasoningContent
+		}
 		cand := GeminiCandidate{
 			Content: GeminiContent{
 				Role:  "model",
-				Parts: []GeminiPart{{Text: c.Message.Content}},
+				Parts: []GeminiPart{{Text: text}},
 			},
 			FinishReason: reason,
 			Index:        i,

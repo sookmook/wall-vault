@@ -38,8 +38,12 @@ func (s *Server) callAnthropicPassthrough(
 	byoAPIKey, byoBearer string,
 ) ([]byte, string, *localKey, error) {
 	if !strings.HasPrefix(model, "claude-") {
-		log.Printf("[anthropic] non-Claude model %q → fallback to claude-haiku-4-5", model)
-		model = "claude-haiku-4-5-20251001"
+		fb := s.cfg.Proxy.AnthropicFallbackModel
+		if fb == "" {
+			return nil, "", nil, fmt.Errorf("Anthropic 디스패치는 Claude 모델 ID 가 필요 (받음: %q). 라우팅을 확인하거나 proxy.anthropic_fallback_model 로 자동 치환을 옵트인하세요", model)
+		}
+		log.Printf("[anthropic] non-Claude model %q → fallback to %q (proxy.anthropic_fallback_model)", model, fb)
+		model = fb
 	}
 
 	// Build a sanitised copy: strip fields the upstream doesn't accept.
@@ -149,10 +153,17 @@ func (s *Server) callAnthropicPassthrough(
 }
 
 // callAnthropic: call Anthropic API directly using vault anthropic keys.
-// If `model` is not a Claude model, falls back to claude-haiku-4-5-20251001.
+// Returns an error when `model` is not a Claude id and the operator hasn't
+// opted into proxy.anthropic_fallback_model — silent rewrites burn
+// upstream credits on a model the caller never asked for.
 func (s *Server) callAnthropic(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
 	if !strings.HasPrefix(model, "claude-") {
-		model = "claude-haiku-4-5-20251001"
+		fb := s.cfg.Proxy.AnthropicFallbackModel
+		if fb == "" {
+			return nil, fmt.Errorf("Anthropic 디스패치는 Claude 모델 ID 가 필요 (받음: %q). 라우팅을 확인하거나 proxy.anthropic_fallback_model 로 자동 치환을 옵트인하세요", model)
+		}
+		log.Printf("[anthropic] non-Claude model %q → fallback to %q (proxy.anthropic_fallback_model)", model, fb)
+		model = fb
 	}
 
 	const maxAttempts = 3

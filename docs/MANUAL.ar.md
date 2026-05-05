@@ -1,931 +1,621 @@
 # دليل مستخدم wall-vault
-*(Last updated: 2026-04-16 — v0.2.2)*
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · **العربية** · [हिन्दी](MANUAL.hi.md) · [Bahasa Indonesia](MANUAL.id.md) · [ภาษาไทย](MANUAL.th.md) · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
 
-## جدول المحتويات
+يغطي هذا الدليل تثبيت wall-vault وتكوينه وتشغيله. للحصول على نظرة عامة سريعة، راجع [README](../README.md). لمعرفة تفاصيل HTTP API، راجع [API reference](API.md).
 
-1. [ما هو wall-vault؟](#ما-هو-wall-vault)
+## المحتويات
+
+1. [ما يفعله wall-vault](#ما-يفعله-wall-vault)
 2. [التثبيت](#التثبيت)
-3. [البداية الأولى (معالج الإعداد)](#البداية-الأولى)
-4. [تسجيل مفاتيح API](#تسجيل-مفاتيح-api)
-5. [استخدام الوكيل (proxy)](#استخدام-الوكيل)
-6. [لوحة تحكم خزنة المفاتيح](#لوحة-تحكم-خزنة-المفاتيح)
-7. [الوضع الموزع (متعدد البوتات)](#الوضع-الموزع-متعدد-البوتات)
-8. [إعداد التشغيل التلقائي](#إعداد-التشغيل-التلقائي)
-9. [Doctor — التشخيص](#doctor-التشخيص)
-10. [RTK — توفير التوكنات](#rtk-توفير-التوكنات)
-11. [مرجع متغيرات البيئة](#مرجع-متغيرات-البيئة)
-12. [حل المشكلات](#حل-المشكلات)
+3. [التشغيل الأول مع معالج الإعداد](#التشغيل-الأول-مع-معالج-الإعداد)
+4. [تفعيل TLS](#تفعيل-tls)
+5. [تسجيل مفاتيح API](#تسجيل-مفاتيح-api)
+6. [توصيل الوكلاء](#توصيل-الوكلاء)
+7. [لوحة التحكم](#لوحة-التحكم)
+8. [الوضع الموزع](#الوضع-الموزع)
+9. [التشغيل التلقائي](#التشغيل-التلقائي)
+10. [ملفات yaml للإضافات](#ملفات-yaml-للإضافات)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [متغيرات البيئة](#متغيرات-البيئة)
+14. [حل المشاكل](#حل-المشاكل)
 
 ---
 
-## ملاحظات ترقية v0.2
+## ما يفعله wall-vault
 
-- `Service` اكتسب `default_model` و `allowed_models`. يتم الآن تعيين النموذج الافتراضي لكل خدمة مباشرة على بطاقة الخدمة.
-- تمت إعادة تسمية `Client.default_service` و `default_model` وإعادة تفسيرهما باعتبارهما `preferred_service` و `model_override`. إذا كان التجاوز فارغاً، يتم استخدام النموذج الافتراضي للخدمة.
-- عند بدء التشغيل الأول للإصدار v0.2، يتم ترحيل ملف `vault.json` الموجود تلقائياً، ويتم الحفاظ على حالة ما قبل الترحيل باسم `vault.json.pre-v02.{timestamp}.bak`.
-- تمت إعادة هيكلة لوحة التحكم إلى ثلاث مناطق: شريط جانبي أيسر، وشبكة بطاقات في المركز، وشاشة تحرير منزلقة على الجانب الأيمن.
-- مسارات API الإدارية لم تتغير، لكن مخطط صيغة الطلب/الاستجابة تم تحديثه — سيحتاج البرنامج النصي القديم للسطر الأوامر إلى التحديث وفقاً لذلك.
+wall-vault هو ملف Go ثنائي واحد يجمع خدمتين متعاونتين:
 
----
+- **الخزنة (vault)** تخزن مفاتيح API مشفرة عند الراحة (AES-GCM بكلمة مرور رئيسية)، وتتتبع الاستخدام وفترات التهدئة لكل مفتاح، وتبث التغييرات عبر Server-Sent Events (SSE)، وتقدم لوحة تحكم ويب على `:56243` للمشغلين البشريين.
+- **الوسيط (proxy)** يعرض نقاط نهاية متوافقة مع Gemini و Anthropic و OpenAI، وكذلك Ollama الأصلية على `:56244`. أي عميل ذكاء اصطناعي يشير إلى الوسيط فإنه يستخدم المفاتيح الموجودة في الخزنة — لا يراها العملاء أبداً. عندما يفشل أحد المزودين، ينتقل التوزيع إلى المزود التالي بالترتيب.
 
-## الميزات الجديدة في v0.2.1
+هذا مفيد عندما:
 
-- **التمرير متعدد الوسائط (OpenAI → Gemini)**: أصبح `/v1/chat/completions` يقبل الآن ستة أنواع من أجزاء المحتوى بالإضافة إلى `text` — وهي `input_audio` و `input_video` و `input_image` و `input_file` و `image_url` (روابط data URIs وروابط http(s) الخارجية بحجم ≤ 5 ميغابايت). يقوم الوكيل بتحويل كل منها إلى `inlineData` الخاص بـ Gemini. يمكن للعملاء المتوافقين مع OpenAI مثل EconoWorld بث كتل الصوت / الصور / الفيديو مباشرةً.
-- **نوع الوكيل EconoWorld**: يقوم `POST /agent/apply` مع `agentType: "econoworld"` بكتابة إعدادات wall-vault في ملف `analyzer/ai_config.json` الخاص بالمشروع. يقبل `workDir` قائمة بمسارات مرشحة مفصولة بفواصل، ويحوّل مسارات أقراص Windows إلى مسارات تركيب `WSL`.
-- **شبكة المفاتيح في لوحة التحكم + عمليات CRUD**: يتم عرض 11 مفتاحاً كبطاقات مدمجة مع شاشة منزلقة للإضافة + والحذف ✕.
-- **إضافة الخدمات + إعادة الترتيب بالسحب والإفلات**: شبكة الخدمات تكتسب زر إضافة + ومقبض سحب (`⋮⋮`).
-- **استعادة الرأس / التذييل / الرسوم المتحركة للسمات / مبدّل اللغة**. تعمل السمات السبع (`cherry/dark/light/ocean/gold/autumn/winter`) بتأثير الجسيمات الخاص بها على طبقة خلف البطاقات ولكن فوق الخلفية.
-- **تجربة إغلاق الشاشة المنزلقة**: النقر خارجها أو الضغط على `Esc` يغلق الشاشة المنزلقة.
-- **مؤشر حالة `SSE` + مؤقت وقت التشغيل**: في الشريط العلوي (topbar)، بجانب محدد اللغة/السمة، يوجد عدّاد `⏱ وقت التشغيل` ومؤشر `● SSE` (أخضر = متصل، برتقالي = إعادة الاتصال، رمادي = غير متصل) جنباً إلى جنب (تم نقلهما من التذييل إلى الرأس منذ v0.2.18 — يمكن التحقق من الحالة دون تمرير).
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## ما هو wall-vault؟
-
-**wall-vault = وكيل ذكاء اصطناعي (proxy) + خزنة مفاتيح API لـ OpenClaw**
-
-لاستخدام خدمات الذكاء الاصطناعي، تحتاج إلى **مفاتيح API**. مفتاح API يشبه **بطاقة الدخول الرقمية** التي تثبت أن "هذا الشخص لديه صلاحية استخدام هذه الخدمة". لكن بطاقة الدخول هذه لها حد يومي للاستخدام، وهناك خطر التعرض إذا لم تُدار بشكل صحيح.
-
-يحفظ wall-vault بطاقات الدخول هذه في خزنة آمنة ويعمل كـ **وكيل (proxy)** بين OpenClaw وخدمات الذكاء الاصطناعي. ببساطة، يحتاج OpenClaw فقط إلى الاتصال بـ wall-vault، والباقي يتولاه wall-vault.
-
-المشكلات التي يحلها wall-vault:
-
-- **التدوير التلقائي لمفاتيح API**: عندما يصل استخدام مفتاح إلى الحد أو يُحظر مؤقتاً (cooldown)، ينتقل بصمت إلى المفتاح التالي. يستمر OpenClaw في العمل دون انقطاع.
-- **التبديل التلقائي للخدمة (fallback)**: إذا لم يستجب Google، ينتقل إلى OpenRouter؛ وإذا لم ينجح ذلك أيضاً، ينتقل تلقائياً إلى Ollama أو LM Studio أو vLLM (ذكاء اصطناعي محلي) المثبت على جهازك. لا تنقطع الجلسة. عندما تتعافى الخدمة الأصلية، يعود تلقائياً من الطلب التالي (v0.1.18+، LM Studio/vLLM: v0.1.21+).
-- **المزامنة في الوقت الفعلي (SSE)**: عند تغيير النموذج في لوحة تحكم الخزنة، ينعكس التغيير على شاشة OpenClaw خلال 1-3 ثوانٍ. SSE (Server-Sent Events) هي تقنية يدفع فيها الخادم التحديثات في الوقت الفعلي إلى العميل.
-- **الإشعارات في الوقت الفعلي**: أحداث مثل نفاد المفاتيح أو أعطال الخدمة تظهر فوراً في أسفل واجهة TUI (شاشة الطرفية) لـ OpenClaw.
-
-> 💡 يمكن أيضاً توصيل **Claude Code وCursor وVS Code**، لكن الغرض الأساسي لـ wall-vault هو الاستخدام مع OpenClaw.
+- لديك مفاتيح لعدة مزودين وتريد عنوان URL واحدًا يتحدث إليه الوكيل.
+- تريد أن يتنحى مفتاح المستوى المجاني الموجود في فترة تهدئة دون كسر الجلسة.
+- تريد أن تشغل نفس المفاتيح روبوتات متعددة أو IDEs أو سكربتات على نفس LAN دون نسخ الاعتمادات.
+- تريد لوحة تحكم، وليس متغيرات بيئة، لتحرير المفاتيح وتبديل النماذج.
+- تريد بديلاً محلياً (Ollama، LM Studio، vLLM) عند نفاد حدود السحابة.
 
 ```
-OpenClaw (شاشة TUI للطرفية)
-        │
-        ▼
-  وكيل wall-vault (:56244)   ← إدارة المفاتيح، التوجيه، الـ fallback، الأحداث
-        │
-        ├─ Google Gemini API
-        ├─ OpenRouter API (أكثر من 340 نموذجاً)
-        ├─ Ollama / LM Studio / vLLM (جهازك، الملاذ الأخير)
-        └─ OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
 ## التثبيت
 
-### Linux / macOS
-
-افتح الطرفية والصق الأوامر التالية:
+### سطر واحد لـ Linux / macOS
 
 ```bash
-# Linux (حاسوب عادي، خادم — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (ماك M1/M2/M3)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — يُنزّل الملف من الإنترنت.
-- `chmod +x` — يجعل الملف المُنزّل "قابلاً للتنفيذ". إذا تخطيت هذه الخطوة، سيظهر خطأ "رفض الإذن".
+يكتشف السكربت تلقائياً نظام التشغيل والمعمارية، وينزل الملف الثنائي الصحيح إلى `~/.local/bin/wall-vault`، ويجعله قابلاً للتنفيذ. إذا لم يكن `~/.local/bin` موجوداً في `PATH`، أضفه:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### التنزيل اليدوي
+
+تُنشر الملفات الثنائية المُجمَّعة مسبقاً في كل إصدار على `https://github.com/sookmook/wall-vault/releases`.
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-افتح PowerShell (كمسؤول) ونفّذ:
-
 ```powershell
-# التنزيل
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# إضافة إلى PATH (يُطبّق بعد إعادة تشغيل PowerShell)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> 💡 **ما هو PATH؟** هو قائمة المجلدات التي يبحث فيها الحاسوب عن الأوامر. بإضافته إلى PATH، يمكنك تشغيل `wall-vault` من أي مجلد.
+### البناء من المصدر
 
-### البناء من الكود المصدري (للمطورين)
-
-ينطبق فقط إذا كانت بيئة تطوير Go مثبتة لديك.
+يتطلب Go 1.25 أو أحدث.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (الإصدار: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> 💡 **إصدار مع طابع زمني للبناء**: عند البناء بـ `make build`، يُولّد الإصدار تلقائياً بصيغة `v0.1.27.20260409` متضمناً التاريخ والوقت. إذا بنيت مباشرة بـ `go build ./...`، سيظهر الإصدار كـ `"dev"` فقط.
+`make build-all` يقوم بالتجميع المتقاطع لجميع المنصات الخمس المدعومة. تظهر الملفات الثنائية في `bin/`.
 
 ---
 
-## البداية الأولى
-
-### تشغيل معالج الإعداد
-
-بعد التثبيت، يجب تشغيل **معالج الإعداد** بالأمر التالي. سيرشدك المعالج بسؤالك عن كل عنصر مطلوب واحداً تلو الآخر.
+## التشغيل الأول مع معالج الإعداد
 
 ```bash
 wall-vault setup
 ```
 
-الخطوات التي يمر بها المعالج:
+يطلب منك المعالج، بالترتيب:
 
-```
-1. اختيار اللغة (10 لغات بما فيها العربية)
-2. اختيار السمة (light / dark / gold / cherry / ocean)
-3. وضع التشغيل — الاستخدام الفردي (standalone) أو المشترك عبر عدة أجهزة (distributed)
-4. اسم البوت — الاسم الذي سيظهر في لوحة التحكم
-5. إعداد المنافذ — افتراضياً: الوكيل 56244، الخزنة 56243 (اضغط Enter إذا لم ترد التغيير)
-6. اختيار خدمات الذكاء الاصطناعي — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. إعداد فلتر أدوات الأمان
-8. رمز المسؤول — كلمة مرور لقفل وظائف الإدارة في لوحة التحكم. التوليد التلقائي متاح
-9. كلمة مرور تشفير مفاتيح API — لتخزين المفاتيح بأمان أكبر (اختياري)
-10. مسار حفظ ملف الإعدادات
-```
+1. **اللغة** — يختار واحدة من 17 لغة لواجهة المستخدم. يتم اكتشافها تلقائياً من `$LANG`؛ ومع ذلك يقدم المعالج قائمة.
+2. **المظهر (Theme)** — `light` (الافتراضي)، `dark`، `cherry`، `ocean`، `gold`، `autumn`، `winter`. للتجميل فقط.
+3. **الوضع** — `standalone` (مضيف واحد، الافتراضي) أو `distributed` (الخزنة على مضيف واحد، الوسطاء على آخرين).
+4. **اسم الروبوت** — معرف `client_id` على شكل slug حر. تستخدم الخزنة هذا لتحديد نطاق التكوين لكل عميل (تجاوزات النموذج، سلاسل التراجع).
+5. **منفذ الوسيط** — الافتراضي `56244`.
+6. **منفذ الخزنة** — الافتراضي `56243` (للوضع المستقل فقط).
+7. **اختيار الخدمة** — y/N لكل من: Google Gemini، OpenRouter، Anthropic، OpenAI، Ollama، LM Studio، vLLM. الاختيارات المتعددة مقبولة؛ كل واحدة تكتب تلميح متغير البيئة الخاص بها في النهاية.
+8. **مرشح الأدوات** — `strip_all` (الافتراضي؛ يحظر جميع تعريفات الأدوات الواردة لأغراض الأمان) أو `passthrough` (السماح بمرور أي أداة).
+9. **رمز المسؤول** — اتركه فارغاً للتوليد التلقائي. تتطلب لوحة التحكم هذا الرمز لتسجيل الدخول.
+10. **كلمة المرور الرئيسية** — اتركها فارغة لعدم التشفير (غير مُوصى به)؛ عيِّن قيمة لتشفير AES-GCM لمخزن المفاتيح عند الراحة.
+11. **مسار الحفظ** — يكون افتراضياً `wall-vault.yaml` في المجلد الحالي. ينظر المُحمِّل أيضاً في `~/.wall-vault/config.yaml`.
 
-> ⚠️ **تذكّر رمز المسؤول.** ستحتاجه لاحقاً لإضافة مفاتيح أو تغيير الإعدادات في لوحة التحكم. إذا نسيته، ستحتاج إلى تعديل ملف الإعدادات يدوياً.
+بعد الحفظ، يقوم المعالج بتشغيل `doctor.FixTrust` بحيث يحصل أي وكيل مثبت محلياً (OpenClaw، Claude Code، Cline) تلقائياً على CA الداخلي لـ wall-vault مضافاً إلى مخزن الثقة الخاص به. إذا لم يكن أي وكيل من هذا القبيل مثبتاً، تطبع الخطوة `SKIP` ولا تكتب شيئاً.
 
-عند إكمال المعالج، سيُنشأ ملف الإعدادات `wall-vault.yaml` تلقائياً.
-
-### التشغيل
+ثم ابدأ تشغيل الملف الثنائي:
 
 ```bash
 wall-vault start
 ```
 
-يبدأ خادمان في وقت واحد:
+`start` يشغل كلاً من الخزنة والوسيط في عملية واحدة (الوضع المستقل). للوضع الموزع استخدم `wall-vault vault` على مضيف الخزنة و `wall-vault proxy` على كل مضيف وسيط.
 
-- **الوكيل** (`https://localhost:56244`) — وسيط بين OpenClaw وخدمات الذكاء الاصطناعي
-- **خزنة المفاتيح** (`https://localhost:56243`) — إدارة مفاتيح API ولوحة تحكم ويب
+افتح `http://localhost:56243` في المتصفح. سجِّل الدخول برمز المسؤول الذي طبعه المعالج.
 
-افتح `https://localhost:56243` في المتصفح للوصول إلى لوحة التحكم.
+---
+
+## تفعيل TLS
+
+تترك الإعدادات الافتراضية للمعالج كلا المُستمعَين على HTTP عادي. تعمل معظم الوكلاء (OpenClaw، Claude Code، Cursor) بشكل أفضل مقابل نقطة نهاية HTTPS واحدة، لذا يُوصى باستخدام TLS في أي توزيع يمتد إلى أكثر من الجهاز المحلي.
+
+يأتي wall-vault مع CA داخلي خاص به، لذا لا تحتاج إلى اسم DNS عام أو Let's Encrypt.
+
+```bash
+# 1. Create the internal CA — written to ~/.wall-vault/ca.{crt,key}.
+#    The CA is good for 10 years by default; override with --ca-years.
+wall-vault cert init
+
+# 2. Issue a host certificate. Subject Alternative Names automatically include:
+#       hostname, "localhost", "127.0.0.1", and any non-loopback LAN IP detected.
+#    Override the issuer dir with --dir, validity with --host-years.
+wall-vault cert issue $(hostname)
+
+# 3. Trust the CA in this machine's OS keychain.
+#    Linux: writes to /etc/ssl/certs/ via update-ca-certificates (needs sudo).
+#    macOS: adds to the System keychain via security add-trusted-cert (needs sudo).
+#    Windows: imports into CurrentUser\Root via certutil (no admin needed).
+wall-vault cert install-trust
+
+# 4. Enable TLS on both listeners.
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
+wall-vault start
+```
+
+لتمديد الثقة إلى أجهزة LAN أخرى، انسخ `~/.wall-vault/ca.crt` وقم بتشغيل `wall-vault cert install-trust --ca <path>` على كل واحدة. تعرض الخزنة أيضاً `ca.crt` عبر مُستمع HTTP عادي صغير على `:56247` (**منفذ التمهيد**) لحالة catch-22 حيث يحتاج عميل جديد إلى CA للتحدث عبر HTTPS.
+
+### رفيق HTTP loopback
+
+بعض الوكلاء — لا سيما وقت تشغيل Node المرفق مع OpenClaw — تعيد كتابة `NODE_EXTRA_CA_CERTS` عند إنشاء العملية، مما يسقط أي تلميح CA قدمه المشغل. لا يمكنها احترام CA الخاص بـ wall-vault من داخل الـ daemon، حتى بعد `cert install-trust`. يحل wall-vault هذه المشكلة من خلال ربط **مُستمع HTTP عادي خاص بـ loopback فقط** على `127.0.0.1:56245` كلما تم تمكين TLS. يصل العملاء على نفس المضيف إلى الوسيط من خلال هذا المنفذ دون TLS على الإطلاق؛ بينما تستمر عملاء LAN في استخدام مُستمع TLS.
+
+عطّله بـ `WV_PROXY_PLAIN_PORT=0` إذا لم تكن بحاجة إليه.
+
+### `wall-vault cert list`
+
+يعرض كل شهادة تحت `~/.wall-vault/` مع الموضوع ونافذة الصلاحية وأسماء SANs.
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
+```
 
 ---
 
 ## تسجيل مفاتيح API
 
-هناك أربع طرق لتسجيل مفاتيح API. **للمبتدئين، نوصي بالطريقة 1 (متغيرات البيئة)**.
+طريقتان: لوحة التحكم، أو متغيرات البيئة.
 
-### الطريقة 1: متغيرات البيئة (موصى بها — الأبسط)
+### لوحة التحكم (مُوصى بها)
 
-متغيرات البيئة هي **قيم مُعدّة مسبقاً** يقرأها البرنامج عند بدء التشغيل. اكتب في الطرفية:
+1. سجل الدخول على `https://localhost:56243` برمز المسؤول.
+2. انقر **+ API key** في بطاقة المفاتيح.
+3. اختر خدمة (Google، OpenRouter، Anthropic، OpenAI، …).
+4. الصق المفتاح. احفظ.
+
+مفاتيح متعددة لكل خدمة جيدة؛ يقوم الوسيط بالتدوير بينها ويتخطى تلك التي وصلت إلى فترة تهدئة لكل مفتاح.
+
+### متغيرات البيئة (تمهيد لمرة واحدة)
 
 ```bash
-# تسجيل مفتاح Google Gemini
-export WV_KEY_GOOGLE=AIzaSy...
-
-# تسجيل مفتاح OpenRouter
-export WV_KEY_OPENROUTER=sk-or-v1-...
-
-# التشغيل بعد التسجيل
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
 wall-vault start
 ```
 
-إذا كان لديك عدة مفاتيح، افصلها بفاصلة (,). سيستخدمها wall-vault تلقائياً بالتناوب (round-robin):
+تكتب المفاتيح المقدمة بهذه الطريقة في المخزن المشفر عند أول تشغيل. تقرأ التشغيلات اللاحقة هذه من القرص؛ يمكنك إلغاء تعيين متغيرات البيئة بعد التشغيل الأول.
+
+### فترات التهدئة والتدوير
+
+كل مكالمة ناجحة تزيد `usage_count` للمفتاح وتحدّث `last_used`. عند HTTP 429 / 402 / 403، يضع الوسيط المفتاح في **فترة تهدئة** (الافتراضيات: 60 دقيقة لـ 429، و24 ساعة لـ 402، و12 ساعة لـ 403). ينتقي التوزيع التالي مفتاحاً مختلفاً لتلك الخدمة. عندما تكون جميع مفاتيح الخدمة في فترة تهدئة، يتخطى الوسيط تلك الخدمة بسرعة بالكامل ويحاول المزود التالي في سلسلة التراجع.
+
+تكون فترات التهدئة مرئية لكل مفتاح في لوحة التحكم مع عدّ تنازلي.
+
+---
+
+## توصيل الوكلاء
+
+### OpenClaw
+
+OpenClaw هو العميل المستهدف الأصلي. استخدم النافذة المنبثقة **+ Add agent** في لوحة التحكم:
+
+- عيّن **Agent type** إلى `openclaw` أو `nanoclaw`.
+- عيّن **Work directory** — لـ OpenClaw يتم ملؤه تلقائياً كـ `~/.openclaw`.
+- اختر **preferred service** واختياريا **model override**.
+- انقر **Apply**. يكتب wall-vault `~/.openclaw/openclaw.json` مباشرة (عناوين URL للمزود، رمز الخزنة، إدخالات النموذج).
+
+عندما تغير النموذج من لوحة التحكم، يلتقط OpenClaw التغيير عبر SSE في غضون 1-3 ثوانٍ — دون إعادة تشغيل.
+
+### Claude Code
 
 ```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
 ```
 
-> 💡 **نصيحة**: أمر `export` ينطبق فقط على جلسة الطرفية الحالية. لجعله دائماً بعد إعادة تشغيل الحاسوب، أضف السطر إلى ملف `~/.bashrc` أو `~/.zshrc`.
+عندما ينفد رصيد Anthropic الأعلى، يتراجع التوزيع إلى أي خدمات مدرجة في `fallback_services` لهذا العميل. افتراضياً، يُرجع معرف نموذج غير Claude مرسل إلى توزيع anthropic خطأ بحيث يظهر التوجيه الخاطئ على الفور. اختر الكتابة التلقائية:
 
-### الطريقة 2: واجهة لوحة التحكم (بالنقر بالماوس)
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
 
-1. افتح `https://localhost:56243` في المتصفح
-2. في بطاقة **🔑 مفاتيح API** في الأعلى، انقر زر `[+ إضافة]`
-3. أدخل نوع الخدمة وقيمة المفتاح والتسمية (اسم للمرجع) والحد اليومي، ثم احفظ
+### Cursor
 
-### الطريقة 3: REST API (للأتمتة/السكربتات)
+في **Settings → AI → OpenAI API** الخاص بـ Cursor:
 
-REST API هي طريقة لتبادل البيانات بين البرامج عبر HTTP. مفيدة للتسجيل التلقائي عبر سكربت.
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### HTTP مخصص
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer رمز_المسؤول" \
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "المفتاح الرئيسي",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### الطريقة 4: علم الوكيل (للاختبار السريع)
+تقبل نقطة النهاية نفسها التدفق (`"stream": true`) عند تعيين `proxy.oai_stream_forward: true`.
 
-لاختبار مؤقت بمفتاح دون تسجيل رسمي. يختفي المفتاح عند إنهاء البرنامج.
+---
+
+## لوحة التحكم
+
+`https://localhost:56243`. خمس بطاقات على شبكة الصفحة الرئيسية:
+
+- **Keys** — كل مفتاح API، مجموع حسب الخدمة. أضف، حرر، احذف؛ شاهد الاستخدام وفترة التهدئة.
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp، بالإضافة إلى أي ملف yaml إضافي في `~/.wall-vault/services/`. عيّن `default_model`، `allowed_models`، عنوان URL الأساسي، تبديل التفكير لكل خدمة.
+- **Clients (agents)** — كل عميل مسجل (روبوت OpenClaw، جلسة Claude Code، نسخة Cursor، …). عيّن الخدمة المفضلة، تجاوز النموذج، سلسلة التراجع.
+- **Proxies** — كل وسيط تم مصادقته على هذه الخزنة. الحالة الحية (online/offline)، آخر ظهور، النموذج الحالي.
+- **Settings** — رمز المسؤول، تدوير كلمة المرور الرئيسية، المظهر، اللغة.
+
+كل بطاقة لها slideover للتحرير (الجانب الأيمن). النقر خارجاً أو `Esc` يغلقه. تُدفع التغييرات إلى جميع الوسطاء المتصلين عبر SSE في غضون ثوانٍ.
+
+يحمل **التذييل** مؤشر SSE (أخضر = متصل، برتقالي = إعادة الاتصال، رمادي = غير متصل) وإصدار البناء الحي.
+
+---
+
+## الوضع الموزع
+
+عندما يكون لديك عدة أجهزة كلها تحتاج إلى نفس المفاتيح، شغّل الخزنة على مضيف واحد والوسطاء على كل من البقية.
+
+### مضيف الخزنة
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## استخدام الوكيل
-
-### الاستخدام مع OpenClaw (الغرض الرئيسي)
-
-إليك كيفية إعداد OpenClaw للاتصال بخدمات الذكاء الاصطناعي عبر wall-vault.
-
-افتح ملف `~/.openclaw/openclaw.json` وأضف المحتوى التالي:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // رمز وكيل الخزنة
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // سياق 1M مجاني
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> 💡 **طريقة أسهل**: انقر زر **🦞 نسخ إعدادات OpenClaw** في بطاقة الوكيل بلوحة التحكم. سيُنسخ مقتطف بالرمز والعنوان مملوءين بالفعل إلى الحافظة. فقط قم باللصق.
-
-**إلى أين يوجّه البادئة `wall-vault/` في اسم النموذج؟**
-
-يحدد wall-vault تلقائياً إلى أي خدمة ذكاء اصطناعي يُرسل الطلب بناءً على اسم النموذج:
-
-| صيغة النموذج | الخدمة المتصلة |
-|----------|--------------|
-| `wall-vault/gemini-*` | اتصال مباشر بـ Google Gemini |
-| `wall-vault/gpt-*`، `wall-vault/o3`، `wall-vault/o4*` | اتصال مباشر بـ OpenAI |
-| `wall-vault/claude-*` | Anthropic عبر OpenRouter |
-| `wall-vault/hunter-alpha`، `wall-vault/healer-alpha` | OpenRouter (مليون توكن سياق مجاني) |
-| `wall-vault/kimi-*`، `wall-vault/glm-*`، `wall-vault/deepseek-*` | اتصال عبر OpenRouter |
-| `google/اسم_النموذج`، `openai/اسم_النموذج`، `anthropic/اسم_النموذج` إلخ | اتصال مباشر بالخدمة المقابلة |
-| `custom/google/اسم_النموذج`، `custom/openai/اسم_النموذج` إلخ | يُزيل البادئة `custom/` ويعيد التوجيه |
-| `اسم_النموذج:cloud` | يُزيل اللاحقة `:cloud` ويتصل عبر OpenRouter |
-
-> 💡 **ما هو السياق (context)؟** هو حجم المحادثة الذي يمكن للذكاء الاصطناعي "تذكره" دفعة واحدة. 1M (مليون توكن) يعني أنه يمكن معالجة محادثات طويلة جداً أو مستندات كبيرة دفعة واحدة.
-
-### الاتصال المباشر بصيغة Gemini API (التوافق مع الأدوات الحالية)
-
-إذا كان لديك أداة تستخدم Google Gemini API مباشرة، فقط غيّر العنوان إلى wall-vault:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-أو إذا كانت الأداة تحدد URL مباشرة:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### الاستخدام مع OpenAI SDK (Python)
-
-يمكنك توصيل wall-vault في كود Python الذي يستخدم الذكاء الاصطناعي. فقط غيّر `base_url`:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # wall-vault يدير مفاتيح API تلقائياً
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # صيغة provider/model
-    messages=[{"role": "user", "content": "مرحباً"}]
-)
-```
-
-### تغيير النموذج أثناء التشغيل
-
-لتغيير نموذج الذكاء الاصطناعي مع wall-vault قيد التشغيل:
-
-```bash
-# تغيير النموذج بطلب مباشر للوكيل
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# في الوضع الموزع (متعدد البوتات)، غيّر من خادم الخزنة → ينعكس فوراً عبر SSE
-curl -X PUT https://localhost:56243/admin/clients/معرّف-البوت \
-  -H "Authorization: Bearer رمز_المسؤول" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### التحقق من النماذج المتاحة
-
-```bash
-# عرض القائمة الكاملة
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# عرض نماذج Google فقط
-curl "https://localhost:56244/api/models?service=google"
-
-# البحث بالاسم (مثال: نماذج تحتوي على "claude")
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**ملخص النماذج الرئيسية حسب الخدمة:**
-
-| الخدمة | النماذج الرئيسية |
-|--------|----------|
-| Google | gemini-2.5-pro، gemini-2.5-flash، gemini-2.5-flash-8b، gemini-2.0-flash |
-| OpenAI | gpt-4o، gpt-4o-mini، o3، o1، o1-mini |
-| OpenRouter | أكثر من 346 (Hunter Alpha سياق 1M مجاني، DeepSeek R1/V3، Qwen 2.5 إلخ) |
-| Ollama | كشف تلقائي للخوادم المحلية المثبتة على جهازك |
-| LM Studio | خادم محلي على جهازك (المنفذ 1234) |
-| vLLM | خادم محلي على جهازك (المنفذ 8000) |
-| llama.cpp | خادم محلي على جهازك (المنفذ 8080) |
-
----
-
-## لوحة تحكم خزنة المفاتيح
-
-افتح `https://localhost:56243` في المتصفح لرؤية لوحة التحكم.
-
-**تخطيط الشاشة:**
-- **الشريط العلوي الثابت (topbar)**: الشعار، محدد اللغة/السمة، مؤشر اتصال SSE
-- **شبكة البطاقات**: بطاقات الوكلاء والخدمات ومفاتيح API مرتبة كبلاطات
-
-### بطاقة مفاتيح API
-
-بطاقة لإدارة جميع مفاتيح API المسجلة بنظرة واحدة.
-
-- تعرض قائمة المفاتيح مصنفة حسب الخدمة.
-- `today_usage`: التوكنات المعالجة بنجاح اليوم (عدد الأحرف التي قرأها وكتبها الذكاء الاصطناعي)
-- `today_attempts`: إجمالي عدد الاستدعاءات اليوم (نجاح + فشل)
-- زر `[+ إضافة]` لتسجيل مفاتيح جديدة، و `✕` لحذف المفاتيح.
-
-> 💡 **ما هو التوكن (token)؟** هو الوحدة التي يستخدمها الذكاء الاصطناعي لمعالجة النص. يعادل تقريباً كلمة واحدة بالإنجليزية، أو 1-2 حرف بالعربية. عادةً ما يُحسب سعر API بناءً على عدد التوكنات.
-
-### بطاقة الوكلاء
-
-بطاقة تعرض حالة البوتات (الوكلاء) المتصلة بوكيل wall-vault.
-
-**حالة الاتصال تُعرض في 4 مستويات:**
-
-| المؤشر | الحالة | المعنى |
-|------|------|------|
-| 🟢 | قيد التشغيل | الوكيل يعمل بشكل طبيعي |
-| 🟡 | تأخير | يستجيب لكن ببطء |
-| 🔴 | غير متصل | الوكيل لا يستجيب |
-| ⚫ | غير متصل/معطّل | الوكيل لم يتصل بالخزنة أبداً أو معطّل |
-
-**دليل الأزرار في أسفل بطاقة الوكيل:**
-
-عند تسجيل وكيل، إذا حددت **نوع الوكيل**، ستظهر أزرار الراحة المناسبة تلقائياً.
-
----
-
-#### 🔘 زر نسخ الإعدادات — ينشئ إعدادات الاتصال تلقائياً
-
-عند النقر على الزر، يُنسخ مقتطف إعدادات بالرمز وعنوان الوكيل ومعلومات النموذج مملوءة بالفعل إلى الحافظة. فقط الصقه في الموقع المشار إليه في الجدول أدناه لإكمال الإعداد.
-
-| الزر | نوع الوكيل | مكان اللصق |
-|------|-------------|-------------|
-| 🦞 نسخ إعدادات OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 نسخ إعدادات NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 نسخ إعدادات Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⌨ نسخ إعدادات Cursor | `cursor` | Cursor → Settings → AI |
-| 💻 نسخ إعدادات VSCode | `vscode` | `~/.continue/config.json` |
-
-**مثال — لنوع Claude Code، يُنسخ هذا المحتوى:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "رمز-هذا-الوكيل"
-}
-```
-
-**مثال — لنوع VSCode (Continue):**
-
-```yaml
-# ~/.continue/config.yaml  ← الصق في config.yaml وليس config.json
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: رمز-هذا-الوكيل
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> ⚠️ **الإصدارات الأحدث من Continue تستخدم `config.yaml`.** إذا وُجد `config.yaml`، يُتجاهل `config.json` تماماً. تأكد من اللصق في `config.yaml`.
-
-**مثال — لنوع Cursor:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : رمز-هذا-الوكيل
-
-// أو متغيرات البيئة:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=رمز-هذا-الوكيل
-```
-
-> ⚠️ **إذا لم تعمل النسخ إلى الحافظة**: قد تمنع سياسة أمان المتصفح النسخ. إذا ظهرت نافذة منبثقة بمربع نص، حدد الكل بـ Ctrl+A وانسخ بـ Ctrl+C.
-
----
-
-#### ⚡ زر التطبيق التلقائي — نقرة واحدة وينتهي الإعداد
-
-لأنواع الوكلاء `cline` و`claude-code` و`openclaw` و`nanoclaw`، تعرض بطاقة الوكيل زر **⚡ تطبيق الإعدادات**. عند النقر عليه، يُحدّث ملف الإعدادات المحلي للوكيل تلقائياً.
-
-| الزر | نوع الوكيل | الملف المستهدف |
-|------|-------------|-------------|
-| ⚡ تطبيق إعدادات Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ تطبيق إعدادات Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⚡ تطبيق إعدادات OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ تطبيق إعدادات NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> ⚠️ هذا الزر يُرسل طلبات إلى **localhost:56244** (الوكيل المحلي). يجب أن يكون الوكيل قيد التشغيل على ذلك الجهاز ليعمل.
-
----
-
-#### 🔀 ترتيب البطاقات بالسحب والإفلات (v0.1.17، محسّن v0.1.25)
-
-يمكنك **سحب** بطاقات الوكلاء في لوحة التحكم لإعادة ترتيبها حسب رغبتك.
-
-1. أمسك واسحب منطقة **إشارة المرور (●)** في أعلى يسار البطاقة
-2. أفلتها فوق البطاقة في الموضع المطلوب لتبديل الترتيب
-
-> 💡 لا يمكن سحب محتوى البطاقة (حقول الإدخال، الأزرار، إلخ). يمكن الإمساك فقط من منطقة إشارة المرور.
-
-#### 🟠 كشف عملية الوكيل (v0.1.25)
-
-عندما يعمل الوكيل بشكل طبيعي لكن عملية الوكيل المحلي (NanoClaw، OpenClaw) توقفت، تتحول إشارة مرور البطاقة إلى **برتقالي (وامض)** وتعرض رسالة "توقفت عملية الوكيل".
-
-- 🟢 أخضر: الوكيل + البوت طبيعيان
-- 🟠 برتقالي (وامض): الوكيل طبيعي، البوت متوقف
-- 🔴 أحمر: الوكيل غير متصل
-3. يُحفظ الترتيب المتغير **فوراً على الخادم** ويستمر حتى بعد تحديث الصفحة
-
-> 💡 على أجهزة اللمس (الجوال/التابلت)، هذه الميزة غير مدعومة بعد. استخدم متصفح سطح المكتب.
-
----
-
-#### 🔄 مزامنة النماذج ثنائية الاتجاه (v0.1.16)
-
-عند تغيير نموذج وكيل في لوحة تحكم الخزنة، تُحدّث إعدادات ذلك الوكيل المحلية تلقائياً.
-
-**لـ Cline:**
-- تغيير النموذج في الخزنة → حدث SSE → الوكيل يُحدّث حقل النموذج في `globalState.json`
-- الحقول المُحدّثة: `actModeOpenAiModelId`، `planModeOpenAiModelId`، `openAiModelId`
-- لا يُعدّل `openAiBaseUrl` ومفتاح API
-- **يلزم إعادة تحميل VS Code (`Ctrl+Alt+R` أو `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - لأن Cline لا يعيد قراءة ملف الإعدادات أثناء التشغيل
-
-**لـ Claude Code:**
-- تغيير النموذج في الخزنة → حدث SSE → الوكيل يُحدّث حقل `model` في `settings.json`
-- بحث تلقائي في مسارات WSL وWindows (`~/.claude/`، `/mnt/c/Users/*/.claude/`)
-
-**الاتجاه المعاكس (الوكيل → الخزنة):**
-- عندما يُرسل وكيل (Cline، Claude Code، إلخ) طلباً للوكيل، يُضمّن الوكيل معلومات الخدمة/النموذج لذلك العميل في heartbeat
-- تعرض بطاقة الوكيل في لوحة تحكم الخزنة الخدمة/النموذج المستخدمين حالياً في الوقت الفعلي
-
-> 💡 **النقطة الجوهرية**: يُحدد الوكيل هوية الوكيل برمز Authorization في الطلب ويوجّه تلقائياً إلى الخدمة/النموذج المُعدّين في الخزنة. حتى لو أرسل Cline أو Claude Code اسم نموذج مختلفاً، يتجاوزه الوكيل بإعدادات الخزنة.
-
----
-
-### استخدام Cline في VS Code — دليل مفصّل
-
-#### الخطوة 1: تثبيت Cline
-
-ثبّت **Cline** (المعرف: `saoudrizwan.claude-dev`) من سوق ملحقات VS Code.
-
-#### الخطوة 2: تسجيل الوكيل في الخزنة
-
-1. افتح لوحة تحكم الخزنة (`http://عنوان_الخزنة:56243`)
-2. في قسم **الوكلاء**، انقر **+ إضافة**
-3. أدخل التالي:
-
-| الحقل | القيمة | الوصف |
-|------|----|------|
-| المعرّف | `my_cline` | معرّف فريد (أحرف إنجليزية بدون مسافات) |
-| الاسم | `Cline الخاص بي` | الاسم المعروض في لوحة التحكم |
-| نوع الوكيل | `cline` | ← يجب اختيار `cline` |
-| الخدمة | اختر الخدمة (مثال: `google`) | |
-| النموذج | أدخل النموذج (مثال: `gemini-2.5-flash`) | |
-
-4. عند النقر على **حفظ**، يُولّد الرمز تلقائياً
-
-#### الخطوة 3: الاتصال بـ Cline
-
-**الطريقة أ — التطبيق التلقائي (موصى بها)**
-
-1. تأكد من تشغيل **وكيل** wall-vault على هذا الجهاز (`localhost:56244`)
-2. انقر زر **⚡ تطبيق إعدادات Cline** في بطاقة الوكيل بلوحة التحكم
-3. نجاح عند ظهور إشعار "تم تطبيق الإعدادات بنجاح!"
-4. أعد تحميل VS Code (`Ctrl+Alt+R`)
-
-**الطريقة ب — الإعداد اليدوي**
-
-في الشريط الجانبي لـ Cline، افتح الإعدادات (⚙️):
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://عنوان_الوكيل:56244/v1`
-  - على نفس الجهاز: `https://localhost:56244/v1`
-  - على جهاز آخر (مثل خادم Mini): `http://192.168.1.20:56244/v1`
-- **API Key**: الرمز الصادر من الخزنة (انسخه من بطاقة الوكيل)
-- **Model ID**: النموذج المُعدّ في الخزنة (مثال: `gemini-2.5-flash`)
-
-#### الخطوة 4: التحقق
-
-أرسل أي رسالة في نافذة دردشة Cline. إذا كان يعمل:
-- ستظهر **نقطة خضراء (● قيد التشغيل)** في بطاقة الوكيل بلوحة تحكم الخزنة
-- ستعرض البطاقة الخدمة/النموذج الحاليين (مثال: `google / gemini-2.5-flash`)
-
-#### تغيير النموذج
-
-لتغيير نموذج Cline، غيّره من **لوحة تحكم الخزنة**:
-
-1. غيّر القائمة المنسدلة للخدمة/النموذج في بطاقة الوكيل
-2. انقر **تطبيق**
-3. أعد تحميل VS Code (`Ctrl+Alt+R`) — سيُحدّث اسم النموذج في تذييل Cline
-4. سيُستخدم النموذج الجديد من الطلب التالي
-
-> 💡 فعلياً، يُحدد الوكيل طلبات Cline بالرمز ويوجّهها إلى النموذج المُعدّ في الخزنة. حتى بدون إعادة تحميل VS Code، **يتغير النموذج المستخدم فعلاً فوراً** — إعادة التحميل لتحديث عرض النموذج في واجهة Cline فقط.
-
-#### كشف انقطاع الاتصال
-
-عند إغلاق VS Code، تتحول بطاقة الوكيل في لوحة التحكم إلى أصفر (تأخير) بعد حوالي **90 ثانية** وإلى أحمر (غير متصل) بعد **3 دقائق**. (منذ v0.1.18، أصبح كشف عدم الاتصال أسرع مع فحوصات حالة كل 15 ثانية.)
-
-#### حل المشكلات
-
-| العرض | السبب | الحل |
-|------|------|------|
-| خطأ "فشل الاتصال" في Cline | الوكيل لا يعمل أو العنوان خاطئ | تحقق من الوكيل بـ `curl https://localhost:56244/health` |
-| النقطة الخضراء لا تظهر في الخزنة | مفتاح API (الرمز) غير مُعدّ | انقر زر **⚡ تطبيق إعدادات Cline** مرة أخرى |
-| نموذج تذييل Cline لا يتغير | Cline يخزّن الإعدادات مؤقتاً | أعد تحميل VS Code (`Ctrl+Alt+R`) |
-| يظهر اسم نموذج خاطئ | خطأ قديم (مصحح في v0.1.16) | حدّث الوكيل إلى v0.1.16 أو أحدث |
-
----
-
-#### 🟣 زر نسخ أمر النشر — للتثبيت على جهاز جديد
-
-يُستخدم عند تثبيت وكيل wall-vault لأول مرة على حاسوب جديد وتوصيله بالخزنة. عند النقر على الزر، يُنسخ سكربت التثبيت بالكامل. الصقه في طرفية الحاسوب الجديد ونفّذه ليُعالج الكل دفعة واحدة:
-
-1. تثبيت ثنائي wall-vault (يتخطى إذا كان مثبتاً بالفعل)
-2. تسجيل تلقائي لخدمة systemd المستخدم
-3. بدء الخدمة والاتصال التلقائي بالخزنة
-
-> 💡 السكربت يأتي مع رمز هذا الوكيل وعنوان خادم الخزنة مملوءين بالفعل، لذا يمكن تنفيذه فوراً بعد اللصق دون تعديلات إضافية.
-
----
-
-### بطاقة الخدمات
-
-بطاقة لتشغيل/إيقاف أو إعداد خدمات الذكاء الاصطناعي.
-
-- مفتاح تبديل لتفعيل/تعطيل كل خدمة
-- عند إدخال عنوان خوادم الذكاء الاصطناعي المحلية (Ollama، LM Studio، vLLM، llama.cpp إلخ المشغّلة على جهازك)، يُكتشف النماذج المتاحة تلقائياً.
-- **مؤشر حالة اتصال الخدمة المحلية**: النقطة ● بجانب اسم الخدمة تكون **خضراء** عند الاتصال، **رمادية** عند عدم الاتصال
-- **إشارة مرور تلقائية للخدمة المحلية** (v0.1.23+): الخدمات المحلية (Ollama، LM Studio، vLLM، llama.cpp) تُفعّل/تُعطّل تلقائياً بناءً على توفر الاتصال. عند تفعيل خدمة، خلال 15 ثانية تتحول النقطة ● إلى خضراء ويُفعّل مربع الاختيار؛ عند إيقاف الخدمة، تُعطّل تلقائياً. تعمل بنفس طريقة التبديل التلقائي للخدمات السحابية (Google، OpenRouter إلخ) بناءً على وجود مفاتيح API.
-- **مفتاح تبديل وضع الاستدلال** (v0.2.17+): يظهر مربع اختيار **وضع الاستدلال** في أسفل نافذة تحرير الخدمة المحلية. عند تفعيله، يُضيف الوكيل `"reasoning": true` إلى جسم طلب chat-completions المُرسَل إلى الخادم العلوي، مما يسمح للنماذج الداعمة لإخراج عملية التفكير مثل DeepSeek R1 وQwen QwQ بإرجاع كتلة `<think>…</think>` مع الرد. الخوادم التي لا تعرف هذا الحقل تتجاهله، لذا يمكن إبقاؤه مُفعّلاً بأمان حتى في أحمال العمل المختلطة.
-
-> 💡 **إذا كانت الخدمة المحلية تعمل على حاسوب آخر**: أدخل عنوان IP ذلك الحاسوب في حقل URL الخدمة. مثال: `http://192.168.1.20:11434` (Ollama)، `http://192.168.1.20:1234` (LM Studio)، `http://192.168.1.20:8080` (llama.cpp). إذا كانت الخدمة مرتبطة بـ `127.0.0.1` فقط وليس `0.0.0.0`، لن يعمل الوصول عبر IP خارجي — تحقق من عنوان الربط في إعدادات الخدمة.
-
-### إدخال رمز المسؤول
-
-عند محاولة استخدام وظائف مهمة مثل إضافة/حذف المفاتيح في لوحة التحكم، ستظهر نافذة منبثقة لإدخال رمز المسؤول. أدخل الرمز الذي أعددته في معالج الإعداد. بمجرد إدخاله، يبقى صالحاً حتى إغلاق المتصفح.
-
-> ⚠️ **إذا تجاوزت محاولات المصادقة الفاشلة 10 مرات خلال 15 دقيقة، سيُحظر عنوان IP مؤقتاً.** إذا نسيت الرمز، تحقق من عنصر `admin_token` في ملف `wall-vault.yaml`.
-
----
-
-## الوضع الموزع (متعدد البوتات)
-
-عند تشغيل OpenClaw على عدة حواسيب في وقت واحد، هذا هو الإعداد لـ **مشاركة خزنة مفاتيح واحدة**. إنه مريح لأن إدارة المفاتيح تتم في مكان واحد فقط.
-
-### مثال على التكوين
-
-```
-[خادم خزنة المفاتيح]
-  wall-vault vault    (خزنة المفاتيح :56243، لوحة التحكم)
-
-[WSL ألفا]            [Raspberry Pi غاما]    [Mac Mini محلي]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ مزامنة SSE          ↕ مزامنة SSE             ↕ مزامنة SSE
-```
-
-جميع البوتات تتطلع إلى خادم الخزنة المركزي، لذا عند تغيير النماذج أو إضافة مفاتيح في الخزنة، تنعكس التغييرات فوراً على جميع البوتات.
-
-### الخطوة 1: بدء خادم خزنة المفاتيح
-
-نفّذ على الحاسوب الذي سيكون خادم الخزنة:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### الخطوة 2: تسجيل كل بوت (عميل)
+لوحة التحكم متاحة الآن على `https://<vault-host>:56243`. أضف وكيلاً لكل وسيط بعيد في بطاقة **Clients**؛ كل واحد يصدر `vault_token` فريداً.
 
-سجّل مسبقاً معلومات كل بوت سيتصل بخادم الخزنة:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer رمز_المسؤول" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "البوت أ",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### الخطوة 3: بدء الوكيل على كل حاسوب بوت
-
-نفّذ الوكيل على كل حاسوب مثبت عليه البوت مع تحديد عنوان خادم الخزنة والرمز:
+### مضيفو الوسيط
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> 💡 استبدل **`192.168.x.x`** بعنوان IP الداخلي الفعلي لحاسوب خادم الخزنة. يمكنك التحقق منه في إعدادات الراوتر أو بأمر `ip addr`.
+يصادق الوسيط على الخزنة، ويفتح تدفق SSE، ويطبق أي تكوين يستلمه (الخدمة المفضلة، تجاوز النموذج، سلسلة التراجع). تصل تعديلات الخزنة اللاحقة في ثوانٍ بدون إعادة تشغيل.
+
+لتثبيتات تمتد عبر LAN، فعّل TLS على مضيف الخزنة (`WV_VAULT_TLS_ENABLED=1` + متغيرات بيئة الشهادة/المفتاح) وقم بتشغيل كل مضيف وسيط من خلال نفس خطوة `wall-vault cert install-trust` بحيث يتم الوثوق بمكالمات HTTPS الخاصة بالوسيط إلى الخزنة.
 
 ---
 
-## إعداد التشغيل التلقائي
+## التشغيل التلقائي
 
-إذا كان من المزعج تشغيل wall-vault يدوياً في كل مرة تعيد تشغيل الحاسوب، سجّله كخدمة نظام. بمجرد التسجيل، يبدأ تلقائياً عند التشغيل.
+### systemd (Linux)
 
-### Linux — systemd (معظم توزيعات Linux)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd هو النظام الذي يدير البدء والتشغيل التلقائي للبرامج في Linux:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-عرض السجلات:
+للخزنة على نفس المضيف، اكتب `wall-vault-vault.service` موازياً. للوضع المستقل، وحدة واحدة تستدعي `wall-vault start` كافية.
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-هو النظام المسؤول عن التشغيل التلقائي للبرامج في macOS:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. نزّل NSSM من [nssm.cc](https://nssm.cc/download) وأضفه إلى PATH.
-2. في PowerShell كمسؤول:
-
-```powershell
-wall-vault doctor deploy windows
-```
+استخدم `nssm` لتغليف `wall-vault.exe start` كخدمة Windows، أو إدخال `schtasks` يعمل عند تسجيل دخول المستخدم.
 
 ---
 
-## Doctor — التشخيص
+## ملفات yaml للإضافات
 
-أمر `doctor` هو أداة **تُشخّص وتُصلح تلقائياً** ما إذا كان wall-vault مُعدّاً بشكل صحيح.
+يمكن إضافة أي backend متوافق مع OpenAI بدون تغييرات في الكود عن طريق إسقاط ملف yaml تحت `~/.wall-vault/services/`. يُحمل wall-vault الملف عند بدء التشغيل ويسجل الخدمة للتوزيع، ومجموعة كشف OAI-compat، وجسر تدفق Gemini.
 
-```bash
-wall-vault doctor check   # تشخيص الحالة الحالية (قراءة فقط، لا يغيّر شيئاً)
-wall-vault doctor fix     # إصلاح المشكلات تلقائياً
-wall-vault doctor all     # تشخيص + إصلاح تلقائي دفعة واحدة
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
 ```
 
-> 💡 إذا بدا شيء غريباً، نفّذ `wall-vault doctor all` أولاً. يحل كثيراً من المشكلات تلقائياً.
+تأتي المجموعة المرفقة في `configs/services/` (lmstudio، vllm، llamacpp، tgwui، localai، jan، koboldcpp، tabbyapi، mlx-server، litellm-proxy، ollama، google، openrouter) معطلة افتراضياً. انسخ الذي تريده إلى `~/.wall-vault/services/`، عيّن `enabled: true`، وأعد التشغيل.
 
 ---
 
-## RTK — توفير التوكنات
+## Doctor
 
-*(v0.1.24+)*
+`wall-vault doctor` يُجري فحص صحة لمرة واحدة عبر التثبيت بأكمله:
 
-**RTK (أداة توفير التوكنات)** تضغط تلقائياً مخرجات أوامر الصدفة التي ينفّذها وكلاء البرمجة بالذكاء الاصطناعي (مثل Claude Code)، مما يقلل استهلاك التوكنات. على سبيل المثال، 15 سطراً من مخرجات `git status` تُلخّص إلى سطرين.
-
-### الاستخدام الأساسي
-
-```bash
-# غلّف الأمر بـ wall-vault rtk لتصفية المخرجات تلقائياً
-wall-vault rtk git status          # يعرض قائمة الملفات المتغيرة فقط
-wall-vault rtk git diff HEAD~1     # الأسطر المتغيرة + أقل سياق
-wall-vault rtk git log -10         # سطر واحد لكل commit: hash + رسالة
-wall-vault rtk go test ./...       # يعرض الاختبارات الفاشلة فقط
-wall-vault rtk ls -la              # الأوامر غير المدعومة تُقطع تلقائياً
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
 ```
 
-### الأوامر المدعومة ونسبة التوفير
+كل سطر هو واحد من:
 
-| الأمر | طريقة التصفية | نسبة التوفير |
-|------|----------|--------|
-| `git status` | ملخص الملفات المتغيرة فقط | ~87% |
-| `git diff` | الأسطر المتغيرة + 3 أسطر سياق | ~60-94% |
-| `git log` | Hash + السطر الأول من الرسالة | ~90% |
-| `git push/pull/fetch` | إزالة التقدم، الملخص فقط | ~80% |
-| `go test` | يعرض الفشل فقط، يعدّ الناجحة | ~88-99% |
-| `go build/vet` | يعرض الأخطاء فقط | ~90% |
-| جميع الأوامر الأخرى | أول 50 سطراً + آخر 50 سطراً، حد أقصى 32KB | متغير |
+- `✓` — صحي
+- `⚠` — متدهور لكن يعمل (مفتاح واحد في فترة تهدئة، حصة منخفضة، إلخ.)
+- `✗` — معطل
+- `SKIP` — غير مكوّن / غير قابل للتطبيق على هذا المضيف
 
-### خط أنابيب تصفية من 3 مراحل
+يقوم وضع daemon ثانٍ بتشغيل نفس الفحص كل `doctor.interval` (الافتراضي 5 دقائق) ويكتب النتائج إلى `doctor.log_file` (الافتراضي `/tmp/wall-vault-doctor.log`). عندما يكون `doctor.auto_fix` صحيحاً، يحاول أيضاً إصلاح الانحراف الشائع (تكوين OpenClaw قديم، ثقة TLS مفقودة، خدمات قابلة لإعادة التشغيل).
 
-1. **مرشح هيكلي حسب الأمر** — يفهم تنسيق مخرجات git، go إلخ ويستخرج الأجزاء ذات المعنى فقط
-2. **معالجة لاحقة بالتعبيرات النمطية** — إزالة أكواد ألوان ANSI، ضغط الأسطر الفارغة، تجميع الأسطر المكررة
-3. **تمرير + قطع** — الأوامر غير المدعومة تحتفظ بأول/آخر 50 سطراً فقط
-
-### التكامل مع Claude Code
-
-يمكنك إعداد خطاف `PreToolUse` في Claude Code ليمر جميع أوامر الصدفة تلقائياً عبر RTK.
-
-```bash
-# تثبيت الخطاف (يُضاف تلقائياً إلى settings.json الخاص بـ Claude Code)
-wall-vault rtk hook install
-```
-
-أو أضف يدوياً في `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
-
-> 💡 **الحفاظ على كود الخروج**: يُرجع RTK كود الخروج الأصلي للأمر. إذا فشل الأمر (كود خروج ≠ 0)، يكتشف الذكاء الاصطناعي الفشل بدقة.
-
-> 💡 **مخرجات إنجليزية إجبارية**: ينفّذ RTK الأوامر بـ `LC_ALL=C` لتوليد مخرجات إنجليزية دائماً بغض النظر عن إعدادات لغة النظام. هذا يضمن عمل المرشحات بشكل صحيح.
+شغل عملية واحدة من لوحة التحكم عبر بطاقة **Doctor** أو `wall-vault doctor`.
 
 ---
 
-## مرجع متغيرات البيئة
+## Hooks
 
-متغيرات البيئة هي طريقة لتمرير قيم الإعداد للبرنامج. اكتب `export اسم_المتغير=قيمة` في الطرفية أو ضعها في ملف خدمة التشغيل التلقائي ليُطبّق دائماً.
+شغّل أمر shell عند الأحداث الرئيسية:
 
-| المتغير | الوصف | قيمة مثال |
-|------|------|---------|
-| `WV_LANG` | لغة لوحة التحكم | `ko`، `en`، `ja` |
-| `WV_THEME` | سمة لوحة التحكم | `light`، `dark`، `gold` |
-| `WV_KEY_GOOGLE` | مفتاح API لـ Google (عدة مفاتيح بفاصلة) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | مفتاح API لـ OpenRouter | `sk-or-v1-...` |
-| `WV_VAULT_URL` | عنوان خادم الخزنة في الوضع الموزع | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | رمز مصادقة العميل (البوت) | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | رمز المسؤول | `admin-token-here` |
-| `WV_MASTER_PASS` | كلمة مرور تشفير مفاتيح API | `my-password` |
-| `WV_AVATAR` | مسار ملف الصورة الرمزية (مسار نسبي لـ `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | عنوان خادم Ollama المحلي | `http://192.168.x.x:11434` |
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+يحصل كل hook على متغيرات بيئة خاصة بالحدث (`SERVICE`، `MODEL`، `ERROR`، `AGENT`، `LEVEL`، `MSG`). تعمل الـ hooks بشكل غير متزامن مع مهلة 5 ثوانٍ — لا يحجب الوسيط أبداً عن hook بطيء.
 
 ---
 
-## حل المشكلات
+## متغيرات البيئة
 
-### عندما لا يبدأ الوكيل
+| المتغير | حقل YAML |
+|----------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | One-shot import: comma-separated Google keys |
+| `WV_KEY_OPENROUTER` | One-shot import: OpenRouter keys |
+| `WV_KEY_ANTHROPIC` | One-shot import: Anthropic keys |
+| `WV_KEY_OPENAI` | One-shot import: OpenAI keys |
+| `WV_OLLAMA_URL` | Per-host Ollama URL override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Per-backend URL override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
 
-في معظم الحالات، المنفذ مستخدم بالفعل من برنامج آخر.
-
-```bash
-ss -tlnp | grep 56244   # التحقق من يستخدم المنفذ 56244
-wall-vault proxy --port 8080   # البدء بمنفذ آخر
-```
-
-### عند حدوث أخطاء مفاتيح API (429، 402، 401، 403، 582)
-
-| كود الخطأ | المعنى | طريقة الحل |
-|----------|------|----------|
-| **429** | طلبات كثيرة جداً (تجاوز الحصة) | انتظر قليلاً أو أضف مفتاحاً آخر |
-| **402** | الدفع مطلوب أو رصيد غير كافٍ | اشحن رصيداً في الخدمة المعنية |
-| **401 / 403** | المفتاح خاطئ أو بدون صلاحية | تحقق من قيمة المفتاح وأعد التسجيل |
-| **582** | حمل زائد على البوابة (cooldown 5 دقائق) | يُرفع تلقائياً بعد 5 دقائق |
-
-```bash
-# التحقق من قائمة المفاتيح المسجلة وحالتها
-curl -H "Authorization: Bearer رمز_المسؤول" https://localhost:56243/admin/keys
-
-# إعادة تعيين عدادات الاستخدام
-curl -X POST -H "Authorization: Bearer رمز_المسؤول" https://localhost:56243/admin/keys/reset
-```
-
-### عندما يظهر الوكيل كـ "غير متصل"
-
-"غير متصل" يعني أن عملية الوكيل لا ترسل إشارات (heartbeat) إلى الخزنة. **لا يعني أن الإعدادات لم تُحفظ.** يجب أن يكون الوكيل قيد التشغيل مع معرفة عنوان خادم الخزنة والرمز ليتحول إلى حالة الاتصال.
-
-```bash
-# بدء الوكيل مع تحديد عنوان خادم الخزنة والرمز ومعرّف العميل
-WV_VAULT_URL=http://عنوان_الخزنة:56243 \
-WV_VAULT_TOKEN=رمز_العميل \
-WV_VAULT_CLIENT_ID=معرّف_العميل \
-wall-vault proxy
-```
-
-إذا نجح الاتصال، سيتغير في لوحة التحكم إلى 🟢 قيد التشغيل خلال حوالي 20 ثانية.
-
-### عندما لا يتصل Ollama
-
-Ollama هو برنامج يُشغّل الذكاء الاصطناعي مباشرة على جهازك. أولاً، تأكد من أن Ollama قيد التشغيل.
-
-```bash
-curl http://localhost:11434/api/tags   # إذا ظهرت قائمة النماذج فهو يعمل
-export OLLAMA_URL=http://192.168.x.x:11434   # إذا كان يعمل على حاسوب آخر
-```
-
-> ⚠️ إذا لم يستجب Ollama، ابدأه أولاً بأمر `ollama serve`.
-
-> ⚠️ **النماذج الكبيرة بطيئة**: النماذج الكبيرة مثل `qwen3.5:35b` و`deepseek-r1` قد تستغرق عدة دقائق لتوليد الاستجابة. حتى لو بدا أنه لا توجد استجابة، فقد يكون في معالجة طبيعية — انتظر.
+كل متغير بيئة، عند تعيينه، يتغلب على ملف YAML.
 
 ---
 
-## التغييرات الأخيرة (v0.1.16 ~ v0.1.27)
+## حل المشاكل
 
-### v0.1.27 (2026-04-09)
-- **إصلاح اسم نموذج fallback لـ Ollama**: إصلاح مشكلة تمرير أسماء نماذج ببادئة provider (مثل `google/gemini-3.1-pro-preview`) مباشرة إلى Ollama عند الـ fallback من خدمات أخرى. الآن يُستبدل تلقائياً بمتغير البيئة/النموذج الافتراضي.
-- **تقليل كبير لأوقات cooldown**: Rate limit 429: 30 دقيقة→5 دقائق، دفع 402: ساعة→30 دقيقة، 401/403: 24 ساعة→6 ساعات. يمنع شلل الوكيل الكامل عندما تدخل جميع المفاتيح في cooldown متزامن.
-- **إعادة محاولة إجبارية عند cooldown شامل**: عندما تكون جميع المفاتيح في cooldown، يُجبر المفتاح الأقرب للتحرر على إعادة المحاولة، مما يمنع رفض الطلبات.
-- **إصلاح عرض قائمة الخدمات**: استجابة `/status` تعرض قائمة الخدمات الفعلية المتزامنة من vault (يمنع إغفال anthropic إلخ).
+### `connection refused` على `:56244`
 
-### v0.1.25 (2026-04-08)
-- **كشف عملية الوكيل**: يكتشف الوكيل بقاء الوكلاء المحليين (NanoClaw/OpenClaw) ويعرض إشارة مرور برتقالية في لوحة التحكم.
-- **تحسين مقبض السحب**: عند ترتيب البطاقات، يمكن السحب فقط من منطقة إشارة المرور (●). يمنع السحب العرضي من حقول الإدخال أو الأزرار.
+إما أن الوسيط لا يعمل أو أنه مرتبط بمضيف مختلف. تحقق من:
 
-### v0.1.24 (2026-04-06)
-- **أمر RTK الفرعي لتوفير التوكنات**: `wall-vault rtk <command>` يُصفّي مخرجات أوامر الصدفة تلقائياً، مما يقلل استهلاك توكنات وكيل الذكاء الاصطناعي بنسبة 60-90%. يتضمن مرشحات مخصصة للأوامر الرئيسية مثل git وgo، ويقطع الأوامر غير المدعومة تلقائياً. يتكامل بشفافية عبر خطاف `PreToolUse` لـ Claude Code.
+```bash
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
+```
 
-### v0.1.23 (2026-04-06)
-- **إصلاح تغيير نموذج Ollama**: إصلاح مشكلة عدم انعكاس تغيير نموذج Ollama في لوحة تحكم الخزنة على الوكيل. كان يستخدم سابقاً متغير البيئة فقط (`OLLAMA_MODEL`)، الآن يُعطي الأولوية لإعدادات الخزنة.
-- **إشارة مرور تلقائية للخدمة المحلية**: Ollama وLM Studio وvLLM تُفعّل تلقائياً عند إمكانية الاتصال وتُعطّل عند الانقطاع. تعمل بنفس طريقة التبديل التلقائي المبني على المفاتيح للخدمات السحابية.
+إذا كان يعمل على منفذ مختلف، فإن تكوينك يحتوي على تجاوز لـ `proxy.port` — تحقق من `~/.wall-vault/config.yaml`.
 
-### v0.1.22 (2026-04-05)
-- **إصلاح حقل content الفارغ المفقود**: عندما تستهلك نماذج thinking (gemini-3.1-pro، o1، claude thinking إلخ) كل حد max_tokens في reasoning ولا تستطيع توليد استجابة فعلية، كان الوكيل يحذف حقول `content`/`text` من JSON الاستجابة بـ `omitempty`، مما يسبب تعطل عملاء SDK OpenAI/Anthropic بخطأ `Cannot read properties of undefined (reading 'trim')`. تم التغيير ليشمل الحقول دائماً وفق مواصفات API الرسمية.
+### `x509: certificate signed by unknown authority`
 
-### v0.1.21 (2026-04-05)
-- **دعم نماذج Gemma 4**: نماذج عائلة Gemma مثل `gemma-4-31b-it`، `gemma-4-26b-a4b-it` يمكن استخدامها عبر Google Gemini API.
-- **دعم رسمي لخدمات LM Studio / vLLM**: سابقاً، كانت هذه الخدمات مُغفلة في توجيه الوكيل وتُستبدل دائماً بـ Ollama. الآن تُوجّه بشكل صحيح عبر API متوافق مع OpenAI.
-- **إصلاح عرض الخدمة في لوحة التحكم**: حتى عند حدوث fallback، تعرض لوحة التحكم دائماً الخدمة المُعدّة من المستخدم.
-- **عرض حالة الخدمة المحلية**: عند تحميل لوحة التحكم، تُعرض حالة اتصال الخدمات المحلية (Ollama، LM Studio، vLLM إلخ) بلون النقطة ●.
-- **متغير بيئة لفلتر الأدوات**: `WV_TOOL_FILTER=passthrough` يسمح بإعداد وضع تمرير الأدوات (tools) عبر متغير بيئة.
+العميل لا يثق بـ CA الداخلي لـ wall-vault. شغل `wall-vault cert install-trust` على جهاز العميل. للوكلاء التي يتجاهل وقت تشغيلها مخزن ثقة OS (مثل Node مع `NODE_EXTRA_CA_CERTS` مُرمَّز بشكل صلب)، استخدم رفيق HTTP loopback على `127.0.0.1:56245` (نفس المضيف فقط) أو عيّن `WV_PROXY_TLS_ENABLED=0` للرجوع إلى HTTP عادي.
 
-### v0.1.20 (2026-03-28)
-- **تعزيز أمني شامل**: منع XSS (41 نقطة)، مقارنة رموز بوقت ثابت، تقييد CORS، حدود حجم الطلب، منع اجتياز المسار، مصادقة SSE، تعزيز تحديد المعدل، من بين 12 بنداً أمنياً محسّناً.
+### `token not registered with vault`
 
-### v0.1.19 (2026-03-27)
-- **كشف Claude Code متصل**: Claude Code الذي لا يمر عبر الوكيل يظهر أيضاً كمتصل في لوحة التحكم.
+`Authorization: Bearer <token>` للعميل لا يطابق أي عميل مسجل. تحقق من الرمز تحت **Clients** في لوحة التحكم. إذا نسخت رمزاً حرفياً مثل `proxy-managed`، `dummy`، أو `""` من تكوين قديم، استبدله برمز العميل الحقيقي.
 
-### v0.1.18 (2026-03-26)
-- **إصلاح التصاق خدمة الـ fallback**: بعد fallback مؤقت إلى Ollama، يعود النظام تلقائياً إلى الخدمة الأصلية عند تعافيها.
-- **تحسين كشف عدم الاتصال**: فحص حالة كل 15 ثانية يُسرّع كشف توقف الوكيل.
+### `Anthropic dispatch needs a Claude model id`
 
-### v0.1.17 (2026-03-25)
-- **ترتيب البطاقات بالسحب والإفلات**: يمكن إعادة ترتيب بطاقات الوكلاء بالسحب.
-- **زر تطبيق إعدادات مضمّن**: زر [⚡ تطبيق الإعدادات] يظهر في الوكلاء غير المتصلين.
-- **إضافة نوع وكيل cokacdir**.
+السلوك الافتراضي اعتباراً من v0.2.63: يُرجع معرف نموذج غير Claude مرسل إلى توزيع anthropic خطأ. إما إصلاح التوجيه (لا ترسل `gemini-2.5-flash` إلى anthropic) أو الموافقة على الكتابة التلقائية عبر `proxy.anthropic_fallback_model`.
 
-### v0.1.16 (2026-03-25)
-- **مزامنة النماذج ثنائية الاتجاه**: تغيير نموذج Cline أو Claude Code في لوحة تحكم الخزنة يُطبّق تلقائياً.
+### `unknown service: <id>`
+
+رأى التوزيع معرف خدمة لم تطالب به أي ملف yaml إضافي. تحقق من:
+
+```bash
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
+```
+
+إذا كان ملف yaml موجوداً ولكنه `enabled: false`، اقلبه. إذا كان مفقوداً تماماً، انسخ من `configs/services/` في شجرة المصدر.
+
+### استجابة فارغة على نموذج تفكير
+
+`qwen3.6`، `deepseek-r1`، وعائلة GPT-`o1` تُصدر أحياناً `reasoning_content` فقط وتترك `content` فارغاً. اعتباراً من v0.2.63 يتراجع wall-vault إلى نص التفكير تلقائياً — إذا كنت لا تزال ترى استجابات فارغة، فإن backend لا يُرجع أي حقل. تحقق من سجلات upstream.
+
+لـ LM Studio مع qwen3 على وجه التحديد، عيّن `inline_no_think_for_qwen3: true` في ملف yaml الإضافي بحيث يتم تعطيل التفكير inline. lmstudio.yaml و ollama.yaml المدمجة تفعل هذا بالفعل.
+
+### تظهر لوحة التحكم "all keys on cooldown" لكنني للتو أضفت واحداً
+
+المفتاح الجديد صحي لكن مسار التوزيع قد لا يزال في فترة تهدئة لمفتاح أقدم. جرب طلباً جديداً — يقوم الوسيط بالتدوير لكل مكالمة، وسيتم انتقاء مفتاح صحي تالياً.
+
+### الخزنة لن تفتح بكلمة المرور الرئيسية
+
+كلمة مرور خاطئة. لا يوجد استرداد — wall-vault لا يشحن باب خلفي عمداً. إذا فقدت بصدق كلمة المرور الرئيسية، فالطريق الوحيد هو حذف `~/.wall-vault/data/vault.json`، وإعادة التشغيل بكلمة مرور جديدة، وإعادة إضافة المفاتيح.
+
+### ضربت حدود OpenRouter للمستوى المجاني
+
+عيّن `proxy.services` ليتضمن `openrouter` وأضف مفتاح OpenRouter واحد على الأقل. يتراجع الوسيط تلقائياً من النموذج المدفوع إلى متغيره `:free` عندما يُرجع المسار المدفوع 402 / 429.
+
+### `journalctl --user -u wall-vault-proxy` فارغ
+
+سجلات systemd `--user` تذهب إلى journal للمستخدم الذي يشغلها. إذا بدأت الوحدة كـ `root` أو عبر `sudo`، فإن journal موجود في النسخة الخاصة بالنظام بدلاً من ذلك — جرب `journalctl -u wall-vault-proxy` بدون `--user`.
 
 ---
 
-*لمزيد من المعلومات التفصيلية عن API، راجع [API.md](API.md).*
+## المزيد
+
+- مرجع HTTP API — انظر [API.md](API.md)
+- المصدر — `https://github.com/sookmook/wall-vault`
+- تقارير الأخطاء / طلبات الميزات — GitHub Issues
+- سجل الإصدارات — [CHANGELOG.md](../CHANGELOG.md)

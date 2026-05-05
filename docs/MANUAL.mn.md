@@ -1,931 +1,621 @@
-# wall-vault Хэрэглэгчийн Гарын Авлага
-*(Last updated: 2026-04-16 — v0.2.2)*
+# wall-vault User Manual
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · [हिन्दी](MANUAL.hi.md) · [Bahasa Indonesia](MANUAL.id.md) · [ภาษาไทย](MANUAL.th.md) · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · Монгол · [isiZulu](MANUAL.zu.md)
+
+Энэ гарын авлага нь wall-vault-ыг суулгах, тохируулах, ажиллуулах талаар тайлбарладаг. Товч тоймыг [README](../README.md)-ээс үзнэ үү. HTTP API-ийн дэлгэрэнгүй мэдээллийг [API reference](API.md)-ээс үзнэ үү.
 
 ## Агуулга
 
-1. [wall-vault гэж юу вэ?](#wall-vault-гэж-юу-вэ)
-2. [Суулгалт](#суулгалт)
-3. [Анх удаа эхлүүлэх (setup шидтэн)](#анх-удаа-эхлүүлэх)
-4. [API Key бүртгэл](#api-key-бүртгэл)
-5. [Proxy ашиглах арга](#proxy-ашиглах-арга)
-6. [Key Vault хянах самбар](#key-vault-хянах-самбар)
-7. [Тархсан горим (Multi Bot)](#тархсан-горим-multi-bot)
-8. [Автомат эхлүүлэх тохиргоо](#автомат-эхлүүлэх-тохиргоо)
-9. [Doctor (Эмч)](#doctor-эмч)
-10. [RTK Токен хэмнэлт](#rtk-токен-хэмнэлт)
-11. [Орчны хувьсагчийн лавлах](#орчны-хувьсагчийн-лавлах)
-12. [Алдаа засах](#алдаа-засах)
+1. [wall-vault юу хийдэг вэ](#wall-vault-юу-хийдэг-вэ)
+2. [Суулгац](#суулгац)
+3. [setup wizard-аар анх удаа ажиллуулах](#setup-wizard-аар-анх-удаа-ажиллуулах)
+4. [TLS-ийг идэвхжүүлэх](#tls-ийг-идэвхжүүлэх)
+5. [API key бүртгэх](#api-key-бүртгэх)
+6. [Agent холбох](#agent-холбох)
+7. [Dashboard](#dashboard)
+8. [Distributed горим](#distributed-горим)
+9. [Авто-эхлэлт](#авто-эхлэлт)
+10. [Plugin yamls](#plugin-yamls)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [Орчны хувьсагчид](#орчны-хувьсагчид)
+14. [Алдааг засах](#алдааг-засах)
 
 ---
 
-## wall-vault гэж юу вэ?
+## wall-vault юу хийдэг вэ
 
-**wall-vault = OpenClaw-д зориулсан AI төлөөлөгч (Proxy) + API Key сейф**
+wall-vault бол хамтран ажилладаг хоёр үйлчилгээг нэгтгэсэн нэг Go binary юм:
 
-AI үйлчилгээ ашиглахад **API key** хэрэгтэй. API key гэдэг нь "энэ хүн энэ үйлчилгээг ашиглах эрхтэй" гэдгийг нотлох **дижитал нэвтрэх карт** юм. Гэхдээ энэ нэвтрэх карт нь өдөрт ашиглах тоо хязгаартай бөгөөд буруу удирдвал задрах эрсдэлтэй.
+- **Vault** API key-уудыг амрах үед нь шифрлэн хадгалдаг (мастер нууц үгтэй AES-GCM), key тус бүрийн хэрэглээ болон cooldown-ыг хянадаг, өөрчлөлтүүдийг Server-Sent Events (SSE)-ээр дамжуулдаг, мөн хүний оператор нарт зориулсан вэб dashboard-ыг `:56243` дээр үйлчилгээгээр хангадаг.
+- **Proxy** Gemini, Anthropic, OpenAI-нийцтэй, Ollama-native endpoint-уудыг `:56244` дээр илчилнэ. Proxy руу заасан AI client нь vault дахь key-уудыг ашигладаг — client-ууд тэдгээрийг хэзээ ч харахгүй. Нэг upstream бүтэлгүйтэх үед dispatch нь дарааллын дагуу дараагийн provider руу шилждэг.
 
-wall-vault нь эдгээр нэвтрэх картуудыг аюулгүй сейфэнд хадгалж, OpenClaw болон AI үйлчилгээний хооронд **төлөөлөгч (proxy)** үүрэг гүйцэтгэдэг. Товчхондоо, OpenClaw зөвхөн wall-vault-д холбогдоход л хангалттай, бусад төвөгтэй ажлуудыг wall-vault өөрөө зохицуулна.
+Энэ нь дараах тохиолдолд хэрэгтэй:
 
-wall-vault-ын шийдэж буй асуудлууд:
-
-- **API Key автомат эргүүлэлт**: Нэг түлхүүрийн хэрэглээ хязгаарт хүрэх буюу түр хаагдсан (cooldown) тохиолдолд чимээгүйхэн дараагийн түлхүүрт шилждэг. OpenClaw тасалдалгүйгээр үргэлжлэн ажиллана.
-- **Үйлчилгээний автомат солилт (Fallback)**: Google хариу өгөхгүй бол OpenRouter руу, тэр нь ч ажиллахгүй бол таны компьютерт суулгасан Ollama·LM Studio·vLLM (локал AI) руу автоматаар шилждэг. Session тасрахгүй. Анхны үйлчилгээ сэргэсэн бол дараагийн хүсэлтээс автоматаар буцна (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Бодит цагийн синхрончлол (SSE)**: Сейф хянах самбар дээр модель өөрчлөхөд OpenClaw дэлгэц дээр 1-3 секундын дотор тусгагдана. SSE (Server-Sent Events) гэдэг нь сервер өөрчлөлтүүдийг бодит цагт клиент руу түлхэх технологи юм.
-- **Бодит цагийн мэдэгдэл**: Түлхүүр дуусах буюу үйлчилгээний алдаа зэрэг үйл явдлууд OpenClaw TUI (терминал дэлгэц) доод талд шууд харагдана.
-
-> 💡 **Claude Code, Cursor, VS Code** ч холбогдож ашиглах боломжтой, гэхдээ wall-vault-ын анхны зорилго нь OpenClaw-тай хамт ашиглах юм.
+- Танд хэд хэдэн provider-ийн key-ууд байгаа бөгөөд agent ярилцах нэг URL хэрэгтэй бол.
+- Та cooldown дээр байгаа free-tier key-г session эвдэхгүйгээр зайлуулахыг хүсэж байгаа бол.
+- Та credentials хуулахгүйгээр нэг LAN дээр олон bot, IDE, эсвэл script-уудыг ижил key-уудаар тэжээхийг хүсэж байгаа бол.
+- Та key-уудыг засах, model-уудыг солихын тулд environment variable биш dashboard ашиглахыг хүсэж байгаа бол.
+- Cloud хязгаар дуусахад орон нутгийн fallback (Ollama, LM Studio, vLLM) хэрэгтэй бол.
 
 ```
-OpenClaw (TUI терминал дэлгэц)
-        │
-        ▼
-  wall-vault Proxy (:56244)   ← Түлхүүр удирдлага, чиглүүлэлт, fallback, үйл явдлууд
-        │
-        ├─ Google Gemini API
-        ├─ OpenRouter API (340+ загвар)
-        ├─ Ollama / LM Studio / vLLM (таны компьютер, сүүлчийн хоргодох газар)
-        └─ OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
-## Суулгалт
+## Суулгац
 
-### Linux / macOS
-
-Терминал нээж доорх тушаалуудыг байгаагаар нь буулгана уу.
+### Linux / macOS one-liner
 
 ```bash
-# Linux (ердийн PC, сервер — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (M1/M2/M3 Mac)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — Интернетээс файл татаж авна.
-- `chmod +x` — Татаж авсан файлыг "ажиллуулах боломжтой" болгоно. Энэ алхмыг алгасвал "зөвшөөрөл татгалзсан" алдаа гарна.
+Скрипт нь OS болон architecture-ыг автоматаар илрүүлж, зөв binary-г `~/.local/bin/wall-vault` руу татаж аваад, executable болгоно. Хэрэв `~/.local/bin` таны `PATH` дээр байхгүй бол нэмнэ үү:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Гар татах
+
+Урьдчилан бэлдсэн binary-уудыг release бүрт `https://github.com/sookmook/wall-vault/releases` дээр нийтэлдэг.
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-PowerShell (администратор эрхтэйгээр) нээж доорх тушаалуудыг ажиллуулна уу.
-
 ```powershell
-# Татах
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# PATH-д нэмэх (PowerShell дахин эхлүүлсний дараа хэрэгжинэ)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> 💡 **PATH гэж юу вэ?** Компьютер тушаалуудыг хайж олох хавтасны жагсаалт юм. PATH-д нэмсэн бол ямар ч хавтаснаас `wall-vault` гэж бичээд ажиллуулах боломжтой.
+### Source-оос build хийх
 
-### Эх кодоос шууд бүтээх (Хөгжүүлэгчдэд)
-
-Go хэлний хөгжүүлэлтийн орчин суулгасан тохиолдолд л хамаарна.
+Go 1.25 эсвэл түүнээс шинэ хувилбар шаардлагатай.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (хувилбар: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> 💡 **Бүтээлтийн цагийн тэмдэг хувилбар**: `make build`-ээр бүтээхэд хувилбар нь `v0.1.27.20260409` гэх мэт огноо·цаг агуулсан форматаар автоматаар үүсгэгдэнэ. `go build ./...`-ээр шууд бүтээхэд хувилбар зөвхөн `"dev"` гэж харагдана.
+`make build-all` нь дэмжигдсэн таван platform руу cross-compile хийнэ. Binary-ууд `bin/`-д үлдэнэ.
 
 ---
 
-## Анх удаа эхлүүлэх
-
-### setup шидтэн ажиллуулах
-
-Суулгасны дараа заавал доорх тушаалаар **тохиргооны шидтэн** ажиллуулна уу. Шидтэн шаардлагатай зүйлсийг нэг нэгээр нь асууж чиглүүлнэ.
+## setup wizard-аар анх удаа ажиллуулах
 
 ```bash
 wall-vault setup
 ```
 
-Шидтэнгийн дамжих алхмууд дараах байдалтай:
+Wizard нь танаас дарааллын дагуу асууна:
 
-```
-1. Хэл сонгох (Монгол хэл орсон 10 хэл)
-2. Загвар сонгох (light / dark / gold / cherry / ocean)
-3. Ажиллагааны горим — ганцаараа ашиглах (standalone) эсвэл олон машинд хамт ашиглах (distributed) сонгох
-4. Бот нэр оруулах — хянах самбар дээр харагдах нэр
-5. Порт тохиргоо — анхдагч: proxy 56244, vault 56243 (өөрчлөх шаардлагагүй бол Enter дарах)
-6. AI үйлчилгээ сонгох — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Хэрэгслийн аюулгүй байдлын шүүлтүүрийн тохиргоо
-8. Администратор токен тохиргоо — хянах самбарын удирдлагын функцийг түгжих нууц үг. Автоматаар ч үүсгэх боломжтой
-9. API key шифрлэлтийн нууц үг тохиргоо — түлхүүрийг илүү аюулгүй хадгалах бол (сонголтоор)
-10. Тохиргооны файл хадгалах зам
-```
+1. **Хэл** — 17 UI locale-ээс нэгийг сонгоно. `$LANG`-аас автоматаар илрүүлдэг; wizard ямартай ч жагсаалтыг санал болгоно.
+2. **Theme** — `light` (өгөгдмөл), `dark`, `cherry`, `ocean`, `gold`, `autumn`, `winter`. Зөвхөн гадаад харагдац.
+3. **Горим** — `standalone` (нэг host, өгөгдмөл) эсвэл `distributed` (нэг host дээр vault, бусад дээр proxy-нууд).
+4. **Bot нэр** — чөлөөт `client_id` slug. Vault нь үүнийг client-тус бүрийн config (model overrides, fallback chains) хязгаарлахад ашигладаг.
+5. **Proxy port** — өгөгдмөл `56244`.
+6. **Vault port** — өгөгдмөл `56243` (зөвхөн standalone).
+7. **Үйлчилгээ сонголт** — дараах тус бүрд y/N: Google Gemini, OpenRouter, Anthropic, OpenAI, Ollama, LM Studio, vLLM. Олон сонголт зүгээр; тус бүр эцэст нь өөрийн env-var зөвлөмжийг бичнэ.
+8. **Tool filter** — `strip_all` (өгөгдмөл; аюулгүй байдлын үүднээс ирж буй бүх tool definition-уудыг хаадаг) эсвэл `passthrough` (ямар ч tool-ыг нэвтрүүлдэг).
+9. **Admin token** — автоматаар үүсгэхийн тулд хоосон үлдээ. Dashboard-д нэвтрэхэд энэ token шаардлагатай.
+10. **Мастер нууц үг** — шифрлэхгүй бол хоосон үлдээ (зөвлөдөггүй); амрах үед key store-ыг AES-GCM шифрлэхийн тулд утга тохируул.
+11. **Хадгалах зам** — одоогийн directory дахь `wall-vault.yaml` руу өгөгдмөл. Loader нь `~/.wall-vault/config.yaml`-ыг ч мөн харна.
 
-> ⚠️ **Администратор токеноо заавал санаж байгаарай.** Дараа нь хянах самбар дээр түлхүүр нэмэх эсвэл тохиргоо өөрчлөхөд хэрэг болно. Мартвал тохиргооны файлыг шууд засварлах хэрэгтэй.
+Хадгалсны дараа wizard нь `doctor.FixTrust`-ыг ажиллуулдаг ингэснээр орон нутагт суулгасан ямар ч agent (OpenClaw, Claude Code, Cline) wall-vault-ийн дотоод CA-г trust store-доо автоматаар нэмж авах болно. Хэрэв ийм agent суулгаагүй бол энэ алхам `SKIP` хэвлээд юу ч бичихгүй.
 
-Шидтэн дуусмагц `wall-vault.yaml` тохиргооны файл автоматаар үүсгэгдэнэ.
-
-### Ажиллуулах
+Дараа нь binary-г эхлүүл:
 
 ```bash
 wall-vault start
 ```
 
-Доорх хоёр сервер нэгэн зэрэг эхэлнэ:
+`start` нь vault болон proxy-г нэг process-д хамтад нь ажиллуулна (standalone горим). Distributed горимын хувьд vault host дээр `wall-vault vault`, proxy host тус бүр дээр `wall-vault proxy` ашигла.
 
-- **Proxy** (`https://localhost:56244`) — OpenClaw болон AI үйлчилгээг холбох төлөөлөгч
-- **Key Vault** (`https://localhost:56243`) — API key удирдлага болон вэб хянах самбар
-
-Хөтөч дээр `https://localhost:56243` нээвэл хянах самбарыг шууд харах боломжтой.
+Browser дээр `http://localhost:56243`-ыг нээ. Wizard-ийн хэвлэсэн admin token-оор нэвтэр.
 
 ---
 
-## API Key бүртгэл
+## TLS-ийг идэвхжүүлэх
 
-API key бүртгэх дөрвөн арга бий. **Анх эхлэгчдэд арга 1 (орчны хувьсагч) санал болгоно**.
+Wizard-ийн өгөгдмөл нь хоёр listener-ыг энгийн HTTP дээр үлдээдэг. Ихэнх agent (OpenClaw, Claude Code, Cursor) нэг HTTPS endpoint-той илүү сайн ажилладаг, тиймээс орон нутгийн машинаас илүү тэлэх deployment-д TLS-ийг зөвлөдөг.
 
-### Арга 1: Орчны хувьсагч (Санал болгох — Хамгийн энгийн)
-
-Орчны хувьсагч гэдэг нь програм эхлэхэд уншдаг **урьдчилж тохируулсан утга** юм. Терминалд доорх шиг бичнэ үү.
+wall-vault нь өөрийн дотоод CA-тай хамт ирдэг тул нийтийн DNS нэр эсвэл Let's Encrypt шаардагдахгүй.
 
 ```bash
-# Google Gemini key бүртгэх
-export WV_KEY_GOOGLE=AIzaSy...
+# 1. Дотоод CA үүсгэх — ~/.wall-vault/ca.{crt,key}-д бичигдэнэ.
+#    CA нь өгөгдмөлөөр 10 жил хүчинтэй; --ca-years-аар override хийнэ.
+wall-vault cert init
 
-# OpenRouter key бүртгэх
-export WV_KEY_OPENROUTER=sk-or-v1-...
+# 2. Host certificate гарга. Subject Alternative Names-д автоматаар орно:
+#       hostname, "localhost", "127.0.0.1", илрүүлсэн loopback бус LAN IP-нүүд.
+#    Issuer dir-ийг --dir-аар, validity-г --host-years-аар override хийнэ.
+wall-vault cert issue $(hostname)
 
-# Бүртгэсний дараа ажиллуулах
+# 3. Энэ машины OS keychain-д CA-г trust хий.
+#    Linux: update-ca-certificates-аар /etc/ssl/certs/ руу бичнэ (sudo шаардлагатай).
+#    macOS: security add-trusted-cert-аар System keychain-д нэмнэ (sudo шаардлагатай).
+#    Windows: certutil-аар CurrentUser\Root руу import хийнэ (admin шаардлагагүй).
+wall-vault cert install-trust
+
+# 4. Хоёр listener дээр TLS-г идэвхжүүлнэ.
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
 wall-vault start
 ```
 
-Олон түлхүүр байвал таслалаар (,) холбоно. wall-vault түлхүүрүүдийг ээлжлэн автоматаар ашиглана (round robin):
+Бусад LAN машинд trust-ыг тэлэхийн тулд `~/.wall-vault/ca.crt`-ыг хуулж, тус бүр дээр `wall-vault cert install-trust --ca <path>`-ыг ажиллуул. Vault мөн `:56247` (**bootstrap port**) дээр жижиг plain-HTTP listener-ээр `ca.crt`-г илчилдэг шинэ client-д HTTPS ярихын тулд CA хэрэгтэй болсон catch-22 тохиолдлуудад зориулж.
 
-```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+### Loopback HTTP companion
+
+Зарим agent — ялангуяа OpenClaw-ийн багцлагдсан Node runtime — process spawn-д `NODE_EXTRA_CA_CERTS`-ыг дахин бичдэг бөгөөд оператороос өгсөн CA hint-ийг хаядаг. Тэд `cert install-trust` хийсний дараа ч daemon дотроос wall-vault CA-г хүндлэж чадахгүй. wall-vault нь TLS идэвхжсэн үед `127.0.0.1:56245` дээр **зөвхөн loopback plain-HTTP listener**-ыг нэмж холбосноор үүнийг тойрч ажилладаг. Same-host client-ууд тэр port-оор TLS-гүйгээр proxy-д хүрнэ; LAN client-ууд TLS listener-ыг үргэлжлүүлэн ашиглана.
+
+Хэрэгцээгүй бол `WV_PROXY_PLAIN_PORT=0`-аар идэвхгүй болго.
+
+### `wall-vault cert list`
+
+`~/.wall-vault/`-ын доорх cert бүрийг subject, validity window, SAN-уудтай нь харуулна.
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
 ```
 
-> 💡 **Зөвлөмж**: `export` тушаал зөвхөн одоогийн терминал сесcэд хамаарна. Компьютер дахин эхлүүлсний дараа ч хадгалагдахын тулд `~/.bashrc` эсвэл `~/.zshrc` файлд дээрх мөрийг нэмнэ үү.
+---
 
-### Арга 2: Хянах самбар UI (хулганаар товших)
+## API key бүртгэх
 
-1. Хөтөч дээр `https://localhost:56243` нээх
-2. Дээд талын **🔑 API Key** карт дээрх `[+ Нэмэх]` товчийг товших
-3. Үйлчилгээний төрөл, түлхүүрийн утга, шошго (санамжийн нэр), өдрийн хязгаар оруулаад хадгалах
+Хоёр арга: dashboard, эсвэл environment variable-ууд.
 
-### Арга 3: REST API (Автоматжуулалт·Скриптийн хувьд)
+### Dashboard (зөвлөдөг)
 
-REST API гэдэг нь програмууд хоорондоо HTTP-ээр өгөгдөл солилцох арга юм. Скриптээр автомат бүртгэхэд хэрэгтэй.
+1. Admin token-оор `https://localhost:56243`-д нэвтэр.
+2. Keys card-д **+ API key** дар.
+3. Үйлчилгээ сонго (Google, OpenRouter, Anthropic, OpenAI, …).
+4. Key-г paste хий. Хадгал.
+
+Үйлчилгээ тус бүрд олон key байж болно; proxy тэдгээрийн хооронд round-robin хийж, per-key cooldown-д орсон key-уудыг алгасдаг.
+
+### Environment variables (нэг удаагийн bootstrap)
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer администратор-токен" \
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
+wall-vault start
+```
+
+Ийнхүү өгсөн key-уудыг анхны launch-ын үед encrypted store руу бичнэ. Дараагийн start-ууд нь тэдгээрийг disk-ээс уншина; та эхний run-ийн дараа env var-уудыг unset хийж болно.
+
+### Cooldown болон солих
+
+Амжилттай дуудлага бүр key-ийн `usage_count`-ыг нэмэгдүүлж, `last_used`-ийг шинэчилнэ. HTTP 429 / 402 / 403 дээр proxy нь key-г **cooldown** руу оруулдаг (өгөгдмөл: 429-д 60 минут, 402-д 24 цаг, 403-д 12 цаг). Дараагийн dispatch тэр үйлчилгээний өөр key-г сонгоно. Үйлчилгээний бүх key cooldown-д орсон үед proxy тэр үйлчилгээг бүхэлд нь хурдан алгасч fallback chain-ий дараагийн provider-ыг туршина.
+
+Cooldown-ууд dashboard дээр key-тус бүрд буурах тоологчтойгоор харагдана.
+
+---
+
+## Agent холбох
+
+### OpenClaw
+
+OpenClaw анхны зорилтот client. Dashboard-ын **+ Add agent** modal-ыг ашигла:
+
+- **Agent type**-ыг `openclaw` эсвэл `nanoclaw` болгож тохируул.
+- **Work directory**-г тохируул — OpenClaw-ын хувьд энэ нь `~/.openclaw` болж автоматаар бөглөгдөнө.
+- **preferred service** болон сонголтоор **model override** сонго.
+- **Apply** дар. wall-vault `~/.openclaw/openclaw.json`-ыг шууд бичнэ (provider URL, vault token, model entry-үүд).
+
+Та dashboard-аас model-ыг солих үед OpenClaw 1–3 секундийн дотор SSE-ээр өөрчлөлтийг авна — restart хийхгүй.
+
+### Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
+```
+
+Upstream Anthropic credit дуусахад dispatch нь энэ client-ын `fallback_services`-д жагсаасан үйлчилгээ рүү шилждэг. Өгөгдмөлөөр anthropic dispatch руу илгээсэн Claude бус model id error буцаадаг ингэснээр misrouting шууд гарч ирнэ. Автомат дахин бичилт рүү opt in хий:
+
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
+
+### Cursor
+
+Cursor **Settings → AI → OpenAI API**-д:
+
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### Custom HTTP
+
+```bash
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "Үндсэн Key",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### Арга 4: proxy флаг (Түр зуурын тест хийхэд)
+`proxy.oai_stream_forward: true` тохируулагдсан үед мөн endpoint streaming (`"stream": true`)-ыг хүлээн авна.
 
-Албан ёсоор бүртгэлгүйгээр түр зуур түлхүүр оруулж туршихад ашиглана. Програм хаахад устана.
+---
+
+## Dashboard
+
+`https://localhost:56243`. Home grid дээр таван card:
+
+- **Keys** — API key бүрийг үйлчилгээгээр бүлэглэсэн. Нэмэх, засах, устгах; хэрэглээ, cooldown-ыг харах.
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp, мөн `~/.wall-vault/services/`-ын ямар ч plugin yaml. Үйлчилгээ тус бүрд `default_model`, `allowed_models`, base URL, reasoning toggle тохируулах.
+- **Clients (agents)** — бүртгэгдсэн client бүр (OpenClaw bot, Claude Code session, Cursor instance, …). Preferred service, model override, fallback chain хуваарилах.
+- **Proxies** — энэ vault руу authenticate хийсэн proxy бүр. Шууд төлөв (online/offline), сүүлчийн харсан, одоогийн model.
+- **Settings** — admin token, мастер нууц үг солих, theme, хэл.
+
+Card бүр edit slideover-той (баруун тал). Гадуур дарах эсвэл `Esc` дарвал хаагдана. Өөрчлөлтүүд секундын дотор SSE-ээр холбогдсон бүх proxy руу push хийгддэг.
+
+**Footer** нь SSE indicator (ногоон = холбогдсон, улбар шар = дахин холбогдож байна, саарал = тасарсан) болон шууд build хувилбарыг агуулдаг.
+
+---
+
+## Distributed горим
+
+Танд бүгд адил key хэрэгтэй хэд хэдэн машин байгаа үед нэг host дээр vault, бусад тус бүр дээр proxy-нуудыг ажиллуул.
+
+### Vault host
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## Proxy ашиглах арга
-
-### OpenClaw дээр ашиглах (Гол зорилго)
-
-OpenClaw-г wall-vault-аар дамжуулан AI үйлчилгээнд холбох арга.
-
-`~/.openclaw/openclaw.json` файлыг нээж доорх агуулгыг нэмнэ үү:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // vault агент токен
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // Үнэгүй 1M context
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> 💡 **Илүү хялбар арга**: Хянах самбар дахь агент картын **🦞 OpenClaw тохиргоо хуулах** товчийг дарвал токен болон хаяг аль хэдийн бөглөгдсөн хэсэг clipboard-д хуулагдана. Зүгээр буулгаад л болно.
-
-**Загварын нэрний өмнөх `wall-vault/` хаашаа холбогдох вэ?**
-
-Загварын нэрийг харснаар wall-vault аль AI үйлчилгээ рүү хүсэлт илгээхийг автоматаар шийднэ:
-
-| Загварын хэлбэр | Холбогдох үйлчилгээ |
-|----------|--------------|
-| `wall-vault/gemini-*` | Google Gemini шууд холболт |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI шууд холболт |
-| `wall-vault/claude-*` | OpenRouter-аар дамжсан Anthropic холболт |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (Үнэгүй 1 сая токен context) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter холболт |
-| `google/загвар-нэр`, `openai/загвар-нэр`, `anthropic/загвар-нэр` гэх мэт | Холбогдох үйлчилгээнд шууд холболт |
-| `custom/google/загвар-нэр`, `custom/openai/загвар-нэр` гэх мэт | `custom/` хэсгийг хасаад дахин чиглүүлэх |
-| `загвар-нэр:cloud` | `:cloud` хэсгийг хасаад OpenRouter-тай холбох |
-
-> 💡 **Context (контекст) гэж юу вэ?** AI-ын нэг удаа санах боломжтой яриа хэлэлцээний хэмжээ юм. 1M (нэг сая токен) гэвэл маш урт яриа эсвэл баримт бичгийг нэг дор боловсруулах боломжтой.
-
-### Gemini API форматаар шууд холбох (байгаа хэрэгслүүдтэй нийцтэй)
-
-Google Gemini API шууд ашиглаж байсан хэрэгсэл байвал хаягийг зүгээр wall-vault руу өөрчилнө:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-Эсвэл URL-г шууд зааж өгдөг хэрэгслийн хувьд:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### OpenAI SDK (Python) дээр ашиглах
-
-Python-ээр AI ашигладаг кодонд ч wall-vault холбож болно. `base_url`-г л өөрчилнө:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # API key-г wall-vault өөрөө удирдана
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # provider/model форматаар оруулах
-    messages=[{"role": "user", "content": "Сайн байна уу"}]
-)
-```
-
-### Ажиллаж байх үед загвар солих
-
-wall-vault аль хэдийн ажиллаж байх үед AI загварыг солихын тулд:
-
-```bash
-# Proxy руу шууд хүсэлт илгээж загвар солих
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# Тархсан горимд (multi bot) vault сервер дээр солих → SSE-ээр шууд тусгагдана
-curl -X PUT https://localhost:56243/admin/clients/миний-бот-id \
-  -H "Authorization: Bearer администратор-токен" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### Боломжтой загварын жагсаалт шалгах
-
-```bash
-# Бүх жагсаалтыг харах
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# Зөвхөн Google загварыг харах
-curl "https://localhost:56244/api/models?service=google"
-
-# Нэрээр хайх (жишээ нь: "claude" агуулсан загварууд)
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**Үйлчилгээ тус бүрийн гол загварын хураангуй:**
-
-| Үйлчилгээ | Гол загварууд |
-|--------|----------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M context үнэгүй, DeepSeek R1/V3, Qwen 2.5 гэх мэт) |
-| Ollama | Таны компьютерт суулгасан локал серверийг автоматаар илрүүлнэ |
-| LM Studio | Компьютерийн локал сервер (порт 1234) |
-| vLLM | Компьютерийн локал сервер (порт 8000) |
-| llama.cpp | Компьютерийн локал сервер (порт 8080) |
-
----
-
-## Key Vault хянах самбар
-
-Хөтөч дээр `https://localhost:56243` нээвэл хянах самбарыг харна.
-
-**Дэлгэцийн бүтэц:**
-- **Дээд тогтмол мөр (topbar)**: Лого, хэл·загвар сонголт, SSE холболтын төлөв
-- **Картын грид**: Агент·үйлчилгээ·API key картууд плитка хэлбэрээр байрласан
-
-### API Key карт
-
-Бүртгэгдсэн API key-нүүдийг нэг дор удирдах карт.
-
-- Үйлчилгээ тус бүрээр ялган key жагсаалтыг харуулна.
-- `today_usage`: Өнөөдөр амжилттай боловсруулсан токен (AI-ын уншсан, бичсэн тэмдэгт) тоо
-- `today_attempts`: Өнөөдрийн нийт дуудлагын тоо (амжилттай + амжилтгүй)
-- `[+ Нэмэх]` товчоор шинэ key бүртгэх, `✕`-ээр key устгах.
-
-> 💡 **Токен гэж юу вэ?** AI текст боловсруулахад ашигладаг нэгж юм. Ойролцоогоор нэг англи үг, эсвэл бусад хэлний 1-2 тэмдэгттэй тэнцэнэ. API-ын төлбөр ихэвчлэн энэ токен тоогоор тооцогдоно.
-
-### Агент карт
-
-wall-vault proxy-д холбогдсон бот (агент)-уудын төлөвийг харуулах карт.
-
-**Холболтын төлөв 4 шатлалаар харагдана:**
-
-| Тэмдэг | Төлөв | Утга |
-|------|------|------|
-| 🟢 | Ажиллаж байна | Proxy хэвийн ажиллаж байна |
-| 🟡 | Хоцрогдсон | Хариу ирж байгаа ч удаан |
-| 🔴 | Офлайн | Proxy хариу өгөхгүй байна |
-| ⚫ | Холбогдоогүй·Идэвхгүй | Proxy vault-д холбогдож байгаагүй эсвэл идэвхгүй |
-
-**Агент картны доод товчны заавар:**
-
-Агентыг бүртгэхдээ **агентын төрөл**-ийг заавал тусдаа ашиглавал тухайн төрлийн хялбар товчнууд автоматаар гарч ирнэ.
-
----
-
-#### 🔘 Тохиргоо хуулах товч — Холболтын тохиргоог автоматаар бүрдүүлнэ
-
-Товч дарвал тухайн агентын токен, proxy хаяг, загварын мэдээлэл аль хэдийн бөглөгдсөн тохиргооны хэсэг clipboard-д хуулагдана. Хуулсан агуулгыг доорх хүснэгтэд үзүүлсэн газар буулгавал холболтын тохиргоо дуусна.
-
-| Товч | Агентын төрөл | Буулгах газар |
-|------|-------------|-------------|
-| 🦞 OpenClaw тохиргоо хуулах | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 NanoClaw тохиргоо хуулах | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 Claude Code тохиргоо хуулах | `claude-code` | `~/.claude/settings.json` |
-| ⌨ Cursor тохиргоо хуулах | `cursor` | Cursor → Settings → AI |
-| 💻 VSCode тохиргоо хуулах | `vscode` | `~/.continue/config.json` |
-
-**Жишээ — Claude Code төрөл бол ийм агуулга хуулагдана:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "энэ-агентын-токен"
-}
-```
-
-**Жишээ — VSCode (Continue) төрөл бол:**
-
-```yaml
-# ~/.continue/config.yaml  ← config.json биш config.yaml-д буулгах
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: энэ-агентын-токен
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> ⚠️ **Continue-ийн хамгийн сүүлийн хувилбар `config.yaml` ашигладаг.** `config.yaml` байвал `config.json` бүрэн үл тоомсорлогдоно. Заавал `config.yaml`-д буулгана уу.
-
-**Жишээ — Cursor төрөл бол:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : энэ-агентын-токен
-
-// Эсвэл орчны хувьсагч:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=энэ-агентын-токен
-```
-
-> ⚠️ **Clipboard-д хуулагдахгүй бол**: Хөтчийн аюулгүй байдлын бодлогоор хуулалт хаагдаж болно. Popup-аар текст хайрцаг нээгдвэл Ctrl+A-аар бүгдийг сонгоод Ctrl+C-ээр хуулна уу.
-
----
-
-#### ⚡ Автомат хэрэглэх товч — Нэг удаа дарвал тохиргоо дуусна
-
-Агентын төрөл `cline`, `claude-code`, `openclaw`, эсвэл `nanoclaw` бол агент карт дээр **⚡ Тохиргоо хэрэглэх** товч харагдана. Энэ товчийг дарвал холбогдох агентын локал тохиргооны файл автоматаар шинэчлэгдэнэ.
-
-| Товч | Агентын төрөл | Зорилтот файл |
-|------|-------------|-------------|
-| ⚡ Cline тохиргоо хэрэглэх | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ Claude Code тохиргоо хэрэглэх | `claude-code` | `~/.claude/settings.json` |
-| ⚡ OpenClaw тохиргоо хэрэглэх | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ NanoClaw тохиргоо хэрэглэх | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> ⚠️ Энэ товч **localhost:56244** (локал proxy) руу хүсэлт илгээнэ. Тухайн машин дээр proxy ажиллаж байх ёстой.
-
----
-
-#### 🔀 Чирж буулгах картын эрэмбэ (v0.1.17, сайжруулсан v0.1.25)
-
-Хянах самбарын агент картуудыг **чирж** хүссэн дарааллаар дахин байрлуулж болно.
-
-1. Картны зүүн дээд талын **гэрлэн дохио (●)** хэсгийг хулганаар барьж чирнэ
-2. Хүссэн байрлалын карт дээр буулгавал дараалал солигдоно
-
-> 💡 Картны их бие (оруулах талбар, товч гэх мэт) чирэгддэггүй. Зөвхөн гэрлэн дохионы хэсгээс л барьж болно.
-
-#### 🟠 Агентын процесс илрүүлэлт (v0.1.25)
-
-Proxy хэвийн ажиллаж байгаа ч локал агентын процесс (NanoClaw, OpenClaw) унтарсан тохиолдолд картны гэрлэн дохио **улбар шар (анивчих)** болж "Агентын процесс зогссон" мессеж харагдана.
-
-- 🟢 Ногоон: Proxy + агент хэвийн
-- 🟠 Улбар шар (анивчих): Proxy хэвийн, агент унтарсан
-- 🔴 Улаан: Proxy офлайн
-3. Солигдсон дараалал **сервер дээр шууд хадгалагдаж** шинэчилсний дараа ч хадгалагдана
-
-> 💡 Мэдрэгчтэй төхөөрөмж (гар утас/таблет) дээр одоохондоо дэмжигдэхгүй. Десктоп хөтөч ашиглана уу.
-
----
-
-#### 🔄 Хоёр талт загвар синхрончлол (v0.1.16)
-
-Vault хянах самбар дээр агентын загварыг өөрчлөхөд тухайн агентын локал тохиргоо автоматаар шинэчлэгдэнэ.
-
-**Cline-ийн хувьд:**
-- Vault дээр загвар өөрчлөхөд → SSE үйл явдал → proxy `globalState.json`-ийн загвар талбарыг шинэчилнэ
-- Шинэчлэгдэх талбарууд: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` болон API key хөндөгдөхгүй
-- **VS Code дахин ачаалах шаардлагатай (`Ctrl+Alt+R` эсвэл `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - Cline ажиллаж байх үедээ тохиргооны файлыг дахин уншдаггүй учраас
-
-**Claude Code-ийн хувьд:**
-- Vault дээр загвар өөрчлөхөд → SSE үйл явдал → proxy `settings.json`-ийн `model` талбарыг шинэчилнэ
-- WSL болон Windows хоёр замыг автоматаар хайна (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
-
-**Буцах чиглэл (агент → vault):**
-- Агент (Cline, Claude Code гэх мэт) proxy руу хүсэлт илгээхэд proxy heartbeat-д тухайн клиентийн үйлчилгээ·загварын мэдээллийг оруулна
-- Vault хянах самбарын агент карт дээр одоо ашиглаж буй үйлчилгээ/загвар бодит цагт харагдана
-
-> 💡 **Гол зүйл**: Proxy хүсэлтийн Authorization токеноор агентыг таньж, vault-д тохируулсан үйлчилгээ/загвар руу автоматаар чиглүүлнэ. Cline эсвэл Claude Code өөр загварын нэр илгээсэн ч proxy vault тохиргоогоор хүчингүй болгоно.
-
----
-
-### VS Code дээр Cline ашиглах — Дэлгэрэнгүй заавар
-
-#### Алхам 1: Cline суулгах
-
-VS Code Extension Marketplace-аас **Cline** (ID: `saoudrizwan.claude-dev`) суулгана.
-
-#### Алхам 2: Vault-д агент бүртгэх
-
-1. Vault хянах самбар (`http://vault-IP:56243`) нээнэ
-2. **Агент** хэсэгт **+ Нэмэх** товших
-3. Доорх байдлаар бөглөнө:
-
-| Талбар | Утга | Тайлбар |
-|------|----|------|
-| ID | `minii_cline` | Өвөрмөц таних тэмдэг (англиар, зай тавихгүй) |
-| Нэр | `Миний Cline` | Хянах самбар дээр харагдах нэр |
-| Агентын төрөл | `cline` | ← Заавал `cline` сонгох |
-| Үйлчилгээ | Үйлчилгээ сонгох (жишээ: `google`) | |
-| Загвар | Загвар оруулах (жишээ: `gemini-2.5-flash`) | |
-
-4. **Хадгалах** дарвал токен автоматаар үүсгэгдэнэ
-
-#### Алхам 3: Cline-тай холбох
-
-**Арга A — Автомат хэрэглэх (Санал болгох)**
-
-1. Тухайн машин дээр wall-vault **proxy** ажиллаж байгааг шалгана (`localhost:56244`)
-2. Хянах самбарын агент картын **⚡ Cline тохиргоо хэрэглэх** товчийг дарна
-3. "Тохиргоо амжилттай хэрэглэгдлээ!" мэдэгдэл гарвал амжилттай
-4. VS Code дахин ачаална (`Ctrl+Alt+R`)
-
-**Арга B — Гар тохиргоо**
-
-Cline хажуугийн самбарт тохиргоо (⚙️) нээнэ:
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://proxy-хаяг:56244/v1`
-  - Ижил машин: `https://localhost:56244/v1`
-  - Өөр машин жишээ нь mini сервер: `http://192.168.1.20:56244/v1`
-- **API Key**: Vault-аас олгосон токен (агент картнаас хуулна)
-- **Model ID**: Vault-д тохируулсан загвар (жишээ: `gemini-2.5-flash`)
-
-#### Алхам 4: Шалгах
-
-Cline чат дээр ямар нэг зурвас илгээнэ. Хэвийн бол:
-- Vault хянах самбарын тухайн агент карт дээр **ногоон цэг (● Ажиллаж байна)** харагдана
-- Карт дээр одоогийн үйлчилгээ/загвар харагдана (жишээ: `google / gemini-2.5-flash`)
-
-#### Загвар солих
-
-Cline-ийн загварыг солихыг хүсвэл **vault хянах самбар** дээр солино:
-
-1. Агент картны үйлчилгээ/загвар dropdown-г өөрчлөх
-2. **Хэрэглэх** товших
-3. VS Code дахин ачаалах (`Ctrl+Alt+R`) — Cline footer-ийн загварын нэр шинэчлэгдэнэ
-4. Дараагийн хүсэлтээс шинэ загвар ашиглагдана
-
-> 💡 Бодитоор proxy Cline-ийн хүсэлтийг токеноор таньж vault тохиргооны загвар руу чиглүүлнэ. VS Code дахин ачаалахгүй ч **ашиглагдаж буй загвар шууд солигдоно** — дахин ачаалах нь Cline UI-ийн загварын дүрслэлийг шинэчлэхийн л тулд юм.
-
-#### Холболт тасрах илрүүлэлт
-
-VS Code-г хаахад vault хянах самбарын агент карт ойролцоогоор **90 секунд**-ийн дараа шар (хоцрогдсон), **3 минут**-ийн дараа улаан (офлайн) болно. (v0.1.18-аас 15 секунд тутмын төлөв шалгалтаар офлайн илрүүлэлт хурдассан.)
-
-#### Алдаа засах
-
-| Шинж тэмдэг | Шалтгаан | Шийдэл |
-|------|------|------|
-| Cline дээр "Холбогдож чадсангүй" алдаа | Proxy ажиллахгүй байгаа эсвэл хаяг буруу | `curl https://localhost:56244/health`-ээр proxy шалгах |
-| Vault дээр ногоон цэг харагдахгүй | API key (токен) тохируулаагүй | **⚡ Cline тохиргоо хэрэглэх** товчийг дахин дарах |
-| Cline footer загвар солигдохгүй | Cline тохиргоог кэш хийсэн | VS Code дахин ачаалах (`Ctrl+Alt+R`) |
-| Буруу загварын нэр харагдах | Хуучин алдаа (v0.1.16-д засагдсан) | Proxy-г v0.1.16 ба дээш шинэчлэх |
-
----
-
-#### 🟣 Байршуулах тушаал хуулах товч — Шинэ машинд суулгахад ашиглана
-
-Шинэ компьютерт wall-vault proxy анх удаа суулгаж vault-д холбоход ашиглана. Товч дарвал суулгалтын бүх скрипт хуулагдана. Шинэ компьютерийн терминалд буулгаад ажиллуулвал доорх бүх зүйл нэг дор хийгдэнэ:
-
-1. wall-vault binary суулгах (аль хэдийн суулгасан бол алгасна)
-2. systemd хэрэглэгчийн үйлчилгээний автомат бүртгэл
-3. Үйлчилгээ эхлүүлж vault-д автоматаар холбох
-
-> 💡 Скрипт дотор энэ агентын токен болон vault серверийн хаяг аль хэдийн бөглөгдсөн тул буулгасны дараа ямар нэг засвар хийхгүйгээр шууд ажиллуулах боломжтой.
-
----
-
-### Үйлчилгээний карт
-
-Ашиглах AI үйлчилгээг асаах, унтраах эсвэл тохируулах карт.
-
-- Үйлчилгээ тус бүрийн идэвхжүүлэх·идэвхгүй болгох шилжүүлэгч
-- Локал AI сервер (таны компьютер дээр ажиллаж буй Ollama, LM Studio, vLLM, llama.cpp гэх мэт)-ийн хаягийг оруулвал боломжтой загваруудыг автоматаар олно.
-- **Локал үйлчилгээний холболтын төлөв**: Үйлчилгээний нэрний хажууд ● цэг **ногоон** бол холбогдсон, **саарал** бол холбогдоогүй
-- **Локал үйлчилгээний автомат гэрлэн дохио** (v0.1.23+): Локал үйлчилгээнүүд (Ollama, LM Studio, vLLM, llama.cpp) холболт боломжтой бол автоматаар идэвхждэг, тасарвал автоматаар идэвхгүй болно. Cloud үйлчилгээнүүд (Google, OpenRouter гэх мэт) API key-тэй/байхгүйгээс хамаарч автомат шилждэгтэй адил.
-- **Сэтгэлгээний горимын шилжүүлэгч** (v0.2.17+): Локал үйлчилгээний засах цонхны доор **сэтгэлгээний горим** шалгах нүд гарч ирнэ. Асаавал proxy нь upstream руу илгээх chat-completions биед `"reasoning": true` нэмэх бөгөөд DeepSeek R1, Qwen QwQ зэрэг бодох үйл явцыг гаргаж өгдөг загварууд `<think>…</think>` блокыг хамт буцаана. Энэ талбарыг мэддэггүй серверүүд үл тоомсорлодог тул холимог ачаалалд ч аюулгүйгээр асаалттай үлдээж болно.
-
-> 💡 **Локал үйлчилгээ өөр компьютер дээр ажиллаж байвал**: Үйлчилгээний URL оруулах талбарт тухайн компьютерийн IP-г оруулна. Жишээ: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Үйлчилгээ `0.0.0.0` биш `127.0.0.1` дээр bind хийсэн бол гаднах IP-аар хандах боломжгүй тул үйлчилгээний тохиргооноос bind хаягийг шалгана уу.
-
-### Администратор токен оруулах
-
-Хянах самбар дээр key нэмэх·устгах зэрэг чухал үйлдэл хийхэд администратор токен оруулах popup гарч ирнэ. setup шидтэнд тохируулсан токеноо оруулна. Нэг удаа оруулсны дараа хөтчийг хаах хүртэл хүчинтэй.
-
-> ⚠️ **15 минутын дотор баталгаажуулалт 10 удаагаас дээш амжилтгүй болвол тухайн IP түр хугацаагаар хаагдана.** Токеноо мартсан бол `wall-vault.yaml` файлын `admin_token` хэсгийг шалгана уу.
-
----
-
-## Тархсан горим (Multi Bot)
-
-Олон компьютер дээр OpenClaw-г нэгэн зэрэг ажиллуулахад **нэг key сейфийг хуваалцах** бүтэц. Нэг газраас л key удирдахад хялбар.
-
-### Бүтцийн жишээ
-
-```
-[Key Vault сервер]
-  wall-vault vault    (Key Vault :56243, хянах самбар)
-
-[WSL Alpha]           [Raspberry Pi Gamma]    [Mac Mini локал]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ SSE синхрончлол     ↕ SSE синхрончлол       ↕ SSE синхрончлол
-```
-
-Бүх бот төвийн vault серверийг хардаг тул vault дээр загвар солих эсвэл key нэмэхэд бүх ботод шууд тусгагдана.
-
-### Алхам 1: Key Vault сервер эхлүүлэх
-
-Vault серверээр ашиглах компьютер дээр ажиллуулна:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### Алхам 2: Бот бүрийг (клиент) бүртгэх
+Dashboard одоо `https://<vault-host>:56243`-д хүртээмжтэй боллоо. **Clients** card-д алсын proxy тус бүрд agent нэмэх; тус бүр өвөрмөц `vault_token` үүсгэнэ.
 
-Vault серверт холбогдох бот бүрийн мэдээллийг урьдчилж бүртгэнэ:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer администратор-токен" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "БотA",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### Алхам 3: Бот бүрийн компьютер дээр Proxy эхлүүлэх
-
-Бот суулгасан компьютер бүр дээр vault серверийн хаяг болон токен зааж proxy ажиллуулна:
+### Proxy host-ууд
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> 💡 **`192.168.x.x`** хэсгийг vault сервер компьютерийн бодит дотоод IP хаягаар солино. Router тохиргоо эсвэл `ip addr` тушаалаар шалгаж болно.
+Proxy нь vault руу authenticate хийж, SSE stream нээж, хүлээн авсан ямар ч config-ыг (preferred service, model override, fallback chain) хэрэгжүүлдэг. Дараагийн vault засварууд секундын дотор restart хийхгүйгээр гарч ирнэ.
+
+LAN-тэлсэн суулгацын хувьд vault host дээр TLS идэвхжүүл (`WV_VAULT_TLS_ENABLED=1` + cert/key env var-ууд) ба proxy host тус бүрийг ижил `wall-vault cert install-trust` алхмаар ажиллуул ингэснээр proxy-ийн vault руу хийх HTTPS дуудлагууд найдвартай байх болно.
 
 ---
 
-## Автомат эхлүүлэх тохиргоо
+## Авто-эхлэлт
 
-Компьютер дахин эхлүүлэх бүрт гараар wall-vault асаах нь төвөгтэй бол системийн үйлчилгээнд бүртгэнэ. Нэг удаа бүртгэвэл ачаалах үед автоматаар эхэлнэ.
+### systemd (Linux)
 
-### Linux — systemd (ихэнх Linux)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd гэдэг нь Linux дээр програмыг автоматаар эхлүүлэх·удирдах систем:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-Лог шалгах:
+Ижил host дээрх vault-ын хувьд параллел `wall-vault-vault.service` бичнэ. Standalone горимын хувьд `wall-vault start` дуудах нэг unit хангалттай.
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-macOS дээр програмын автомат ажиллагааг хариуцах систем:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. [nssm.cc](https://nssm.cc/download)-аас NSSM татаж PATH-д нэмнэ.
-2. Администратор PowerShell дээр:
-
-```powershell
-wall-vault doctor deploy windows
-```
+`wall-vault.exe start`-г Windows service болгож wrap хийхэд `nssm` ашигла, эсвэл хэрэглэгч logon хийх үед ажиллах `schtasks` бичлэг ашигла.
 
 ---
 
-## Doctor (Эмч)
+## Plugin yamls
 
-`doctor` тушаал нь wall-vault зөв тохируулагдсан эсэхийг **өөрөө оношлож, засах хэрэгсэл** юм.
+Ямар ч OpenAI-нийцтэй backend-ыг `~/.wall-vault/services/`-ын доор yaml хаяснаар код өөрчлөлгүйгээр нэмж болно. wall-vault нь үүнийг startup-д ачаалж, dispatch, OAI-compat detection set, Gemini-stream bridge-д үйлчилгээг бүртгэдэг.
+
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
+```
+
+`configs/services/`-д багцлагдсан багц (lmstudio, vllm, llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server, litellm-proxy, ollama, google, openrouter) өгөгдмөлөөр идэвхгүйгээр ирдэг. Хэрэгтэйг нь `~/.wall-vault/services/` руу хуулж, `enabled: true` болгож, restart хий.
+
+---
+
+## Doctor
+
+`wall-vault doctor` нь бүх суулгац дээр нэг удаагийн health probe ажиллуулдаг:
+
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
+```
+
+Мөр бүр дараахын аль нэг:
+
+- `✓` — эрүүл
+- `⚠` — доройтсон ч ажиллаж байгаа (нэг key cooldown-д орсон, бага quota гэх мэт)
+- `✗` — эвдэрсэн
+- `SKIP` — тохируулаагүй / энэ host-д хамаагүй
+
+Хоёр дахь daemon горим нь ижил probe-ыг `doctor.interval` бүр (өгөгдмөл 5 минут) ажиллуулж, үр дүнг `doctor.log_file`-д (өгөгдмөл `/tmp/wall-vault-doctor.log`) бичнэ. `doctor.auto_fix` true үед энэ нь нийтлэг drift-ийг засахыг (хуучин OpenClaw config, дутуу TLS trust, дахин эхлүүлэх боломжтой үйлчилгээнүүд) оролдоно.
+
+Dashboard-аас **Doctor** card эсвэл `wall-vault doctor`-аар нэг удаагийн trigger хий.
+
+---
+
+## Hooks
+
+Key event-үүд дээр shell command ажиллуул:
+
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+Hook бүр event-тусгайлан environment variable-ууд (`SERVICE`, `MODEL`, `ERROR`, `AGENT`, `LEVEL`, `MSG`) авдаг. Hook-ууд 5 секундын timeout-той async ажилладаг — proxy удаан hook дээр хэзээ ч block хийхгүй.
+
+---
+
+## Орчны хувьсагчид
+
+| Variable | YAML field |
+|----------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | One-shot import: comma-separated Google keys |
+| `WV_KEY_OPENROUTER` | One-shot import: OpenRouter keys |
+| `WV_KEY_ANTHROPIC` | One-shot import: Anthropic keys |
+| `WV_KEY_OPENAI` | One-shot import: OpenAI keys |
+| `WV_OLLAMA_URL` | Per-host Ollama URL override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Per-backend URL override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
+
+Тохируулагдсан env var бүр YAML file-аас давамгайлдаг.
+
+---
+
+## Алдааг засах
+
+### `:56244` дээр `connection refused`
+
+Эсвэл proxy ажиллахгүй байгаа, эсвэл өөр host-д холбогдсон байна. Шалга:
 
 ```bash
-wall-vault doctor check   # Одоогийн төлөвийг оношлох (зөвхөн унших, юу ч өөрчлөхгүй)
-wall-vault doctor fix     # Асуудлуудыг автоматаар засах
-wall-vault doctor all     # Оношлох + автомат засах нэг дор
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
 ```
 
-> 💡 Ямар нэг зүйл буруу мэт санагдвал `wall-vault doctor all`-г эхлээд ажиллуулна уу. Олон асуудлыг автоматаар барина.
+Хэрэв энэ нь өөр port дээр ажиллаж байгаа бол, таны config-д `proxy.port` override хийгдсэн байна — `~/.wall-vault/config.yaml`-г шалга.
 
----
+### `x509: certificate signed by unknown authority`
 
-## RTK Токен хэмнэлт
+Client wall-vault дотоод CA-г trust хийдэггүй. Client машин дээр `wall-vault cert install-trust` ажиллуул. OS trust store-ыг үл тоох runtime-тай agent-ын хувьд (жишээ нь `NODE_EXTRA_CA_CERTS` нь hardcoded байгаа Node), `127.0.0.1:56245` (зөвхөн нэг host) дахь loopback HTTP companion-ыг ашигла, эсвэл энгийн HTTP руу шилжихийн тулд `WV_PROXY_TLS_ENABLED=0` тохируул.
 
-*(v0.1.24+)*
+### `token not registered with vault`
 
-**RTK (Токен хэмнэлтийн хэрэгсэл)** нь AI кодлох агент (Claude Code гэх мэт)-ын ажиллуулсан shell тушаалын гаралтыг автоматаар шахаж токен хэрэглээг бууруулна. Жишээлбэл `git status`-ийн 15 мөрийн гаралт 2 мөр хураангуй болно.
+Client-ын `Authorization: Bearer <token>` бүртгэгдсэн ямар ч client-тай таарахгүй байна. Dashboard-ын **Clients** доор token-ыг шалга. Хэрэв та хуучин config-аас `proxy-managed`, `dummy`, `""` зэрэг token-ыг шууд хуулсан бол үүнийг жинхэнэ client token-оор солино.
 
-### Үндсэн хэрэглээ
+### `Anthropic dispatch needs a Claude model id`
+
+v0.2.63-аас хойшхи өгөгдмөл зан үйл: anthropic dispatch руу илгээсэн Claude бус model id error буцаадаг. Routing-аа засах (anthropic руу `gemini-2.5-flash` бүү илгээ) эсвэл `proxy.anthropic_fallback_model`-ээр автомат дахин бичилт рүү opt in хий.
+
+### `unknown service: <id>`
+
+Dispatch ямар ч plugin yaml эзэмшээгүй service id-г харсан. Шалга:
 
 ```bash
-# Тушаалыг wall-vault rtk-аар ороож гаралтыг автомат шүүнэ
-wall-vault rtk git status          # Өөрчлөгдсөн файлын жагсаалт л
-wall-vault rtk git diff HEAD~1     # Өөрчлөгдсөн мөрүүд + хамгийн бага контекст
-wall-vault rtk git log -10         # Hash + нэг мөр мессеж тус бүр
-wall-vault rtk go test ./...       # Зөвхөн амжилтгүй тестүүд
-wall-vault rtk ls -la              # Дэмжигдэхгүй тушаалууд автоматаар хайчлагдана
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
 ```
 
-### Дэмжигдсэн тушаалууд болон хэмнэлтийн үр дүн
+Хэрэв yaml байгаа боловч `enabled: false` бол түүнийг сольж тохируул. Хэрэв энэ нь бүхэлдээ дутуу бол source tree-ийн `configs/services/`-аас хуул.
 
-| Тушаал | Шүүлтүүрийн арга | Хэмнэлтийн хувь |
-|------|----------|--------|
-| `git status` | Зөвхөн өөрчлөгдсөн файлын хураангуй | ~87% |
-| `git diff` | Өөрчлөгдсөн мөрүүд + 3 мөр контекст | ~60-94% |
-| `git log` | Hash + эхний мөр мессеж | ~90% |
-| `git push/pull/fetch` | Явц арилгах, зөвхөн хураангуй | ~80% |
-| `go test` | Зөвхөн амжилтгүйг харуулах, тэнцсэнийг тоолох | ~88-99% |
-| `go build/vet` | Зөвхөн алдаа харуулах | ~90% |
-| Бусад бүх тушаалууд | Эхний 50 мөр + сүүлийн 50 мөр, дээд 32KB | Хувьсах |
+### Reasoning model дээр хоосон хариу
 
-### 3 алхамт шүүлтүүрийн дамжуулга
+`qwen3.6`, `deepseek-r1`, GPT-`o1` гэр бүл нь заримдаа зөвхөн `reasoning_content` гаргаж, `content`-ыг хоосон үлдээдэг. v0.2.63-аас хойш wall-vault автоматаар reasoning text руу шилжидэг — хэрэв та одоо ч хоосон хариу харж байгаа бол backend ямар ч field буцаахгүй байна. Upstream-ийн log-уудыг шалга.
 
-1. **Тушаал тус бүрийн бүтцийн шүүлтүүр** — git, go зэргийн гаралтын форматыг ойлгож утга бүхий хэсгийг л гаргаж авна
-2. **Regex дараах боловсруулалт** — ANSI өнгөний кодыг арилгах, хоосон мөрийг цөөлөх, давтагдсан мөрийг нэгтгэх
-3. **Дамжуулах + хайчлах** — Дэмжигдэхгүй тушаалууд эхний/сүүлийн 50 мөрийг л хадгална
+LM Studio-той qwen3-ын хувьд тусгайлан plugin yaml-д `inline_no_think_for_qwen3: true` тохируул ингэснээр reasoning inline идэвхгүй болно. Built-in lmstudio.yaml болон ollama.yaml аль хэдийн үүнийг хийсэн байдаг.
 
-### Claude Code-тай холбох
+### Dashboard "all keys on cooldown" гэж харуулдаг ч би сая нэгийг нэмлээ
 
-Claude Code-ийн `PreToolUse` hook-оор бүх shell тушаалыг автоматаар RTK-аар дамжуулах тохиргоо хийх боломжтой.
+Шинэ key эрүүл боловч dispatch path хуучин key-ийн cooldown-д хэвээр байж магадгүй. Шинэ хүсэлт хий — proxy дуудлага тус бүрд round-robin хийдэг бөгөөд эрүүл key дараагийнх нь сонгогдоно.
 
-```bash
-# Hook суулгах (Claude Code settings.json-д автоматаар нэмэгдэнэ)
-wall-vault rtk hook install
-```
+### Vault мастер нууц үгээр түгжээ тайлахгүй
 
-Эсвэл `~/.claude/settings.json`-д гараар нэмэх:
+Буруу нууц үг. Сэргээх боломжгүй — wall-vault зориудаар backdoor илгээдэггүй. Хэрэв та үнэхээр мастер нууц үгээ алдсан бол цорын ганц зам нь `~/.wall-vault/data/vault.json`-ыг устгаад, шинэ нууц үгээр restart хийж, key-уудыг дахин нэмэх юм.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
+### Free-tier OpenRouter хязгаар хүрсэн
 
-> 💡 **Exit code хадгалалт**: RTK анхны тушаалын exit code-г байгаагаар нь буцаана. Тушаал амжилтгүй бол (exit code ≠ 0) AI ч алдааг зөв илрүүлнэ.
+`proxy.services`-д `openrouter` оруулахаар тохируулж, дор хаяж нэг OpenRouter key нэм. Paid path 402 / 429 буцаах үед proxy нь paid model-аас түүний `:free` хувилбар руу автоматаар шилждэг.
 
-> 💡 **Англи хэл албадлах**: RTK `LC_ALL=C`-аар тушаал ажиллуулж системийн хэлний тохиргооноос үл хамааран үргэлж англи хэлний гаралт гаргана. Ингэснээр шүүлтүүр зөв ажиллана.
+### `journalctl --user -u wall-vault-proxy` хоосон байна
+
+systemd `--user` log-ууд нь түүнийг ажиллуулж буй хэрэглэгчийн journal руу очдог. Хэрэв та unit-ыг `root`-оор эсвэл `sudo`-р эхлүүлсэн бол journal нь оронд нь system instance-д байна — `--user`-гүйгээр `journalctl -u wall-vault-proxy`-г оролдоно уу.
 
 ---
 
-## Орчны хувьсагчийн лавлах
+## Илүү
 
-Орчны хувьсагч гэдэг нь програмд тохиргооны утга дамжуулах арга юм. Терминалд `export хувьсагч-нэр=утга` хэлбэрээр оруулах, эсвэл автомат эхлүүлэх үйлчилгээний файлд тавивал үргэлж хэрэгжинэ.
-
-| Хувьсагч | Тайлбар | Жишээ утга |
-|------|------|---------|
-| `WV_LANG` | Хянах самбарын хэл | `ko`, `en`, `ja` |
-| `WV_THEME` | Хянах самбарын загвар | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Google API key (таслалаар олон) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | OpenRouter API key | `sk-or-v1-...` |
-| `WV_VAULT_URL` | Тархсан горимд vault серверийн хаяг | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Клиент (бот) баталгаажуулалтын токен | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | Администратор токен | `admin-token-here` |
-| `WV_MASTER_PASS` | API key шифрлэлтийн нууц үг | `my-password` |
-| `WV_AVATAR` | Аватар зургийн файлын зам (`~/.openclaw/`-аас харьцангуй зам) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Ollama локал серверийн хаяг | `http://192.168.x.x:11434` |
-
----
-
-## Алдаа засах
-
-### Proxy эхлэхгүй байх үед
-
-Ихэвчлэн порт аль хэдийн өөр програмаар ашиглагдаж байгаагаас болдог.
-
-```bash
-ss -tlnp | grep 56244   # 56244 портыг хэн ашиглаж байгааг шалгах
-wall-vault proxy --port 8080   # Өөр порт дугаараар эхлүүлэх
-```
-
-### API Key алдаа гарах үед (429, 402, 401, 403, 582)
-
-| Алдааны код | Утга | Шийдэл |
-|----------|------|----------|
-| **429** | Хэт олон хүсэлт (хэрэглээ хэтэрсэн) | Жаахан хүлээх эсвэл өөр key нэмэх |
-| **402** | Төлбөр шаардлагатай эсвэл кредит хүрэлцэхгүй | Холбогдох үйлчилгээнд кредит цэнэглэх |
-| **401 / 403** | Key буруу эсвэл зөвшөөрөлгүй | Key утгыг дахин шалгаж дахин бүртгэх |
-| **582** | Gateway хэт ачаалалтай (cooldown 5 минут) | 5 минутын дараа автоматаар суларна |
-
-```bash
-# Бүртгэгдсэн key жагсаалт болон төлөвийг шалгах
-curl -H "Authorization: Bearer администратор-токен" https://localhost:56243/admin/keys
-
-# Key хэрэглээний тоолуурыг дахин тохируулах
-curl -X POST -H "Authorization: Bearer администратор-токен" https://localhost:56243/admin/keys/reset
-```
-
-### Агент "Холбогдоогүй" гэж харагдах үед
-
-"Холбогдоогүй" гэдэг нь proxy процесс vault-д дохио (heartbeat) илгээхгүй байгаа гэсэн утга. **Тохиргоо хадгалагдаагүй гэсэн утга биш.** Proxy vault серверийн хаяг болон токеныг мэдэж ажиллаж байж холбогдсон төлөвт шилжинэ.
-
-```bash
-# Vault серверийн хаяг, токен, клиент ID-г зааж proxy эхлүүлэх
-WV_VAULT_URL=http://vault-серверийн-хаяг:56243 \
-WV_VAULT_TOKEN=клиент-токен \
-WV_VAULT_CLIENT_ID=клиент-ID \
-wall-vault proxy
-```
-
-Холболт амжилттай бол ойролцоогоор 20 секундын дотор хянах самбар дээр 🟢 Ажиллаж байна гэж өөрчлөгдөнө.
-
-### Ollama холболт ажиллахгүй үед
-
-Ollama гэдэг нь таны компьютер дээр AI-г шууд ажиллуулдаг програм юм. Эхлээд Ollama асаалттай эсэхийг шалгана уу.
-
-```bash
-curl http://localhost:11434/api/tags   # Загварын жагсаалт гарвал хэвийн
-export OLLAMA_URL=http://192.168.x.x:11434   # Өөр компьютер дээр ажиллаж байвал
-```
-
-> ⚠️ Ollama хариу өгөхгүй бол `ollama serve` тушаалаар эхлээд Ollama-г асаана уу.
-
-> ⚠️ **Том загварууд удаан**: `qwen3.5:35b`, `deepseek-r1` зэрэг том загварууд хариу гаргахад хэдэн минут зарцуулж болно. Хариу ирэхгүй мэт харагдаж байсан ч хэвийн боловсруулж байж болох тул хүлээнэ үү.
-
----
-
-## v0.2 шинэчлэлтийн тэмдэглэл
-
-- `Service` нь `default_model` болон `allowed_models` гэсэн шинэ талбар нэмэгдсэн. Үйлчилгээ бүрийн анхдагч загварыг одоо үйлчилгээний картын дээр шууд тохируулна.
-- `Client.default_service` / `default_model` нь `preferred_service` / `model_override` гэж дахин нэрлэгдэж дахин тайлбарлагдсан. Хэрэв override хоосон байвал үйлчилгээний анхдагч загварыг ашиглана.
-- v0.2-ын анхны эхлүүлэлтэд одоо байгаа `vault.json` автоматаар нүүлгэлдэнэ. v0.2 нүүлгэлэлтийн өмнөх төлөв нь `vault.json.pre-v02.{timestamp}.bak` гэж хадгалагдана.
-- Хянах самбар нь гурван бүсээр дахин төлөвлөгдсөн: зүүн талын хажуугийн цэс, төв хэсгийн картуудын сүлжээ, баруун талын засах слайдер.
-- Admin API-ийн замууд өөрчлөгдөөгүй, гэхдээ хүсэлт/хариу биеийн схемүүд шинэчилсэн — хуучин CLI скрипт-үүдийг шинэчилж байх шаардлагатай.
-
----
-
-## v0.2.1 шинэ боломжууд
-
-- **Мультимодаль дамжуулалт (OpenAI → Gemini)**: `/v1/chat/completions` одоо `text`-ээс гадна зургаан төрлийн контент хэсгийг хүлээн авна — `input_audio`, `input_video`, `input_image`, `input_file`, болон `image_url` (data URI болон гадаад http(s) URL, ≤ 5 МБ). Proxy тус бүрийг Gemini-ийн `inlineData` формат руу хөрвүүлнэ. EconoWorld мэтийн OpenAI-нийцтэй клиентүүд аудио / зураг / видео блобыг шууд дамжуулж болно.
-- **EconoWorld агентын төрөл**: `agentType: "econoworld"`-тэй `POST /agent/apply` нь wall-vault тохиргоог төслийн `analyzer/ai_config.json` руу бичнэ. `workDir` нь таслалаар тусгаарлагдсан боломжит замуудын жагсаалтыг хүлээн авч, Windows диск замуудыг `WSL` холболтын зам руу хөрвүүлнэ.
-- **Хянах самбарын түлхүүрийн сүлжээ + CRUD**: 11 түлхүүр нягтархан карт хэлбэрээр харагдаж, + нэмэх / ✕ устгах слайдовертой.
-- **Үйлчилгээ нэмэх + чирч дахин эрэмбэлэх**: үйлчилгээний сүлжээнд + нэмэх товч болон чирэх бариул (`⋮⋮`) нэмэгдсэн.
-- **Толгой / хөл / сэдвийн хөдөлгөөн / хэл солих товч** сэргээгдсэн. 7 сэдэв (`cherry/dark/light/ocean/gold/autumn/winter`) нь картуудын ард, дэвсгэрийн урд давхаргад тоосонцрын эффектээ тоглуулна.
-- **Слайдовер хаах UX**: гадна талд товших эсвэл `Esc` дарж слайдоверыг хаана.
-- **`SSE` төлөвийн заагч + ажиллах хугацааны таймер**: дээд мөр (topbar) дээр, хэл·загвар сонголтын хажууд `⏱ ажиллах хугацаа` тоолуур ба `● SSE` заагч (ногоон = холбогдсон, улбар шар = дахин холбогдож байна, саарал = тасарсан) зэрэгцэн байрлана (v0.2.18-ээс эхлэн хөлнөөс толгой руу шилжсэн — гүйлгэхгүйгээр төлвийг харах боломжтой).
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## Сүүлийн үеийн өөрчлөлтүүд (v0.1.16 ~ v0.1.27)
-
-### v0.1.27 (2026-04-09)
-- **Ollama fallback загварын нэр засвар**: Өөр үйлчилгээнээс Ollama руу fallback хийхэд provider угтвартай загварын нэр (жишээ: `google/gemini-3.1-pro-preview`) Ollama руу шууд дамжуулагдаж байсан асуудлыг засав. Одоо автоматаар орчны хувьсагч/анхдагч загвараар солигдоно.
-- **Cooldown хугацааг эрс багасгасан**: 429 rate limit 30мин→5мин, 402 төлбөр 1цаг→30мин, 401/403 24цаг→6цаг. Бүх key нэгэн зэрэг cooldown-д орж proxy бүрэн зогсох нөхцөлийг хаасан.
-- **Бүрэн cooldown үед албадан дахин оролдлого**: Бүх key cooldown төлөвт байхад хамгийн эхлээд суларах key-г албадан дахин оролдож хүсэлт татгалзахыг хаана.
-- **Үйлчилгээний жагсаалтын дүрслэл засвар**: `/status` хариу vault-аас синхрончлогдсон бодит үйлчилгээний жагсаалтыг харуулна (anthropic гэх мэтийн дутагдлыг хаасан).
-
-### v0.1.25 (2026-04-08)
-- **Агентын процесс илрүүлэлт**: Proxy локал агент (NanoClaw/OpenClaw)-ын амьд эсэхийг илрүүлж хянах самбар дээр улбар шар гэрлэн дохиогоор харуулна.
-- **Чирэх бариулын сайжруулалт**: Карт дарааллахад зөвхөн гэрлэн дохио (●) хэсгээс л барьж болохоор өөрчилсөн. Оруулах талбар эсвэл товчноос санамсаргүйгээр чирэгдэхгүй болсон.
-
-### v0.1.24 (2026-04-06)
-- **RTK токен хэмнэлтийн дэд тушаал**: `wall-vault rtk <command>` shell тушаалын гаралтыг автоматаар шүүж AI агентын токен хэрэглээг 60-90% бууруулна. git, go зэрэг гол тушаалуудад тусгай шүүлтүүр суулгасан бөгөөд дэмжигдэхгүй тушаалууд ч автоматаар хайчлагдана. Claude Code `PreToolUse` hook-оор ил тод холбогдоно.
-
-### v0.1.23 (2026-04-06)
-- **Ollama загвар солих засвар**: Vault хянах самбар дээр Ollama загвар солисон ч proxy-д тусгагдаагүй асуудлыг засав. Өмнө нь зөвхөн орчны хувьсагч (`OLLAMA_MODEL`) ашигладаг байсан, одоо vault тохиргоонд тэргүүлэх ач холбогдол өгнө.
-- **Локал үйлчилгээний автомат гэрлэн дохио**: Ollama·LM Studio·vLLM холбогдох боломжтой бол автоматаар идэвхждэг, тасарвал автоматаар идэвхгүй болно. Cloud үйлчилгээний key-д суурилсан автомат шилжилттэй адил.
-
-### v0.1.22 (2026-04-05)
-- **Хоосон content талбар дутагдсан засвар**: thinking загвар (gemini-3.1-pro, o1, claude thinking гэх мэт) max_tokens хязгаарыг reasoning-д зарцуулж бодит хариу гаргаж чадаагүй тохиолдолд proxy хариу JSON-ийн `content`/`text` талбарыг `omitempty`-аар хассанаас OpenAI/Anthropic SDK клиентүүд `Cannot read properties of undefined (reading 'trim')` алдаагаар crash хийж байсан асуудлыг засав. Албан ёсны API spec-ийн дагуу талбаруудыг үргэлж оруулахаар өөрчилсөн.
-
-### v0.1.21 (2026-04-05)
-- **Gemma 4 загварын дэмжлэг**: Google Gemini API-аар `gemma-4-31b-it`, `gemma-4-26b-a4b-it` зэрэг Gemma гэр бүлийн загваруудыг ашиглах боломжтой.
-- **LM Studio / vLLM үйлчилгээний албан ёсны дэмжлэг**: Өмнө нь эдгээр үйлчилгээнүүд proxy чиглүүлэлтээс хасагдаж үргэлж Ollama-аар орлуулагддаг байсан. Одоо OpenAI нийцтэй API-аар хэвийн чиглүүлэгдэнэ.
-- **Хянах самбарын үйлчилгээний дүрслэл засвар**: Fallback болсон ч хянах самбар үргэлж хэрэглэгчийн тохируулсан үйлчилгээг харуулна.
-- **Локал үйлчилгээний төлөв дүрслэл**: Хянах самбар ачаалахад локал үйлчилгээнүүдийн (Ollama, LM Studio, vLLM гэх мэт) холболтын төлөвийг ● цэгийн өнгөөр харуулна.
-- **Хэрэгслийн шүүлтүүрийн орчны хувьсагч**: `WV_TOOL_FILTER=passthrough` орчны хувьсагчаар хэрэгсэл (tools) дамжуулах горимыг тохируулах боломжтой.
-
-### v0.1.20 (2026-03-28)
-- **Иж бүрэн аюулгүй байдлын бэхжүүлэлт**: XSS хамгаалалт (41 цэг), тогтмол хугацааны токен харьцуулалт, CORS хязгаарлалт, хүсэлтийн хэмжээний хязгаар, зам дайрах хамгаалалт, SSE баталгаажуулалт, хурдны хязгаар бэхжүүлэлт зэрэг 12 аюулгүй байдлын зүйлийг сайжруулсан.
-
-### v0.1.19 (2026-03-27)
-- **Claude Code онлайн илрүүлэлт**: Proxy-аар дамжихгүй Claude Code ч хянах самбар дээр онлайн гэж харагдана.
-
-### v0.1.18 (2026-03-26)
-- **Fallback үйлчилгээнд наалдах засвар**: Түр зуурын алдаагаар Ollama fallback хийсний дараа анхны үйлчилгээ сэргэвэл автоматаар буцна.
-- **Офлайн илрүүлэлт сайжруулалт**: 15 секунд тутмын төлөв шалгалтаар proxy зогссоныг илрүүлэх хурдассан.
-
-### v0.1.17 (2026-03-25)
-- **Чирж буулгах картын эрэмбэ**: Агент картуудыг чирж дараалал солих боломжтой.
-- **Мөр доторх тохиргоо хэрэглэх товч**: Офлайн агентуудад [⚡ Тохиргоо хэрэглэх] товч харагдана.
-- **cokacdir агентын төрөл нэмэгдсэн**.
-
-### v0.1.16 (2026-03-25)
-- **Хоёр талт загвар синхрончлол**: Vault хянах самбар дээр Cline·Claude Code-ийн загварыг өөрчлөхөд автоматаар тусгагдана.
-
----
-
-*API-ийн дэлгэрэнгүй мэдээллийг [API.md](API.md)-с үзнэ үү.*
+- HTTP API reference — [API.md](API.md)-г үзнэ үү
+- Source — `https://github.com/sookmook/wall-vault`
+- Bug report / feature request — GitHub Issues
+- Release түүх — [CHANGELOG.md](../CHANGELOG.md)

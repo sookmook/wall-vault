@@ -131,7 +131,7 @@ func TestCallLocalService_DefaultURLFallback(t *testing.T) {
 	}
 	s := minimalServer(t, plugin)
 	// serviceURLs is intentionally empty so the dispatcher has to fall
-	// through to plugin.DefaultURL — this is the path a fresh raspi takes
+	// through to plugin.DefaultURL — this is the path a fresh host-A takes
 	// before the SSE config_change has populated serviceURLs.
 
 	req := &GeminiRequest{}

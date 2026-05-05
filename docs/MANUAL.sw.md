@@ -1,931 +1,621 @@
-# Mwongozo wa Mtumiaji wa wall-vault
-*(Last updated: 2026-04-16 — v0.2.2)*
+# wall-vault User Manual
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · [हिन्दी](MANUAL.hi.md) · [Bahasa Indonesia](MANUAL.id.md) · [ภาษาไทย](MANUAL.th.md) · Kiswahili · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
+
+Mwongozo huu unahusu kusakinisha, kusanidi, na kuendesha wall-vault. Kwa muhtasari wa haraka, angalia [README](../README.md). Kwa maelezo ya HTTP API, angalia [API reference](API.md).
 
 ## Yaliyomo
 
-1. [wall-vault ni nini?](#wall-vault-ni-nini)
-2. [Ufungaji](#ufungaji)
-3. [Kuanza kwa Mara ya Kwanza (mchawi wa setup)](#kuanza-kwa-mara-ya-kwanza)
-4. [Usajili wa API Key](#usajili-wa-api-key)
-5. [Jinsi ya Kutumia Proxy](#jinsi-ya-kutumia-proxy)
-6. [Dashibodi ya Key Vault](#dashibodi-ya-key-vault)
-7. [Hali ya Kusambazwa (Multi Bot)](#hali-ya-kusambazwa-multi-bot)
-8. [Mpangilio wa Kuanza Kiotomatiki](#mpangilio-wa-kuanza-kiotomatiki)
-9. [Doctor (Daktari)](#doctor-daktari)
-10. [RTK Kuokoa Tokeni](#rtk-kuokoa-tokeni)
-11. [Rejea ya Vigezo vya Mazingira](#rejea-ya-vigezo-vya-mazingira)
-12. [Utatuzi wa Matatizo](#utatuzi-wa-matatizo)
+1. [wall-vault inafanya nini](#wall-vault-inafanya-nini)
+2. [Usakinishaji](#usakinishaji)
+3. [Kuendesha kwa mara ya kwanza na setup wizard](#kuendesha-kwa-mara-ya-kwanza-na-setup-wizard)
+4. [Kuwezesha TLS](#kuwezesha-tls)
+5. [Kusajili API key](#kusajili-api-key)
+6. [Kuunganisha agent](#kuunganisha-agent)
+7. [Dashboard](#dashboard)
+8. [Hali ya distributed](#hali-ya-distributed)
+9. [Kuanza kiotomatiki](#kuanza-kiotomatiki)
+10. [Plugin yamls](#plugin-yamls)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [Vigezo vya mazingira](#vigezo-vya-mazingira)
+14. [Utatuzi wa matatizo](#utatuzi-wa-matatizo)
 
 ---
 
-## wall-vault ni nini?
+## wall-vault inafanya nini
 
-**wall-vault = Wakala wa AI (Proxy) + Kabati la API Key kwa ajili ya OpenClaw**
+wall-vault ni Go binary moja inayobeba huduma mbili zinazoshirikiana:
 
-Ili kutumia huduma za AI, unahitaji **API key**. API key ni kama **kitambulisho cha dijitali** kinachothibitisha kuwa "mtu huyu ana haki ya kutumia huduma hii". Hata hivyo, kitambulisho hiki kina kikomo cha matumizi kwa siku, na kikisimamiwa vibaya, kinaweza kufichuliwa.
+- **vault** huhifadhi API key zilizosimbwa wakati wa kupumzika (AES-GCM kwa nenosiri kuu), hufuatilia matumizi na cooldown kwa kila key, hutangaza mabadiliko kupitia Server-Sent Events (SSE), na hutoa web dashboard kwenye `:56243` kwa waendeshaji wa kibinadamu.
+- **proxy** hufunua endpoint zinazoendana na Gemini, Anthropic, OpenAI, na Ollama-native kwenye `:56244`. AI client yoyote inayoelekeza kwenye proxy hutumia key zilizo katika vault — wateja kamwe hawazioni. Wakati upstream moja inashindwa, dispatch huangukia kwa provider inayofuata kwa mpangilio.
 
-wall-vault huhifadhi vitambulisho hivi kwenye kabati salama, na hufanya kazi kama **wakala (proxy)** kati ya OpenClaw na huduma za AI. Kwa ufupi, OpenClaw inahitaji tu kuunganishwa na wall-vault, na wall-vault inashughulikia mambo yote mengine magumu.
+Hii ni muhimu wakati:
 
-Matatizo ambayo wall-vault inasuluhisha:
-
-- **Mzunguko wa Kiotomatiki wa API Key**: Wakati matumizi ya key moja yanafikia kikomo au inapigwa marufuku kwa muda (cooldown), inabadilika kimya kimya hadi key inayofuata. OpenClaw inaendelea kufanya kazi bila kukatizwa.
-- **Ubadilishaji wa Kiotomatiki wa Huduma (Fallback)**: Ikiwa Google haijibu, inabadilika hadi OpenRouter, na ikiwa hiyo pia haifanyi kazi, inabadilika kiotomatiki hadi Ollama·LM Studio·vLLM (AI ya ndani) iliyofungwa kwenye kompyuta yako. Kipindi hakikatiki. Huduma ya awali ikirejea, maombi yanayofuata yatabadilika kiotomatiki (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Usawazishaji wa Wakati Halisi (SSE)**: Ukibadilisha modeli kwenye dashibodi ya kabati, inajitokeza kwenye skrini ya OpenClaw ndani ya sekunde 1-3. SSE (Server-Sent Events) ni teknolojia ambapo seva inasukuma mabadiliko kwa mteja kwa wakati halisi.
-- **Arifa za Wakati Halisi**: Matukio kama uchoshaji wa key au kushindikana kwa huduma yanaonyeshwa mara moja chini ya skrini ya OpenClaw TUI (skrini ya terminal).
-
-> 💡 **Claude Code, Cursor, VS Code** pia zinaweza kuunganishwa, lakini kusudi la awali la wall-vault ni kutumika pamoja na OpenClaw.
+- Una key za provider kadhaa na unataka URL moja ambayo agent inazungumza nayo.
+- Unataka key ya free-tier iliyo kwenye cooldown ipishe bila kuvunja session.
+- Unataka key zile zile ziwashe bot, IDE, au script kadhaa kwenye LAN moja bila kunakili credentials.
+- Unataka dashboard, sio vigezo vya mazingira, kwa kuhariri key na kubadilisha model.
+- Unataka fallback ya ndani (Ollama, LM Studio, vLLM) wakati ukomo wa cloud unapoisha.
 
 ```
-OpenClaw (Skrini ya Terminal ya TUI)
-        │
-        ▼
-  wall-vault Proxy (:56244)   ← Usimamizi wa key, uelekezaji, fallback, matukio
-        │
-        ├─ Google Gemini API
-        ├─ OpenRouter API (modeli 340+)
-        ├─ Ollama / LM Studio / vLLM (kompyuta yako, kimbilio la mwisho)
-        └─ OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
-## Ufungaji
+## Usakinishaji
 
-### Linux / macOS
-
-Fungua terminal na ubandike amri zifuatazo kama zilivyo.
+### Linux / macOS one-liner
 
 ```bash
-# Linux (PC ya kawaida, seva — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (M1/M2/M3 Mac)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — Inapakua faili kutoka mtandaoni.
-- `chmod +x` — Inafanya faili iliyopakuliwa "iweze kutekelezwa". Ukikosa hatua hii, utapata kosa la "ruhusa imekataliwa".
+Script hugundua OS na architecture kiotomatiki, hupakua binary sahihi katika `~/.local/bin/wall-vault`, na huifanya iwe inayoweza kutekelezwa. Ikiwa `~/.local/bin` haiko kwenye `PATH` yako, iongeze:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Kupakua kwa mkono
+
+Binary zilizojengwa awali huchapishwa kila release katika `https://github.com/sookmook/wall-vault/releases`.
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-Fungua PowerShell (kama msimamizi) na utekeleze amri zifuatazo.
-
 ```powershell
-# Pakua
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# Ongeza kwenye PATH (inatumika baada ya kuanzisha upya PowerShell)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> 💡 **PATH ni nini?** Ni orodha ya folda ambapo kompyuta inatafuta amri. Unahitaji kuiongeza kwenye PATH ili uweze kutekeleza `wall-vault` kutoka folda yoyote.
+### Kujenga kutoka source
 
-### Kujenga kutoka Chanzo (kwa Waendelezaji)
-
-Hii inatumika tu ikiwa una mazingira ya maendeleo ya lugha ya Go.
+Inahitaji Go 1.25 au mpya zaidi.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (toleo: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> 💡 **Toleo la Muhuri wa Wakati wa Kujenga**: Ukijenga kwa `make build`, toleo linazalishwa kiotomatiki katika muundo unaojumuisha tarehe·muda kama `v0.1.27.20260409`. Ukijenga moja kwa moja kwa `go build ./...`, toleo linaonyeshwa tu kama `"dev"`.
+`make build-all` hu-cross-compile kwa platforms zote tano zinazoungwa mkono. Binary huishia kwa `bin/`.
 
 ---
 
-## Kuanza kwa Mara ya Kwanza
-
-### Kuendesha mchawi wa setup
-
-Baada ya ufungaji, hakikisha umetekeleza **mchawi wa usanidi** kwa amri ifuatayo kwanza. Mchawi atakuongoza kwa kukuuliza vitu muhimu moja baada ya nyingine.
+## Kuendesha kwa mara ya kwanza na setup wizard
 
 ```bash
 wall-vault setup
 ```
 
-Hatua ambazo mchawi anazipitia ni kama zifuatazo:
+Wizard hukuuliza, kwa mpangilio:
 
-```
-1. Chagua lugha (lugha 10 ikiwa ni pamoja na Kiswahili)
-2. Chagua mandhari (light / dark / gold / cherry / ocean)
-3. Hali ya uendeshaji — chagua kama utatumia peke yako (standalone) au kwenye mashine nyingi (distributed)
-4. Ingiza jina la bot — jina litakaloonyeshwa kwenye dashibodi
-5. Mpangilio wa bandari — chaguomsingi: proxy 56244, vault 56243 (bonyeza Enter tu ikiwa huhitaji kubadilisha)
-6. Chagua huduma za AI — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Mpangilio wa kichuja cha zana za usalama
-8. Weka tokeni ya msimamizi — nenosiri la kufunga vipengele vya usimamizi wa dashibodi. Inaweza kuzalishwa kiotomatiki
-9. Weka nenosiri la usimbaji fiche wa API key — wakati unataka kuhifadhi key kwa usalama zaidi (hiari)
-10. Njia ya kuhifadhi faili ya usanidi
-```
+1. **Lugha** — huchagua moja ya locale 17 za UI. Hugunduliwa kiotomatiki kutoka `$LANG`; wizard hutoa orodha hata hivyo.
+2. **Mandhari** — `light` (chaguo-msingi), `dark`, `cherry`, `ocean`, `gold`, `autumn`, `winter`. Mapambo tu.
+3. **Hali** — `standalone` (host moja, chaguo-msingi) au `distributed` (vault kwenye host moja, proxy kwenye nyingine).
+4. **Jina la bot** — slug ya `client_id` ya bure. Vault hutumia hii kufungia config kwa kila client (model overrides, fallback chains).
+5. **Proxy port** — chaguo-msingi `56244`.
+6. **Vault port** — chaguo-msingi `56243` (standalone tu).
+7. **Uchaguzi wa huduma** — y/N kwa kila moja ya: Google Gemini, OpenRouter, Anthropic, OpenAI, Ollama, LM Studio, vLLM. Chaguo nyingi ni sawa; kila moja huandika dokezo lake la env-var mwishoni.
+8. **Tool filter** — `strip_all` (chaguo-msingi; huzuia tool definitions zote zinazoingia kwa usalama) au `passthrough` (huruhusu tool yoyote ipite).
+9. **Admin token** — acha tupu ili kuzalisha kiotomatiki. Dashboard inahitaji token hii kuingia.
+10. **Nenosiri kuu** — acha tupu kwa kutotumia encryption (HAIPENDEKEZWI); weka thamani ili AES-GCM isimbe key store wakati wa kupumzika.
+11. **Njia ya kuhifadhi** — chaguo-msingi ni `wall-vault.yaml` katika directory ya sasa. Loader pia huangalia katika `~/.wall-vault/config.yaml`.
 
-> ⚠️ **Hakikisha umekumbuka tokeni ya msimamizi.** Utaihitaji baadaye unapoongeza key au kubadilisha mipangilio kwenye dashibodi. Ukiipoteza, utahitaji kuhariri faili ya usanidi moja kwa moja.
+Baada ya kuhifadhi, wizard huendesha `doctor.FixTrust` ili agent yoyote iliyosakinishwa kienyeji (OpenClaw, Claude Code, Cline) ipate CA ya ndani ya wall-vault iliyoongezwa kwenye trust store yake kiotomatiki. Ikiwa hakuna agent kama hiyo iliyosakinishwa, hatua hii huchapisha `SKIP` na haiandiki chochote.
 
-Mchawi ukimalizika, faili ya usanidi `wall-vault.yaml` inazalishwa kiotomatiki.
-
-### Kuendesha
+Kisha anza binary:
 
 ```bash
 wall-vault start
 ```
 
-Seva mbili zinaanza wakati huo huo:
+`start` huendesha vault na proxy katika process moja (hali ya standalone). Kwa hali ya distributed tumia `wall-vault vault` kwenye vault host na `wall-vault proxy` kwenye kila proxy host.
 
-- **Proxy** (`https://localhost:56244`) — Wakala anayeunganisha OpenClaw na huduma za AI
-- **Key Vault** (`https://localhost:56243`) — Usimamizi wa API key na dashibodi ya wavuti
-
-Fungua `https://localhost:56243` kwenye kivinjari chako ili kuona dashibodi mara moja.
+Fungua `http://localhost:56243` kwenye browser. Ingia na admin token ambayo wizard ilichapisha.
 
 ---
 
-## Usajili wa API Key
+## Kuwezesha TLS
 
-Kuna njia nne za kusajili API key. **Kwa wanaoanza, Njia 1 (vigezo vya mazingira) inapendekezwa**.
+Vifani-msingi vya wizard huacha listener zote mbili kwenye HTTP wazi. Agent nyingi (OpenClaw, Claude Code, Cursor) hufanya kazi vyema dhidi ya HTTPS endpoint moja, hivyo TLS inapendekezwa katika deployment yoyote inayoenea zaidi ya mashine ya kienyeji.
 
-### Njia 1: Vigezo vya Mazingira (Inashauriwa — Rahisi Zaidi)
-
-Vigezo vya mazingira ni **maadili yaliyowekwa mapema** ambayo programu inayasoma inapoanza. Ingiza yafuatayo kwenye terminal.
+wall-vault inakuja na CA yake ya ndani hivyo huhitaji jina la DNS la umma au Let's Encrypt.
 
 ```bash
-# Sajili key ya Google Gemini
-export WV_KEY_GOOGLE=AIzaSy...
+# 1. Unda CA ya ndani — imeandikwa kwa ~/.wall-vault/ca.{crt,key}.
+#    CA ni nzuri kwa miaka 10 kwa chaguo-msingi; pindua na --ca-years.
+wall-vault cert init
 
-# Sajili key ya OpenRouter
-export WV_KEY_OPENROUTER=sk-or-v1-...
+# 2. Toa cheti cha host. Subject Alternative Names hujumuisha kiotomatiki:
+#       hostname, "localhost", "127.0.0.1", na LAN IP yoyote isiyo ya loopback iliyogunduliwa.
+#    Pindua issuer dir na --dir, validity na --host-years.
+wall-vault cert issue $(hostname)
 
-# Endesha baada ya usajili
+# 3. Amini CA katika OS keychain ya mashine hii.
+#    Linux: huandika kwa /etc/ssl/certs/ kupitia update-ca-certificates (inahitaji sudo).
+#    macOS: huongeza kwa System keychain kupitia security add-trusted-cert (inahitaji sudo).
+#    Windows: hu-import katika CurrentUser\Root kupitia certutil (haiitaji admin).
+wall-vault cert install-trust
+
+# 4. Wezesha TLS kwenye listener zote mbili.
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
 wall-vault start
 ```
 
-Ikiwa una key nyingi, ziunganishe kwa koma (,). wall-vault itazitumia kwa mzunguko kiotomatiki (round robin):
+Ili kupanua trust kwa mashine zingine za LAN, nakili `~/.wall-vault/ca.crt` na endesha `wall-vault cert install-trust --ca <path>` kwenye kila moja. Vault pia hufunua `ca.crt` kupitia plain-HTTP listener ndogo kwenye `:56247` (**bootstrap port**) kwa kesi ya catch-22 ambapo client mpya inahitaji CA kuzungumza HTTPS.
 
-```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+### Loopback HTTP companion
+
+Agent zingine — hasa Node runtime ya OpenClaw — huandika upya `NODE_EXTRA_CA_CERTS` wakati wa kuanzisha process, zikidondosha CA hint yoyote iliyotolewa na operator. Haziwezi kuheshimu CA ya wall-vault kutoka ndani ya daemon, hata baada ya `cert install-trust`. wall-vault hupata njia ya kuzunguka hili kwa kufunga **plain-HTTP listener ya loopback-tu** ya ziada kwenye `127.0.0.1:56245` wakati wowote TLS imewezeshwa. Wateja wa host moja hufikia proxy kupitia port hiyo bila TLS kabisa; wateja wa LAN huendelea kutumia TLS listener.
+
+Lemaza na `WV_PROXY_PLAIN_PORT=0` ikiwa huitaji.
+
+### `wall-vault cert list`
+
+Huonyesha kila cheti chini ya `~/.wall-vault/` na subject, validity window, na SANs.
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
 ```
 
-> 💡 **Kidokezo**: Amri ya `export` inatumika tu kwa kipindi cha sasa cha terminal. Ili ibakie hata baada ya kuanzisha upya kompyuta, ongeza mstari huo kwenye faili ya `~/.bashrc` au `~/.zshrc`.
+---
 
-### Njia 2: UI ya Dashibodi (Bonyeza kwa Panya)
+## Kusajili API key
 
-1. Fungua `https://localhost:56243` kwenye kivinjari
-2. Bonyeza kitufe cha `[+ Ongeza]` kwenye kadi ya **🔑 API Key** juu
-3. Ingiza aina ya huduma, thamani ya key, lebo (jina la kumbukumbu), na kikomo cha kila siku kisha uhifadhi
+Njia mbili: dashboard, au vigezo vya mazingira.
 
-### Njia 3: REST API (kwa Otomatiki·Hati)
+### Dashboard (inapendekezwa)
 
-REST API ni njia ya programu kubadilishana data kupitia HTTP. Ni muhimu kwa usajili wa kiotomatiki kupitia hati.
+1. Ingia katika `https://localhost:56243` na admin token.
+2. Bonyeza **+ API key** katika kadi ya keys.
+3. Chagua huduma (Google, OpenRouter, Anthropic, OpenAI, …).
+4. Bandika key. Hifadhi.
+
+Key nyingi kwa kila huduma ni sawa; proxy hu-round-robin kati yao na kuruka zile zinazogonga cooldown ya per-key.
+
+### Vigezo vya mazingira (bootstrap ya mara moja)
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer tokeni-ya-msimamizi" \
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
+wall-vault start
+```
+
+Key zilizotolewa kwa njia hii huandikwa kwenye encrypted store wakati wa kuanza kwa mara ya kwanza. Kuanza kwa baadaye huzisoma kutoka diski; unaweza ku-unset env var baada ya run ya kwanza.
+
+### Cooldown na rotation
+
+Kila call inayofanikiwa huongeza `usage_count` ya key na kuonyesha upya `last_used`. Kwenye HTTP 429 / 402 / 403, proxy huweka key kwenye **cooldown** (chaguo-msingi: dakika 60 kwa 429, masaa 24 kwa 402, masaa 12 kwa 403). Dispatch inayofuata huchagua key tofauti kwa huduma hiyo. Wakati key zote za huduma ziko kwenye cooldown, proxy huruka huduma hiyo haraka kabisa na kujaribu provider inayofuata katika fallback chain.
+
+Cooldown zinaonekana kwa kila key katika dashboard na hesabu ya kushuka.
+
+---
+
+## Kuunganisha agent
+
+### OpenClaw
+
+OpenClaw ni client ya asili inayolengwa. Tumia modal ya **+ Add agent** ya dashboard:
+
+- Weka **Agent type** kuwa `openclaw` au `nanoclaw`.
+- Weka **Work directory** — kwa OpenClaw hii hujaza kiotomatiki kama `~/.openclaw`.
+- Chagua **preferred service** na ikiwezekana **model override**.
+- Bonyeza **Apply**. wall-vault huandika `~/.openclaw/openclaw.json` moja kwa moja (provider URLs, vault token, model entries).
+
+Unapobadilisha model kutoka dashboard, OpenClaw huchukua mabadiliko kupitia SSE ndani ya sekunde 1–3 — hakuna restart.
+
+### Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
+```
+
+Wakati credit za upstream Anthropic zinapoisha, dispatch huangukia kwa huduma yoyote iliyoorodheshwa katika `fallback_services` ya client hii. Kwa chaguo-msingi, model id isiyo ya Claude iliyotumwa kwa anthropic dispatch hurudisha error ili misrouting ionekane mara moja. Chagua opt in kwa kuandika upya kiotomatiki:
+
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
+
+### Cursor
+
+Katika Cursor **Settings → AI → OpenAI API**:
+
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### Custom HTTP
+
+```bash
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "Key Kuu",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### Njia 4: Bendera ya proxy (kwa Majaribio ya Haraka)
+Endpoint hiyo hiyo hukubali streaming (`"stream": true`) wakati `proxy.oai_stream_forward: true` imewekwa.
 
-Tumia hii wakati unataka kuingiza key kwa muda kwa majaribio bila usajili rasmi. Key inatoweka ukifunga programu.
+---
+
+## Dashboard
+
+`https://localhost:56243`. Kadi tano kwenye home grid:
+
+- **Keys** — kila API key, iliyowekwa kwa huduma. Ongeza, hariri, futa; ona matumizi na cooldown.
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp, pamoja na plugin yaml yoyote katika `~/.wall-vault/services/`. Weka per-service `default_model`, `allowed_models`, base URL, kifungo cha reasoning.
+- **Clients (agents)** — kila client iliyosajiliwa (OpenClaw bot, Claude Code session, Cursor instance, …). Toa preferred service, model override, fallback chain.
+- **Proxies** — kila proxy iliyo-authenticate dhidi ya vault hii. Hali ya live (online/offline), iliyoonekana mwisho, model ya sasa.
+- **Settings** — admin token, mzunguko wa nenosiri kuu, mandhari, lugha.
+
+Kila kadi ina edit slideover (upande wa kulia). Bonyeza nje au `Esc` kufunga. Mabadiliko husukumwa kwa proxy zote zilizounganishwa kupitia SSE ndani ya sekunde.
+
+**Footer** hubeba kiashiria cha SSE (kijani = imeunganishwa, machungwa = inaunganisha tena, kijivu = imekatika) na live build version.
+
+---
+
+## Hali ya distributed
+
+Una mashine kadhaa zote zinazohitaji key zile zile, endesha vault kwenye host moja na proxy kwenye kila moja ya zingine.
+
+### Vault host
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## Jinsi ya Kutumia Proxy
-
-### Kutumia na OpenClaw (Kusudi Kuu)
-
-Hivi ndivyo unavyosanidi OpenClaw ili kuunganishwa na huduma za AI kupitia wall-vault.
-
-Fungua faili `~/.openclaw/openclaw.json` na uongeze yaliyomo yafuatayo:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // tokeni ya wakala wa vault
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // 1M context bure
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> 💡 **Njia Rahisi Zaidi**: Bonyeza kitufe cha **🦞 Nakili Usanidi wa OpenClaw** kwenye kadi ya wakala kwenye dashibodi na snippet yenye tokeni na anwani tayari imejazwa itanakiliwa kwenye clipboard. Bandika tu.
-
-**`wall-vault/` mbele ya jina la modeli inaelekeza wapi?**
-
-Kwa kuangalia jina la modeli, wall-vault inaamua kiotomatiki ni huduma gani ya AI itatuma ombi:
-
-| Muundo wa Modeli | Huduma Inayounganishwa |
-|----------|--------------|
-| `wall-vault/gemini-*` | Google Gemini moja kwa moja |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI moja kwa moja |
-| `wall-vault/claude-*` | Anthropic kupitia OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (tokeni milioni 1 bure) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
-| `google/jina-la-modeli`, `openai/jina-la-modeli`, `anthropic/jina-la-modeli` n.k. | Muunganisho wa moja kwa moja na huduma husika |
-| `custom/google/jina-la-modeli`, `custom/openai/jina-la-modeli` n.k. | Ondoa sehemu ya `custom/` na uelekeze upya |
-| `jina-la-modeli:cloud` | Ondoa sehemu ya `:cloud` na uunganishe na OpenRouter |
-
-> 💡 **Context (muktadha) ni nini?** Ni kiasi cha mazungumzo ambacho AI inaweza kukumbuka kwa wakati mmoja. 1M (tokeni milioni) inamaanisha inaweza kushughulikia mazungumzo au hati ndefu sana kwa wakati mmoja.
-
-### Kuunganisha Moja kwa Moja kwa Muundo wa Gemini API (utangamano na zana zilizopo)
-
-Ikiwa una zana iliyokuwa ikitumia Google Gemini API moja kwa moja, badilisha tu anwani hadi wall-vault:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-Au ikiwa zana yako inabainisha URL moja kwa moja:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### Kutumia na OpenAI SDK (Python)
-
-Unaweza pia kuunganisha wall-vault kwenye msimbo wa Python unaotumia AI. Badilisha tu `base_url`:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # wall-vault inasimamia API key kiotomatiki
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # ingiza katika muundo wa provider/model
-    messages=[{"role": "user", "content": "Habari"}]
-)
-```
-
-### Kubadilisha Modeli Wakati wa Uendeshaji
-
-Ili kubadilisha modeli ya AI wakati wall-vault tayari inaendesha:
-
-```bash
-# Badilisha modeli kwa kuomba moja kwa moja kwa proxy
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# Katika hali ya kusambazwa (multi bot), badilisha kwenye seva ya vault → inajitokeza mara moja kupitia SSE
-curl -X PUT https://localhost:56243/admin/clients/id-ya-bot-yangu \
-  -H "Authorization: Bearer tokeni-ya-msimamizi" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### Kuangalia Orodha ya Modeli Zinazopatikana
-
-```bash
-# Angalia orodha nzima
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# Angalia modeli za Google tu
-curl "https://localhost:56244/api/models?service=google"
-
-# Tafuta kwa jina (mfano: modeli zenye "claude")
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**Muhtasari wa Modeli Kuu kwa Huduma:**
-
-| Huduma | Modeli Kuu |
-|--------|----------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M context bure, DeepSeek R1/V3, Qwen 2.5 n.k.) |
-| Ollama | Hugundua kiotomatiki seva ya ndani iliyofungwa kwenye kompyuta yako |
-| LM Studio | Seva ya ndani ya kompyuta (bandari 1234) |
-| vLLM | Seva ya ndani ya kompyuta (bandari 8000) |
-| llama.cpp | Seva ya ndani ya kompyuta (bandari 8080) |
-
----
-
-## Dashibodi ya Key Vault
-
-Fungua `https://localhost:56243` kwenye kivinjari chako ili kuona dashibodi.
-
-**Mpangilio wa Skrini:**
-- **Upau wa juu ulioshikiliwa (topbar)**: Nembo, kichaguzi cha lugha·mandhari, hali ya muunganisho wa SSE
-- **Gridi ya Kadi**: Kadi za wakala·huduma·API key zimepangwa kama vigae
-
-### Kadi ya API Key
-
-Kadi ya kusimamia API key zilizosajiliwa kwa mtazamo mmoja.
-
-- Inaonyesha orodha ya key zilizogawanywa kwa huduma.
-- `today_usage`: Idadi ya tokeni (herufi ambazo AI imesoma na kuandika) zilizoshughulikiwa kwa mafanikio leo
-- `today_attempts`: Jumla ya milio leo (mafanikio + kushindikana)
-- Sajili key mpya kwa kitufe cha `[+ Ongeza]`, na ufute key kwa `✕`.
-
-> 💡 **Tokeni ni nini?** Ni kipimo kinachotumiwa na AI inaporubani maandishi. Ni takriban neno moja la Kiingereza, au herufi 1-2 za lugha nyingine. Ada ya API kwa kawaida inahesabiwa kulingana na idadi hii ya tokeni.
-
-### Kadi ya Wakala
-
-Kadi inayoonyesha hali ya bot (wakala) zilizounganishwa na proxy ya wall-vault.
-
-**Hali ya muunganisho inaonyeshwa kwa ngazi 4:**
-
-| Alama | Hali | Maana |
-|------|------|------|
-| 🟢 | Inaendesha | Proxy inafanya kazi kawaida |
-| 🟡 | Imecheleweshwa | Majibu yanakuja lakini polepole |
-| 🔴 | Nje ya Mtandao | Proxy haijibu |
-| ⚫ | Haijaunganishwa·Imezimwa | Proxy haijawahi kuunganishwa na vault au imezimwa |
-
-**Mwongozo wa vitufe chini ya kadi ya wakala:**
-
-Unaposajili wakala, ukibainisha **aina ya wakala**, vitufe vya urahisi vinavyolingana na aina hiyo vinaonekana kiotomatiki.
-
----
-
-#### 🔘 Kitufe cha Nakili Usanidi — Kinaunda usanidi wa muunganisho kiotomatiki
-
-Ukibonyeza kitufe, snippet ya usanidi yenye tokeni ya wakala, anwani ya proxy, na taarifa za modeli tayari imejazwa inanakiliwa kwenye clipboard. Bandika tu yaliyonakiliwa kwenye eneo lililoonyeshwa kwenye jedwali hapa chini ili kukamilisha usanidi wa muunganisho.
-
-| Kitufe | Aina ya Wakala | Mahali pa Kubandika |
-|------|-------------|-------------|
-| 🦞 Nakili Usanidi wa OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 Nakili Usanidi wa NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 Nakili Usanidi wa Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⌨ Nakili Usanidi wa Cursor | `cursor` | Cursor → Settings → AI |
-| 💻 Nakili Usanidi wa VSCode | `vscode` | `~/.continue/config.json` |
-
-**Mfano — Ikiwa aina ni Claude Code, yaliyomo kama haya yananakiliwa:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "tokeni-ya-wakala-huu"
-}
-```
-
-**Mfano — Ikiwa aina ni VSCode (Continue):**
-
-```yaml
-# ~/.continue/config.yaml  ← Bandika kwenye config.yaml, si config.json
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: tokeni-ya-wakala-huu
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> ⚠️ **Toleo la hivi karibuni la Continue linatumia `config.yaml`.** Ikiwa `config.yaml` ipo, `config.json` inapuuzwa kabisa. Hakikisha umebandika kwenye `config.yaml`.
-
-**Mfano — Ikiwa aina ni Cursor:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : tokeni-ya-wakala-huu
-
-// Au vigezo vya mazingira:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=tokeni-ya-wakala-huu
-```
-
-> ⚠️ **Kunakili kwenye clipboard hakufanyi kazi**: Sera za usalama za kivinjari zinaweza kuzuia kunakili. Ikiwa sanduku la maandishi linafunguka kwenye popup, chagua yote kwa Ctrl+A kisha nakili kwa Ctrl+C.
-
----
-
-#### ⚡ Kitufe cha Kutumia Kiotomatiki — Bonyeza mara moja na usanidi umekamilika
-
-Ikiwa aina ya wakala ni `cline`, `claude-code`, `openclaw`, au `nanoclaw`, kitufe cha **⚡ Tumia Usanidi** kinaonyeshwa kwenye kadi ya wakala. Ukibonyeza kitufe hiki, faili za usanidi za ndani za wakala husika zinasasishwa kiotomatiki.
-
-| Kitufe | Aina ya Wakala | Faili Inayolengwa |
-|------|-------------|-------------|
-| ⚡ Tumia Usanidi wa Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ Tumia Usanidi wa Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⚡ Tumia Usanidi wa OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ Tumia Usanidi wa NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> ⚠️ Kitufe hiki kinatuma ombi kwa **localhost:56244** (proxy ya ndani). Proxy lazima iwe inaendesha kwenye mashine hiyo ili ifanye kazi.
-
----
-
-#### 🔀 Kupanga Kadi kwa Kuburuta na Kudondosha (v0.1.17, iliyoboreshwa v0.1.25)
-
-Unaweza **kuburuta** kadi za wakala kwenye dashibodi ili kuzipanga upya kwa mpangilio unaotaka.
-
-1. Shika eneo la **taa ya trafiki (●)** upande wa juu kushoto wa kadi kwa panya na uburute
-2. Idondoshe juu ya kadi katika nafasi unayotaka na mpangilio utabadilika
-
-> 💡 Mwili wa kadi (sehemu za kuingiza, vitufe n.k.) hauburutiki. Unaweza kushika tu kutoka eneo la taa ya trafiki.
-
-#### 🟠 Kugundua Mchakato wa Wakala (v0.1.25)
-
-Wakati proxy inafanya kazi kawaida lakini mchakato wa wakala wa ndani (NanoClaw, OpenClaw) umekufa, taa ya trafiki ya kadi inabadilika kuwa **machungwa (inayofifia)** na ujumbe wa "Mchakato wa wakala umesimama" unaonyeshwa.
-
-- 🟢 Kijani: Proxy + wakala kwa kawaida
-- 🟠 Machungwa (inafifia): Proxy kawaida, wakala amekufa
-- 🔴 Nyekundu: Proxy nje ya mtandao
-3. Mpangilio uliobadilika **unahifadhiwa kwenye seva mara moja** na unabaki hata ukisasisha ukurasa
-
-> 💡 Kwenye vifaa vya kugusa (simu/kibao) bado haijaunga mkono. Tumia kivinjari cha kompyuta ya mezani.
-
----
-
-#### 🔄 Usawazishaji wa Pande Mbili wa Modeli (v0.1.16)
-
-Ukibadilisha modeli ya wakala kwenye dashibodi ya vault, usanidi wa ndani wa wakala husika unasasishwa kiotomatiki.
-
-**Kwa Cline:**
-- Ukibadilisha modeli kwenye vault → tukio la SSE → proxy inasasisha sehemu ya modeli kwenye `globalState.json`
-- Sehemu zinazosasishwa: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` na API key hazigusiwi
-- **Unahitaji kusasisha VS Code upya (`Ctrl+Alt+R` au `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - Kwa sababu Cline haisomi faili ya usanidi tena inaporusha
-
-**Kwa Claude Code:**
-- Ukibadilisha modeli kwenye vault → tukio la SSE → proxy inasasisha sehemu ya `model` kwenye `settings.json`
-- Inatafuta kiotomatiki njia zote mbili za WSL na Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
-
-**Upande wa Nyuma (wakala → vault):**
-- Wakala (Cline, Claude Code n.k.) anapotuma ombi kwa proxy, proxy inajumuisha taarifa za huduma·modeli za mteja husika kwenye heartbeat
-- Huduma/modeli inayotumika sasa inaonyeshwa kwa wakati halisi kwenye kadi ya wakala kwenye dashibodi ya vault
-
-> 💡 **Jambo Muhimu**: Proxy inatambua wakala kwa tokeni ya Authorization ya ombi, na inaelekeza kiotomatiki hadi huduma/modeli iliyowekwa kwenye vault. Hata kama Cline au Claude Code inatuma jina tofauti la modeli, proxy inabatilisha kwa usanidi wa vault.
-
----
-
-### Kutumia Cline katika VS Code — Mwongozo wa Kina
-
-#### Hatua ya 1: Funga Cline
-
-Funga **Cline** (ID: `saoudrizwan.claude-dev`) kutoka Soko la Nyongeza la VS Code.
-
-#### Hatua ya 2: Sajili Wakala kwenye Vault
-
-1. Fungua dashibodi ya vault (`http://IP-ya-vault:56243`)
-2. Bonyeza **+ Ongeza** kwenye sehemu ya **Wakala**
-3. Ingiza kama ifuatavyo:
-
-| Sehemu | Thamani | Maelezo |
-|------|----|------|
-| ID | `cline_yangu` | Kitambulisho cha pekee (Kiingereza, bila nafasi) |
-| Jina | `Cline Yangu` | Jina litakaloonyeshwa kwenye dashibodi |
-| Aina ya Wakala | `cline` | ← Lazima uchague `cline` |
-| Huduma | Chagua huduma (mfano: `google`) | |
-| Modeli | Ingiza modeli (mfano: `gemini-2.5-flash`) | |
-
-4. Bonyeza **Hifadhi** na tokeni itazalishwa kiotomatiki
-
-#### Hatua ya 3: Unganisha na Cline
-
-**Njia A — Kutumia Kiotomatiki (Inashauriwa)**
-
-1. Hakikisha **proxy** ya wall-vault inaendesha kwenye mashine hiyo (`localhost:56244`)
-2. Bonyeza kitufe cha **⚡ Tumia Usanidi wa Cline** kwenye kadi ya wakala kwenye dashibodi
-3. Ukiona arifa "Usanidi umetumika kwa mafanikio!" imefanikiwa
-4. Sasisha VS Code upya (`Ctrl+Alt+R`)
-
-**Njia B — Usanidi wa Mikono**
-
-Fungua mipangilio (⚙️) kwenye upau wa kando wa Cline:
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://anwani-ya-proxy:56244/v1`
-  - Mashine ile ile: `https://localhost:56244/v1`
-  - Mashine nyingine kama seva ya mini: `http://192.168.1.20:56244/v1`
-- **API Key**: Tokeni iliyotolewa kutoka vault (nakili kutoka kadi ya wakala)
-- **Model ID**: Modeli iliyowekwa kwenye vault (mfano: `gemini-2.5-flash`)
-
-#### Hatua ya 4: Thibitisha
-
-Tuma ujumbe wowote kwenye mazungumzo ya Cline. Ikiwa ni kawaida:
-- Nukta ya **kijani (● Inaendesha)** itaonyeshwa kwenye kadi ya wakala husika kwenye dashibodi ya vault
-- Huduma/modeli ya sasa itaonyeshwa kwenye kadi (mfano: `google / gemini-2.5-flash`)
-
-#### Kubadilisha Modeli
-
-Unapotaka kubadilisha modeli ya Cline, badilisha kwenye **dashibodi ya vault**:
-
-1. Badilisha huduma/modeli kwenye menyu ya kushuka ya kadi ya wakala
-2. Bonyeza **Tumia**
-3. Sasisha VS Code upya (`Ctrl+Alt+R`) — jina la modeli kwenye kijachini cha Cline litasasishwa
-4. Modeli mpya itatumika kuanzia ombi linalofuata
-
-> 💡 Kwa kweli, proxy inatambua ombi la Cline kwa tokeni na kuielekeza kwa modeli ya usanidi wa vault. Hata ikiwa husasishi VS Code, **modeli inayotumika hubadilika mara moja** — kusasisha ni kwa ajili ya kusasisha onyesho la modeli kwenye UI ya Cline.
-
-#### Kugundua Kukatika kwa Muunganisho
-
-Ukifunga VS Code, kadi ya wakala kwenye dashibodi ya vault itageuka njano (imecheleweshwa) baada ya takriban **sekunde 90**, na nyekundu (nje ya mtandao) baada ya **dakika 3**. (Kuanzia v0.1.18, uchunguzi wa hali kwa vipindi vya sekunde 15 uliharakisha ugunduzi wa hali ya nje ya mtandao.)
-
-#### Utatuzi wa Matatizo
-
-| Dalili | Sababu | Suluhisho |
-|------|------|------|
-| Kosa la "Muunganisho umeshindikana" kwenye Cline | Proxy haiendeshwi au anwani si sahihi | Angalia proxy kwa `curl https://localhost:56244/health` |
-| Nukta ya kijani haionekani kwenye vault | API key (tokeni) haijawekwa | Bonyeza kitufe cha **⚡ Tumia Usanidi wa Cline** tena |
-| Modeli ya kijachini cha Cline haibadiliki | Cline inahifadhi usanidi kwenye cache | Sasisha VS Code upya (`Ctrl+Alt+R`) |
-| Jina lisilo sahihi la modeli linaonyeshwa | Hitilafu ya zamani (iliyorekebishwa v0.1.16) | Sasisha proxy hadi v0.1.16 au zaidi |
-
----
-
-#### 🟣 Kitufe cha Nakili Amri ya Kusambaza — Kinatumika unapofunga kwenye mashine mpya
-
-Kinatumika unapofunga proxy ya wall-vault kwenye kompyuta mpya na kuiunganisha na vault kwa mara ya kwanza. Bonyeza kitufe na hati nzima ya ufungaji inanakiliwa. Bandika na uitekeleze kwenye terminal ya kompyuta mpya na yafuatayo yanashughulikiwa kwa wakati mmoja:
-
-1. Funga binary ya wall-vault (inarukwa ikiwa tayari imefungwa)
-2. Usajili wa kiotomatiki wa huduma ya systemd ya mtumiaji
-3. Anza huduma na uunganishe kiotomatiki na vault
-
-> 💡 Hati ina tokeni ya wakala huu na anwani ya seva ya vault tayari imejazwa, kwa hivyo unaweza kuitekeleza mara moja baada ya kubandika bila marekebisho yoyote.
-
----
-
-### Kadi ya Huduma
-
-Kadi ya kuwasha, kuzima, au kusanidi huduma za AI za kutumia.
-
-- Swichi ya kuzima·kuwasha kwa kila huduma
-- Ukiingiza anwani ya seva ya AI ya ndani (Ollama, LM Studio, vLLM, llama.cpp n.k. inayoendesha kwenye kompyuta yako), itagundua kiotomatiki modeli zinazopatikana.
-- **Onyesho la hali ya muunganisho wa huduma ya ndani**: Nukta ya ● kando ya jina la huduma ikiwa **kijani** imeunganishwa, **kijivu** haijaunganishwa
-- **Taa ya trafiki ya kiotomatiki ya huduma ya ndani** (v0.1.23+): Huduma za ndani (Ollama, LM Studio, vLLM, llama.cpp) zinawashwa/kuzimwa kiotomatiki kulingana na upatikanaji wa muunganisho. Ukiwasha huduma, ndani ya sekunde 15 ● inaonekana kijani na kisanduku cha kuangalia kinawashwa, na ukizima huduma, inazimwa kiotomatiki. Njia ile ile na huduma za wingu (Google, OpenRouter n.k.) zinazobadilika kiotomatiki kulingana na upatikanaji wa API key.
-- **Kibadilishaji cha hali ya ufikirishaji** (v0.2.17+): Chini ya dirisha la kuhariri huduma ya ndani kunaonekana kisanduku cha kuangalia cha **hali ya ufikirishaji**. Ukikiwasha, proksi itaongeza `"reasoning": true` kwenye mwili wa chat-completions inayotumwa kwa seva ya juu, ili modeli zinazoauni utoaji wa mchakato wa mawazo kama DeepSeek R1, Qwen QwQ zirudishe pamoja kizuizi cha `<think>…</think>`. Seva zisizojua uwanja huu zitaupuuza, kwa hivyo unaweza kuiacha imewashwa kwa usalama hata katika mizigo mchanganyiko.
-
-> 💡 **Ikiwa huduma ya ndani inaendesha kwenye kompyuta nyingine**: Ingiza IP ya kompyuta hiyo kwenye sehemu ya kuingiza URL ya huduma. Mfano: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Ikiwa huduma imefungwa kwa `127.0.0.1` tu badala ya `0.0.0.0`, kufikia kwa IP ya nje hakutafanya kazi, kwa hivyo angalia anwani ya kufunga kwenye usanidi wa huduma.
-
-### Kuingiza Tokeni ya Msimamizi
-
-Unapojaribu kutumia vipengele muhimu kama kuongeza·kufuta key kwenye dashibodi, popup ya kuingiza tokeni ya msimamizi itaonekana. Ingiza tokeni uliyoweka kwenye mchawi wa setup. Baada ya kuingiza mara moja, inabaki hadi ufunge kivinjari.
-
-> ⚠️ **Ikiwa kushindikana kwa uthibitishaji kunazidi mara 10 ndani ya dakika 15, IP husika itazuiwa kwa muda.** Ikiwa umesahau tokeni, angalia kipengee cha `admin_token` kwenye faili ya `wall-vault.yaml`.
-
----
-
-## Hali ya Kusambazwa (Multi Bot)
-
-Wakati wa kuendesha OpenClaw kwenye kompyuta nyingi kwa wakati mmoja, hii ni usanidi ambapo **vault moja ya key inashirikiwa**. Ni rahisi kwa sababu unahitaji tu kusimamia key mahali pamoja.
-
-### Mfano wa Usanidi
-
-```
-[Seva ya Key Vault]
-  wall-vault vault    (Key Vault :56243, dashibodi)
-
-[WSL Alpha]           [Raspberry Pi Gamma]    [Mac Mini ya Ndani]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ Usawazishaji wa SSE ↕ Usawazishaji wa SSE  ↕ Usawazishaji wa SSE
-```
-
-Bot zote zinaangalia seva ya kati ya vault, kwa hivyo ukibadilisha modeli au kuongeza key kwenye vault, inajitokeza kwenye bot zote mara moja.
-
-### Hatua ya 1: Anza Seva ya Key Vault
-
-Endesha kwenye kompyuta ambayo itatumika kama seva ya vault:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### Hatua ya 2: Sajili Kila Bot (Mteja)
+Sasa dashboard inafikika katika `https://<vault-host>:56243`. Ongeza agent kwa kila proxy ya mbali katika kadi ya **Clients**; kila moja huzalisha `vault_token` ya kipekee.
 
-Sajili mapema taarifa za kila bot inayounganishwa na seva ya vault:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer tokeni-ya-msimamizi" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "BotA",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### Hatua ya 3: Anza Proxy kwenye Kila Kompyuta ya Bot
-
-Endesha proxy kwa kubainisha anwani ya seva ya vault na tokeni kwenye kila kompyuta ambapo bot imefungwa:
+### Proxy hosts
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> 💡 Badilisha sehemu ya **`192.168.x.x`** na anwani halisi ya IP ya ndani ya kompyuta ya seva ya vault. Unaweza kuiangalia kwenye mipangilio ya router au kwa amri ya `ip addr`.
+Proxy hu-authenticate dhidi ya vault, hufungua SSE stream, na hutekeleza config yoyote inayopokea (preferred service, model override, fallback chain). Edit za vault za baadaye hutua ndani ya sekunde bila restart.
+
+Kwa usakinishaji unaoenea LAN, wezesha TLS kwenye vault host (`WV_VAULT_TLS_ENABLED=1` + cert/key env vars) na endesha kila proxy host kupitia hatua ile ile ya `wall-vault cert install-trust` ili HTTPS calls za proxy ndani ya vault ziaminike.
 
 ---
 
-## Mpangilio wa Kuanza Kiotomatiki
+## Kuanza kiotomatiki
 
-Ikiwa ni kero kuwasha wall-vault kwa mikono kila ukianzisha upya kompyuta, isajili kama huduma ya mfumo. Baada ya kusajili mara moja, itaanza kiotomatiki wakati wa bootup.
+### systemd (Linux)
 
-### Linux — systemd (Linux nyingi)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd ni mfumo unaoendesha·kusimamia programu kiotomatiki kwenye Linux:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-Kuangalia kumbukumbu:
+Kwa vault kwenye host moja, andika `wall-vault-vault.service` sambamba. Kwa hali ya standalone, unit moja inayoita `wall-vault start` inatosha.
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-Ni mfumo unaosimamia utekelezaji wa kiotomatiki wa programu kwenye macOS:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. Pakua NSSM kutoka [nssm.cc](https://nssm.cc/download) na uiongeze kwenye PATH.
-2. Kwenye PowerShell ya msimamizi:
-
-```powershell
-wall-vault doctor deploy windows
-```
+Tumia `nssm` ku-wrap `wall-vault.exe start` kama Windows service, au entry ya `schtasks` inayoendesha wakati wa user logon.
 
 ---
 
-## Doctor (Daktari)
+## Plugin yamls
 
-Amri ya `doctor` ni zana ambayo **inajigundua na kujirekebishA** ikiwa wall-vault imesanidiwa vizuri.
+Backend yoyote inayoendana na OpenAI inaweza kuongezwa bila mabadiliko ya code kwa kudondosha yaml chini ya `~/.wall-vault/services/`. wall-vault huipakia wakati wa startup na husajili huduma kwa dispatch, set ya OAI-compat detection, na Gemini-stream bridge.
+
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
+```
+
+Set iliyojumuishwa katika `configs/services/` (lmstudio, vllm, llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server, litellm-proxy, ollama, google, openrouter) huja imelemazwa kwa chaguo-msingi. Nakili ile unayotaka kwa `~/.wall-vault/services/`, weka `enabled: true`, anza upya.
+
+---
+
+## Doctor
+
+`wall-vault doctor` huendesha health probe ya mara moja kwenye usakinishaji wote:
+
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
+```
+
+Kila line ni moja ya:
+
+- `✓` — afya nzuri
+- `⚠` — imepunguzwa lakini inafanya kazi (key moja imepoa, kiwango cha chini, n.k.)
+- `✗` — imevunjika
+- `SKIP` — haijasanidiwa / haitumiki kwenye host hii
+
+Hali ya pili ya daemon huendesha probe ile ile kila `doctor.interval` (chaguo-msingi dakika 5) na huandika matokeo kwa `doctor.log_file` (chaguo-msingi `/tmp/wall-vault-doctor.log`). Wakati `doctor.auto_fix` ni true, pia hujaribu kurekebisha drift za kawaida (config ya OpenClaw iliyochakaa, TLS trust iliyokosekana, huduma zinazoweza kuanzwa upya).
+
+Anzisha mara moja kutoka dashboard kupitia kadi ya **Doctor** au `wall-vault doctor`.
+
+---
+
+## Hooks
+
+Endesha amri ya shell kwenye matukio ya key:
+
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+Kila hook hupata vigezo vya mazingira maalum kwa tukio (`SERVICE`, `MODEL`, `ERROR`, `AGENT`, `LEVEL`, `MSG`). Hooks huendesha async na timeout ya sekunde 5 — proxy kamwe haisubiri hook ya polepole.
+
+---
+
+## Vigezo vya mazingira
+
+| Variable | YAML field |
+|----------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | One-shot import: comma-separated Google keys |
+| `WV_KEY_OPENROUTER` | One-shot import: OpenRouter keys |
+| `WV_KEY_ANTHROPIC` | One-shot import: Anthropic keys |
+| `WV_KEY_OPENAI` | One-shot import: OpenAI keys |
+| `WV_OLLAMA_URL` | Per-host Ollama URL override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Per-backend URL override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
+
+Kila env var, ikiwekwa, hushinda faili ya YAML.
+
+---
+
+## Utatuzi wa matatizo
+
+### `connection refused` kwenye `:56244`
+
+Ama proxy haiendi au imefungwa kwenye host tofauti. Angalia:
 
 ```bash
-wall-vault doctor check   # Gundua hali ya sasa (soma tu, usibadilishe kitu)
-wall-vault doctor fix     # Rekebisha matatizo kiotomatiki
-wall-vault doctor all     # Gundua + rekebisha kiotomatiki kwa wakati mmoja
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
 ```
 
-> 💡 Ikiwa kitu kinaonekana si sawa, endesha `wall-vault doctor all` kwanza. Inashughulikia matatizo mengi kiotomatiki.
+Ikiwa inaendesha kwenye port tofauti, config yako ina `proxy.port` iliyobadilishwa — angalia `~/.wall-vault/config.yaml`.
 
----
+### `x509: certificate signed by unknown authority`
 
-## RTK Kuokoa Tokeni
+Client haiamini CA ya ndani ya wall-vault. Endesha `wall-vault cert install-trust` kwenye mashine ya client. Kwa agent ambazo runtime yake huipuuza OS trust store (k.m. Node yenye `NODE_EXTRA_CA_CERTS` iliyowekwa hard-coded), tumia loopback HTTP companion kwenye `127.0.0.1:56245` (host moja tu) au weka `WV_PROXY_TLS_ENABLED=0` ili kuangukia kwa HTTP wazi.
 
-*(v0.1.24+)*
+### `token not registered with vault`
 
-**RTK (Zana ya Kuokoa Tokeni)** inashinikiza kiotomatiki matokeo ya amri za shell zinazotekelezwa na wakala wa AI coding (kama Claude Code) ili kupunguza matumizi ya tokeni. Kwa mfano, matokeo ya mistari 15 ya `git status` yanashindiliwa kuwa muhtasari wa mistari 2.
+`Authorization: Bearer <token>` ya client hailingani na client yoyote iliyosajiliwa. Thibitisha token chini ya **Clients** kwenye dashboard. Ikiwa ulinakili token literal kama `proxy-managed`, `dummy`, au `""` kutoka config iliyochakaa, ibadilishe na client token halisi.
 
-### Matumizi ya Msingi
+### `Anthropic dispatch needs a Claude model id`
+
+Tabia ya chaguo-msingi tangu v0.2.63: model id isiyo ya Claude iliyotumwa kwa anthropic dispatch hurudisha error. Ama rekebisha routing (usitume `gemini-2.5-flash` kwa anthropic) au chagua opt in kwa kuandika upya kiotomatiki kupitia `proxy.anthropic_fallback_model`.
+
+### `unknown service: <id>`
+
+Dispatch iliona service id ambayo hakuna plugin yaml iliyoidai. Angalia:
 
 ```bash
-# Funika amri kwa wall-vault rtk na matokeo yachujwa kiotomatiki
-wall-vault rtk git status          # Orodha ya faili zilizobadilishwa tu
-wall-vault rtk git diff HEAD~1     # Mistari iliyobadilishwa + muktadha wa chini
-wall-vault rtk git log -10         # Hash + ujumbe wa mstari mmoja kwa kila moja
-wall-vault rtk go test ./...       # Majaribio yaliyoshindikana tu
-wall-vault rtk ls -la              # Amri zisizotumika zinakatwa kiotomatiki
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
 ```
 
-### Amri Zinazotumika na Athari za Kupunguza
+Ikiwa yaml ipo lakini ni `enabled: false`, igeuze. Ikiwa imepotea kabisa, nakili kutoka `configs/services/` katika source tree.
 
-| Amri | Njia ya Kichuja | Kiwango cha Kupunguza |
-|------|----------|--------|
-| `git status` | Muhtasari wa faili zilizobadilishwa tu | ~87% |
-| `git diff` | Mistari iliyobadilishwa + muktadha wa mistari 3 | ~60-94% |
-| `git log` | Hash + ujumbe wa mstari wa kwanza | ~90% |
-| `git push/pull/fetch` | Ondoa maendeleo, muhtasari tu | ~80% |
-| `go test` | Onyesha kushindikana tu, hesabu zilizopita | ~88-99% |
-| `go build/vet` | Onyesha makosa tu | ~90% |
-| Amri nyingine zote | Mistari 50 ya kwanza + mistari 50 ya mwisho, upeo 32KB | Inabadilika |
+### Response tupu kwenye reasoning model
 
-### Pipeline ya Kichuja cha Hatua 3
+`qwen3.6`, `deepseek-r1`, na familia ya GPT-`o1` wakati mwingine hutoa `reasoning_content` tu na kuacha `content` tupu. Tangu v0.2.63 wall-vault huangukia kwa reasoning text kiotomatiki — ikiwa bado unaona response tupu, backend hairudishi field yoyote. Angalia logs za upstream.
 
-1. **Kichuja cha muundo kwa amri** — Kinaelewa muundo wa matokeo ya git, go n.k. na kuchota sehemu zenye maana tu
-2. **Uchakataji wa baadaye wa regex** — Ondoa misimbo ya rangi ya ANSI, punguza mistari tupu, jumlisha mistari inayojirudia
-3. **Kupitisha + kukata** — Amri zisizotumika huhifadhi mistari 50 ya kwanza/mwisho tu
+Kwa LM Studio na qwen3 hasa, weka `inline_no_think_for_qwen3: true` katika plugin yaml ili reasoning ilemazwe inline. lmstudio.yaml na ollama.yaml zilizojengwa-ndani tayari zinafanya hivi.
 
-### Kuunganisha na Claude Code
+### Dashboard inaonyesha "all keys on cooldown" lakini nimeongeza moja tu
 
-Unaweza kusanidi hook ya `PreToolUse` ya Claude Code ili amri zote za shell zipitie RTK kiotomatiki.
+Key mpya ina afya nzuri lakini dispatch path bado inaweza kuwa katika cooldown ya key ya zamani. Jaribu request mpya — proxy hu-round-robin kwa kila call, na key yenye afya itachaguliwa baadaye.
 
-```bash
-# Funga hook (huongezwa kiotomatiki kwenye settings.json ya Claude Code)
-wall-vault rtk hook install
-```
+### Vault haitafungua na nenosiri kuu
 
-Au ongeza kwa mikono kwenye `~/.claude/settings.json`:
+Nenosiri sio sahihi. Hakuna recovery — wall-vault kwa makusudi haitumii backdoor. Ikiwa umepoteza nenosiri kuu kweli, njia pekee ni kufuta `~/.wall-vault/data/vault.json`, anza upya na nenosiri jipya, na uongeze key tena.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
+### Ukomo wa Free-tier OpenRouter umefikiwa
 
-> 💡 **Uhifadhi wa Exit code**: RTK inarudisha exit code ya amri ya awali kama ilivyo. Ikiwa amri inashindikana (exit code ≠ 0), AI pia inagundua kushindikana kwa usahihi.
+Weka `proxy.services` ijumuishe `openrouter` na ongeza angalau OpenRouter key moja. Proxy hu-auto-fall-back kutoka model ya kulipia hadi `:free` variant yake wakati path ya kulipia inarudisha 402 / 429.
 
-> 💡 **Kulazimisha Kiingereza**: RTK inatekeleza amri kwa `LC_ALL=C` ili kuzalisha matokeo ya Kiingereza kila wakati bila kujali mipangilio ya lugha ya mfumo. Hii inahakikisha kichuja kinafanya kazi kwa usahihi.
+### `journalctl --user -u wall-vault-proxy` ni tupu
+
+systemd `--user` logs huenda kwa journal ya user anayeziendesha. Ikiwa ulianza unit kama `root` au kupitia `sudo`, journal iko katika system instance badala yake — jaribu `journalctl -u wall-vault-proxy` bila `--user`.
 
 ---
 
-## Rejea ya Vigezo vya Mazingira
+## Zaidi
 
-Vigezo vya mazingira ni njia ya kupitisha thamani za usanidi kwa programu. Ingiza katika muundo wa `export jina-la-kigezo=thamani` kwenye terminal, au weka kwenye faili ya huduma ya kuanza kiotomatiki ili itumike daima.
-
-| Kigezo | Maelezo | Thamani ya Mfano |
-|------|------|---------|
-| `WV_LANG` | Lugha ya dashibodi | `ko`, `en`, `ja` |
-| `WV_THEME` | Mandhari ya dashibodi | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | API key ya Google (nyingi kwa koma) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | API key ya OpenRouter | `sk-or-v1-...` |
-| `WV_VAULT_URL` | Anwani ya seva ya vault katika hali ya kusambazwa | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Tokeni ya uthibitishaji ya mteja (bot) | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | Tokeni ya msimamizi | `admin-token-here` |
-| `WV_MASTER_PASS` | Nenosiri la usimbaji fiche wa API key | `my-password` |
-| `WV_AVATAR` | Njia ya faili ya picha ya avatar (njia ya jamaa kutoka `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Anwani ya seva ya ndani ya Ollama | `http://192.168.x.x:11434` |
-
----
-
-## Utatuzi wa Matatizo
-
-### Wakati Proxy Haianzii
-
-Mara nyingi ni kwa sababu bandari tayari inatumika na programu nyingine.
-
-```bash
-ss -tlnp | grep 56244   # Angalia nani anatumia bandari 56244
-wall-vault proxy --port 8080   # Anza kwa nambari tofauti ya bandari
-```
-
-### Wakati Makosa ya API Key Yanatokea (429, 402, 401, 403, 582)
-
-| Msimbo wa Kosa | Maana | Suluhisho |
-|----------|------|----------|
-| **429** | Maombi mengi sana (matumizi yamezidi) | Subiri kidogo au ongeza key nyingine |
-| **402** | Malipo yanahitajika au krediti haitoshi | Jaza krediti kwenye huduma husika |
-| **401 / 403** | Key si sahihi au haina ruhusa | Angalia tena thamani ya key na uisajili upya |
-| **582** | Gateway imezidiwa (cooldown dakika 5) | Inaisha kiotomatiki baada ya dakika 5 |
-
-```bash
-# Angalia orodha na hali ya key zilizosajiliwa
-curl -H "Authorization: Bearer tokeni-ya-msimamizi" https://localhost:56243/admin/keys
-
-# Weka upya vihesabio vya matumizi ya key
-curl -X POST -H "Authorization: Bearer tokeni-ya-msimamizi" https://localhost:56243/admin/keys/reset
-```
-
-### Wakati Wakala Anaonyeshwa kama "Haijaunganishwa"
-
-"Haijaunganishwa" inamaanisha mchakato wa proxy hautumi ishara (heartbeat) kwa vault. **Haimaanishi kuwa usanidi haujahifadhiwa.** Proxy inahitaji kuendesha ukijua anwani ya seva ya vault na tokeni ili kubadilika kuwa hali ya kuunganishwa.
-
-```bash
-# Anza proxy ukibainisha anwani ya seva ya vault, tokeni, na ID ya mteja
-WV_VAULT_URL=http://anwani-ya-seva-ya-vault:56243 \
-WV_VAULT_TOKEN=tokeni-ya-mteja \
-WV_VAULT_CLIENT_ID=id-ya-mteja \
-wall-vault proxy
-```
-
-Muunganisho ukifanikiwa, itabadilika kuwa 🟢 Inaendesha kwenye dashibodi ndani ya takriban sekunde 20.
-
-### Wakati Muunganisho wa Ollama Haifanyi Kazi
-
-Ollama ni programu inayoendesha AI moja kwa moja kwenye kompyuta yako. Kwanza angalia ikiwa Ollama imewashwa.
-
-```bash
-curl http://localhost:11434/api/tags   # Ikiwa orodha ya modeli inaonekana, ni kawaida
-export OLLAMA_URL=http://192.168.x.x:11434   # Ikiwa inaendesha kwenye kompyuta nyingine
-```
-
-> ⚠️ Ikiwa Ollama haijibu, anza kwanza Ollama kwa amri ya `ollama serve`.
-
-> ⚠️ **Modeli kubwa ni polepole**: Modeli kubwa kama `qwen3.5:35b`, `deepseek-r1` zinaweza kuchukua dakika kadhaa kuzalisha jibu. Hata ikiwa inaonekana hakuna jibu, inaweza kuwa bado inashughulika kawaida, kwa hivyo subiri.
-
----
-
-## Maelezo ya Uboreshaji wa v0.2
-
-- `Service` ilipokea `default_model` na `allowed_models`. Modeli chaguomsingi inayolingana na huduma sasa imewekwa moja kwa moja kwenye kadi ya huduma.
-- `Client.default_service` / `default_model` zimebadilishwa jina na kubadilishwa maana kuwa `preferred_service` / `model_override`. Ikiwa kizuizi kipo tupu, modeli chaguomsingi ya huduma itatumika.
-- Wakati wa kuanzisha v0.2 kwa mara ya kwanza, faili ya `vault.json` iliyopo inabadilishwa kiotomatiki, na hali kabla ya ubadilishaji inahifadhwa kama `vault.json.pre-v02.{timestamp}.bak`.
-- Dashibodi imebadilishwa kuwa maeneo matatu: upau wa upande wa kushoto, taifa la kadi katikati, na sehemu ya kuhariri upande wa kulia.
-- Njia za Admin API hazibadilishwi, lakini vigezo vya ombi/jibu vimebadilishwa — hati za CLI za zamani zitahitaji kusasishwa ipasavyo.
-
----
-
-## Vipengele Vipya vya v0.2.1
-
-- **Upitishaji wa Multimodal (OpenAI → Gemini)**: `/v1/chat/completions` sasa inakubali aina sita za sehemu za maudhui zaidi ya `text` — `input_audio`, `input_video`, `input_image`, `input_file`, na `image_url` (data URIs pamoja na URL za nje za http(s) ≤ 5 MB). Proxy hubadilisha kila moja kuwa `inlineData` ya Gemini. Wateja wanaoendana na OpenAI kama EconoWorld wanaweza kutiririsha blobs za sauti / picha / video moja kwa moja.
-- **Aina ya wakala ya EconoWorld**: `POST /agent/apply` ikiwa na `agentType: "econoworld"` inaandika mipangilio ya wall-vault ndani ya `analyzer/ai_config.json` ya mradi. `workDir` inakubali orodha ya njia wagombea zilizotenganishwa kwa koma na kubadilisha njia za kiendeshi cha Windows kuwa njia za mlimo wa WSL.
-- **Gridi ya funguo + CRUD ya dashibodi**: funguo 11 zinaonyeshwa kama kadi zilizokusanywa zikiwa na slideover ya + ongeza / ✕ futa.
-- **Kuongeza huduma + kupanga upya kwa kuburuta-na-kuacha**: gridi ya huduma inapata kitufe cha + ongeza pamoja na kishiko cha kuburuta (`⋮⋮`).
-- **Kichwa / chini / uhuishaji wa mandhari / kibadilishi cha lugha** vimerejeshwa. Mandhari 7 (cherry/dark/light/ocean/gold/autumn/winter) huchezesha athari yao ya chembe kwenye safu nyuma ya kadi lakini juu ya mandharinyuma.
-- **Uzoefu wa kufunga slideover**: kubofya nje au Esc kunafunga slideover.
-- **Kiashiria cha hali ya SSE + kipima muda wa uendeshaji**: kwenye upau wa juu (topbar), kando ya kichaguzi cha lugha/mandhari, kuna kihesabu cha `⏱ uptime` na kiashiria cha `● SSE` (kijani = kimeunganishwa, chungwa = kinaunganisha upya, kijivu = kimekatika) vilivyowekwa pamoja (vilihamishwa kutoka footer hadi header tangu v0.2.18 — hali inaonekana bila kusogeza).
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## Mabadiliko ya Hivi Karibuni (v0.1.16 ~ v0.1.27)
-
-### v0.1.27 (2026-04-09)
-- **Urekebishaji wa jina la modeli ya fallback ya Ollama**: Ilirekebishwa tatizo ambapo jina la modeli yenye kiambishi awali cha provider (mfano: `google/gemini-3.1-pro-preview`) lilipelekwa kwa Ollama kama lilivyo wakati wa fallback kutoka huduma nyingine. Sasa linabadilishwa kiotomatiki na kigezo cha mazingira/modeli chaguomsingi.
-- **Kupunguza sana muda wa cooldown**: 429 rate limit 30min→5min, 402 malipo 1hr→30min, 401/403 24hr→6hr. Kuzuia hali ambapo key zote ziko kwenye cooldown kwa wakati mmoja na kusababisha proxy kusimama kabisa.
-- **Kujaribu tena kwa lazima wakati wa cooldown kamili**: Wakati key zote ziko kwenye hali ya cooldown, key inayofunguliwa mapema zaidi inajaribiwa tena kwa lazima ili kuzuia kukataliwa kwa ombi.
-- **Urekebishaji wa onyesho la orodha ya huduma**: Jibu la `/status` linaonyesha orodha halisi ya huduma iliyosawazishwa kutoka vault (kuzuia kukosekana kwa anthropic n.k.).
-
-### v0.1.25 (2026-04-08)
-- **Kugundua mchakato wa wakala**: Proxy inagundua iwapo wakala wa ndani (NanoClaw/OpenClaw) yuko hai na kuonyesha kwa taa ya trafiki ya machungwa kwenye dashibodi.
-- **Uboreshaji wa kishiko cha kuburuta**: Kubadilishwa ili uweze kushika tu kutoka eneo la taa ya trafiki (●) wakati wa kupanga kadi. Haiwezekani tena kuburuta kwa bahati mbaya kutoka sehemu za kuingiza au vitufe.
-
-### v0.1.24 (2026-04-06)
-- **Amri ndogo ya RTK ya kuokoa tokeni**: `wall-vault rtk <command>` inachuja kiotomatiki matokeo ya amri za shell ili kupunguza matumizi ya tokeni ya wakala wa AI kwa 60-90%. Inajumuisha vichuja maalum kwa amri kuu kama git, go, na amri zisizotumika pia zinakatwa kiotomatiki. Inaunganishwa kwa uwazi kupitia hook ya `PreToolUse` ya Claude Code.
-
-### v0.1.23 (2026-04-06)
-- **Urekebishaji wa kubadilisha modeli ya Ollama**: Ilirekebishwa tatizo ambapo kubadilisha modeli ya Ollama kwenye dashibodi ya vault hakukujitokeza kwenye proxy. Hapo awali ilitumia tu kigezo cha mazingira (`OLLAMA_MODEL`), sasa usanidi wa vault unapewa kipaumbele.
-- **Taa ya trafiki ya kiotomatiki ya huduma ya ndani**: Ollama·LM Studio·vLLM zinaanzishwa kiotomatiki zikiweza kuunganishwa, na kuzimwa kiotomatiki zikikatika. Njia ile ile na ubadilishaji wa kiotomatiki wa huduma za wingu kulingana na key.
-
-### v0.1.22 (2026-04-05)
-- **Urekebishaji wa sehemu ya content tupu inayokosekana**: Wakati modeli za thinking (gemini-3.1-pro, o1, claude thinking n.k.) zinatumia kikomo cha max_tokens kwa reasoning na haziwezi kuzalisha jibu halisi, proxy ilikuwa ikiondoa sehemu za `content`/`text` za jibu la JSON kwa `omitempty`, na kusababisha SDK za mteja za OpenAI/Anthropic kuanguka kwa kosa la `Cannot read properties of undefined (reading 'trim')`. Kubadilishwa ili kujumuisha sehemu kila wakati kama ilivyo kwenye vipimo rasmi vya API.
-
-### v0.1.21 (2026-04-05)
-- **Msaada wa modeli ya Gemma 4**: Modeli za familia ya Gemma kama `gemma-4-31b-it`, `gemma-4-26b-a4b-it` zinaweza kutumika kupitia Google Gemini API.
-- **Msaada rasmi wa huduma ya LM Studio / vLLM**: Hapo awali huduma hizi zilikuwa zikiachwa nje ya uelekezaji wa proxy na kila wakati kubadilishwa na Ollama. Sasa zinaelekezwa kawaida kupitia API inayolingana na OpenAI.
-- **Urekebishaji wa onyesho la huduma kwenye dashibodi**: Hata fallback ikitokea, dashibodi daima inaonyesha huduma iliyowekwa na mtumiaji.
-- **Onyesho la hali ya huduma ya ndani**: Hali ya muunganisho wa huduma za ndani (Ollama, LM Studio, vLLM n.k.) inaonyeshwa kwa rangi ya nukta ya ● dashibodi inapopakiwa.
-- **Kigezo cha mazingira cha kichuja cha zana**: Hali ya kupitisha zana (tools) inaweza kuwekwa kwa kigezo cha mazingira `WV_TOOL_FILTER=passthrough`.
-
-### v0.1.20 (2026-03-28)
-- **Uimarishaji wa kina wa usalama**: Kuzuia XSS (sehemu 41), kulinganisha tokeni kwa muda sawa, vizuizi vya CORS, vikomo vya ukubwa wa ombi, kuzuia kupita njia, uthibitishaji wa SSE, uimarishaji wa kikomo cha kasi, na uboreshaji wa vipengee 12 vya usalama.
-
-### v0.1.19 (2026-03-27)
-- **Kugundua Claude Code mtandaoni**: Claude Code ambayo haipiti proxy pia inaonyeshwa kama mtandaoni kwenye dashibodi.
-
-### v0.1.18 (2026-03-26)
-- **Urekebishaji wa kushikamana na huduma ya fallback**: Baada ya fallback ya muda kwa Ollama, huduma ya awali ikirejea inarudi kiotomatiki.
-- **Uboreshaji wa ugunduzi wa nje ya mtandao**: Ugunduzi wa proxy iliyosimama uliharakishwa kwa uchunguzi wa hali kwa vipindi vya sekunde 15.
-
-### v0.1.17 (2026-03-25)
-- **Kupanga kadi kwa kuburuta na kudondosha**: Kadi za wakala zinaweza kuvutwa ili kubadilisha mpangilio.
-- **Kitufe cha kutumia usanidi ndani ya mstari**: Kitufe cha [⚡ Tumia Usanidi] kinaonyeshwa kwa wakala walio nje ya mtandao.
-- **Aina ya wakala wa cokacdir imeongezwa**.
-
-### v0.1.16 (2026-03-25)
-- **Usawazishaji wa pande mbili wa modeli**: Kubadilisha modeli ya Cline·Claude Code kwenye dashibodi ya vault kunajitokeza kiotomatiki.
-
----
-
-*Kwa taarifa zaidi za API, tazama [API.md](API.md).*
+- HTTP API reference — angalia [API.md](API.md)
+- Source — `https://github.com/sookmook/wall-vault`
+- Ripoti za bug / maombi ya feature — GitHub Issues
+- Historia ya release — [CHANGELOG.md](../CHANGELOG.md)

@@ -34,7 +34,7 @@ func TestIsLoopbackHostPort(t *testing.T) {
 		{"127.0.0.1:54321", true},
 		{"[::1]:54321", true},
 		{"localhost:54321", true},
-		{"192.168.0.4:54321", false},
+		{"192.168.0.20:54321", false},
 		{"10.0.0.1:80", false},
 		{"127.0.0.1", true},
 		{"::1", true},
@@ -86,7 +86,7 @@ func TestSubstituteSelfManagedSentinel_NonLoopbackBlocked(t *testing.T) {
 	}}}
 	r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
 	r.Header.Set("Authorization", "Bearer proxy-managed")
-	r.RemoteAddr = "192.168.0.4:55555"
+	r.RemoteAddr = "192.168.0.20:55555"
 	if s.substituteSelfManagedSentinel(r) {
 		t.Fatal("non-loopback caller must not get substitution")
 	}

@@ -1,931 +1,621 @@
 # wall-vault उपयोगकर्ता मैनुअल
-*(Last updated: 2026-04-16 — v0.2.2)*
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · **हिन्दी** · [Bahasa Indonesia](MANUAL.id.md) · [ภาษาไทย](MANUAL.th.md) · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
 
-## विषय सूची
+यह मैनुअल wall-vault को इंस्टॉल करने, कॉन्फ़िगर करने और संचालित करने को कवर करता है। एक नज़र में अवलोकन के लिए [README](../README.md) देखें। HTTP API विवरण के लिए [API reference](API.md) देखें।
 
-1. [wall-vault क्या है?](#wall-vault-क्या-है)
+## विषय-सूची
+
+1. [wall-vault क्या करता है](#wall-vault-क्या-करता-है)
 2. [इंस्टॉलेशन](#इंस्टॉलेशन)
-3. [शुरुआत करना (setup विज़ार्ड)](#शुरुआत-करना)
-4. [API कुंजी पंजीकरण](#api-कुंजी-पंजीकरण)
-5. [प्रॉक्सी का उपयोग](#प्रॉक्सी-का-उपयोग)
-6. [कुंजी तिजोरी डैशबोर्ड](#कुंजी-तिजोरी-डैशबोर्ड)
-7. [वितरित मोड (मल्टी बॉट)](#वितरित-मोड-मल्टी-बॉट)
-8. [ऑटो-स्टार्ट सेटअप](#ऑटो-स्टार्ट-सेटअप)
-9. [Doctor (डॉक्टर)](#doctor-डॉक्टर)
-10. [RTK टोकन बचत](#rtk-टोकन-बचत)
-11. [पर्यावरण चर संदर्भ](#पर्यावरण-चर-संदर्भ)
-12. [समस्या निवारण](#समस्या-निवारण)
+3. [सेटअप विज़ार्ड के साथ पहली बार चलाना](#सेटअप-विज़ार्ड-के-साथ-पहली-बार-चलाना)
+4. [TLS सक्षम करना](#tls-सक्षम-करना)
+5. [API कुंजियाँ रजिस्टर करना](#api-कुंजियाँ-रजिस्टर-करना)
+6. [एजेंट कनेक्ट करना](#एजेंट-कनेक्ट-करना)
+7. [डैशबोर्ड](#डैशबोर्ड)
+8. [वितरित मोड](#वितरित-मोड)
+9. [ऑटो-स्टार्ट](#ऑटो-स्टार्ट)
+10. [प्लगइन yamls](#प्लगइन-yamls)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [पर्यावरण चर](#पर्यावरण-चर)
+14. [समस्या निवारण](#समस्या-निवारण)
 
 ---
 
-## v0.2 अपग्रेड नोट्स
+## wall-vault क्या करता है
 
-- `Service` को `default_model` और `allowed_models` मिले। सेवा के डिफ़ॉल्ट मॉडल को अब सीधे सेवा कार्ड पर सेट किया जाता है।
-- `Client.default_service` / `default_model` को नाम बदलकर `preferred_service` / `model_override` किया गया है। यदि override खाली है, तो सेवा का डिफ़ॉल्ट मॉडल उपयोग किया जाता है।
-- पहले v0.2 स्टार्टअप पर, मौजूदा `vault.json` को स्वचालित रूप से माइग्रेट किया जाता है, और माइग्रेशन से पहले की स्थिति को `vault.json.pre-v02.{timestamp}.bak` के रूप में संरक्षित किया जाता है।
-- डैशबोर्ड को तीन जोनों में पुनर्गठित किया गया है: एक बाईं ओर की साइडबार, एक केंद्र कार्ड ग्रिड, और एक दाईं ओर की edit slideover।
-- Admin API पथ अपरिवर्तित हैं, लेकिन request/response body schemas अपडेट किए गए हैं — पुरानी CLI स्क्रिप्ट को तदनुसार अपडेट करने की आवश्यकता होगी।
+wall-vault एक एकल Go बायनरी है जो दो सहयोगी सेवाओं को एक साथ जोड़ता है:
 
----
+- **vault** API कुंजियों को विश्राम पर एन्क्रिप्टेड (मास्टर पासवर्ड के साथ AES-GCM) संग्रहीत करता है, प्रति कुंजी उपयोग और कूलडाउन को ट्रैक करता है, परिवर्तनों को Server-Sent Events (SSE) पर प्रसारित करता है, और मानव ऑपरेटरों के लिए `:56243` पर एक वेब डैशबोर्ड प्रदान करता है।
+- **proxy** Gemini, Anthropic, OpenAI-संगत और Ollama-नेटिव एंडपॉइंट्स को `:56244` पर एक्सपोज़ करता है। कोई भी AI क्लाइंट जो प्रॉक्सी की ओर इशारा करता है वह vault की कुंजियों का उपयोग कर रहा है — क्लाइंट उन्हें कभी नहीं देखते। जब एक upstream विफल होता है, तो डिस्पैच क्रम में अगले प्रदाता पर वापस आ जाता है।
 
-## v0.2.1 नई विशेषताएँ
+यह उपयोगी है जब:
 
-- **मल्टीमॉडल पास-थ्रू (OpenAI → Gemini)**: `/v1/chat/completions` अब `text` के अतिरिक्त छह कंटेंट पार्ट प्रकार स्वीकार करता है — `input_audio`, `input_video`, `input_image`, `input_file`, और `image_url` (data URIs तथा बाहरी http(s) URLs ≤ 5 MB)। प्रॉक्सी प्रत्येक को Gemini के `inlineData` में परिवर्तित कर देता है। EconoWorld जैसे OpenAI-संगत क्लाइंट ऑडियो / इमेज / वीडियो blobs को सीधे स्ट्रीम कर सकते हैं।
-- **EconoWorld एजेंट प्रकार**: `POST /agent/apply` को `agentType: "econoworld"` के साथ भेजने पर wall-vault सेटिंग्स प्रोजेक्ट के `analyzer/ai_config.json` में लिख दी जाती हैं। `workDir` अल्पविराम-पृथक उम्मीदवार पथों की सूची स्वीकार करता है और Windows drive पथों को WSL mount पथों में परिवर्तित कर देता है।
-- **डैशबोर्ड कुंजियाँ ग्रिड + CRUD**: 11 कुंजियाँ कॉम्पैक्ट कार्ड के रूप में रेंडर होती हैं, साथ में + add / ✕ delete slideover।
-- **सेवा जोड़ें + ड्रैग-एंड-ड्रॉप पुनर्व्यवस्था**: सेवा ग्रिड में + add बटन और drag handle (`⋮⋮`) जोड़े गए हैं।
-- **हेडर / फ़ुटर / थीम एनिमेशन / भाषा स्विचर** पुनर्स्थापित किए गए हैं। 7 थीम्स (cherry/dark/light/ocean/gold/autumn/winter) अपना पार्टिकल इफ़ेक्ट कार्ड के पीछे परंतु बैकग्राउंड के ऊपर एक लेयर पर चलाती हैं।
-- **Slideover बंद करने का UX**: बाहर क्लिक करने या `Esc` दबाने पर slideover बंद हो जाता है।
-- **`SSE` स्थिति सूचक + अपटाइम टाइमर**: शीर्ष बार (topbar) में, भाषा/थीम चयनकर्ता के बगल में `⏱ अपटाइम` काउंटर और `● SSE` सूचक (हरा = कनेक्टेड, नारंगी = पुनः कनेक्ट हो रहा है, ग्रे = डिस्कनेक्टेड) एक साथ रखे गए हैं (v0.2.18 से फ़ुटर से हेडर में स्थानांतरित — बिना स्क्रॉल किए स्थिति देख सकते हैं)।
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## wall-vault क्या है?
-
-**wall-vault = OpenClaw (ओपनक्लॉ) के लिए AI प्रॉक्सी + API कुंजी तिजोरी**
-
-AI सेवाओं का उपयोग करने के लिए **API कुंजी** की आवश्यकता होती है। API कुंजी एक **डिजिटल पास** की तरह है जो प्रमाणित करती है कि "इस व्यक्ति को यह सेवा उपयोग करने का अधिकार है।" लेकिन इस पास की दैनिक उपयोग सीमा होती है, और गलत तरीके से प्रबंधन करने पर इसके लीक होने का खतरा रहता है।
-
-wall-vault इन पास को एक सुरक्षित तिजोरी में रखता है और OpenClaw तथा AI सेवाओं के बीच **प्रॉक्सी (मध्यस्थ)** की भूमिका निभाता है। सरल शब्दों में, OpenClaw को बस wall-vault से कनेक्ट करना होता है, और बाकी जटिल कार्य wall-vault स्वयं संभाल लेता है।
-
-wall-vault जो समस्याएँ हल करता है:
-
-- **API कुंजी ऑटो-रोटेशन**: जब किसी कुंजी की उपयोग सीमा पूरी हो जाती है या अस्थायी रूप से ब्लॉक (कूलडाउन) होती है, तो चुपचाप अगली कुंजी पर स्विच हो जाता है। OpenClaw बिना रुकावट काम करता रहता है।
-- **सर्विस ऑटो-फॉलबैक**: अगर Google जवाब नहीं देता, तो OpenRouter पर, वह भी न हो तो आपके कंप्यूटर पर इंस्टॉल Ollama/LM Studio/vLLM (लोकल AI) पर ऑटोमैटिक स्विच हो जाता है। सेशन टूटता नहीं। मूल सेवा वापस आने पर अगले अनुरोध से स्वत: वापसी होती है (v0.1.18+, LM Studio/vLLM: v0.1.21+)।
-- **रियल-टाइम सिंक (SSE)**: तिजोरी डैशबोर्ड में मॉडल बदलने पर 1-3 सेकंड के अंदर OpenClaw स्क्रीन पर दिखता है। SSE (Server-Sent Events) वह तकनीक है जिसमें सर्वर क्लाइंट को रियल-टाइम अपडेट पुश करता है।
-- **रियल-टाइम सूचनाएँ**: कुंजी समाप्ति या सेवा बाधा जैसी घटनाएँ OpenClaw TUI (टर्मिनल स्क्रीन) के नीचे तुरंत दिखाई देती हैं।
-
-> 💡 **Claude Code, Cursor, VS Code** भी कनेक्ट किए जा सकते हैं, लेकिन wall-vault का मूल उद्देश्य OpenClaw के साथ उपयोग करना है।
+- आपके पास कई प्रदाताओं के लिए कुंजियाँ हैं और आप एक URL चाहते हैं जिससे एजेंट बात करे।
+- आप चाहते हैं कि कूलडाउन पर मुफ्त-स्तरीय कुंजी सत्र को बाधित किए बिना एक तरफ हो जाए।
+- आप चाहते हैं कि वही कुंजियाँ क्रेडेंशियल कॉपी किए बिना एक ही LAN पर कई बॉट्स, IDEs, या स्क्रिप्ट्स को चलाएँ।
+- आप कुंजियों को संपादित करने और मॉडल बदलने के लिए डैशबोर्ड चाहते हैं, पर्यावरण चर नहीं।
+- आप क्लाउड सीमाएँ समाप्त होने पर एक स्थानीय फ़ॉलबैक (Ollama, LM Studio, vLLM) चाहते हैं।
 
 ```
-OpenClaw (TUI टर्मिनल स्क्रीन)
-        │
-        ▼
-  wall-vault प्रॉक्सी (:56244)   ← कुंजी प्रबंधन, राउटिंग, फॉलबैक, इवेंट
-        │
-        ├─ Google Gemini API
-        ├─ OpenRouter API (340+ मॉडल)
-        ├─ Ollama / LM Studio / vLLM (आपका कंप्यूटर, अंतिम विकल्प)
-        └─ OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
 ## इंस्टॉलेशन
 
-### Linux / macOS
-
-टर्मिनल खोलें और नीचे दिए गए कमांड को सीधे पेस्ट करें।
+### Linux / macOS एक-लाइनर
 
 ```bash
-# Linux (सामान्य PC, सर्वर — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (M1/M2/M3 Mac)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — इंटरनेट से फ़ाइल डाउनलोड करता है।
-- `chmod +x` — डाउनलोड की गई फ़ाइल को "चलाने योग्य" बनाता है। यह चरण छोड़ने पर "अनुमति नहीं" त्रुटि आएगी।
+स्क्रिप्ट OS और आर्किटेक्चर का स्वचालित रूप से पता लगाती है, सही बायनरी को `~/.local/bin/wall-vault` में डाउनलोड करती है, और इसे निष्पादन योग्य बनाती है। यदि `~/.local/bin` आपके `PATH` पर नहीं है, तो इसे जोड़ें:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### मैनुअल डाउनलोड
+
+प्रत्येक रिलीज़ पर पूर्व-निर्मित बायनरी `https://github.com/sookmook/wall-vault/releases` पर प्रकाशित की जाती हैं।
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-PowerShell (एडमिनिस्ट्रेटर) खोलें और नीचे दिए गए कमांड चलाएँ।
-
 ```powershell
-# डाउनलोड
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# PATH में जोड़ें (PowerShell रीस्टार्ट के बाद प्रभावी)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> 💡 **PATH क्या है?** यह फ़ोल्डरों की सूची है जहाँ कंप्यूटर कमांड खोजता है। PATH में जोड़ने पर आप किसी भी फ़ोल्डर से `wall-vault` टाइप करके चला सकते हैं।
+### स्रोत से बनाएँ
 
-### सोर्स से बिल्ड (डेवलपर्स के लिए)
-
-यह केवल तब लागू होता है जब Go भाषा का विकास वातावरण इंस्टॉल हो।
+Go 1.25 या नया आवश्यक है।
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (संस्करण: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> 💡 **बिल्ड टाइमस्टैंप संस्करण**: `make build` से बिल्ड करने पर संस्करण `v0.1.27.20260409` जैसे दिनांक-समय सहित स्वचालित रूप से बनता है। `go build ./...` से सीधे बिल्ड करने पर संस्करण केवल `"dev"` दिखता है।
+`make build-all` सभी पाँच समर्थित प्लेटफ़ॉर्म के लिए क्रॉस-कंपाइल करता है। बायनरी `bin/` में आती हैं।
 
 ---
 
-## शुरुआत करना
-
-### setup विज़ार्ड चलाना
-
-इंस्टॉलेशन के बाद पहली बार नीचे दिए गए कमांड से **सेटअप विज़ार्ड** अवश्य चलाएँ। विज़ार्ड आवश्यक आइटम एक-एक करके पूछेगा और मार्गदर्शन करेगा।
+## सेटअप विज़ार्ड के साथ पहली बार चलाना
 
 ```bash
 wall-vault setup
 ```
 
-विज़ार्ड जो चरण पूरे करता है:
+विज़ार्ड आपसे क्रम में पूछता है:
 
-```
-1. भाषा चुनें (हिंदी सहित 10 भाषाएँ)
-2. थीम चुनें (light / dark / gold / cherry / ocean)
-3. संचालन मोड — अकेले उपयोग (standalone) या कई मशीनों पर (distributed)
-4. बॉट का नाम — डैशबोर्ड पर दिखने वाला नाम
-5. पोर्ट सेटिंग — डिफ़ॉल्ट: प्रॉक्सी 56244, तिजोरी 56243 (बदलने की ज़रूरत नहीं तो बस एंटर दबाएँ)
-6. AI सेवा चुनें — Google / OpenRouter / Ollama / LM Studio / vLLM में से
-7. टूल सुरक्षा फ़िल्टर सेटिंग
-8. एडमिन टोकन सेटिंग — डैशबोर्ड प्रबंधन सुविधाओं को लॉक करने वाला पासवर्ड। ऑटो-जनरेट भी संभव
-9. API कुंजी एन्क्रिप्शन पासवर्ड — कुंजियों को अधिक सुरक्षित रूप से स्टोर करने के लिए (वैकल्पिक)
-10. कॉन्फ़िग फ़ाइल का पथ
-```
+1. **भाषा** — 17 UI लोकेल में से एक चुनता है। `$LANG` से स्वचालित रूप से पता लगाया जाता है; विज़ार्ड फिर भी एक सूची प्रदान करता है।
+2. **थीम** — `light` (डिफ़ॉल्ट), `dark`, `cherry`, `ocean`, `gold`, `autumn`, `winter`. केवल कॉस्मेटिक।
+3. **मोड** — `standalone` (एकल होस्ट, डिफ़ॉल्ट) या `distributed` (एक होस्ट पर vault, अन्य पर प्रॉक्सी)।
+4. **बॉट का नाम** — एक स्वतंत्र-रूप `client_id` स्लग। vault इसका उपयोग प्रति-क्लाइंट कॉन्फ़िगरेशन (मॉडल ओवरराइड, फ़ॉलबैक चेन) को स्कोप करने के लिए करता है।
+5. **प्रॉक्सी पोर्ट** — डिफ़ॉल्ट `56244`।
+6. **vault पोर्ट** — डिफ़ॉल्ट `56243` (केवल standalone)।
+7. **सेवा चयन** — प्रत्येक के लिए y/N: Google Gemini, OpenRouter, Anthropic, OpenAI, Ollama, LM Studio, vLLM. कई विकल्प ठीक हैं; प्रत्येक अंत में अपना env-var संकेत लिखता है।
+8. **टूल फ़िल्टर** — `strip_all` (डिफ़ॉल्ट; सुरक्षा के लिए सभी आने वाली टूल परिभाषाओं को ब्लॉक करता है) या `passthrough` (किसी भी टूल को गुज़रने दें)।
+9. **एडमिन टोकन** — स्वत: उत्पन्न करने के लिए खाली छोड़ दें। डैशबोर्ड को लॉग इन करने के लिए इस टोकन की आवश्यकता है।
+10. **मास्टर पासवर्ड** — कोई एन्क्रिप्शन नहीं के लिए खाली छोड़ दें (अनुशंसित नहीं); विश्राम पर कुंजी संग्रह को AES-GCM एन्क्रिप्ट करने के लिए एक मान सेट करें।
+11. **सहेजने का पथ** — वर्तमान निर्देशिका में डिफ़ॉल्ट रूप से `wall-vault.yaml`। लोडर `~/.wall-vault/config.yaml` को भी देखता है।
 
-> ⚠️ **एडमिन टोकन अवश्य याद रखें।** बाद में डैशबोर्ड से कुंजी जोड़ने या सेटिंग बदलने में इसकी आवश्यकता होगी। भूलने पर कॉन्फ़िग फ़ाइल को सीधे एडिट करना पड़ेगा।
+सहेजने के बाद, विज़ार्ड `doctor.FixTrust` चलाता है ताकि कोई भी स्थानीय रूप से इंस्टॉल किया गया एजेंट (OpenClaw, Claude Code, Cline) स्वचालित रूप से अपने ट्रस्ट स्टोर में जोड़ा गया wall-vault आंतरिक CA प्राप्त करे। यदि ऐसा कोई एजेंट इंस्टॉल नहीं है, तो चरण `SKIP` प्रिंट करता है और कुछ नहीं लिखता।
 
-विज़ार्ड पूरा होने पर `wall-vault.yaml` कॉन्फ़िग फ़ाइल स्वचालित रूप से बनती है।
-
-### चलाना
+फिर बायनरी शुरू करें:
 
 ```bash
 wall-vault start
 ```
 
-नीचे दिए गए दो सर्वर एक साथ शुरू होंगे:
+`start` एक प्रक्रिया (standalone मोड) में vault और प्रॉक्सी दोनों चलाता है। वितरित मोड के लिए vault होस्ट पर `wall-vault vault` और प्रत्येक प्रॉक्सी होस्ट पर `wall-vault proxy` का उपयोग करें।
 
-- **प्रॉक्सी** (`https://localhost:56244`) — OpenClaw और AI सेवाओं को जोड़ने वाला मध्यस्थ
-- **कुंजी तिजोरी** (`https://localhost:56243`) — API कुंजी प्रबंधन और वेब डैशबोर्ड
-
-ब्राउज़र में `https://localhost:56243` खोलें तो डैशबोर्ड तुरंत दिखेगा।
+ब्राउज़र में `http://localhost:56243` खोलें। विज़ार्ड द्वारा प्रिंट किए गए एडमिन टोकन के साथ लॉग इन करें।
 
 ---
 
-## API कुंजी पंजीकरण
+## TLS सक्षम करना
 
-API कुंजी पंजीकरण के चार तरीके हैं। **शुरुआत करने वालों के लिए विधि 1 (पर्यावरण चर) की सिफ़ारिश** है।
+विज़ार्ड के डिफ़ॉल्ट दोनों listeners को सादे HTTP पर छोड़ देते हैं। अधिकांश एजेंट (OpenClaw, Claude Code, Cursor) एकल HTTPS एंडपॉइंट के विरुद्ध बेहतर काम करते हैं, इसलिए स्थानीय मशीन से अधिक तक फैले किसी भी डिप्लॉयमेंट में TLS की अनुशंसा की जाती है।
 
-### विधि 1: पर्यावरण चर (अनुशंसित — सबसे सरल)
-
-पर्यावरण चर वे **पूर्व-निर्धारित मान** हैं जो प्रोग्राम शुरू होने पर पढ़ता है। टर्मिनल में इस प्रकार दर्ज करें।
+wall-vault अपने स्वयं के आंतरिक CA के साथ शिप करता है ताकि आपको सार्वजनिक DNS नाम या Let's Encrypt की आवश्यकता न हो।
 
 ```bash
-# Google Gemini कुंजी पंजीकरण
-export WV_KEY_GOOGLE=AIzaSy...
+# 1. Create the internal CA — written to ~/.wall-vault/ca.{crt,key}.
+#    The CA is good for 10 years by default; override with --ca-years.
+wall-vault cert init
 
-# OpenRouter कुंजी पंजीकरण
-export WV_KEY_OPENROUTER=sk-or-v1-...
+# 2. Issue a host certificate. Subject Alternative Names automatically include:
+#       hostname, "localhost", "127.0.0.1", and any non-loopback LAN IP detected.
+#    Override the issuer dir with --dir, validity with --host-years.
+wall-vault cert issue $(hostname)
 
-# पंजीकरण के बाद चलाएँ
+# 3. Trust the CA in this machine's OS keychain.
+#    Linux: writes to /etc/ssl/certs/ via update-ca-certificates (needs sudo).
+#    macOS: adds to the System keychain via security add-trusted-cert (needs sudo).
+#    Windows: imports into CurrentUser\Root via certutil (no admin needed).
+wall-vault cert install-trust
+
+# 4. Enable TLS on both listeners.
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
 wall-vault start
 ```
 
-यदि आपके पास कई कुंजियाँ हैं, तो उन्हें कॉमा (,) से जोड़ें। wall-vault कुंजियों को बारी-बारी से स्वचालित उपयोग करेगा (राउंड रॉबिन):
+अन्य LAN मशीनों तक विश्वास का विस्तार करने के लिए, `~/.wall-vault/ca.crt` को कॉपी करें और प्रत्येक पर `wall-vault cert install-trust --ca <path>` चलाएँ। vault `:56247` पर एक छोटे प्लेन-HTTP listener के माध्यम से `ca.crt` को भी एक्सपोज़ करता है (**bootstrap port**) catch-22 मामले के लिए जहाँ एक नए क्लाइंट को HTTPS बात करने के लिए CA की आवश्यकता होती है।
 
-```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+### Loopback HTTP साथी
+
+कुछ एजेंट — विशेष रूप से OpenClaw का बंडल किया गया Node रनटाइम — प्रोसेस स्पॉन पर `NODE_EXTRA_CA_CERTS` को फिर से लिखते हैं, किसी भी ऑपरेटर-आपूर्ति किए गए CA संकेत को छोड़ देते हैं। वे `cert install-trust` के बाद भी, daemon के अंदर से wall-vault CA का सम्मान नहीं कर सकते। wall-vault इसके चारों ओर TLS सक्षम होने पर `127.0.0.1:56245` पर एक अतिरिक्त **loopback-only plain-HTTP listener** बाँधकर काम करता है। एक ही होस्ट के क्लाइंट उस पोर्ट के माध्यम से बिना किसी TLS के प्रॉक्सी तक पहुँचते हैं; LAN क्लाइंट TLS listener का उपयोग करना जारी रखते हैं।
+
+यदि आपको इसकी आवश्यकता नहीं है तो `WV_PROXY_PLAIN_PORT=0` के साथ अक्षम करें।
+
+### `wall-vault cert list`
+
+`~/.wall-vault/` के अंतर्गत प्रत्येक प्रमाणपत्र को विषय, वैधता विंडो और SANs के साथ दिखाता है।
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
 ```
 
-> 💡 **टिप**: `export` कमांड केवल वर्तमान टर्मिनल सत्र पर लागू होता है। कंप्यूटर रीस्टार्ट के बाद भी बने रहने के लिए `~/.bashrc` या `~/.zshrc` फ़ाइल में ऊपर की पंक्ति जोड़ें।
+---
 
-### विधि 2: डैशबोर्ड UI (माउस से क्लिक)
+## API कुंजियाँ रजिस्टर करना
 
-1. ब्राउज़र में `https://localhost:56243` खोलें
-2. शीर्ष **🔑 API कुंजी** कार्ड में `[+ जोड़ें]` बटन क्लिक करें
-3. सेवा प्रकार, कुंजी मान, लेबल (मेमो नाम), दैनिक सीमा दर्ज करके सेव करें
+दो तरीके: डैशबोर्ड, या पर्यावरण चर।
 
-### विधि 3: REST API (ऑटोमेशन/स्क्रिप्ट के लिए)
+### डैशबोर्ड (अनुशंसित)
 
-REST API वह तरीका है जिसमें प्रोग्राम HTTP के माध्यम से डेटा का आदान-प्रदान करते हैं। स्क्रिप्ट से ऑटो-पंजीकरण करते समय उपयोगी है।
+1. एडमिन टोकन के साथ `https://localhost:56243` पर लॉग इन करें।
+2. कुंजी कार्ड में **+ API key** क्लिक करें।
+3. एक सेवा चुनें (Google, OpenRouter, Anthropic, OpenAI, …)।
+4. कुंजी पेस्ट करें। सहेजें।
+
+प्रति सेवा कई कुंजियाँ ठीक हैं; प्रॉक्सी उनके बीच राउंड-रॉबिन करता है और प्रति-कुंजी कूलडाउन से टकराने वालों को छोड़ देता है।
+
+### पर्यावरण चर (वन-शॉट bootstrap)
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer एडमिन-टोकन" \
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
+wall-vault start
+```
+
+इस तरह प्रदान की गई कुंजियाँ पहले लॉन्च पर एन्क्रिप्टेड स्टोर में लिखी जाती हैं। बाद के स्टार्ट उन्हें डिस्क से पढ़ते हैं; पहले रन के बाद आप env चर को unset कर सकते हैं।
+
+### कूलडाउन और रोटेशन
+
+प्रत्येक सफल कॉल कुंजी के `usage_count` को बढ़ाती है और `last_used` को रिफ्रेश करती है। HTTP 429 / 402 / 403 पर, प्रॉक्सी कुंजी को **कूलडाउन** पर रखता है (डिफ़ॉल्ट: 429 के लिए 60 मिनट, 402 के लिए 24 घंटे, 403 के लिए 12 घंटे)। अगला डिस्पैच उस सेवा के लिए एक अलग कुंजी चुनता है। जब किसी सेवा के लिए सभी कुंजियाँ कूलडाउन पर होती हैं, तो प्रॉक्सी उस सेवा को पूरी तरह से तेज़ी से छोड़ देता है और फ़ॉलबैक चेन में अगले प्रदाता को आज़माता है।
+
+कूलडाउन डैशबोर्ड में काउंटडाउन के साथ प्रति-कुंजी दिखाई देते हैं।
+
+---
+
+## एजेंट कनेक्ट करना
+
+### OpenClaw
+
+OpenClaw मूल लक्षित क्लाइंट है। डैशबोर्ड के **+ Add agent** मोडल का उपयोग करें:
+
+- **Agent type** को `openclaw` या `nanoclaw` पर सेट करें।
+- **Work directory** सेट करें — OpenClaw के लिए यह स्वचालित रूप से `~/.openclaw` के रूप में भर जाता है।
+- एक **preferred service** चुनें और वैकल्पिक रूप से एक **model override**।
+- **Apply** क्लिक करें। wall-vault सीधे `~/.openclaw/openclaw.json` लिखता है (प्रदाता URLs, vault token, मॉडल entries)।
+
+जब आप डैशबोर्ड से मॉडल बदलते हैं, तो OpenClaw 1-3 सेकंड के भीतर SSE पर परिवर्तन उठा लेता है — कोई पुनः आरंभ नहीं।
+
+### Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
+```
+
+जब upstream Anthropic क्रेडिट समाप्त हो जाते हैं, तो डिस्पैच इस क्लाइंट के `fallback_services` में सूचीबद्ध जो भी सेवाएँ हैं, उन पर वापस आ जाता है। डिफ़ॉल्ट रूप से, anthropic डिस्पैच को भेजी गई एक गैर-Claude मॉडल आईडी एक त्रुटि लौटाती है ताकि गलत मार्गनिर्देशन तुरंत सतह पर आ जाए। स्वचालित पुनर्लेखन में ऑप्ट-इन करें:
+
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
+
+### Cursor
+
+Cursor **Settings → AI → OpenAI API** में:
+
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### कस्टम HTTP
+
+```bash
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "मुख्य कुंजी",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### विधि 4: proxy फ़्लैग (त्वरित परीक्षण के लिए)
+जब `proxy.oai_stream_forward: true` सेट है तो वही एंडपॉइंट स्ट्रीमिंग (`"stream": true`) स्वीकार करता है।
 
-बिना आधिकारिक पंजीकरण के अस्थायी रूप से कुंजी डालकर परीक्षण करने के लिए। प्रोग्राम बंद करने पर गायब हो जाती है।
+---
+
+## डैशबोर्ड
+
+`https://localhost:56243`. होम ग्रिड पर पाँच कार्ड:
+
+- **Keys** — प्रत्येक API कुंजी, सेवा द्वारा समूहीकृत। जोड़ें, संपादित करें, हटाएँ; उपयोग और कूलडाउन देखें।
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp, और `~/.wall-vault/services/` में कोई भी प्लगइन yaml। प्रति-सेवा `default_model`, `allowed_models`, बेस URL, reasoning टॉगल सेट करें।
+- **Clients (agents)** — प्रत्येक रजिस्टर्ड क्लाइंट (OpenClaw बॉट, Claude Code सत्र, Cursor इंस्टेंस, …)। पसंदीदा सेवा, मॉडल ओवरराइड, फ़ॉलबैक चेन असाइन करें।
+- **Proxies** — हर प्रॉक्सी जिसने इस vault के विरुद्ध प्रमाणित किया है। लाइव स्थिति (online/offline), अंतिम बार देखा गया, वर्तमान मॉडल।
+- **Settings** — एडमिन टोकन, मास्टर पासवर्ड रोटेशन, थीम, भाषा।
+
+प्रत्येक कार्ड में एक संपादन slideover (दाहिनी ओर) है। बाहर-क्लिक या `Esc` इसे बंद कर देता है। परिवर्तन कुछ सेकंड के भीतर SSE पर सभी कनेक्ट किए गए प्रॉक्सी पर पुश किए जाते हैं।
+
+**फ़ुटर** एक SSE संकेतक (हरा = कनेक्टेड, नारंगी = फिर से कनेक्ट हो रहा है, ग्रे = डिस्कनेक्ट) और लाइव बिल्ड संस्करण रखता है।
+
+---
+
+## वितरित मोड
+
+जब आपके पास कई मशीनें हैं जिन्हें सभी को समान कुंजियों की आवश्यकता है, तो एक होस्ट पर vault और बाकी प्रत्येक पर प्रॉक्सी चलाएँ।
+
+### vault होस्ट
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## प्रॉक्सी का उपयोग
-
-### OpenClaw में उपयोग (मुख्य उद्देश्य)
-
-OpenClaw को wall-vault के माध्यम से AI सेवाओं से कनेक्ट करने की विधि:
-
-`~/.openclaw/openclaw.json` फ़ाइल खोलें और नीचे की सामग्री जोड़ें:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // vault एजेंट टोकन
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // मुफ़्त 1M context
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> 💡 **और आसान तरीका**: डैशबोर्ड एजेंट कार्ड के **🦞 OpenClaw सेटिंग कॉपी** बटन को दबाएँ, टोकन और पता पहले से भरा हुआ स्निपेट क्लिपबोर्ड पर कॉपी हो जाएगा। बस पेस्ट करें।
-
-**मॉडल नाम के आगे `wall-vault/` कहाँ कनेक्ट होगा?**
-
-मॉडल नाम देखकर wall-vault स्वचालित रूप से निर्णय लेता है कि किस AI सेवा को अनुरोध भेजना है:
-
-| मॉडल प्रारूप | कनेक्ट होने वाली सेवा |
-|----------|--------------|
-| `wall-vault/gemini-*` | Google Gemini सीधा कनेक्शन |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI सीधा कनेक्शन |
-| `wall-vault/claude-*` | OpenRouter के माध्यम से Anthropic |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (मुफ़्त 10 लाख टोकन context) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter कनेक्शन |
-| `google/मॉडल-नाम`, `openai/मॉडल-नाम`, `anthropic/मॉडल-नाम` आदि | संबंधित सेवा सीधा कनेक्शन |
-| `custom/google/मॉडल-नाम`, `custom/openai/मॉडल-नाम` आदि | `custom/` भाग हटाकर री-राउटिंग |
-| `मॉडल-नाम:cloud` | `:cloud` भाग हटाकर OpenRouter कनेक्शन |
-
-> 💡 **Context क्या है?** यह वह बातचीत की मात्रा है जो AI एक बार में याद रख सकता है। 1M (दस लाख टोकन) होने पर बहुत लंबी बातचीत या लंबे दस्तावेज़ भी एक बार में संसाधित किए जा सकते हैं।
-
-### Gemini API फ़ॉर्मेट से सीधा कनेक्शन (मौजूदा टूल संगतता)
-
-यदि आपके पास कोई टूल है जो सीधे Google Gemini API का उपयोग करता था, तो बस पता wall-vault में बदलें:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-या URL सीधे निर्दिष्ट करने वाले टूल के लिए:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### OpenAI SDK (Python) में उपयोग
-
-Python से AI का उपयोग करने वाले कोड में भी wall-vault को कनेक्ट किया जा सकता है। बस `base_url` बदलें:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # API कुंजी wall-vault स्वयं प्रबंधित करता है
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # provider/model प्रारूप में दर्ज करें
-    messages=[{"role": "user", "content": "नमस्ते"}]
-)
-```
-
-### चलते समय मॉडल बदलना
-
-wall-vault पहले से चल रहा हो तो उपयोग किया जाने वाला AI मॉडल बदलने के लिए:
-
-```bash
-# प्रॉक्सी को सीधे अनुरोध करके मॉडल बदलें
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# वितरित मोड (मल्टी बॉट) में तिजोरी सर्वर से बदलें → SSE से तुरंत लागू
-curl -X PUT https://localhost:56243/admin/clients/मेरा-बॉट-id \
-  -H "Authorization: Bearer एडमिन-टोकन" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### उपलब्ध मॉडल सूची देखना
-
-```bash
-# पूरी सूची देखें
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# केवल Google मॉडल
-curl "https://localhost:56244/api/models?service=google"
-
-# नाम से खोजें (उदा: "claude" वाले मॉडल)
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**सेवा-वार प्रमुख मॉडल सारांश:**
-
-| सेवा | प्रमुख मॉडल |
-|--------|----------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M context मुफ़्त, DeepSeek R1/V3, Qwen 2.5 आदि) |
-| Ollama | आपके कंप्यूटर पर इंस्टॉल लोकल सर्वर ऑटो-डिटेक्ट |
-| LM Studio | आपका कंप्यूटर लोकल सर्वर (पोर्ट 1234) |
-| vLLM | आपका कंप्यूटर लोकल सर्वर (पोर्ट 8000) |
-| llama.cpp | आपका कंप्यूटर लोकल सर्वर (पोर्ट 8080) |
-
----
-
-## कुंजी तिजोरी डैशबोर्ड
-
-ब्राउज़र में `https://localhost:56243` खोलें तो डैशबोर्ड दिखेगा।
-
-**स्क्रीन लेआउट:**
-- **शीर्ष स्थिर बार (topbar)**: लोगो, भाषा/थीम चयनकर्ता, SSE कनेक्शन स्थिति
-- **कार्ड ग्रिड**: एजेंट, सेवा, API कुंजी कार्ड टाइल रूप में व्यवस्थित
-
-### API कुंजी कार्ड
-
-पंजीकृत API कुंजियों को एक नज़र में प्रबंधित करने वाला कार्ड।
-
-- सेवा-वार कुंजी सूची दिखाता है।
-- `today_usage`: आज सफलतापूर्वक संसाधित टोकन (AI द्वारा पढ़े-लिखे अक्षरों) की संख्या
-- `today_attempts`: आज कुल कॉल संख्या (सफल + विफल सहित)
-- `[+ जोड़ें]` बटन से नई कुंजी पंजीकृत करें, `✕` से कुंजी हटाएँ।
-
-> 💡 **टोकन (token) क्या है?** यह वह इकाई है जिसमें AI टेक्स्ट को संसाधित करता है। लगभग एक अंग्रेज़ी शब्द, या हिंदी के 1-2 अक्षर के बराबर होता है। API शुल्क आमतौर पर इस टोकन संख्या के अनुसार गणना किया जाता है।
-
-### एजेंट कार्ड
-
-wall-vault प्रॉक्सी से जुड़े बॉट (एजेंट) की स्थिति दिखाने वाला कार्ड।
-
-**कनेक्शन स्थिति 4 स्तरों में दिखाई जाती है:**
-
-| प्रतीक | स्थिति | अर्थ |
-|------|------|------|
-| 🟢 | चल रहा है | प्रॉक्सी सामान्य रूप से काम कर रहा है |
-| 🟡 | विलंब | जवाब आ रहा है लेकिन धीमा |
-| 🔴 | ऑफ़लाइन | प्रॉक्सी जवाब नहीं दे रहा |
-| ⚫ | अकनेक्टेड/निष्क्रिय | प्रॉक्सी कभी तिजोरी से कनेक्ट नहीं हुआ या निष्क्रिय |
-
-**एजेंट कार्ड के निचले बटन गाइड:**
-
-एजेंट पंजीकरण करते समय **एजेंट प्रकार** निर्दिष्ट करने पर उस प्रकार के अनुसार सुविधा बटन स्वचालित रूप से दिखाई देते हैं।
-
----
-
-#### 🔘 सेटिंग कॉपी बटन — कनेक्शन सेटिंग स्वचालित रूप से बनाता है
-
-बटन क्लिक करने पर उस एजेंट का टोकन, प्रॉक्सी पता, मॉडल जानकारी पहले से भरा हुआ सेटिंग स्निपेट क्लिपबोर्ड पर कॉपी हो जाता है। कॉपी की गई सामग्री को नीचे दी गई तालिका के स्थान पर पेस्ट करने से कनेक्शन सेटअप पूरा हो जाता है।
-
-| बटन | एजेंट प्रकार | पेस्ट करने का स्थान |
-|------|-------------|-------------|
-| 🦞 OpenClaw सेटिंग कॉपी | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 NanoClaw सेटिंग कॉपी | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 Claude Code सेटिंग कॉपी | `claude-code` | `~/.claude/settings.json` |
-| ⌨ Cursor सेटिंग कॉपी | `cursor` | Cursor → Settings → AI |
-| 💻 VSCode सेटिंग कॉपी | `vscode` | `~/.continue/config.json` |
-
-**उदाहरण — Claude Code प्रकार हो तो ऐसी सामग्री कॉपी होती है:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "इस-एजेंट-का-टोकन"
-}
-```
-
-**उदाहरण — VSCode (Continue) प्रकार हो तो:**
-
-```yaml
-# ~/.continue/config.yaml  ← config.json नहीं, config.yaml में पेस्ट करें
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: इस-एजेंट-का-टोकन
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> ⚠️ **Continue का नवीनतम संस्करण `config.yaml` का उपयोग करता है।** यदि `config.yaml` मौजूद है तो `config.json` पूरी तरह अनदेखा किया जाता है। अवश्य `config.yaml` में पेस्ट करें।
-
-**उदाहरण — Cursor प्रकार हो तो:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : इस-एजेंट-का-टोकन
-
-// या पर्यावरण चर:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=इस-एजेंट-का-टोकन
-```
-
-> ⚠️ **क्लिपबोर्ड कॉपी काम न करे तो**: ब्राउज़र सुरक्षा नीति से कॉपी अवरुद्ध हो सकती है। पॉपअप में टेक्स्टबॉक्स खुले तो Ctrl+A से पूरा चुनें फिर Ctrl+C से कॉपी करें।
-
----
-
-#### ⚡ ऑटो-अप्लाई बटन — एक क्लिक में सेटअप पूरा
-
-एजेंट प्रकार `cline`, `claude-code`, `openclaw`, `nanoclaw` होने पर एजेंट कार्ड में **⚡ सेटिंग अप्लाई** बटन दिखता है। यह बटन दबाने पर उस एजेंट की लोकल सेटिंग फ़ाइल स्वचालित रूप से अपडेट हो जाती है।
-
-| बटन | एजेंट प्रकार | अप्लाई होने वाली फ़ाइल |
-|------|-------------|-------------|
-| ⚡ Cline सेटिंग अप्लाई | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ Claude Code सेटिंग अप्लाई | `claude-code` | `~/.claude/settings.json` |
-| ⚡ OpenClaw सेटिंग अप्लाई | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ NanoClaw सेटिंग अप्लाई | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> ⚠️ यह बटन **localhost:56244** (लोकल प्रॉक्सी) को अनुरोध भेजता है। उस मशीन पर प्रॉक्सी चलना आवश्यक है।
-
----
-
-#### 🔀 ड्रैग एंड ड्रॉप कार्ड सॉर्टिंग (v0.1.17, सुधार v0.1.25)
-
-डैशबोर्ड के एजेंट कार्ड को **ड्रैग** करके इच्छित क्रम में पुनर्व्यवस्थित किया जा सकता है।
-
-1. कार्ड के ऊपरी बाएँ कोने में **ट्रैफ़िक लाइट (●)** क्षेत्र को माउस से पकड़कर ड्रैग करें
-2. इच्छित स्थान के कार्ड पर छोड़ने पर क्रम बदल जाता है
-
-> 💡 कार्ड बॉडी (इनपुट फ़ील्ड, बटन आदि) ड्रैग नहीं होती। केवल ट्रैफ़िक लाइट क्षेत्र से पकड़ सकते हैं।
-
-#### 🟠 एजेंट प्रोसेस डिटेक्शन (v0.1.25)
-
-प्रॉक्सी सामान्य काम कर रहा हो लेकिन लोकल एजेंट प्रोसेस (NanoClaw, OpenClaw) बंद हो गया हो, तो कार्ड की ट्रैफ़िक लाइट **नारंगी (ब्लिंकिंग)** हो जाती है और "एजेंट प्रोसेस बंद" संदेश दिखता है।
-
-- 🟢 हरा: प्रॉक्सी + एजेंट सामान्य
-- 🟠 नारंगी (ब्लिंकिंग): प्रॉक्सी सामान्य, एजेंट बंद
-- 🔴 लाल: प्रॉक्सी ऑफ़लाइन
-3. बदला हुआ क्रम **तुरंत सर्वर पर सेव** होता है और रिफ़्रेश करने पर भी बना रहता है
-
-> 💡 टच डिवाइस (मोबाइल/टैबलेट) पर अभी समर्थित नहीं है। डेस्कटॉप ब्राउज़र पर उपयोग करें।
-
----
-
-#### 🔄 दो-तरफ़ा मॉडल सिंक (v0.1.16)
-
-तिजोरी डैशबोर्ड में एजेंट का मॉडल बदलने पर उस एजेंट की लोकल सेटिंग स्वचालित रूप से अपडेट हो जाती है।
-
-**Cline के मामले में:**
-- तिजोरी में मॉडल बदलें → SSE इवेंट → प्रॉक्सी `globalState.json` का मॉडल फ़ील्ड अपडेट करता है
-- अपडेट लक्ष्य: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` और API कुंजी को छुआ नहीं जाता
-- **VS Code रीलोड (`Ctrl+Alt+R` या `Ctrl+Shift+P` → `Developer: Reload Window`) आवश्यक है**
-  - क्योंकि Cline चलते समय सेटिंग फ़ाइल दोबारा नहीं पढ़ता
-
-**Claude Code के मामले में:**
-- तिजोरी में मॉडल बदलें → SSE इवेंट → प्रॉक्सी `settings.json` का `model` फ़ील्ड अपडेट करता है
-- WSL और Windows दोनों पथ स्वचालित खोजता है (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
-
-**उल्टी दिशा (एजेंट → तिजोरी):**
-- एजेंट (Cline, Claude Code आदि) प्रॉक्सी को अनुरोध भेजता है, प्रॉक्सी हार्टबीट में उस क्लाइंट की सेवा/मॉडल जानकारी शामिल करता है
-- तिजोरी डैशबोर्ड के एजेंट कार्ड में वर्तमान उपयोग हो रही सेवा/मॉडल रियल-टाइम में दिखती है
-
-> 💡 **मुख्य बात**: प्रॉक्सी अनुरोध के Authorization टोकन से एजेंट की पहचान करता है और तिजोरी में सेट की गई सेवा/मॉडल पर ऑटो-राउट करता है। भले ही Cline या Claude Code अलग मॉडल नाम भेजे, प्रॉक्सी तिजोरी सेटिंग से ओवरराइड करता है।
-
----
-
-### VS Code में Cline उपयोग — विस्तृत गाइड
-
-#### चरण 1: Cline इंस्टॉल
-
-VS Code एक्सटेंशन मार्केटप्लेस से **Cline** (ID: `saoudrizwan.claude-dev`) इंस्टॉल करें।
-
-#### चरण 2: तिजोरी में एजेंट पंजीकरण
-
-1. तिजोरी डैशबोर्ड (`http://तिजोरी-IP:56243`) खोलें
-2. **एजेंट** सेक्शन में **+ जोड़ें** क्लिक करें
-3. निम्नलिखित दर्ज करें:
-
-| फ़ील्ड | मान | विवरण |
-|------|----|------|
-| ID | `मेरा_cline` | विशिष्ट पहचानकर्ता (अंग्रेज़ी, बिना रिक्त स्थान) |
-| नाम | `मेरा Cline` | डैशबोर्ड पर दिखने वाला नाम |
-| एजेंट प्रकार | `cline` | ← अवश्य `cline` चुनें |
-| सेवा | उपयोग करने वाली सेवा चुनें (उदा: `google`) | |
-| मॉडल | उपयोग करने वाला मॉडल दर्ज करें (उदा: `gemini-2.5-flash`) | |
-
-4. **सेव** करने पर टोकन स्वचालित बनता है
-
-#### चरण 3: Cline से कनेक्ट
-
-**विधि A — ऑटो-अप्लाई (अनुशंसित)**
-
-1. उस मशीन पर wall-vault **प्रॉक्सी** चल रहा है, इसकी पुष्टि करें (`localhost:56244`)
-2. डैशबोर्ड एजेंट कार्ड में **⚡ Cline सेटिंग अप्लाई** बटन क्लिक करें
-3. "सेटिंग अप्लाई सफल!" अलर्ट आए तो सफल
-4. VS Code रीलोड करें (`Ctrl+Alt+R`)
-
-**विधि B — मैनुअल सेटअप**
-
-Cline साइडबार में सेटिंग (⚙️) खोलें:
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://प्रॉक्सी-पता:56244/v1`
-  - उसी मशीन पर हो तो `https://localhost:56244/v1`
-  - मिनी सर्वर जैसी अन्य मशीन पर हो तो `http://192.168.1.20:56244/v1`
-- **API Key**: तिजोरी से जारी टोकन (एजेंट कार्ड से कॉपी)
-- **Model ID**: तिजोरी में सेट किया गया मॉडल (उदा: `gemini-2.5-flash`)
-
-#### चरण 4: पुष्टि
-
-Cline चैट विंडो में कोई भी संदेश भेजें। सामान्य होने पर:
-- तिजोरी डैशबोर्ड के उस एजेंट कार्ड में **हरा बिंदु (● चल रहा है)** दिखेगा
-- कार्ड में वर्तमान सेवा/मॉडल दिखेगा (उदा: `google / gemini-2.5-flash`)
-
-#### मॉडल बदलना
-
-Cline का मॉडल बदलना हो तो **तिजोरी डैशबोर्ड** से बदलें:
-
-1. एजेंट कार्ड का सेवा/मॉडल ड्रॉपडाउन बदलें
-2. **अप्लाई** क्लिक करें
-3. VS Code रीलोड (`Ctrl+Alt+R`) — Cline फ़ुटर में मॉडल नाम अपडेट होगा
-4. अगले अनुरोध से नया मॉडल उपयोग होगा
-
-> 💡 वास्तव में प्रॉक्सी Cline के अनुरोध को टोकन से पहचानकर तिजोरी सेटिंग के मॉडल पर राउट करता है। VS Code रीलोड न करने पर भी **वास्तव में उपयोग होने वाला मॉडल तुरंत बदल जाता है** — रीलोड Cline UI का मॉडल डिस्प्ले अपडेट करने के लिए है।
-
-#### डिस्कनेक्शन डिटेक्शन
-
-VS Code बंद करने पर तिजोरी डैशबोर्ड में लगभग **90 सेकंड** बाद एजेंट कार्ड पीला (विलंब), **3 मिनट** बाद लाल (ऑफ़लाइन) हो जाता है। (v0.1.18 से 15-सेकंड अंतराल स्थिति जाँच से ऑफ़लाइन डिटेक्शन तेज़ हुआ।)
-
-#### समस्या निवारण
-
-| लक्षण | कारण | समाधान |
-|------|------|------|
-| Cline में "कनेक्शन विफल" त्रुटि | प्रॉक्सी नहीं चल रहा या पता ग़लत | `curl https://localhost:56244/health` से प्रॉक्सी जाँचें |
-| तिजोरी में हरा बिंदु नहीं दिखता | API कुंजी (टोकन) सेट नहीं | **⚡ Cline सेटिंग अप्लाई** बटन फिर से क्लिक करें |
-| Cline फ़ुटर मॉडल नहीं बदला | Cline सेटिंग कैश करता है | VS Code रीलोड (`Ctrl+Alt+R`) |
-| ग़लत मॉडल नाम दिख रहा | पुराना बग (v0.1.16 में ठीक) | प्रॉक्सी को v0.1.16+ में अपडेट करें |
-
----
-
-#### 🟣 डिप्लॉय कमांड कॉपी बटन — नई मशीन पर इंस्टॉल करते समय
-
-नए कंप्यूटर पर wall-vault प्रॉक्सी पहली बार इंस्टॉल करके तिजोरी से कनेक्ट करते समय उपयोग करें। बटन क्लिक करने पर पूरी इंस्टॉल स्क्रिप्ट कॉपी हो जाती है। नए कंप्यूटर के टर्मिनल में पेस्ट करके चलाने पर ये सब एक बार में होता है:
-
-1. wall-vault बाइनरी इंस्टॉल (पहले से इंस्टॉल हो तो स्किप)
-2. systemd यूज़र सर्विस ऑटो-रजिस्ट्रेशन
-3. सर्विस स्टार्ट और तिजोरी ऑटो-कनेक्शन
-
-> 💡 स्क्रिप्ट में इस एजेंट का टोकन और तिजोरी सर्वर पता पहले से भरा होता है, इसलिए पेस्ट करने के बाद बिना किसी संशोधन के सीधे चला सकते हैं।
-
----
-
-### सर्विस कार्ड
-
-उपयोग करने वाली AI सेवाओं को चालू/बंद करने या सेटिंग करने का कार्ड।
-
-- सेवा-वार सक्रिय/निष्क्रिय टॉगल स्विच
-- लोकल AI सर्वर (आपके कंप्यूटर पर चलने वाले Ollama, LM Studio, vLLM, llama.cpp आदि) का पता दर्ज करने पर उपलब्ध मॉडल स्वचालित खोजे जाते हैं।
-- **लोकल सर्विस कनेक्शन स्थिति**: सेवा नाम के बगल का ● बिंदु **हरा** होने पर कनेक्टेड, **ग्रे** होने पर कनेक्टेड नहीं
-- **लोकल सर्विस ऑटो ट्रैफ़िक लाइट** (v0.1.23+): लोकल सेवाएँ (Ollama, LM Studio, vLLM, llama.cpp) कनेक्ट हो सकने पर स्वचालित सक्रिय, डिस्कनेक्ट होने पर स्वचालित निष्क्रिय। क्लाउड सेवाओं (Google, OpenRouter आदि) के API कुंजी आधारित ऑटो-टॉगल जैसा ही तरीका।
-- **रीज़निंग मोड टॉगल** (v0.2.17+): लोकल सर्विस एडिट विंडो के नीचे **रीज़निंग मोड** चेकबॉक्स दिखाई देता है। इसे चालू करने पर प्रॉक्सी अपस्ट्रीम को भेजे जाने वाले chat-completions बॉडी में `"reasoning": true` जोड़ देता है, जिससे DeepSeek R1, Qwen QwQ जैसे सोच-प्रक्रिया आउटपुट का समर्थन करने वाले मॉडल `<think>…</think>` ब्लॉक भी साथ में लौटाते हैं। जो सर्वर इस फ़ील्ड को नहीं जानते वे उसे अनदेखा कर देते हैं, इसलिए मिश्रित वर्कलोड में भी इसे सुरक्षित रूप से चालू रखा जा सकता है।
-
-> 💡 **लोकल सर्विस अन्य कंप्यूटर पर चल रही हो तो**: सर्विस URL इनपुट में उस कंप्यूटर का IP दर्ज करें। उदा: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp)। यदि सेवा `0.0.0.0` के बजाय `127.0.0.1` पर ही बाइंड है तो बाहरी IP से कनेक्शन नहीं होगा, सेवा सेटिंग में बाइंड पता जाँचें।
-
-### एडमिन टोकन इनपुट
-
-डैशबोर्ड में कुंजी जोड़ने/हटाने जैसी महत्वपूर्ण सुविधाओं का उपयोग करते समय एडमिन टोकन इनपुट पॉपअप दिखता है। setup विज़ार्ड में सेट किया गया टोकन दर्ज करें। एक बार दर्ज करने पर ब्राउज़र बंद करने तक बना रहता है।
-
-> ⚠️ **15 मिनट में 10 से अधिक प्रमाणीकरण विफलता पर उस IP अस्थायी रूप से ब्लॉक हो जाता है।** टोकन भूल गए हों तो `wall-vault.yaml` फ़ाइल में `admin_token` आइटम देखें।
-
----
-
-## वितरित मोड (मल्टी बॉट)
-
-कई कंप्यूटरों पर एक साथ OpenClaw चलाते समय **एक कुंजी तिजोरी साझा** करने का कॉन्फ़िगरेशन। कुंजी प्रबंधन एक ही स्थान से करना सुविधाजनक है।
-
-### कॉन्फ़िगरेशन उदाहरण
-
-```
-[कुंजी तिजोरी सर्वर]
-  wall-vault vault    (कुंजी तिजोरी :56243, डैशबोर्ड)
-
-[WSL अल्फ़ा]            [रास्पबेरी पाई गामा]    [मैक मिनी लोकल]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ SSE सिंक            ↕ SSE सिंक              ↕ SSE सिंक
-```
-
-सभी बॉट बीच की तिजोरी सर्वर को देखते हैं, इसलिए तिजोरी में मॉडल बदलने या कुंजी जोड़ने पर सभी बॉट में तुरंत लागू होता है।
-
-### चरण 1: कुंजी तिजोरी सर्वर शुरू
-
-तिजोरी सर्वर के रूप में उपयोग करने वाले कंप्यूटर पर चलाएँ:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### चरण 2: प्रत्येक बॉट (क्लाइंट) पंजीकरण
+डैशबोर्ड अब `https://<vault-host>:56243` पर पहुँच योग्य है। **Clients** कार्ड में प्रत्येक रिमोट प्रॉक्सी के लिए एक एजेंट जोड़ें; प्रत्येक एक अद्वितीय `vault_token` बनाता है।
 
-तिजोरी सर्वर से कनेक्ट होने वाले प्रत्येक बॉट की जानकारी पहले से पंजीकृत करें:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer एडमिन-टोकन" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "बॉट A",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### चरण 3: प्रत्येक बॉट कंप्यूटर पर प्रॉक्सी शुरू
-
-बॉट इंस्टॉल प्रत्येक कंप्यूटर पर तिजोरी सर्वर का पता और टोकन निर्दिष्ट करके प्रॉक्सी चलाएँ:
+### प्रॉक्सी होस्ट
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> 💡 **`192.168.x.x`** भाग को तिजोरी सर्वर कंप्यूटर के वास्तविक आंतरिक IP पते से बदलें। राउटर सेटिंग या `ip addr` कमांड से पता लगा सकते हैं।
+प्रॉक्सी vault के विरुद्ध प्रमाणित करता है, एक SSE स्ट्रीम खोलता है, और प्राप्त किसी भी कॉन्फ़िगरेशन को लागू करता है (पसंदीदा सेवा, मॉडल ओवरराइड, फ़ॉलबैक चेन)। बाद के vault संपादन बिना पुनः आरंभ के सेकंडों में आते हैं।
+
+LAN-व्यापी इंस्टॉल के लिए, vault होस्ट पर TLS सक्षम करें (`WV_VAULT_TLS_ENABLED=1` + cert/key env चर) और प्रत्येक प्रॉक्सी होस्ट को उसी `wall-vault cert install-trust` चरण से चलाएँ ताकि vault में प्रॉक्सी की HTTPS कॉल पर भरोसा किया जा सके।
 
 ---
 
-## ऑटो-स्टार्ट सेटअप
+## ऑटो-स्टार्ट
 
-कंप्यूटर रीस्टार्ट होने पर हर बार मैन्युअल रूप से wall-vault चालू करना बोझिल हो तो सिस्टम सर्विस के रूप में रजिस्टर करें। एक बार रजिस्टर करने पर बूट समय स्वचालित शुरू होता है।
+### systemd (Linux)
 
-### Linux — systemd (अधिकांश Linux)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd Linux में प्रोग्राम को स्वचालित शुरू और प्रबंधित करने की प्रणाली है:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-लॉग देखें:
+उसी होस्ट पर vault के लिए, एक समानांतर `wall-vault-vault.service` लिखें। standalone मोड के लिए, एक यूनिट `wall-vault start` को कॉल करना पर्याप्त है।
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-macOS में प्रोग्राम ऑटो-स्टार्ट की प्रणाली:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. [nssm.cc](https://nssm.cc/download) से NSSM डाउनलोड करके PATH में जोड़ें।
-2. एडमिनिस्ट्रेटर PowerShell में:
-
-```powershell
-wall-vault doctor deploy windows
-```
+`wall-vault.exe start` को Windows सेवा के रूप में wrap करने के लिए `nssm` का उपयोग करें, या एक `schtasks` प्रविष्टि जो उपयोगकर्ता लॉगऑन पर चलती है।
 
 ---
 
-## Doctor (डॉक्टर)
+## प्लगइन yamls
 
-`doctor` कमांड wall-vault की सेटिंग सही है या नहीं, **स्वयं जाँचने और ठीक करने** का उपकरण है।
+`~/.wall-vault/services/` के अंतर्गत एक yaml ड्रॉप करके किसी भी OpenAI-संगत बैकएंड को बिना कोड परिवर्तन के जोड़ा जा सकता है। wall-vault इसे स्टार्टअप पर लोड करता है और सेवा को डिस्पैच, OAI-compat डिटेक्शन सेट और Gemini-stream ब्रिज के लिए रजिस्टर करता है।
 
-```bash
-wall-vault doctor check   # वर्तमान स्थिति जाँच (केवल पढ़ना, कुछ नहीं बदलता)
-wall-vault doctor fix     # समस्या स्वचालित ठीक करें
-wall-vault doctor all     # जाँच + स्वचालित मरम्मत एक बार में
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
 ```
 
-> 💡 कुछ ग़लत लग रहा हो तो पहले `wall-vault doctor all` चलाएँ। कई समस्याएँ स्वचालित पकड़ में आ जाती हैं।
+`configs/services/` में बंडल किया गया सेट (lmstudio, vllm, llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server, litellm-proxy, ollama, google, openrouter) डिफ़ॉल्ट रूप से अक्षम शिप होता है। आप जो चाहते हैं उसे `~/.wall-vault/services/` में कॉपी करें, `enabled: true` सेट करें, पुनः आरंभ करें।
 
 ---
 
-## RTK टोकन बचत
+## Doctor
 
-*(v0.1.24+)*
+`wall-vault doctor` पूरे इंस्टॉल पर एक बार का स्वास्थ्य परीक्षण चलाता है:
 
-**RTK (टोकन बचत उपकरण)** AI कोडिंग एजेंट (Claude Code आदि) द्वारा चलाए जाने वाले शेल कमांड के आउटपुट को स्वचालित रूप से संपीड़ित करके टोकन उपयोग कम करता है। उदाहरण के लिए, `git status` का 15-पंक्ति आउटपुट 2-पंक्ति सारांश में सिमट जाता है।
-
-### बुनियादी उपयोग
-
-```bash
-# कमांड को wall-vault rtk से रैप करें, आउटपुट ऑटो-फ़िल्टर होता है
-wall-vault rtk git status          # केवल बदली हुई फ़ाइलों की सूची
-wall-vault rtk git diff HEAD~1     # बदली हुई पंक्तियाँ + न्यूनतम context
-wall-vault rtk git log -10         # हैश + एक-पंक्ति संदेश
-wall-vault rtk go test ./...       # केवल विफल टेस्ट दिखाएँ
-wall-vault rtk ls -la              # असमर्थित कमांड ऑटो-ट्रंकेट
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
 ```
 
-### समर्थित कमांड और बचत प्रभाव
+प्रत्येक पंक्ति इनमें से एक है:
 
-| कमांड | फ़िल्टर विधि | बचत दर |
-|------|----------|--------|
-| `git status` | केवल बदली हुई फ़ाइलों का सारांश | ~87% |
-| `git diff` | बदली हुई पंक्तियाँ + 3-पंक्ति context | ~60-94% |
-| `git log` | हैश + पहली पंक्ति संदेश | ~90% |
-| `git push/pull/fetch` | प्रगति हटाएँ, केवल सारांश | ~80% |
-| `go test` | केवल विफल दिखाएँ, सफल की गिनती | ~88-99% |
-| `go build/vet` | केवल त्रुटियाँ | ~90% |
-| अन्य सभी कमांड | पहली 50 + अंतिम 50 पंक्तियाँ, अधिकतम 32KB | परिवर्तनशील |
+- `✓` — स्वस्थ
+- `⚠` — खराब लेकिन कार्य कर रहा है (एक कुंजी कूल हो गई, कम कोटा, आदि।)
+- `✗` — टूटा हुआ
+- `SKIP` — कॉन्फ़िगर नहीं किया गया / इस होस्ट पर लागू नहीं
 
-### 3-चरण फ़िल्टर पाइपलाइन
+एक दूसरा daemon मोड हर `doctor.interval` (डिफ़ॉल्ट 5 मिनट) समान परीक्षण चलाता है और परिणामों को `doctor.log_file` (डिफ़ॉल्ट `/tmp/wall-vault-doctor.log`) में लिखता है। जब `doctor.auto_fix` true है, तो यह आम drift (बासी OpenClaw कॉन्फ़िग, गायब TLS विश्वास, पुनः आरंभ करने योग्य सेवाएँ) की मरम्मत करने का भी प्रयास करता है।
 
-1. **कमांड-विशिष्ट संरचना फ़िल्टर** — git, go आदि के आउटपुट प्रारूप को समझकर सार्थक भाग निकालता है
-2. **रेगेक्स पोस्ट-प्रोसेसिंग** — ANSI रंग कोड हटाना, खाली पंक्तियाँ कम करना, डुप्लिकेट पंक्तियाँ एकत्र करना
-3. **पासथ्रू + ट्रंकेशन** — असमर्थित कमांड के लिए पहली/अंतिम 50 पंक्तियाँ रखें
-
-### Claude Code इंटीग्रेशन
-
-Claude Code के `PreToolUse` हुक से सभी शेल कमांड को स्वचालित रूप से RTK से गुज़रने के लिए सेट किया जा सकता है।
-
-```bash
-# हुक इंस्टॉल (Claude Code settings.json में ऑटो-ऐड)
-wall-vault rtk hook install
-```
-
-या मैन्युअल रूप से `~/.claude/settings.json` में जोड़ें:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
-
-> 💡 **Exit code संरक्षण**: RTK मूल कमांड का एक्ज़िट कोड जस का तस लौटाता है। कमांड विफल होने पर (exit code ≠ 0) AI भी विफलता को सही ढंग से पहचानता है।
-
-> 💡 **अंग्रेज़ी बलपूर्वक**: RTK कमांड को `LC_ALL=C` से चलाता है ताकि सिस्टम भाषा सेटिंग की परवाह किए बिना हमेशा अंग्रेज़ी आउटपुट बने। इससे फ़िल्टर सटीक रूप से काम करता है।
+डैशबोर्ड से **Doctor** कार्ड या `wall-vault doctor` के माध्यम से वन-शॉट ट्रिगर करें।
 
 ---
 
-## पर्यावरण चर संदर्भ
+## Hooks
 
-पर्यावरण चर प्रोग्राम को सेटिंग मान पास करने की विधि है। `export चर-नाम=मान` रूप में टर्मिनल में दर्ज करें, या ऑटो-स्टार्ट सर्विस फ़ाइल में रखें तो हमेशा लागू रहता है।
+मुख्य घटनाओं पर एक shell कमांड चलाएँ:
 
-| चर | विवरण | उदाहरण मान |
-|------|------|---------|
-| `WV_LANG` | डैशबोर्ड भाषा | `ko`, `en`, `ja` |
-| `WV_THEME` | डैशबोर्ड थीम | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Google API कुंजी (कॉमा से अनेक) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | OpenRouter API कुंजी | `sk-or-v1-...` |
-| `WV_VAULT_URL` | वितरित मोड में तिजोरी सर्वर पता | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | क्लाइंट (बॉट) प्रमाणीकरण टोकन | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | एडमिन टोकन | `admin-token-here` |
-| `WV_MASTER_PASS` | API कुंजी एन्क्रिप्शन पासवर्ड | `my-password` |
-| `WV_AVATAR` | अवतार छवि फ़ाइल पथ (`~/.openclaw/` आधारित सापेक्ष पथ) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Ollama लोकल सर्वर पता | `http://192.168.x.x:11434` |
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+प्रत्येक hook को घटना-विशिष्ट पर्यावरण चर मिलते हैं (`SERVICE`, `MODEL`, `ERROR`, `AGENT`, `LEVEL`, `MSG`)। Hooks 5-सेकंड टाइमआउट के साथ async चलते हैं — प्रॉक्सी कभी भी धीमे hook पर ब्लॉक नहीं होता।
+
+---
+
+## पर्यावरण चर
+
+| चर | YAML फ़ील्ड |
+|----------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | One-shot import: comma-separated Google keys |
+| `WV_KEY_OPENROUTER` | One-shot import: OpenRouter keys |
+| `WV_KEY_ANTHROPIC` | One-shot import: Anthropic keys |
+| `WV_KEY_OPENAI` | One-shot import: OpenAI keys |
+| `WV_OLLAMA_URL` | Per-host Ollama URL override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Per-backend URL override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
+
+प्रत्येक env चर, जब सेट किया जाता है, YAML फ़ाइल पर जीतता है।
 
 ---
 
 ## समस्या निवारण
 
-### प्रॉक्सी शुरू नहीं होता
+### `:56244` पर `connection refused`
 
-पोर्ट पहले से किसी अन्य प्रोग्राम द्वारा उपयोग में होना सामान्य कारण है।
-
-```bash
-ss -tlnp | grep 56244   # 56244 पोर्ट कौन उपयोग कर रहा है जाँचें
-wall-vault proxy --port 8080   # अन्य पोर्ट नंबर से शुरू करें
-```
-
-### API कुंजी त्रुटि (429, 402, 401, 403, 582)
-
-| त्रुटि कोड | अर्थ | समाधान |
-|----------|------|----------|
-| **429** | बहुत अधिक अनुरोध (उपयोग सीमा पार) | थोड़ी देर प्रतीक्षा करें या अन्य कुंजी जोड़ें |
-| **402** | भुगतान आवश्यक या क्रेडिट कम | संबंधित सेवा में क्रेडिट रिचार्ज करें |
-| **401 / 403** | कुंजी ग़लत है या अनुमति नहीं | कुंजी मान पुन: जाँचें और दोबारा पंजीकृत करें |
-| **582** | गेटवे ओवरलोड (कूलडाउन 5 मिनट) | 5 मिनट बाद स्वचालित हटता है |
+या तो प्रॉक्सी नहीं चल रहा है या यह एक अलग होस्ट से बाउंड है। जाँच करें:
 
 ```bash
-# पंजीकृत कुंजी सूची और स्थिति जाँचें
-curl -H "Authorization: Bearer एडमिन-टोकन" https://localhost:56243/admin/keys
-
-# कुंजी उपयोग काउंटर रीसेट
-curl -X POST -H "Authorization: Bearer एडमिन-टोकन" https://localhost:56243/admin/keys/reset
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
 ```
 
-### एजेंट "अकनेक्टेड" दिख रहा हो
+यदि यह एक अलग पोर्ट पर चल रहा है, तो आपके कॉन्फ़िगरेशन में `proxy.port` ओवरराइड किया गया है — `~/.wall-vault/config.yaml` जाँचें।
 
-"अकनेक्टेड" का अर्थ है कि प्रॉक्सी प्रोसेस तिजोरी को सिग्नल (heartbeat) नहीं भेज रहा। **इसका मतलब सेटिंग सेव नहीं हुई, ऐसा नहीं है।** प्रॉक्सी को तिजोरी सर्वर पता और टोकन जानते हुए चलना चाहिए तभी कनेक्टेड स्थिति में आएगा।
+### `x509: certificate signed by unknown authority`
+
+क्लाइंट wall-vault आंतरिक CA पर भरोसा नहीं करता। क्लाइंट मशीन पर `wall-vault cert install-trust` चलाएँ। उन एजेंटों के लिए जिनका रनटाइम OS ट्रस्ट स्टोर को अनदेखा करता है (जैसे हार्डकोडेड `NODE_EXTRA_CA_CERTS` के साथ Node), `127.0.0.1:56245` (केवल same-host) पर loopback HTTP साथी का उपयोग करें या प्लेन HTTP पर वापस जाने के लिए `WV_PROXY_TLS_ENABLED=0` सेट करें।
+
+### `token not registered with vault`
+
+क्लाइंट का `Authorization: Bearer <token>` किसी रजिस्टर्ड क्लाइंट से मेल नहीं खाता। डैशबोर्ड में **Clients** के अंतर्गत टोकन सत्यापित करें। यदि आपने एक बासी कॉन्फ़िग से `proxy-managed`, `dummy`, या `""` जैसा एक टोकन शाब्दिक कॉपी किया है, तो इसे वास्तविक क्लाइंट टोकन से बदलें।
+
+### `Anthropic dispatch needs a Claude model id`
+
+v0.2.63 के अनुसार डिफ़ॉल्ट व्यवहार: anthropic डिस्पैच को भेजी गई एक गैर-Claude मॉडल आईडी एक त्रुटि लौटाती है। या तो रूटिंग को ठीक करें (`gemini-2.5-flash` को anthropic पर न भेजें) या `proxy.anthropic_fallback_model` के माध्यम से स्वचालित पुनर्लेखन में ऑप्ट-इन करें।
+
+### `unknown service: <id>`
+
+डिस्पैच ने एक सेवा आईडी देखी जिसका कोई प्लगइन yaml दावा नहीं करता। जाँच करें:
 
 ```bash
-# तिजोरी सर्वर पता, टोकन, क्लाइंट ID निर्दिष्ट करके प्रॉक्सी शुरू करें
-WV_VAULT_URL=http://तिजोरी-सर्वर-पता:56243 \
-WV_VAULT_TOKEN=क्लाइंट-टोकन \
-WV_VAULT_CLIENT_ID=क्लाइंट-ID \
-wall-vault proxy
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
 ```
 
-कनेक्शन सफल होने पर लगभग 20 सेकंड में डैशबोर्ड पर 🟢 चल रहा है दिखेगा।
+यदि yaml मौजूद है लेकिन `enabled: false` है, तो इसे फ्लिप करें। यदि यह पूरी तरह से गायब है, तो स्रोत ट्री में `configs/services/` से कॉपी करें।
 
-### Ollama कनेक्ट नहीं हो रहा
+### एक reasoning मॉडल पर खाली प्रतिक्रिया
 
-Ollama आपके कंप्यूटर पर सीधे AI चलाने वाला प्रोग्राम है। पहले Ollama चालू है या नहीं जाँचें।
+`qwen3.6`, `deepseek-r1`, और GPT-`o1` परिवार कभी-कभी केवल `reasoning_content` उत्सर्जित करते हैं और `content` को खाली छोड़ देते हैं। v0.2.63 के अनुसार wall-vault स्वचालित रूप से reasoning टेक्स्ट पर वापस आता है — यदि आप अभी भी खाली प्रतिक्रियाएँ देखते हैं, तो बैकएंड कोई भी फ़ील्ड नहीं लौटा रहा है। upstream के लॉग जाँचें।
 
-```bash
-curl http://localhost:11434/api/tags   # मॉडल सूची दिखे तो सामान्य
-export OLLAMA_URL=http://192.168.x.x:11434   # अन्य कंप्यूटर पर चल रहा हो तो
-```
+विशेष रूप से qwen3 के साथ LM Studio के लिए, प्लगइन yaml में `inline_no_think_for_qwen3: true` सेट करें ताकि reasoning inline अक्षम हो जाए। बिल्ट-इन lmstudio.yaml और ollama.yaml पहले से ही ऐसा करते हैं।
 
-> ⚠️ Ollama जवाब न दे रहा हो तो पहले `ollama serve` कमांड से Ollama शुरू करें।
+### डैशबोर्ड "all keys on cooldown" दिखाता है लेकिन मैंने अभी एक जोड़ा
 
-> ⚠️ **बड़े मॉडल धीमे होते हैं**: `qwen3.5:35b`, `deepseek-r1` जैसे बड़े मॉडल में जवाब बनने में कई मिनट लग सकते हैं। जवाब न आ रहा दिखे तो भी सामान्य प्रसंस्करण हो सकता है, कृपया प्रतीक्षा करें।
+नई कुंजी स्वस्थ है लेकिन डिस्पैच पथ अभी भी एक पुरानी कुंजी के लिए कूलडाउन में हो सकता है। एक नया अनुरोध आज़माएँ — प्रॉक्सी प्रति कॉल राउंड-रॉबिन करता है, और एक स्वस्थ कुंजी अगली बार चुनी जाएगी।
+
+### vault मास्टर पासवर्ड के साथ अनलॉक नहीं होगा
+
+गलत पासवर्ड। कोई पुनर्प्राप्ति नहीं है — wall-vault जानबूझकर बैकडोर शिप नहीं करता। यदि आपने वास्तव में मास्टर पासवर्ड खो दिया है, तो एकमात्र मार्ग `~/.wall-vault/data/vault.json` को हटाना, एक नए पासवर्ड के साथ पुनः आरंभ करना और कुंजियों को फिर से जोड़ना है।
+
+### फ्री-टियर OpenRouter सीमाएँ हिट
+
+`openrouter` को शामिल करने के लिए `proxy.services` सेट करें और कम से कम एक OpenRouter कुंजी जोड़ें। प्रॉक्सी एक भुगतान किए गए मॉडल से उसके `:free` संस्करण पर स्वत: फ़ॉलबैक करता है जब भुगतान किया गया पथ 402 / 429 लौटाता है।
+
+### `journalctl --user -u wall-vault-proxy` खाली है
+
+systemd `--user` लॉग इसे चलाने वाले उपयोगकर्ता के journal में जाते हैं। यदि आपने यूनिट को `root` के रूप में या `sudo` के माध्यम से शुरू किया है, तो journal इसके बजाय सिस्टम इंस्टेंस में है — `--user` के बिना `journalctl -u wall-vault-proxy` आज़माएँ।
 
 ---
 
-## हालिया परिवर्तन (v0.1.16 ~ v0.1.27)
+## अधिक
 
-### v0.1.27 (2026-04-09)
-- **Ollama फॉलबैक मॉडल नाम सुधार**: अन्य सेवा से Ollama फॉलबैक होने पर provider प्रीफ़िक्स वाला मॉडल नाम (उदा: `google/gemini-3.1-pro-preview`) Ollama को जस का तस भेजा जाता था। अब स्वचालित रूप से पर्यावरण चर/डिफ़ॉल्ट मॉडल से बदला जाता है।
-- **कूलडाउन समय बड़ी कमी**: 429 rate limit 30 मिनट→5 मिनट, 402 भुगतान 1 घंटा→30 मिनट, 401/403 24 घंटे→6 घंटे। सभी कुंजियों के एक साथ कूलडाउन होकर प्रॉक्सी पूरी तरह ठप होने की स्थिति रोकता है।
-- **सब कूलडाउन होने पर ज़बरदस्ती पुनः प्रयास**: सभी कुंजियाँ कूलडाउन में होने पर सबसे जल्दी खुलने वाली कुंजी से ज़बरदस्ती पुनः प्रयास करके अनुरोध अस्वीकृति रोकता है।
-- **सेवा सूची डिस्प्ले सुधार**: `/status` जवाब vault से सिंक की गई वास्तविक सेवा सूची दिखाता है (anthropic आदि की कमी रोकता है)।
-
-### v0.1.25 (2026-04-08)
-- **एजेंट प्रोसेस डिटेक्शन**: प्रॉक्सी लोकल एजेंट (NanoClaw/OpenClaw) जीवित है या नहीं पता लगाकर डैशबोर्ड पर नारंगी ट्रैफ़िक लाइट दिखाता है।
-- **ड्रैग हैंडल सुधार**: कार्ड सॉर्टिंग में केवल ट्रैफ़िक लाइट (●) क्षेत्र से पकड़ सकते हैं। इनपुट फ़ील्ड या बटन से गलती से ड्रैग नहीं होता।
-
-### v0.1.24 (2026-04-06)
-- **RTK टोकन बचत सबकमांड**: `wall-vault rtk <command>` से शेल कमांड आउटपुट ऑटो-फ़िल्टर करके AI एजेंट का टोकन उपयोग 60-90% कम करता है। git, go आदि प्रमुख कमांड के लिए बिल्ट-इन फ़िल्टर, असमर्थित कमांड भी ऑटो-ट्रंकेट। Claude Code `PreToolUse` हुक से पारदर्शी इंटीग्रेशन।
-
-### v0.1.23 (2026-04-06)
-- **Ollama मॉडल बदलाव सुधार**: तिजोरी डैशबोर्ड से Ollama मॉडल बदलने पर वास्तव में प्रॉक्सी पर लागू नहीं होता था। पहले केवल पर्यावरण चर (`OLLAMA_MODEL`) का उपयोग होता था, अब तिजोरी सेटिंग प्राथमिक।
-- **लोकल सर्विस ऑटो ट्रैफ़िक लाइट**: Ollama/LM Studio/vLLM कनेक्ट होने पर स्वचालित सक्रिय, डिस्कनेक्ट पर स्वचालित निष्क्रिय। क्लाउड सेवाओं के कुंजी-आधारित ऑटो-टॉगल जैसा।
-
-### v0.1.22 (2026-04-05)
-- **खाली content फ़ील्ड कमी सुधार**: thinking मॉडल (gemini-3.1-pro, o1, claude thinking आदि) जब max_tokens सीमा reasoning में पूरी खर्च कर वास्तविक जवाब न बना पाएँ, तो प्रॉक्सी जवाब JSON में `content`/`text` फ़ील्ड को `omitempty` से हटा देता था जिससे OpenAI/Anthropic SDK क्लाइंट `Cannot read properties of undefined (reading 'trim')` एरर से क्रैश होते थे। आधिकारिक API स्पेक के अनुसार हमेशा फ़ील्ड शामिल करने में बदलाव।
-
-### v0.1.21 (2026-04-05)
-- **Gemma 4 मॉडल सपोर्ट**: Google Gemini API के माध्यम से `gemma-4-31b-it`, `gemma-4-26b-a4b-it` आदि Gemma श्रेणी के मॉडल उपयोग किए जा सकते हैं।
-- **LM Studio / vLLM सर्विस आधिकारिक सपोर्ट**: पहले ये सेवाएँ प्रॉक्सी राउटिंग में छूट जाती थीं और हमेशा Ollama द्वारा प्रतिस्थापित होती थीं। अब OpenAI संगत API से सामान्य राउटिंग।
-- **डैशबोर्ड सर्विस डिस्प्ले सुधार**: फॉलबैक होने पर भी डैशबोर्ड हमेशा उपयोगकर्ता द्वारा सेट सेवा दिखाता है।
-- **लोकल सर्विस स्थिति डिस्प्ले**: डैशबोर्ड लोड होने पर लोकल सेवाओं (Ollama, LM Studio, vLLM आदि) की कनेक्शन स्थिति ● बिंदु रंग से दिखती है।
-- **टूल फ़िल्टर पर्यावरण चर**: `WV_TOOL_FILTER=passthrough` पर्यावरण चर से टूल पास-थ्रू मोड सेट कर सकते हैं।
-
-### v0.1.20 (2026-03-28)
-- **व्यापक सुरक्षा सुदृढ़ीकरण**: XSS रोकथाम (41 स्थान), स्थिर-समय टोकन तुलना, CORS प्रतिबंध, अनुरोध आकार सीमा, पथ ट्रैवर्सल रोकथाम, SSE प्रमाणीकरण, दर सीमा सुदृढ़ीकरण आदि 12 सुरक्षा आइटम सुधार।
-
-### v0.1.19 (2026-03-27)
-- **Claude Code ऑनलाइन डिटेक्शन**: प्रॉक्सी से न गुज़रने वाला Claude Code भी डैशबोर्ड पर ऑनलाइन दिखता है।
-
-### v0.1.18 (2026-03-26)
-- **फॉलबैक सर्विस अटकना सुधार**: अस्थायी त्रुटि से Ollama फॉलबैक के बाद मूल सेवा वापस आने पर स्वचालित वापसी।
-- **ऑफ़लाइन डिटेक्शन सुधार**: 15-सेकंड अंतराल स्थिति जाँच से प्रॉक्सी बंद होने का पता तेज़ी से लगता है।
-
-### v0.1.17 (2026-03-25)
-- **ड्रैग एंड ड्रॉप कार्ड सॉर्टिंग**: एजेंट कार्ड खींचकर क्रम बदल सकते हैं।
-- **इनलाइन सेटिंग अप्लाई बटन**: ऑफ़लाइन एजेंट पर [⚡ सेटिंग अप्लाई] बटन दिखता है।
-- **cokacdir एजेंट प्रकार जोड़ा गया।**
-
-### v0.1.16 (2026-03-25)
-- **दो-तरफ़ा मॉडल सिंक**: तिजोरी डैशबोर्ड से Cline/Claude Code का मॉडल बदलने पर स्वचालित लागू।
-
----
-
-*अधिक विस्तृत API जानकारी के लिए [API.md](API.md) देखें।*
+- HTTP API रेफरेंस — [API.md](API.md) देखें
+- स्रोत — `https://github.com/sookmook/wall-vault`
+- बग रिपोर्ट / फ़ीचर अनुरोध — GitHub Issues
+- रिलीज़ इतिहास — [CHANGELOG.md](../CHANGELOG.md)

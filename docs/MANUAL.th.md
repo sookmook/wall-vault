@@ -1,931 +1,621 @@
-# คู่มือผู้ใช้ wall-vault
-*(Last updated: 2026-04-16 — v0.2.2)*
+# wall-vault User Manual
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · [हिन्दी](MANUAL.hi.md) · [Bahasa Indonesia](MANUAL.id.md) · ภาษาไทย · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
+
+คู่มือนี้ครอบคลุมการติดตั้ง การกำหนดค่า และการใช้งาน wall-vault สำหรับภาพรวมโดยย่อโปรดดูที่ [README](../README.md) สำหรับรายละเอียด HTTP API ดูที่ [API reference](API.md)
 
 ## สารบัญ
 
-1. [wall-vault คืออะไร?](#wall-vault-คืออะไร)
+1. [wall-vault ทำอะไร](#wall-vault-ทำอะไร)
 2. [การติดตั้ง](#การติดตั้ง)
-3. [เริ่มต้นใช้งาน (wizard setup)](#เริ่มต้นใช้งาน)
-4. [การลงทะเบียน API Key](#การลงทะเบียน-api-key)
-5. [การใช้งาน Proxy](#การใช้งาน-proxy)
-6. [แดชบอร์ดตู้นิรภัยกุญแจ](#แดชบอร์ดตู้นิรภัยกุญแจ)
-7. [โหมดกระจาย (มัลติบอต)](#โหมดกระจาย-มัลติบอต)
-8. [การตั้งค่าเริ่มต้นอัตโนมัติ](#การตั้งค่าเริ่มต้นอัตโนมัติ)
-9. [Doctor (หมอ)](#doctor-หมอ)
-10. [RTK ประหยัดโทเค็น](#rtk-ประหยัดโทเค็น)
-11. [ตัวแปรสภาพแวดล้อมอ้างอิง](#ตัวแปรสภาพแวดล้อมอ้างอิง)
-12. [การแก้ไขปัญหา](#การแก้ไขปัญหา)
+3. [การรันครั้งแรกด้วย setup wizard](#การรันครั้งแรกด้วย-setup-wizard)
+4. [การเปิดใช้งาน TLS](#การเปิดใช้งาน-tls)
+5. [การลงทะเบียน API key](#การลงทะเบียน-api-key)
+6. [การเชื่อมต่อ agent](#การเชื่อมต่อ-agent)
+7. [Dashboard](#dashboard)
+8. [โหมด distributed](#โหมด-distributed)
+9. [การเริ่มต้นอัตโนมัติ](#การเริ่มต้นอัตโนมัติ)
+10. [Plugin yamls](#plugin-yamls)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [ตัวแปรสภาพแวดล้อม](#ตัวแปรสภาพแวดล้อม)
+14. [การแก้ไขปัญหา](#การแก้ไขปัญหา)
 
 ---
 
-## wall-vault คืออะไร?
+## wall-vault ทำอะไร
 
-**wall-vault = AI Proxy + ตู้นิรภัย API Key สำหรับ OpenClaw**
+wall-vault เป็น Go binary ตัวเดียวที่รวมบริการสองอย่างที่ทำงานร่วมกัน:
 
-ในการใช้บริการ AI จำเป็นต้องมี **API key** ซึ่ง API key เปรียบเสมือน **บัตรผ่านดิจิทัล** ที่พิสูจน์ว่า "บุคคลนี้มีสิทธิ์ใช้บริการนี้" แต่บัตรผ่านนี้มีจำนวนครั้งที่ใช้ได้ต่อวันจำกัด และหากจัดการไม่ดีก็มีความเสี่ยงที่จะรั่วไหล
+- **vault** เก็บ API key ที่เข้ารหัสไว้ขณะพัก (AES-GCM พร้อมรหัสผ่านหลัก) ติดตามการใช้งานและ cooldown ต่อ key เผยแพร่การเปลี่ยนแปลงผ่าน Server-Sent Events (SSE) และให้บริการ web dashboard ที่ `:56243` สำหรับผู้ดูแลที่เป็นมนุษย์
+- **proxy** เปิด endpoint ที่เข้ากันได้กับ Gemini, Anthropic, OpenAI และ Ollama-native ที่ `:56244` AI client ใดที่ชี้ไปที่ proxy ก็จะใช้ key ที่อยู่ใน vault โดยที่ client จะไม่เห็น key เหล่านั้นเลย เมื่อ upstream หนึ่งล้มเหลว dispatch จะ fall back ไปยัง provider ถัดไปตามลำดับ
 
-wall-vault เก็บบัตรผ่านเหล่านี้ในตู้นิรภัยที่ปลอดภัย และทำหน้าที่เป็น **proxy (ตัวกลาง)** ระหว่าง OpenClaw กับบริการ AI พูดง่ายๆ คือ OpenClaw แค่เชื่อมต่อกับ wall-vault ก็พอ ส่วนที่เหลือ wall-vault จะจัดการให้ทั้งหมด
+สิ่งนี้มีประโยชน์เมื่อ:
 
-ปัญหาที่ wall-vault แก้ไข:
-
-- **หมุนเวียน API key อัตโนมัติ**: เมื่อการใช้งานของ key ใดถึงขีดจำกัดหรือถูกบล็อกชั่วคราว (cooldown) จะเปลี่ยนไปใช้ key ถัดไปอย่างเงียบๆ OpenClaw ทำงานต่อเนื่องไม่หยุดชะงัก
-- **สลับบริการอัตโนมัติ (fallback)**: หาก Google ไม่ตอบสนอง จะสลับไปใช้ OpenRouter ถ้ายังไม่ได้ก็สลับไป Ollama/LM Studio/vLLM (AI ในเครื่อง) ที่ติดตั้งในคอมพิวเตอร์ของคุณโดยอัตโนมัติ เซสชันไม่ขาด เมื่อบริการเดิมกลับมาทำงานจะสลับกลับอัตโนมัติตั้งแต่คำขอถัดไป (v0.1.18+, LM Studio/vLLM: v0.1.21+)
-- **ซิงค์แบบเรียลไทม์ (SSE)**: เมื่อเปลี่ยนโมเดลในแดชบอร์ดตู้นิรภัย จะแสดงบนหน้าจอ OpenClaw ภายใน 1-3 วินาที SSE (Server-Sent Events) คือเทคโนโลยีที่เซิร์ฟเวอร์ส่งการอัปเดตไปยังไคลเอนต์แบบเรียลไทม์
-- **การแจ้งเตือนแบบเรียลไทม์**: เหตุการณ์เช่น key หมดหรือบริการขัดข้องจะแสดงที่ด้านล่างของ OpenClaw TUI (หน้าจอเทอร์มินัล) ทันที
-
-> 💡 **Claude Code, Cursor, VS Code** ก็สามารถเชื่อมต่อได้ แต่จุดประสงค์หลักของ wall-vault คือใช้ร่วมกับ OpenClaw
+- คุณมี key สำหรับ provider หลายราย และต้องการ URL เดียวที่ agent คุยด้วย
+- คุณต้องการให้ key ระดับ free-tier ที่อยู่ใน cooldown ถอยออกไปโดยไม่ทำให้ session พัง
+- คุณต้องการให้ key ชุดเดียวกันขับเคลื่อนหลาย bot, IDE หรือ script บน LAN เดียวกันโดยไม่ต้องคัดลอกข้อมูลรับรอง
+- คุณต้องการ dashboard แทนตัวแปรสภาพแวดล้อมในการแก้ไข key และเปลี่ยนโมเดล
+- คุณต้องการ fallback ในเครื่อง (Ollama, LM Studio, vLLM) เมื่อโควต้า cloud หมด
 
 ```
-OpenClaw (หน้าจอเทอร์มินัล TUI)
-        │
-        ▼
-  wall-vault proxy (:56244)   ← จัดการ key, routing, fallback, event
-        │
-        ├─ Google Gemini API
-        ├─ OpenRouter API (340+ โมเดล)
-        ├─ Ollama / LM Studio / vLLM (คอมพิวเตอร์ของคุณ, ทางเลือกสุดท้าย)
-        └─ OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
 ## การติดตั้ง
 
-### Linux / macOS
-
-เปิดเทอร์มินัลแล้ววางคำสั่งด้านล่าง
+### Linux / macOS one-liner
 
 ```bash
-# Linux (PC ทั่วไป, เซิร์ฟเวอร์ — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (Mac M1/M2/M3)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — ดาวน์โหลดไฟล์จากอินเทอร์เน็ต
-- `chmod +x` — ทำให้ไฟล์ที่ดาวน์โหลดมา "สามารถเรียกใช้ได้" หากข้ามขั้นตอนนี้จะเกิดข้อผิดพลาด "ไม่มีสิทธิ์"
+สคริปต์จะตรวจหา OS และสถาปัตยกรรมโดยอัตโนมัติ ดาวน์โหลด binary ที่ถูกต้องไปยัง `~/.local/bin/wall-vault` และทำให้สามารถ execute ได้ หาก `~/.local/bin` ยังไม่อยู่บน `PATH` ของคุณ ให้เพิ่ม:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### ดาวน์โหลดด้วยตนเอง
+
+Binary ที่ build ไว้ล่วงหน้าถูกเผยแพร่ใน release ทุกครั้งที่ `https://github.com/sookmook/wall-vault/releases`
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-เปิด PowerShell (ผู้ดูแลระบบ) แล้วรันคำสั่งต่อไปนี้
-
 ```powershell
-# ดาวน์โหลด
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# เพิ่มใน PATH (มีผลหลังรีสตาร์ท PowerShell)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> 💡 **PATH คืออะไร?** รายการโฟลเดอร์ที่คอมพิวเตอร์ใช้ค้นหาคำสั่ง เมื่อเพิ่มใน PATH แล้ว คุณสามารถพิมพ์ `wall-vault` เพื่อเรียกใช้ได้จากโฟลเดอร์ไหนก็ได้
+### Build จาก source
 
-### บิลด์จากซอร์สโค้ด (สำหรับนักพัฒนา)
-
-ใช้ได้เฉพาะเมื่อติดตั้งสภาพแวดล้อมการพัฒนาภาษา Go แล้ว
+ต้องการ Go 1.25 หรือใหม่กว่า
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (เวอร์ชัน: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> 💡 **เวอร์ชัน timestamp ของบิลด์**: เมื่อบิลด์ด้วย `make build` เวอร์ชันจะถูกสร้างอัตโนมัติในรูปแบบที่รวมวันที่-เวลา เช่น `v0.1.27.20260409` หากบิลด์โดยตรงด้วย `go build ./...` เวอร์ชันจะแสดงเป็น `"dev"` เท่านั้น
+`make build-all` จะ cross-compile ไปยังทั้งห้าแพลตฟอร์มที่รองรับ Binary จะอยู่ใน `bin/`
 
 ---
 
-## เริ่มต้นใช้งาน
-
-### การรัน wizard setup
-
-หลังจากติดตั้งแล้ว ในครั้งแรก **ต้อง** รัน **wizard setup** ด้วยคำสั่งด้านล่าง wizard จะถามรายการที่จำเป็นทีละข้อและแนะนำคุณ
+## การรันครั้งแรกด้วย setup wizard
 
 ```bash
 wall-vault setup
 ```
 
-ขั้นตอนที่ wizard ดำเนินการ:
+Wizard จะถามคุณตามลำดับ:
 
-```
-1. เลือกภาษา (10 ภาษารวมภาษาไทย)
-2. เลือกธีม (light / dark / gold / cherry / ocean)
-3. โหมดการทำงาน — ใช้คนเดียว (standalone) หรือใช้ร่วมกันหลายเครื่อง (distributed)
-4. ชื่อบอต — ชื่อที่จะแสดงบนแดชบอร์ด
-5. ตั้งค่าพอร์ต — ค่าเริ่มต้น: proxy 56244, ตู้นิรภัย 56243 (ถ้าไม่ต้องเปลี่ยนก็กด Enter)
-6. เลือกบริการ AI — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. ตั้งค่าตัวกรองความปลอดภัยเครื่องมือ
-8. ตั้งค่าโทเค็นผู้ดูแลระบบ — รหัสผ่านสำหรับล็อกฟีเจอร์การจัดการแดชบอร์ด สร้างอัตโนมัติได้
-9. รหัสผ่านเข้ารหัส API key — สำหรับจัดเก็บ key อย่างปลอดภัยยิ่งขึ้น (ไม่บังคับ)
-10. เส้นทางไฟล์การกำหนดค่า
-```
+1. **ภาษา** — เลือกหนึ่งใน 17 locale ของ UI ตรวจหาโดยอัตโนมัติจาก `$LANG` แต่ wizard ก็เสนอรายการให้เลือกอยู่ดี
+2. **ธีม** — `light` (ค่าเริ่มต้น), `dark`, `cherry`, `ocean`, `gold`, `autumn`, `winter` เป็นเรื่องของรูปลักษณ์เท่านั้น
+3. **โหมด** — `standalone` (host เดียว ค่าเริ่มต้น) หรือ `distributed` (vault บน host หนึ่ง proxy บน host อื่นๆ)
+4. **ชื่อ bot** — slug ของ `client_id` แบบอิสระ vault ใช้สิ่งนี้เพื่อจำกัดขอบเขตการตั้งค่าต่อ client (model override, fallback chain)
+5. **Proxy port** — ค่าเริ่มต้น `56244`
+6. **Vault port** — ค่าเริ่มต้น `56243` (เฉพาะ standalone)
+7. **การเลือกบริการ** — y/N สำหรับแต่ละรายการ: Google Gemini, OpenRouter, Anthropic, OpenAI, Ollama, LM Studio, vLLM เลือกหลายอย่างได้ แต่ละอย่างจะเขียน hint ตัวแปรสภาพแวดล้อมไว้ตอนท้าย
+8. **Tool filter** — `strip_all` (ค่าเริ่มต้น บล็อกการกำหนด tool ที่เข้ามาทั้งหมดเพื่อความปลอดภัย) หรือ `passthrough` (ปล่อย tool ใดก็ได้ผ่าน)
+9. **Admin token** — เว้นว่างเพื่อสร้างอัตโนมัติ Dashboard ต้องใช้ token นี้เพื่อเข้าสู่ระบบ
+10. **รหัสผ่านหลัก** — เว้นว่างเพื่อไม่เข้ารหัส (ไม่แนะนำ) ตั้งค่าเพื่อเข้ารหัส key store ขณะพักด้วย AES-GCM
+11. **เส้นทางบันทึก** — ค่าเริ่มต้นเป็น `wall-vault.yaml` ในไดเรกทอรีปัจจุบัน Loader ยังมองหาที่ `~/.wall-vault/config.yaml` ด้วย
 
-> ⚠️ **ต้องจดจำโทเค็นผู้ดูแลระบบไว้** ต้องใช้ในภายหลังเมื่อเพิ่ม key หรือเปลี่ยนการตั้งค่าในแดชบอร์ด หากลืม ต้องแก้ไขไฟล์การกำหนดค่าโดยตรง
+หลังจากบันทึก wizard จะรัน `doctor.FixTrust` เพื่อให้ agent ที่ติดตั้งในเครื่อง (OpenClaw, Claude Code, Cline) ได้รับการเพิ่ม CA ภายในของ wall-vault ลงใน trust store โดยอัตโนมัติ หากไม่มี agent ดังกล่าวติดตั้งอยู่ ขั้นตอนนี้จะพิมพ์ `SKIP` และไม่เขียนอะไร
 
-เมื่อ wizard เสร็จสิ้น ไฟล์การกำหนดค่า `wall-vault.yaml` จะถูกสร้างโดยอัตโนมัติ
-
-### การรัน
+จากนั้นเริ่ม binary:
 
 ```bash
 wall-vault start
 ```
 
-เซิร์ฟเวอร์สองตัวต่อไปนี้จะเริ่มทำงานพร้อมกัน:
+`start` รัน vault และ proxy ทั้งคู่ใน process เดียว (โหมด standalone) สำหรับโหมด distributed ใช้ `wall-vault vault` บน vault host และ `wall-vault proxy` บน proxy host แต่ละตัว
 
-- **Proxy** (`https://localhost:56244`) — ตัวกลางที่เชื่อมต่อ OpenClaw กับบริการ AI
-- **ตู้นิรภัยกุญแจ** (`https://localhost:56243`) — จัดการ API key และแดชบอร์ดเว็บ
-
-เปิด `https://localhost:56243` ในเบราว์เซอร์เพื่อดูแดชบอร์ดได้ทันที
+เปิด `http://localhost:56243` ใน browser เข้าสู่ระบบด้วย admin token ที่ wizard พิมพ์ออกมา
 
 ---
 
-## การลงทะเบียน API Key
+## การเปิดใช้งาน TLS
 
-มีสี่วิธีในการลงทะเบียน API key **สำหรับผู้เริ่มต้น แนะนำวิธีที่ 1 (ตัวแปรสภาพแวดล้อม)**
+ค่าเริ่มต้นของ wizard ทำให้ listener ทั้งสองอยู่บน HTTP ธรรมดา agent ส่วนใหญ่ (OpenClaw, Claude Code, Cursor) ทำงานได้ดีกว่ากับ HTTPS endpoint เดียว ดังนั้น TLS จึงแนะนำในทุกการ deploy ที่ครอบคลุมเกินกว่าเครื่องเดียว
 
-### วิธีที่ 1: ตัวแปรสภาพแวดล้อม (แนะนำ — ง่ายที่สุด)
-
-ตัวแปรสภาพแวดล้อมคือ **ค่าที่ตั้งไว้ล่วงหน้า** ที่โปรแกรมอ่านเมื่อเริ่มทำงาน พิมพ์ในเทอร์มินัลดังนี้
+wall-vault มาพร้อม CA ภายในของตัวเอง ดังนั้นคุณไม่ต้องการชื่อ DNS สาธารณะหรือ Let's Encrypt
 
 ```bash
-# ลงทะเบียน Google Gemini key
-export WV_KEY_GOOGLE=AIzaSy...
+# 1. สร้าง CA ภายใน — เขียนไปที่ ~/.wall-vault/ca.{crt,key}
+#    CA ใช้ได้ 10 ปีโดยค่าเริ่มต้น override ด้วย --ca-years
+wall-vault cert init
 
-# ลงทะเบียน OpenRouter key
-export WV_KEY_OPENROUTER=sk-or-v1-...
+# 2. ออกใบรับรอง host Subject Alternative Names จะรวมโดยอัตโนมัติ:
+#       hostname, "localhost", "127.0.0.1", และ LAN IP ที่ไม่ใช่ loopback ใดๆ ที่ตรวจพบ
+#    Override issuer dir ด้วย --dir, validity ด้วย --host-years
+wall-vault cert issue $(hostname)
 
-# รันหลังจากลงทะเบียน
+# 3. Trust CA ใน OS keychain ของเครื่องนี้
+#    Linux: เขียนไปที่ /etc/ssl/certs/ ผ่าน update-ca-certificates (ต้องการ sudo)
+#    macOS: เพิ่มไปยัง System keychain ผ่าน security add-trusted-cert (ต้องการ sudo)
+#    Windows: import ไปยัง CurrentUser\Root ผ่าน certutil (ไม่ต้องการ admin)
+wall-vault cert install-trust
+
+# 4. เปิดใช้งาน TLS บน listener ทั้งคู่
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
 wall-vault start
 ```
 
-หากคุณมี key หลายตัว ให้เชื่อมด้วยจุลภาค (,) wall-vault จะใช้ key สลับกันโดยอัตโนมัติ (round robin):
+หากต้องการขยาย trust ไปยังเครื่อง LAN อื่นๆ ให้คัดลอก `~/.wall-vault/ca.crt` ไปและรัน `wall-vault cert install-trust --ca <path>` บนแต่ละเครื่อง vault ยังเปิด `ca.crt` ผ่าน plain-HTTP listener เล็กๆ ที่ `:56247` (**bootstrap port**) สำหรับกรณี catch-22 ที่ client ใหม่ต้องการ CA เพื่อพูดคุย HTTPS
 
-```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+### Loopback HTTP companion
+
+agent บางตัว — โดยเฉพาะ Node runtime ที่มาพร้อมกับ OpenClaw — เขียนทับ `NODE_EXTRA_CA_CERTS` เมื่อ spawn process โดยทิ้ง CA hint ที่ผู้ดูแลให้ไว้ พวกมันไม่สามารถยอมรับ CA ของ wall-vault จากภายใน daemon ได้ แม้หลังจาก `cert install-trust` แล้ว wall-vault แก้ปัญหานี้โดยการ bind **plain-HTTP listener เฉพาะ loopback** เพิ่มเติมที่ `127.0.0.1:56245` เมื่อใดก็ตามที่ TLS เปิดใช้งาน Client บน host เดียวกันเข้าถึง proxy ผ่าน port นั้นโดยไม่มี TLS เลย LAN client ยังคงใช้ TLS listener
+
+ปิดใช้งานด้วย `WV_PROXY_PLAIN_PORT=0` หากคุณไม่ต้องการ
+
+### `wall-vault cert list`
+
+แสดงทุก cert ภายใต้ `~/.wall-vault/` พร้อม subject, validity window และ SAN
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
 ```
 
-> 💡 **เคล็ดลับ**: คำสั่ง `export` ใช้ได้เฉพาะเซสชันเทอร์มินัลปัจจุบัน เพื่อให้คงอยู่หลังรีสตาร์ทคอมพิวเตอร์ ให้เพิ่มบรรทัดข้างต้นในไฟล์ `~/.bashrc` หรือ `~/.zshrc`
+---
 
-### วิธีที่ 2: Dashboard UI (คลิกด้วยเมาส์)
+## การลงทะเบียน API key
 
-1. เปิด `https://localhost:56243` ในเบราว์เซอร์
-2. คลิกปุ่ม `[+ เพิ่ม]` ในการ์ด **🔑 API Key** ด้านบน
-3. กรอกประเภทบริการ ค่า key ป้ายกำกับ (ชื่อบันทึก) ขีดจำกัดรายวัน แล้วบันทึก
+มีสองวิธี: dashboard หรือตัวแปรสภาพแวดล้อม
 
-### วิธีที่ 3: REST API (สำหรับระบบอัตโนมัติ/สคริปต์)
+### Dashboard (แนะนำ)
 
-REST API คือวิธีที่โปรแกรมแลกเปลี่ยนข้อมูลผ่าน HTTP เหมาะสำหรับการลงทะเบียนอัตโนมัติด้วยสคริปต์
+1. เข้าสู่ระบบที่ `https://localhost:56243` ด้วย admin token
+2. คลิก **+ API key** ในการ์ด keys
+3. เลือกบริการ (Google, OpenRouter, Anthropic, OpenAI, …)
+4. วาง key บันทึก
+
+หลาย key ต่อบริการก็ใช้ได้ proxy จะ round-robin ระหว่าง key เหล่านั้นและข้าม key ที่ติด cooldown ต่อ key
+
+### ตัวแปรสภาพแวดล้อม (bootstrap แบบครั้งเดียว)
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer โทเค็น-ผู้ดูแล" \
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
+wall-vault start
+```
+
+Key ที่ให้มาด้วยวิธีนี้จะถูกเขียนเข้า store ที่เข้ารหัสในการเปิดใช้งานครั้งแรก การเริ่มครั้งต่อๆ ไปจะอ่านจากดิสก์ คุณสามารถ unset ตัวแปรสภาพแวดล้อมได้หลังจากการรันครั้งแรก
+
+### Cooldown และการหมุนเวียน
+
+ทุกการเรียกที่สำเร็จจะเพิ่ม `usage_count` ของ key และรีเฟรช `last_used` เมื่อได้ HTTP 429 / 402 / 403, proxy จะใส่ key ใน **cooldown** (ค่าเริ่มต้น: 60 นาทีสำหรับ 429, 24 ชั่วโมงสำหรับ 402, 12 ชั่วโมงสำหรับ 403) Dispatch ครั้งถัดไปจะเลือก key อื่นสำหรับบริการนั้น เมื่อ key ทั้งหมดสำหรับบริการอยู่ใน cooldown, proxy จะข้ามบริการนั้นไปอย่างรวดเร็วและลอง provider ถัดไปใน fallback chain
+
+Cooldown สามารถมองเห็นได้ต่อ key ใน dashboard พร้อมเวลานับถอยหลัง
+
+---
+
+## การเชื่อมต่อ agent
+
+### OpenClaw
+
+OpenClaw เป็น client เป้าหมายดั้งเดิม ใช้ modal **+ Add agent** ของ dashboard:
+
+- ตั้ง **Agent type** เป็น `openclaw` หรือ `nanoclaw`
+- ตั้ง **Work directory** — สำหรับ OpenClaw จะเติมโดยอัตโนมัติเป็น `~/.openclaw`
+- เลือก **preferred service** และอาจเลือก **model override**
+- คลิก **Apply** wall-vault จะเขียน `~/.openclaw/openclaw.json` โดยตรง (provider URL, vault token, รายการโมเดล)
+
+เมื่อคุณเปลี่ยนโมเดลจาก dashboard, OpenClaw จะรับการเปลี่ยนแปลงผ่าน SSE ภายใน 1–3 วินาที โดยไม่ต้อง restart
+
+### Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
+```
+
+เมื่อเครดิต Anthropic upstream หมด, dispatch จะ fall back ไปยังบริการที่อยู่ใน `fallback_services` ของ client นี้ โดยค่าเริ่มต้น model id ที่ไม่ใช่ Claude ที่ส่งไปยัง anthropic dispatch จะคืนค่า error เพื่อให้การ misroute ปรากฏขึ้นทันที เลือก opt in เพื่อเขียนทับโดยอัตโนมัติ:
+
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
+
+### Cursor
+
+ใน Cursor **Settings → AI → OpenAI API**:
+
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### Custom HTTP
+
+```bash
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "Key หลัก",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### วิธีที่ 4: flag proxy (สำหรับทดสอบเร็ว)
+Endpoint เดียวกันรองรับ streaming (`"stream": true`) เมื่อตั้งค่า `proxy.oai_stream_forward: true`
 
-สำหรับใส่ key ชั่วคราวเพื่อทดสอบโดยไม่ต้องลงทะเบียนอย่างเป็นทางการ จะหายไปเมื่อปิดโปรแกรม
+---
+
+## Dashboard
+
+`https://localhost:56243` มีห้าการ์ดบน home grid:
+
+- **Keys** — ทุก API key จัดกลุ่มตามบริการ เพิ่ม แก้ไข ลบ ดูการใช้งานและ cooldown
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp รวมถึง plugin yaml ใดๆ ใน `~/.wall-vault/services/` ตั้งค่า `default_model` ต่อบริการ, `allowed_models`, base URL, การเปิด/ปิด reasoning
+- **Clients (agents)** — ทุก client ที่ลงทะเบียน (OpenClaw bot, Claude Code session, Cursor instance, …) กำหนด preferred service, model override, fallback chain
+- **Proxies** — ทุก proxy ที่ได้รับการ authenticate กับ vault นี้ สถานะ live (online/offline), ครั้งสุดท้ายที่เห็น, model ปัจจุบัน
+- **Settings** — admin token, การหมุนเวียนรหัสผ่านหลัก, ธีม, ภาษา
+
+แต่ละการ์ดมี slideover แก้ไข (ด้านขวา) คลิกข้างนอกหรือ `Esc` เพื่อปิด การเปลี่ยนแปลงจะถูก push ไปยัง proxy ที่เชื่อมต่อทั้งหมดผ่าน SSE ภายในไม่กี่วินาที
+
+**Footer** แสดงตัวบ่งชี้ SSE (เขียว = เชื่อมต่อ, ส้ม = กำลังเชื่อมต่อใหม่, เทา = ตัดการเชื่อมต่อ) และเวอร์ชัน build แบบ live
+
+---
+
+## โหมด distributed
+
+เมื่อคุณมีหลายเครื่องที่ทั้งหมดต้องการ key เดียวกัน ให้รัน vault บน host หนึ่งและ proxy บนแต่ละเครื่องที่เหลือ
+
+### Vault host
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## การใช้งาน Proxy
-
-### ใช้งานใน OpenClaw (จุดประสงค์หลัก)
-
-วิธีตั้งค่าให้ OpenClaw เชื่อมต่อกับบริการ AI ผ่าน wall-vault:
-
-เปิดไฟล์ `~/.openclaw/openclaw.json` แล้วเพิ่มเนื้อหาด้านล่าง:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // โทเค็นเอเจนต์ vault
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // ฟรี 1M context
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> 💡 **วิธีที่ง่ายกว่า**: กดปุ่ม **🦞 คัดลอกการตั้งค่า OpenClaw** ในการ์ดเอเจนต์บนแดชบอร์ด snippet ที่มีโทเค็นและที่อยู่เติมไว้แล้วจะถูกคัดลอกไปยังคลิปบอร์ด แค่วางเท่านั้น
-
-**`wall-vault/` ข้างหน้าชื่อโมเดลจะเชื่อมต่อไปที่ไหน?**
-
-เมื่อดูชื่อโมเดล wall-vault จะตัดสินใจโดยอัตโนมัติว่าจะส่งคำขอไปยังบริการ AI ใด:
-
-| รูปแบบโมเดล | บริการที่เชื่อมต่อ |
-|----------|--------------|
-| `wall-vault/gemini-*` | เชื่อมต่อ Google Gemini โดยตรง |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | เชื่อมต่อ OpenAI โดยตรง |
-| `wall-vault/claude-*` | เชื่อมต่อ Anthropic ผ่าน OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (ฟรี 1 ล้านโทเค็น context) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | เชื่อมต่อ OpenRouter |
-| `google/ชื่อโมเดล`, `openai/ชื่อโมเดล`, `anthropic/ชื่อโมเดล` ฯลฯ | เชื่อมต่อตรงกับบริการนั้น |
-| `custom/google/ชื่อโมเดล`, `custom/openai/ชื่อโมเดล` ฯลฯ | ลบส่วน `custom/` แล้ว re-routing |
-| `ชื่อโมเดล:cloud` | ลบส่วน `:cloud` แล้วเชื่อมต่อ OpenRouter |
-
-> 💡 **Context คืออะไร?** ปริมาณการสนทนาที่ AI จดจำได้ในคราวเดียว เมื่อมี 1M (หนึ่งล้านโทเค็น) จะสามารถประมวลผลการสนทนาที่ยาวมากหรือเอกสารยาวได้ในครั้งเดียว
-
-### เชื่อมต่อตรงรูปแบบ Gemini API (ความเข้ากันได้กับเครื่องมือที่มีอยู่)
-
-หากคุณมีเครื่องมือที่ใช้ Google Gemini API โดยตรงอยู่แล้ว เพียงเปลี่ยนที่อยู่เป็น wall-vault:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-หรือสำหรับเครื่องมือที่ระบุ URL โดยตรง:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### ใช้งานใน OpenAI SDK (Python)
-
-สามารถเชื่อมต่อ wall-vault ในโค้ด Python ที่ใช้ AI ได้ เพียงเปลี่ยน `base_url`:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # API key จัดการโดย wall-vault โดยอัตโนมัติ
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # กรอกในรูปแบบ provider/model
-    messages=[{"role": "user", "content": "สวัสดีครับ"}]
-)
-```
-
-### เปลี่ยนโมเดลขณะใช้งาน
-
-เมื่อ wall-vault กำลังทำงานอยู่ หากต้องการเปลี่ยนโมเดล AI ที่ใช้:
-
-```bash
-# ส่งคำขอไปยัง proxy โดยตรงเพื่อเปลี่ยนโมเดล
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# ในโหมดกระจาย (มัลติบอต) เปลี่ยนจากเซิร์ฟเวอร์ตู้นิรภัย → มีผลทันทีผ่าน SSE
-curl -X PUT https://localhost:56243/admin/clients/id-บอต-ของฉัน \
-  -H "Authorization: Bearer โทเค็น-ผู้ดูแล" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### ดูรายการโมเดลที่ใช้ได้
-
-```bash
-# ดูรายการทั้งหมด
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# ดูเฉพาะโมเดล Google
-curl "https://localhost:56244/api/models?service=google"
-
-# ค้นหาตามชื่อ (เช่น โมเดลที่มี "claude")
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**สรุปโมเดลหลักตามบริการ:**
-
-| บริการ | โมเดลหลัก |
-|--------|----------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M context ฟรี, DeepSeek R1/V3, Qwen 2.5 ฯลฯ) |
-| Ollama | ตรวจจับอัตโนมัติเซิร์ฟเวอร์ในเครื่องที่ติดตั้ง |
-| LM Studio | เซิร์ฟเวอร์ในเครื่องของคุณ (พอร์ต 1234) |
-| vLLM | เซิร์ฟเวอร์ในเครื่องของคุณ (พอร์ต 8000) |
-| llama.cpp | เซิร์ฟเวอร์ในเครื่องของคุณ (พอร์ต 8080) |
-
----
-
-## แดชบอร์ดตู้นิรภัยกุญแจ
-
-เปิด `https://localhost:56243` ในเบราว์เซอร์เพื่อดูแดชบอร์ด
-
-**โครงสร้างหน้าจอ:**
-- **แถบด้านบนคงที่ (topbar)**: โลโก้, ตัวเลือกภาษา/ธีม, สถานะการเชื่อมต่อ SSE
-- **กริดการ์ด**: การ์ดเอเจนต์ บริการ API key จัดวางในรูปแบบไทล์
-
-### การ์ด API Key
-
-การ์ดสำหรับจัดการ API key ที่ลงทะเบียนในมุมมองเดียว
-
-- แสดงรายการ key จำแนกตามบริการ
-- `today_usage`: จำนวนโทเค็น (จำนวนตัวอักษรที่ AI อ่านและเขียน) ที่ประมวลผลสำเร็จวันนี้
-- `today_attempts`: จำนวนการเรียกทั้งหมดวันนี้ (รวมสำเร็จ + ล้มเหลว)
-- ลงทะเบียน key ใหม่ด้วยปุ่ม `[+ เพิ่ม]` ลบ key ด้วย `✕`
-
-> 💡 **โทเค็น (token) คืออะไร?** หน่วยที่ AI ใช้ประมวลผลข้อความ ประมาณเท่ากับหนึ่งคำภาษาอังกฤษ หรือ 1-2 ตัวอักษรภาษาไทย ค่าใช้จ่าย API มักคำนวณตามจำนวนโทเค็นนี้
-
-### การ์ดเอเจนต์
-
-การ์ดที่แสดงสถานะของบอต (เอเจนต์) ที่เชื่อมต่อกับ proxy ของ wall-vault
-
-**สถานะการเชื่อมต่อแสดงเป็น 4 ระดับ:**
-
-| สัญลักษณ์ | สถานะ | ความหมาย |
-|------|------|------|
-| 🟢 | กำลังทำงาน | proxy ทำงานปกติ |
-| 🟡 | ล่าช้า | มีการตอบกลับแต่ช้า |
-| 🔴 | ออฟไลน์ | proxy ไม่ตอบสนอง |
-| ⚫ | ยังไม่เชื่อมต่อ/ปิดใช้งาน | proxy ไม่เคยเชื่อมต่อกับตู้นิรภัยหรือถูกปิดใช้งาน |
-
-**คำแนะนำปุ่มด้านล่างของการ์ดเอเจนต์:**
-
-เมื่อลงทะเบียนเอเจนต์ หากระบุ **ประเภทเอเจนต์** ปุ่มอำนวยความสะดวกที่เหมาะสมกับประเภทนั้นจะปรากฏโดยอัตโนมัติ
-
----
-
-#### 🔘 ปุ่มคัดลอกการตั้งค่า — สร้างการตั้งค่าการเชื่อมต่อโดยอัตโนมัติ
-
-เมื่อคลิกปุ่ม snippet การตั้งค่าที่มีโทเค็นเอเจนต์ ที่อยู่ proxy ข้อมูลโมเดลเติมไว้แล้วจะถูกคัดลอกไปยังคลิปบอร์ด วางเนื้อหาที่คัดลอกในตำแหน่งตามตารางด้านล่างเพื่อตั้งค่าการเชื่อมต่อให้เสร็จสมบูรณ์
-
-| ปุ่ม | ประเภทเอเจนต์ | ตำแหน่งที่จะวาง |
-|------|-------------|-------------|
-| 🦞 คัดลอกการตั้งค่า OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 คัดลอกการตั้งค่า NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 คัดลอกการตั้งค่า Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⌨ คัดลอกการตั้งค่า Cursor | `cursor` | Cursor → Settings → AI |
-| 💻 คัดลอกการตั้งค่า VSCode | `vscode` | `~/.continue/config.json` |
-
-**ตัวอย่าง — หากเป็นประเภท Claude Code เนื้อหาที่คัดลอกจะเป็นดังนี้:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "โทเค็น-ของ-เอเจนต์-นี้"
-}
-```
-
-**ตัวอย่าง — หากเป็นประเภท VSCode (Continue):**
-
-```yaml
-# ~/.continue/config.yaml  ← วางใน config.yaml ไม่ใช่ config.json
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: โทเค็น-ของ-เอเจนต์-นี้
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> ⚠️ **เวอร์ชันล่าสุดของ Continue ใช้ `config.yaml`** หาก `config.yaml` มีอยู่ `config.json` จะถูกเพิกเฉยทั้งหมด ต้องวางใน `config.yaml`
-
-**ตัวอย่าง — หากเป็นประเภท Cursor:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : โทเค็น-ของ-เอเจนต์-นี้
-
-// หรือตัวแปรสภาพแวดล้อม:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=โทเค็น-ของ-เอเจนต์-นี้
-```
-
-> ⚠️ **หากคัดลอกคลิปบอร์ดไม่ทำงาน**: นโยบายความปลอดภัยของเบราว์เซอร์อาจบล็อกการคัดลอก หากป๊อปอัพ textbox เปิดขึ้น ให้เลือกทั้งหมดด้วย Ctrl+A แล้วคัดลอกด้วย Ctrl+C
-
----
-
-#### ⚡ ปุ่มใช้งานอัตโนมัติ — กดครั้งเดียว ตั้งค่าเสร็จ
-
-เมื่อประเภทเอเจนต์เป็น `cline`, `claude-code`, `openclaw`, `nanoclaw` จะมีปุ่ม **⚡ ใช้งานการตั้งค่า** แสดงในการ์ดเอเจนต์ เมื่อกดปุ่มนี้ ไฟล์การตั้งค่าในเครื่องของเอเจนต์นั้นจะถูกอัปเดตโดยอัตโนมัติ
-
-| ปุ่ม | ประเภทเอเจนต์ | ไฟล์ที่ใช้งาน |
-|------|-------------|-------------|
-| ⚡ ใช้งานการตั้งค่า Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ ใช้งานการตั้งค่า Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⚡ ใช้งานการตั้งค่า OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ ใช้งานการตั้งค่า NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> ⚠️ ปุ่มนี้ส่งคำขอไปยัง **localhost:56244** (proxy ในเครื่อง) proxy ต้องกำลังทำงานบนเครื่องนั้น
-
----
-
-#### 🔀 จัดเรียงการ์ดด้วยการลากวาง (v0.1.17, ปรับปรุง v0.1.25)
-
-สามารถ **ลาก** การ์ดเอเจนต์ในแดชบอร์ดเพื่อจัดเรียงใหม่ตามลำดับที่ต้องการ
-
-1. จับบริเวณ **สัญญาณไฟจราจร (●)** ที่มุมซ้ายบนของการ์ดด้วยเมาส์แล้วลาก
-2. วางบนการ์ดในตำแหน่งที่ต้องการ ลำดับจะเปลี่ยน
-
-> 💡 เนื้อหาการ์ด (ช่องกรอกข้อมูล ปุ่ม ฯลฯ) ไม่สามารถลากได้ สามารถจับได้จากบริเวณสัญญาณไฟจราจรเท่านั้น
-
-#### 🟠 การตรวจจับโปรเซสเอเจนต์ (v0.1.25)
-
-เมื่อ proxy ทำงานปกติแต่โปรเซสเอเจนต์ในเครื่อง (NanoClaw, OpenClaw) ตาย สัญญาณไฟจราจรของการ์ดจะเปลี่ยนเป็น **สีส้ม (กะพริบ)** และแสดงข้อความ "โปรเซสเอเจนต์หยุดทำงาน"
-
-- 🟢 เขียว: proxy + เอเจนต์ปกติ
-- 🟠 ส้ม (กะพริบ): proxy ปกติ เอเจนต์ตาย
-- 🔴 แดง: proxy ออฟไลน์
-3. ลำดับที่เปลี่ยนจะ **บันทึกลงเซิร์ฟเวอร์ทันที** และคงอยู่หลังรีเฟรช
-
-> 💡 ยังไม่รองรับอุปกรณ์ระบบสัมผัส (มือถือ/แท็บเล็ต) ใช้เบราว์เซอร์เดสก์ท็อป
-
----
-
-#### 🔄 ซิงค์โมเดลสองทาง (v0.1.16)
-
-เมื่อเปลี่ยนโมเดลของเอเจนต์ในแดชบอร์ดตู้นิรภัย การตั้งค่าในเครื่องของเอเจนต์นั้นจะถูกอัปเดตโดยอัตโนมัติ
-
-**สำหรับ Cline:**
-- เปลี่ยนโมเดลในตู้นิรภัย → event SSE → proxy อัปเดตฟิลด์โมเดลใน `globalState.json`
-- เป้าหมายการอัปเดต: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- ไม่แตะ `openAiBaseUrl` และ API key
-- **ต้องรีโหลด VS Code (`Ctrl+Alt+R` หรือ `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - เพราะ Cline ไม่อ่านไฟล์การตั้งค่าใหม่ขณะทำงาน
-
-**สำหรับ Claude Code:**
-- เปลี่ยนโมเดลในตู้นิรภัย → event SSE → proxy อัปเดตฟิลด์ `model` ใน `settings.json`
-- ค้นหา path WSL และ Windows โดยอัตโนมัติ (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
-
-**ทิศทางตรงข้าม (เอเจนต์ → ตู้นิรภัย):**
-- เอเจนต์ (Cline, Claude Code ฯลฯ) ส่งคำขอไปยัง proxy, proxy รวมข้อมูลบริการ/โมเดลของไคลเอนต์นั้นใน heartbeat
-- บริการ/โมเดลที่กำลังใช้งานจะแสดงแบบเรียลไทม์ในการ์ดเอเจนต์ของแดชบอร์ดตู้นิรภัย
-
-> 💡 **จุดสำคัญ**: proxy ระบุตัวตนเอเจนต์จากโทเค็น Authorization ของคำขอ และ routing อัตโนมัติไปยังบริการ/โมเดลที่ตั้งค่าในตู้นิรภัย แม้ว่า Cline หรือ Claude Code จะส่งชื่อโมเดลอื่น proxy จะ override ด้วยการตั้งค่าของตู้นิรภัย
-
----
-
-### ใช้ Cline ใน VS Code — คำแนะนำโดยละเอียด
-
-#### ขั้นตอนที่ 1: ติดตั้ง Cline
-
-ติดตั้ง **Cline** (ID: `saoudrizwan.claude-dev`) จาก VS Code Extension Marketplace
-
-#### ขั้นตอนที่ 2: ลงทะเบียนเอเจนต์ในตู้นิรภัย
-
-1. เปิดแดชบอร์ดตู้นิรภัย (`http://IP-ตู้นิรภัย:56243`)
-2. คลิก **+ เพิ่ม** ในส่วน **เอเจนต์**
-3. กรอกดังนี้:
-
-| ฟิลด์ | ค่า | คำอธิบาย |
-|------|----|------|
-| ID | `cline_ของฉัน` | ตัวระบุเฉพาะ (ภาษาอังกฤษ ไม่มีเว้นวรรค) |
-| ชื่อ | `Cline ของฉัน` | ชื่อที่จะแสดงบนแดชบอร์ด |
-| ประเภทเอเจนต์ | `cline` | ← ต้องเลือก `cline` |
-| บริการ | เลือกบริการที่จะใช้ (เช่น `google`) | |
-| โมเดล | กรอกโมเดลที่จะใช้ (เช่น `gemini-2.5-flash`) | |
-
-4. กด **บันทึก** โทเค็นจะถูกสร้างโดยอัตโนมัติ
-
-#### ขั้นตอนที่ 3: เชื่อมต่อกับ Cline
-
-**วิธี A — ใช้งานอัตโนมัติ (แนะนำ)**
-
-1. ตรวจสอบว่า **proxy** ของ wall-vault กำลังทำงานบนเครื่องนั้น (`localhost:56244`)
-2. คลิกปุ่ม **⚡ ใช้งานการตั้งค่า Cline** ในการ์ดเอเจนต์บนแดชบอร์ด
-3. หากแสดงการแจ้งเตือน "ใช้งานการตั้งค่าสำเร็จ!" แสดงว่าสำเร็จ
-4. รีโหลด VS Code (`Ctrl+Alt+R`)
-
-**วิธี B — ตั้งค่าด้วยตนเอง**
-
-เปิดการตั้งค่า (⚙️) ในแถบข้าง Cline:
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://ที่อยู่-proxy:56244/v1`
-  - หากเป็นเครื่องเดียวกัน: `https://localhost:56244/v1`
-  - หากเป็นเครื่องอื่นเช่นเซิร์ฟเวอร์มินิ: `http://192.168.1.20:56244/v1`
-- **API Key**: โทเค็นที่ออกจากตู้นิรภัย (คัดลอกจากการ์ดเอเจนต์)
-- **Model ID**: โมเดลที่ตั้งค่าในตู้นิรภัย (เช่น `gemini-2.5-flash`)
-
-#### ขั้นตอนที่ 4: ตรวจสอบ
-
-ส่งข้อความอะไรก็ได้ในหน้าต่างแชท Cline หากปกติ:
-- การ์ดเอเจนต์นั้นในแดชบอร์ดตู้นิรภัยจะแสดง **จุดสีเขียว (● กำลังทำงาน)**
-- บริการ/โมเดลปัจจุบันจะแสดงในการ์ด (เช่น `google / gemini-2.5-flash`)
-
-#### เปลี่ยนโมเดล
-
-เมื่อต้องการเปลี่ยนโมเดลของ Cline ให้เปลี่ยนจาก **แดชบอร์ดตู้นิรภัย**:
-
-1. เปลี่ยนดรอปดาวน์บริการ/โมเดลในการ์ดเอเจนต์
-2. คลิก **ใช้งาน**
-3. รีโหลด VS Code (`Ctrl+Alt+R`) — ชื่อโมเดลในส่วนท้ายของ Cline จะอัปเดต
-4. คำขอถัดไปจะใช้โมเดลใหม่
-
-> 💡 จริงๆ แล้ว proxy ระบุคำขอของ Cline ด้วยโทเค็นและ routing ไปยังโมเดลตามการตั้งค่าของตู้นิรภัย แม้ไม่รีโหลด VS Code **โมเดลที่ใช้จริงจะเปลี่ยนทันที** — การรีโหลดเป็นเพียงเพื่ออัปเดตการแสดงโมเดลใน UI ของ Cline
-
-#### การตรวจจับการตัดการเชื่อมต่อ
-
-เมื่อปิด VS Code ในแดชบอร์ดตู้นิรภัยประมาณ **90 วินาที** หลังจากนั้นการ์ดเอเจนต์จะเปลี่ยนเป็นสีเหลือง (ล่าช้า) **3 นาที** หลังจากนั้นเป็นสีแดง (ออฟไลน์) (ตั้งแต่ v0.1.18 การตรวจสอบสถานะทุก 15 วินาทีทำให้ตรวจจับออฟไลน์ได้เร็วขึ้น)
-
-#### การแก้ไขปัญหา
-
-| อาการ | สาเหตุ | วิธีแก้ |
-|------|------|------|
-| ข้อผิดพลาด "เชื่อมต่อล้มเหลว" ใน Cline | proxy ไม่ทำงานหรือที่อยู่ผิด | ตรวจสอบ proxy ด้วย `curl https://localhost:56244/health` |
-| จุดสีเขียวไม่แสดงในตู้นิรภัย | API key (โทเค็น) ยังไม่ได้ตั้งค่า | คลิกปุ่ม **⚡ ใช้งานการตั้งค่า Cline** อีกครั้ง |
-| โมเดลส่วนท้ายของ Cline ไม่เปลี่ยน | Cline แคชการตั้งค่า | รีโหลด VS Code (`Ctrl+Alt+R`) |
-| ชื่อโมเดลผิดแสดง | บั๊กเก่า (แก้ไขใน v0.1.16) | อัปเดต proxy เป็น v0.1.16+ |
-
----
-
-#### 🟣 ปุ่มคัดลอกคำสั่ง deploy — ใช้เมื่อติดตั้งบนเครื่องใหม่
-
-ใช้เมื่อติดตั้ง proxy wall-vault ครั้งแรกบนคอมพิวเตอร์เครื่องใหม่และเชื่อมต่อกับตู้นิรภัย เมื่อคลิกปุ่ม สคริปต์การติดตั้งทั้งหมดจะถูกคัดลอก วางในเทอร์มินัลของคอมพิวเตอร์เครื่องใหม่แล้วรัน สิ่งต่อไปนี้จะถูกดำเนินการในครั้งเดียว:
-
-1. ติดตั้ง binary wall-vault (ข้ามหากติดตั้งแล้ว)
-2. ลงทะเบียน systemd user service อัตโนมัติ
-3. เริ่มบริการและเชื่อมต่อตู้นิรภัยอัตโนมัติ
-
-> 💡 โทเค็นของเอเจนต์นี้และที่อยู่เซิร์ฟเวอร์ตู้นิรภัยเติมไว้ในสคริปต์แล้ว จึงสามารถรันได้ทันทีหลังวางโดยไม่ต้องแก้ไข
-
----
-
-### การ์ดบริการ
-
-การ์ดสำหรับเปิด/ปิดหรือตั้งค่าบริการ AI ที่จะใช้
-
-- สวิตช์เปิด/ปิดแต่ละบริการ
-- หากกรอกที่อยู่เซิร์ฟเวอร์ AI ในเครื่อง (Ollama, LM Studio, vLLM, llama.cpp ฯลฯ ที่ทำงานบนคอมพิวเตอร์ของคุณ) จะค้นหาโมเดลที่ใช้ได้โดยอัตโนมัติ
-- **แสดงสถานะการเชื่อมต่อบริการในเครื่อง**: จุด ● ข้างชื่อบริการเป็น **สีเขียว** หากเชื่อมต่อ **สีเทา** หากไม่เชื่อมต่อ
-- **สัญญาณไฟจราจรอัตโนมัติของบริการในเครื่อง** (v0.1.23+): บริการในเครื่อง (Ollama, LM Studio, vLLM, llama.cpp) จะเปิดใช้งานอัตโนมัติเมื่อเชื่อมต่อได้ ปิดใช้งานอัตโนมัติเมื่อตัดการเชื่อมต่อ วิธีเดียวกับการสลับอัตโนมัติตาม API key ของบริการคลาวด์ (Google, OpenRouter ฯลฯ)
-- **สวิตช์โหมดการให้เหตุผล** (v0.2.17+): ที่ด้านล่างของหน้าต่างแก้ไขบริการในเครื่องจะมีช่องทำเครื่องหมาย **โหมดการให้เหตุผล** ปรากฏขึ้น เมื่อเปิดใช้งาน พร็อกซีจะแทรก `"reasoning": true` ลงในเนื้อหา chat-completions ที่ส่งไปยังเซิร์ฟเวอร์ต้นทาง ทำให้โมเดลที่รองรับการแสดงกระบวนการคิด เช่น DeepSeek R1, Qwen QwQ ส่งบล็อก `<think>…</think>` กลับมาด้วย เซิร์ฟเวอร์ที่ไม่รู้จักฟิลด์นี้จะละเว้น จึงสามารถเปิดทิ้งไว้ได้อย่างปลอดภัยแม้ในภาระงานแบบผสม
-
-> 💡 **หากบริการในเครื่องทำงานบนคอมพิวเตอร์อื่น**: กรอก IP ของคอมพิวเตอร์นั้นในช่อง URL บริการ เช่น `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp) หากบริการ bind กับ `127.0.0.1` เท่านั้นไม่ใช่ `0.0.0.0` จะเชื่อมต่อผ่าน IP ภายนอกไม่ได้ ตรวจสอบที่อยู่ bind ในการตั้งค่าบริการ
-
-### กรอกโทเค็นผู้ดูแลระบบ
-
-เมื่อพยายามใช้ฟีเจอร์สำคัญเช่นเพิ่ม/ลบ key ในแดชบอร์ด จะมีป๊อปอัพให้กรอกโทเค็นผู้ดูแลระบบ กรอกโทเค็นที่ตั้งค่าในวิซาร์ด setup เมื่อกรอกแล้วครั้งเดียวจะคงอยู่จนปิดเบราว์เซอร์
-
-> ⚠️ **หากการยืนยันตัวตนล้มเหลวเกิน 10 ครั้งใน 15 นาที IP นั้นจะถูกบล็อกชั่วคราว** หากลืมโทเค็น ตรวจสอบรายการ `admin_token` ในไฟล์ `wall-vault.yaml`
-
----
-
-## โหมดกระจาย (มัลติบอต)
-
-การกำหนดค่าสำหรับ **แชร์ตู้นิรภัยกุญแจเดียว** เมื่อใช้งาน OpenClaw บนคอมพิวเตอร์หลายเครื่องพร้อมกัน สะดวกเพราะจัดการ key จากที่เดียว
-
-### ตัวอย่างการกำหนดค่า
-
-```
-[เซิร์ฟเวอร์ตู้นิรภัยกุญแจ]
-  wall-vault vault    (ตู้นิรภัยกุญแจ :56243, แดชบอร์ด)
-
-[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini ในเครื่อง]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ ซิงค์ SSE           ↕ ซิงค์ SSE             ↕ ซิงค์ SSE
-```
-
-บอตทั้งหมดมองไปที่เซิร์ฟเวอร์ตู้นิรภัยตรงกลาง เมื่อเปลี่ยนโมเดลหรือเพิ่ม key ในตู้นิรภัย จะมีผลทันทีกับบอตทั้งหมด
-
-### ขั้นตอนที่ 1: เริ่มเซิร์ฟเวอร์ตู้นิรภัยกุญแจ
-
-รันบนคอมพิวเตอร์ที่จะใช้เป็นเซิร์ฟเวอร์ตู้นิรภัย:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### ขั้นตอนที่ 2: ลงทะเบียนแต่ละบอต (ไคลเอนต์)
+ตอนนี้ dashboard เข้าถึงได้ที่ `https://<vault-host>:56243` เพิ่ม agent สำหรับแต่ละ proxy ระยะไกลในการ์ด **Clients** แต่ละตัวจะสร้าง `vault_token` ที่ไม่ซ้ำกัน
 
-ลงทะเบียนข้อมูลของแต่ละบอตที่จะเชื่อมต่อกับเซิร์ฟเวอร์ตู้นิรภัยล่วงหน้า:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer โทเค็น-ผู้ดูแล" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "Bot A",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### ขั้นตอนที่ 3: เริ่ม proxy บนคอมพิวเตอร์ของแต่ละบอต
-
-รัน proxy โดยระบุที่อยู่เซิร์ฟเวอร์ตู้นิรภัยและโทเค็นบนแต่ละคอมพิวเตอร์ที่ติดตั้งบอต:
+### Proxy host
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> 💡 เปลี่ยนส่วน **`192.168.x.x`** เป็น IP ภายในจริงของคอมพิวเตอร์เซิร์ฟเวอร์ตู้นิรภัย ตรวจสอบได้จากการตั้งค่าเราเตอร์หรือคำสั่ง `ip addr`
+Proxy authenticate กับ vault, เปิด SSE stream และนำการตั้งค่าใดๆ ที่ได้รับมาใช้ (preferred service, model override, fallback chain) การแก้ไข vault ครั้งต่อๆ ไปจะมาถึงในไม่กี่วินาทีโดยไม่ต้อง restart
+
+สำหรับการติดตั้งที่ครอบคลุม LAN ให้เปิดใช้งาน TLS บน vault host (`WV_VAULT_TLS_ENABLED=1` + ตัวแปรสภาพแวดล้อม cert/key) และรันแต่ละ proxy host ผ่านขั้นตอน `wall-vault cert install-trust` เดียวกัน เพื่อให้การเรียก HTTPS ของ proxy ไปยัง vault ได้รับ trust
 
 ---
 
-## การตั้งค่าเริ่มต้นอัตโนมัติ
+## การเริ่มต้นอัตโนมัติ
 
-หากรู้สึกลำบากที่ต้องเปิด wall-vault ด้วยตนเองทุกครั้งที่รีสตาร์ทคอมพิวเตอร์ ให้ลงทะเบียนเป็น system service เมื่อลงทะเบียนครั้งเดียวแล้วจะเริ่มทำงานอัตโนมัติเมื่อบูต
+### systemd (Linux)
 
-### Linux — systemd (Linux ส่วนใหญ่)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd คือระบบที่จัดการและเริ่มโปรแกรมอัตโนมัติใน Linux:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-ดูล็อก:
+สำหรับ vault บน host เดียวกัน ให้เขียน `wall-vault-vault.service` คู่ขนาน สำหรับโหมด standalone หนึ่ง unit ที่เรียก `wall-vault start` ก็เพียงพอ
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-ระบบที่รับผิดชอบการเรียกใช้โปรแกรมอัตโนมัติใน macOS:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. ดาวน์โหลด NSSM จาก [nssm.cc](https://nssm.cc/download) แล้วเพิ่มใน PATH
-2. ใน PowerShell ผู้ดูแลระบบ:
-
-```powershell
-wall-vault doctor deploy windows
-```
+ใช้ `nssm` เพื่อ wrap `wall-vault.exe start` เป็น Windows service หรือ entry `schtasks` ที่รันเมื่อ user logon
 
 ---
 
-## Doctor (หมอ)
+## Plugin yamls
 
-คำสั่ง `doctor` เป็นเครื่องมือสำหรับ **วินิจฉัยตัวเองและแก้ไข** ว่า wall-vault ถูกตั้งค่าอย่างถูกต้องหรือไม่
+backend ที่เข้ากันได้กับ OpenAI ใดๆ สามารถเพิ่มได้โดยไม่ต้องเปลี่ยนแปลงโค้ดด้วยการวาง yaml ภายใต้ `~/.wall-vault/services/` wall-vault จะโหลดมันเมื่อ startup และลงทะเบียนบริการสำหรับ dispatch, ชุดการตรวจหา OAI-compat และ Gemini-stream bridge
 
-```bash
-wall-vault doctor check   # วินิจฉัยสถานะปัจจุบัน (อ่านอย่างเดียว ไม่เปลี่ยนแปลงอะไร)
-wall-vault doctor fix     # แก้ไขปัญหาโดยอัตโนมัติ
-wall-vault doctor all     # วินิจฉัย + แก้ไขอัตโนมัติในครั้งเดียว
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
 ```
 
-> 💡 หากรู้สึกว่ามีอะไรผิดปกติ ให้รัน `wall-vault doctor all` ก่อน ปัญหาหลายอย่างจะถูกตรวจจับโดยอัตโนมัติ
+ชุดที่มาพร้อมใน `configs/services/` (lmstudio, vllm, llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server, litellm-proxy, ollama, google, openrouter) มาในสถานะ disabled โดยค่าเริ่มต้น คัดลอกตัวที่คุณต้องการไปยัง `~/.wall-vault/services/` ตั้ง `enabled: true` แล้ว restart
 
 ---
 
-## RTK ประหยัดโทเค็น
+## Doctor
 
-*(v0.1.24+)*
+`wall-vault doctor` รัน health probe ครั้งเดียวทั่วทั้งการติดตั้ง:
 
-**RTK (เครื่องมือประหยัดโทเค็น)** บีบอัดเอาต์พุตของคำสั่งเชลล์ที่รันโดย AI coding agent (Claude Code ฯลฯ) โดยอัตโนมัติเพื่อลดการใช้โทเค็น ตัวอย่างเช่น เอาต์พุต 15 บรรทัดของ `git status` จะถูกย่อเหลือสรุป 2 บรรทัด
-
-### การใช้งานพื้นฐาน
-
-```bash
-# ครอบคำสั่งด้วย wall-vault rtk เอาต์พุตจะถูกกรองอัตโนมัติ
-wall-vault rtk git status          # แสดงเฉพาะรายการไฟล์ที่เปลี่ยน
-wall-vault rtk git diff HEAD~1     # บรรทัดที่เปลี่ยน + context ขั้นต่ำ
-wall-vault rtk git log -10         # hash + ข้อความบรรทัดเดียว
-wall-vault rtk go test ./...       # แสดงเฉพาะ test ที่ล้มเหลว
-wall-vault rtk ls -la              # คำสั่งที่ไม่รองรับจะถูกตัดอัตโนมัติ
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
 ```
 
-### คำสั่งที่รองรับและผลการประหยัด
+แต่ละบรรทัดเป็นหนึ่งใน:
 
-| คำสั่ง | วิธีกรอง | อัตราประหยัด |
-|------|----------|--------|
-| `git status` | เฉพาะสรุปไฟล์ที่เปลี่ยน | ~87% |
-| `git diff` | บรรทัดที่เปลี่ยน + 3 บรรทัด context | ~60-94% |
-| `git log` | hash + ข้อความบรรทัดแรก | ~90% |
-| `git push/pull/fetch` | ลบความคืบหน้า แสดงเฉพาะสรุป | ~80% |
-| `go test` | แสดงเฉพาะที่ล้มเหลว นับที่ผ่าน | ~88-99% |
-| `go build/vet` | แสดงเฉพาะข้อผิดพลาด | ~90% |
-| คำสั่งอื่นทั้งหมด | 50 บรรทัดแรก + 50 บรรทัดสุดท้าย สูงสุด 32KB | แตกต่างกัน |
+- `✓` — แข็งแรง
+- `⚠` — เสื่อมแต่ยังทำงานได้ (key หนึ่งอยู่ใน cooldown, โควต้าต่ำ ฯลฯ)
+- `✗` — เสีย
+- `SKIP` — ไม่ได้กำหนดค่า / ไม่เกี่ยวข้องบน host นี้
 
-### ไปป์ไลน์กรอง 3 ขั้นตอน
+โหมด daemon ที่สองรัน probe เดียวกันทุก `doctor.interval` (ค่าเริ่มต้น 5 นาที) และเขียนผลลัพธ์ไปยัง `doctor.log_file` (ค่าเริ่มต้น `/tmp/wall-vault-doctor.log`) เมื่อ `doctor.auto_fix` เป็น true มันยังพยายามซ่อม drift ทั่วไป (config OpenClaw ที่เก่า, TLS trust ที่หายไป, บริการที่ restart ได้)
 
-1. **ตัวกรองโครงสร้างตามคำสั่ง** — เข้าใจรูปแบบเอาต์พุตของ git, go ฯลฯ และแยกส่วนที่มีความหมาย
-2. **การประมวลผลหลัง regex** — ลบ ANSI color code ลดบรรทัดว่าง รวบรวมบรรทัดซ้ำ
-3. **Passthrough + ตัดทอน** — สำหรับคำสั่งที่ไม่รองรับ เก็บ 50 บรรทัดแรก/สุดท้าย
-
-### การเชื่อมต่อกับ Claude Code
-
-สามารถตั้งค่าให้คำสั่งเชลล์ทั้งหมดผ่าน RTK โดยอัตโนมัติด้วย hook `PreToolUse` ของ Claude Code
-
-```bash
-# ติดตั้ง hook (เพิ่มใน settings.json ของ Claude Code อัตโนมัติ)
-wall-vault rtk hook install
-```
-
-หรือเพิ่มด้วยตนเองใน `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
-
-> 💡 **รักษา exit code**: RTK คืน exit code ของคำสั่งเดิมเหมือนเดิม หากคำสั่งล้มเหลว (exit code ≠ 0) AI ก็ตรวจจับความล้มเหลวได้อย่างถูกต้อง
-
-> 💡 **บังคับภาษาอังกฤษ**: RTK รันคำสั่งด้วย `LC_ALL=C` เพื่อให้ได้เอาต์พุตภาษาอังกฤษเสมอโดยไม่ขึ้นกับการตั้งค่าภาษาของระบบ ทำให้ตัวกรองทำงานได้อย่างแม่นยำ
+Trigger ครั้งเดียวจาก dashboard ผ่านการ์ด **Doctor** หรือ `wall-vault doctor`
 
 ---
 
-## ตัวแปรสภาพแวดล้อมอ้างอิง
+## Hooks
 
-ตัวแปรสภาพแวดล้อมคือวิธีส่งค่าการตั้งค่าไปยังโปรแกรม พิมพ์ในเทอร์มินัลในรูปแบบ `export ชื่อตัวแปร=ค่า` หรือใส่ในไฟล์บริการเริ่มต้นอัตโนมัติจะมีผลเสมอ
+รันคำสั่ง shell บน event ของ key:
 
-| ตัวแปร | คำอธิบาย | ตัวอย่างค่า |
-|------|------|---------|
-| `WV_LANG` | ภาษาแดชบอร์ด | `ko`, `en`, `ja` |
-| `WV_THEME` | ธีมแดชบอร์ด | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | API key ของ Google (หลายตัวด้วยจุลภาค) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | API key ของ OpenRouter | `sk-or-v1-...` |
-| `WV_VAULT_URL` | ที่อยู่เซิร์ฟเวอร์ตู้นิรภัยในโหมดกระจาย | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | โทเค็นยืนยันตัวตนไคลเอนต์ (บอต) | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | โทเค็นผู้ดูแลระบบ | `admin-token-here` |
-| `WV_MASTER_PASS` | รหัสผ่านเข้ารหัส API key | `my-password` |
-| `WV_AVATAR` | เส้นทางไฟล์ภาพอวาตาร์ (เส้นทางสัมพัทธ์จาก `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | ที่อยู่เซิร์ฟเวอร์ในเครื่องของ Ollama | `http://192.168.x.x:11434` |
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+แต่ละ hook ได้รับตัวแปรสภาพแวดล้อมเฉพาะ event (`SERVICE`, `MODEL`, `ERROR`, `AGENT`, `LEVEL`, `MSG`) Hook รันแบบ async พร้อม timeout 5 วินาที proxy จะไม่ block บน hook ที่ช้า
+
+---
+
+## ตัวแปรสภาพแวดล้อม
+
+| Variable | YAML field |
+|----------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | One-shot import: comma-separated Google keys |
+| `WV_KEY_OPENROUTER` | One-shot import: OpenRouter keys |
+| `WV_KEY_ANTHROPIC` | One-shot import: Anthropic keys |
+| `WV_KEY_OPENAI` | One-shot import: OpenAI keys |
+| `WV_OLLAMA_URL` | Per-host Ollama URL override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Per-backend URL override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
+
+ทุกตัวแปรสภาพแวดล้อมเมื่อตั้งค่าจะชนะไฟล์ YAML
 
 ---
 
 ## การแก้ไขปัญหา
 
-### Proxy ไม่สามารถเริ่มได้
+### `connection refused` บน `:56244`
 
-สาเหตุทั่วไปคือพอร์ตถูกใช้โดยโปรแกรมอื่นอยู่แล้ว
-
-```bash
-ss -tlnp | grep 56244   # ตรวจสอบว่าใครใช้พอร์ต 56244
-wall-vault proxy --port 8080   # เริ่มด้วยหมายเลขพอร์ตอื่น
-```
-
-### ข้อผิดพลาด API Key (429, 402, 401, 403, 582)
-
-| รหัสข้อผิดพลาด | ความหมาย | วิธีแก้ |
-|----------|------|----------|
-| **429** | คำขอมากเกินไป (เกินขีดจำกัดการใช้งาน) | รอสักครู่หรือเพิ่ม key อื่น |
-| **402** | ต้องชำระเงินหรือเครดิตหมด | เติมเครดิตในบริการที่เกี่ยวข้อง |
-| **401 / 403** | key ไม่ถูกต้องหรือไม่มีสิทธิ์ | ตรวจสอบค่า key อีกครั้งแล้วลงทะเบียนใหม่ |
-| **582** | Gateway โอเวอร์โหลด (cooldown 5 นาที) | จะปลดล็อกอัตโนมัติหลัง 5 นาที |
+อาจเป็นเพราะ proxy ไม่ได้รัน หรือ bind ไปยัง host อื่น ตรวจสอบ:
 
 ```bash
-# ตรวจสอบรายการ key ที่ลงทะเบียนและสถานะ
-curl -H "Authorization: Bearer โทเค็น-ผู้ดูแล" https://localhost:56243/admin/keys
-
-# รีเซ็ตตัวนับการใช้งาน key
-curl -X POST -H "Authorization: Bearer โทเค็น-ผู้ดูแล" https://localhost:56243/admin/keys/reset
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
 ```
 
-### เอเจนต์แสดง "ยังไม่เชื่อมต่อ"
+หากกำลังรันบน port อื่น แสดงว่า config ของคุณมี `proxy.port` ถูก override — ตรวจสอบ `~/.wall-vault/config.yaml`
 
-"ยังไม่เชื่อมต่อ" หมายความว่าโปรเซส proxy ไม่ได้ส่งสัญญาณ (heartbeat) ไปยังตู้นิรภัย **ไม่ได้หมายความว่าการตั้งค่าไม่ได้บันทึก** proxy ต้องทำงานโดยรู้ที่อยู่เซิร์ฟเวอร์ตู้นิรภัยและโทเค็นจึงจะเปลี่ยนสถานะเป็นเชื่อมต่อ
+### `x509: certificate signed by unknown authority`
+
+Client ไม่ trust CA ภายในของ wall-vault รัน `wall-vault cert install-trust` บนเครื่อง client สำหรับ agent ที่ runtime ไม่สนใจ OS trust store (เช่น Node ที่มี `NODE_EXTRA_CA_CERTS` ฮาร์ดโค้ด) ใช้ loopback HTTP companion ที่ `127.0.0.1:56245` (host เดียวกันเท่านั้น) หรือตั้ง `WV_PROXY_TLS_ENABLED=0` เพื่อ fall back เป็น HTTP ธรรมดา
+
+### `token not registered with vault`
+
+`Authorization: Bearer <token>` ของ client ไม่ตรงกับ client ที่ลงทะเบียนใดๆ ตรวจสอบ token ภายใต้ **Clients** ใน dashboard หากคุณคัดลอก token literal เช่น `proxy-managed`, `dummy` หรือ `""` จาก config เก่า ให้แทนที่ด้วย client token จริง
+
+### `Anthropic dispatch needs a Claude model id`
+
+พฤติกรรมเริ่มต้น ณ v0.2.63: model id ที่ไม่ใช่ Claude ที่ส่งไปยัง anthropic dispatch จะคืนค่า error ให้แก้ไข routing (อย่าส่ง `gemini-2.5-flash` ไปยัง anthropic) หรือเลือก opt in เพื่อเขียนทับโดยอัตโนมัติผ่าน `proxy.anthropic_fallback_model`
+
+### `unknown service: <id>`
+
+Dispatch เห็น service id ที่ไม่มี plugin yaml อ้างสิทธิ์ ตรวจสอบ:
 
 ```bash
-# เริ่ม proxy โดยระบุที่อยู่เซิร์ฟเวอร์ตู้นิรภัย โทเค็น ID ไคลเอนต์
-WV_VAULT_URL=http://ที่อยู่-เซิร์ฟเวอร์-ตู้นิรภัย:56243 \
-WV_VAULT_TOKEN=โทเค็น-ไคลเอนต์ \
-WV_VAULT_CLIENT_ID=ID-ไคลเอนต์ \
-wall-vault proxy
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
 ```
 
-หากเชื่อมต่อสำเร็จ ภายในประมาณ 20 วินาทีจะแสดง 🟢 กำลังทำงาน บนแดชบอร์ด
+หาก yaml มีอยู่แต่ `enabled: false` ให้ flip มัน หากหายไปทั้งหมด ให้คัดลอกจาก `configs/services/` ใน source tree
 
-### Ollama เชื่อมต่อไม่ได้
+### Response ว่างเปล่าบนโมเดล reasoning
 
-Ollama เป็นโปรแกรมที่รัน AI ในคอมพิวเตอร์ของคุณโดยตรง ตรวจสอบว่า Ollama เปิดอยู่หรือไม่
+`qwen3.6`, `deepseek-r1` และตระกูล GPT-`o1` บางครั้ง emit เฉพาะ `reasoning_content` และทิ้ง `content` ว่างเปล่า ณ v0.2.63 wall-vault fall back ไปยังข้อความ reasoning โดยอัตโนมัติ — หากคุณยังเห็น response ว่าง backend กำลังคืนค่าทั้งสอง field ไม่กลับมาเลย ตรวจสอบ log ของ upstream
 
-```bash
-curl http://localhost:11434/api/tags   # หากแสดงรายการโมเดลแสดงว่าปกติ
-export OLLAMA_URL=http://192.168.x.x:11434   # หากทำงานบนคอมพิวเตอร์อื่น
-```
+สำหรับ LM Studio กับ qwen3 โดยเฉพาะ ตั้ง `inline_no_think_for_qwen3: true` ใน plugin yaml เพื่อให้ reasoning ถูกปิดใช้งานแบบ inline lmstudio.yaml และ ollama.yaml ในตัวทำสิ่งนี้แล้ว
 
-> ⚠️ หาก Ollama ไม่ตอบสนอง ให้เริ่ม Ollama ด้วยคำสั่ง `ollama serve` ก่อน
+### Dashboard แสดง "all keys on cooldown" แต่ฉันเพิ่งเพิ่มหนึ่ง
 
-> ⚠️ **โมเดลขนาดใหญ่จะช้า**: โมเดลขนาดใหญ่เช่น `qwen3.5:35b`, `deepseek-r1` อาจใช้เวลาหลายนาทีในการสร้างคำตอบ แม้ดูเหมือนไม่มีคำตอบ แต่อาจกำลังประมวลผลตามปกติ กรุณารอ
+Key ใหม่แข็งแรงแต่ dispatch path อาจยังอยู่ใน cooldown สำหรับ key เก่า ลอง request ใหม่ — proxy round-robin ต่อการเรียก และ key ที่แข็งแรงจะถูกเลือกถัดไป
 
----
+### Vault จะไม่ปลดล็อกด้วยรหัสผ่านหลัก
 
-## หมายเหตุการอัปเกรด v0.2
+รหัสผ่านผิด ไม่มีการกู้คืน — wall-vault จงใจไม่มี backdoor หากคุณสูญเสียรหัสผ่านหลักจริงๆ ทางเดียวคือลบ `~/.wall-vault/data/vault.json` restart ด้วยรหัสผ่านใหม่ และเพิ่ม key อีกครั้ง
 
-- `Service` ได้รับ `default_model` และ `allowed_models` ตอนนี้โมเดลเริ่มต้นของแต่ละบริการถูกตั้งค่าโดยตรงบนการ์ดบริการ
-- `Client.default_service` / `default_model` ถูกเปลี่ยนชื่อและตีความใหม่เป็น `preferred_service` / `model_override` หากการแทนที่ว่าง จะใช้โมเดลเริ่มต้นของบริการ
-- เมื่อเริ่มต้น v0.2 ครั้งแรก `vault.json` ที่มีอยู่จะถูกย้ายข้อมูลอัตโนมัติ และสถานะก่อนการย้ายจะถูกเก็บเป็น `vault.json.pre-v02.{timestamp}.bak`
-- แดชบอร์ดได้ถูกจัดโครงสร้างใหม่เป็นสามโซน: แถบด้านข้างซ้าย, กริดการ์ดในตรงกลาง, และ slideover การแก้ไขด้านขวา
-- เส้นทาง Admin API ไม่เปลี่ยนแปลง แต่สคีมาคำขอ/คำตอบได้รับการอัปเดต — สคริปต์ CLI เก่าจะต้องอัปเดต
+### ขีดจำกัด OpenRouter free-tier ถึง
 
----
+ตั้ง `proxy.services` ให้รวม `openrouter` และเพิ่ม OpenRouter key อย่างน้อยหนึ่งตัว Proxy จะ auto-fall-back จากโมเดลแบบเสียเงินไปยัง variant `:free` เมื่อ path ที่จ่ายเงินคืนค่า 402 / 429
 
-## คุณสมบัติใหม่ใน v0.2.1
+### `journalctl --user -u wall-vault-proxy` ว่างเปล่า
 
-- **การส่งผ่านแบบมัลติโมดัล (OpenAI → Gemini)**: `/v1/chat/completions` รองรับ content part เพิ่มอีก 6 ประเภทนอกเหนือจาก `text` — `input_audio`, `input_video`, `input_image`, `input_file`, และ `image_url` (รองรับทั้ง data URI และ URL http(s) ภายนอกที่มีขนาดไม่เกิน 5 MB) proxy จะแปลงแต่ละส่วนเป็น `inlineData` ของ Gemini ไคลเอนต์ที่เข้ากันได้กับ OpenAI เช่น EconoWorld สามารถสตรีม blob เสียง / ภาพ / วิดีโอได้โดยตรง
-- **ประเภทเอเจนต์ EconoWorld**: `POST /agent/apply` พร้อม `agentType: "econoworld"` จะเขียนการตั้งค่า wall-vault ลงใน `analyzer/ai_config.json` ของโปรเจ็กต์ `workDir` รองรับรายการพาธที่คั่นด้วยเครื่องหมายจุลภาค และแปลงพาธไดรฟ์ของ Windows เป็นพาธ mount ของ WSL โดยอัตโนมัติ
-- **กริดกุญแจในแดชบอร์ด + CRUD**: กุญแจ 11 ดอกแสดงผลเป็นการ์ดขนาดกระทัดรัดพร้อม slideover สำหรับเพิ่ม + / ลบ ✕
-- **เพิ่มบริการ + จัดเรียงใหม่แบบลากวาง**: กริดบริการได้รับปุ่มเพิ่ม + และที่จับลาก (`⋮⋮`)
-- **Header / footer / ภาพเคลื่อนไหวของธีม / สวิตช์เปลี่ยนภาษา** ถูกฟื้นคืนกลับมา ธีมทั้ง 7 (cherry/dark/light/ocean/gold/autumn/winter) จะเล่นเอฟเฟกต์อนุภาคบนเลเยอร์ที่อยู่ด้านหลังการ์ดแต่ด้านหน้าพื้นหลัง
-- **UX การปิด slideover**: คลิกนอกพื้นที่หรือกด Esc เพื่อปิด slideover
-- **ตัวบ่งชี้สถานะ SSE + ตัวจับเวลาทำงาน**: ในแถบด้านบน (topbar) ถัดจากตัวเลือกภาษา/ธีม จะมีตัวนับ `⏱ uptime` และตัวบ่งชี้ `● SSE` (เขียว = เชื่อมต่อแล้ว, ส้ม = กำลังเชื่อมต่อใหม่, เทา = ขาดการเชื่อมต่อ) วางเคียงข้างกัน (ย้ายจาก footer ไปที่ header ตั้งแต่ v0.2.18 — ตรวจสอบสถานะได้โดยไม่ต้องเลื่อน)
+systemd `--user` log ไปที่ journal ของ user ที่รันมัน หากคุณเริ่ม unit เป็น `root` หรือผ่าน `sudo`, journal อยู่ใน system instance แทน — ลอง `journalctl -u wall-vault-proxy` โดยไม่มี `--user`
 
 ---
 
-## v0.2.2 Stability & UX Improvements
+## เพิ่มเติม
 
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## การเปลี่ยนแปลงล่าสุด (v0.1.16 ~ v0.1.27)
-
-### v0.1.27 (2026-04-09)
-- **แก้ไขชื่อโมเดล fallback Ollama**: เมื่อ fallback จากบริการอื่นไป Ollama ชื่อโมเดลที่มี provider prefix (เช่น `google/gemini-3.1-pro-preview`) ถูกส่งไป Ollama ตามเดิม ตอนนี้จะถูกแทนที่ด้วยตัวแปรสภาพแวดล้อม/โมเดลเริ่มต้นโดยอัตโนมัติ
-- **ลดเวลา cooldown อย่างมาก**: 429 rate limit 30 นาที→5 นาที, 402 การชำระเงิน 1 ชั่วโมง→30 นาที, 401/403 24 ชั่วโมง→6 ชั่วโมง ป้องกันสถานการณ์ที่ key ทั้งหมด cooldown พร้อมกันทำให้ proxy หยุดทำงานทั้งหมด
-- **บังคับลองใหม่เมื่อทั้งหมด cooldown**: เมื่อ key ทั้งหมดอยู่ในสถานะ cooldown จะบังคับลองใหม่ด้วย key ที่ปลดล็อกเร็วที่สุดเพื่อป้องกันการปฏิเสธคำขอ
-- **แก้ไขการแสดงรายการบริการ**: การตอบกลับ `/status` แสดงรายการบริการจริงที่ซิงค์จาก vault (ป้องกันการขาดหายของ anthropic ฯลฯ)
-
-### v0.1.25 (2026-04-08)
-- **ตรวจจับโปรเซสเอเจนต์**: proxy ตรวจจับว่าเอเจนต์ในเครื่อง (NanoClaw/OpenClaw) ยังอยู่หรือไม่ และแสดงสัญญาณไฟจราจรสีส้มบนแดชบอร์ด
-- **ปรับปรุงที่จับ drag**: เมื่อจัดเรียงการ์ดสามารถจับได้เฉพาะจากบริเวณสัญญาณไฟจราจร (●) ไม่มีการ drag โดยไม่ตั้งใจจากช่องกรอกข้อมูลหรือปุ่ม
-
-### v0.1.24 (2026-04-06)
-- **คำสั่งย่อยประหยัดโทเค็น RTK**: `wall-vault rtk <command>` กรองเอาต์พุตคำสั่งเชลล์โดยอัตโนมัติ ลดการใช้โทเค็นของ AI agent 60-90% ตัวกรองในตัวสำหรับคำสั่งหลักเช่น git, go คำสั่งที่ไม่รองรับก็ตัดอัตโนมัติ เชื่อมต่อแบบโปร่งใสผ่าน hook `PreToolUse` ของ Claude Code
-
-### v0.1.23 (2026-04-06)
-- **แก้ไขการเปลี่ยนโมเดล Ollama**: เมื่อเปลี่ยนโมเดล Ollama จากแดชบอร์ดตู้นิรภัยจะไม่ถูกใช้งานจริงบน proxy ก่อนหน้านี้ใช้เฉพาะตัวแปรสภาพแวดล้อม (`OLLAMA_MODEL`) ตอนนี้ใช้การตั้งค่าตู้นิรภัยเป็นหลัก
-- **สัญญาณไฟจราจรอัตโนมัติบริการในเครื่อง**: Ollama/LM Studio/vLLM เปิดใช้งานอัตโนมัติเมื่อเชื่อมต่อได้ ปิดใช้งานอัตโนมัติเมื่อตัดการเชื่อมต่อ เหมือนกับการสลับอัตโนมัติตาม key ของบริการคลาวด์
-
-### v0.1.22 (2026-04-05)
-- **แก้ไขฟิลด์ content ว่างที่หายไป**: เมื่อโมเดล thinking (gemini-3.1-pro, o1, claude thinking ฯลฯ) ใช้ขีดจำกัด max_tokens หมดไปกับ reasoning และสร้างคำตอบจริงไม่ได้ proxy จะละเว้นฟิลด์ `content`/`text` ใน JSON ของคำตอบด้วย `omitempty` ทำให้ไคลเอนต์ SDK ของ OpenAI/Anthropic เกิด crash ด้วยข้อผิดพลาด `Cannot read properties of undefined (reading 'trim')` เปลี่ยนให้รวมฟิลด์เสมอตามสเปก API อย่างเป็นทางการ
-
-### v0.1.21 (2026-04-05)
-- **รองรับโมเดล Gemma 4**: สามารถใช้โมเดลตระกูล Gemma เช่น `gemma-4-31b-it`, `gemma-4-26b-a4b-it` ฯลฯ ผ่าน Google Gemini API
-- **รองรับบริการ LM Studio / vLLM อย่างเป็นทางการ**: ก่อนหน้านี้บริการเหล่านี้หลุดจาก routing ของ proxy และถูกแทนที่ด้วย Ollama เสมอ ตอนนี้ routing ปกติผ่าน API ที่เข้ากันได้กับ OpenAI
-- **แก้ไขการแสดงบริการในแดชบอร์ด**: แม้เกิด fallback แดชบอร์ดจะแสดงบริการที่ผู้ใช้ตั้งค่าเสมอ
-- **แสดงสถานะบริการในเครื่อง**: เมื่อโหลดแดชบอร์ด สถานะการเชื่อมต่อของบริการในเครื่อง (Ollama, LM Studio, vLLM ฯลฯ) จะแสดงด้วยสีจุด ●
-- **ตัวแปรสภาพแวดล้อมตัวกรองเครื่องมือ**: สามารถตั้งค่าโหมดส่งผ่านเครื่องมือด้วยตัวแปรสภาพแวดล้อม `WV_TOOL_FILTER=passthrough`
-
-### v0.1.20 (2026-03-28)
-- **เสริมความปลอดภัยอย่างครอบคลุม**: ป้องกัน XSS (41 จุด), การเปรียบเทียบโทเค็นแบบ constant-time, จำกัด CORS, จำกัดขนาดคำขอ, ป้องกัน path traversal, การยืนยันตัวตน SSE, เสริม rate limiter ฯลฯ 12 รายการความปลอดภัย
-
-### v0.1.19 (2026-03-27)
-- **ตรวจจับ Claude Code ออนไลน์**: Claude Code ที่ไม่ผ่าน proxy ก็แสดงเป็นออนไลน์บนแดชบอร์ด
-
-### v0.1.18 (2026-03-26)
-- **แก้ไขบริการ fallback ค้าง**: หลังจาก fallback ไป Ollama จากข้อผิดพลาดชั่วคราว จะกลับอัตโนมัติเมื่อบริการเดิมกลับมา
-- **ปรับปรุงการตรวจจับออฟไลน์**: การตรวจสอบสถานะทุก 15 วินาทีทำให้ตรวจจับการหยุดของ proxy ได้เร็วขึ้น
-
-### v0.1.17 (2026-03-25)
-- **จัดเรียงการ์ดแบบลากวาง**: สามารถลากการ์ดเอเจนต์เพื่อเปลี่ยนลำดับ
-- **ปุ่มใช้งานการตั้งค่าแบบ inline**: แสดงปุ่ม [⚡ ใช้งานการตั้งค่า] บนเอเจนต์ที่ออฟไลน์
-- **เพิ่มประเภทเอเจนต์ cokacdir**
-
-### v0.1.16 (2026-03-25)
-- **ซิงค์โมเดลสองทาง**: การเปลี่ยนโมเดลของ Cline/Claude Code จากแดชบอร์ดตู้นิรภัยจะถูกใช้งานอัตโนมัติ
-
----
-
-*สำหรับข้อมูล API โดยละเอียดเพิ่มเติม ดู [API.md](API.md)*
+- HTTP API reference — ดูที่ [API.md](API.md)
+- Source — `https://github.com/sookmook/wall-vault`
+- รายงานบั๊ก / ขอฟีเจอร์ — GitHub Issues
+- ประวัติ release — [CHANGELOG.md](../CHANGELOG.md)

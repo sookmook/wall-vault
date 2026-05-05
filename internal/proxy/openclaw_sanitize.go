@@ -8,7 +8,7 @@ package proxy
 // never trigger such an event keep whatever pre-guard config they had —
 // and OpenClaw 2026.4.29 made schema validation strict enough that a single
 // historic empty-id entry crash-loops the gateway on the next restart
-// (observed on raspi 2026-05-01: "models.providers.custom.models.0.id:
+// (observed on host-A 2026-05-01: "models.providers.custom.models.0.id:
 // Too small: expected string to have >=1 characters").
 //
 // SanitizeOpenClawConfig provides a one-shot fix that the proxy fires at

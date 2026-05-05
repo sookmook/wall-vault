@@ -1,931 +1,621 @@
 # wall-vault Benutzerhandbuch
-*(Last updated: 2026-04-16 — v0.2.2)*
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · **Deutsch** · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · [हिन्दी](MANUAL.hi.md) · [Bahasa Indonesia](MANUAL.id.md) · [ภาษาไทย](MANUAL.th.md) · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
 
-## Inhaltsverzeichnis
+Dieses Handbuch behandelt Installation, Konfiguration und Betrieb von wall-vault. Eine schnelle Übersicht finden Sie in der [README](../README.md). Details zur HTTP-API finden Sie in der [API-Referenz](API.md).
 
-1. [Was ist wall-vault?](#was-ist-wall-vault)
+## Inhalt
+
+1. [Was wall-vault tut](#was-wall-vault-tut)
 2. [Installation](#installation)
-3. [Erste Schritte (Setup-Assistent)](#erste-schritte)
-4. [API-Schlüssel registrieren](#api-schlüssel-registrieren)
-5. [Proxy-Nutzung](#proxy-nutzung)
-6. [Schlüsseltresor-Dashboard](#schlüsseltresor-dashboard)
-7. [Verteilter Modus (Multi-Bot)](#verteilter-modus-multi-bot)
-8. [Autostart-Konfiguration](#autostart-konfiguration)
-9. [Doctor (Diagnose)](#doctor-diagnose)
-10. [RTK Token-Einsparung](#rtk-token-einsparung)
-11. [Umgebungsvariablen-Referenz](#umgebungsvariablen-referenz)
-12. [Fehlerbehebung](#fehlerbehebung)
+3. [Erster Start mit dem Setup-Assistenten](#erster-start-mit-dem-setup-assistenten)
+4. [TLS aktivieren](#tls-aktivieren)
+5. [API-Schlüssel registrieren](#api-schlüssel-registrieren)
+6. [Agenten verbinden](#agenten-verbinden)
+7. [Das Dashboard](#das-dashboard)
+8. [Verteilter Modus](#verteilter-modus)
+9. [Auto-Start](#auto-start)
+10. [Plugin-yamls](#plugin-yamls)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [Umgebungsvariablen](#umgebungsvariablen)
+14. [Fehlerbehebung](#fehlerbehebung)
 
 ---
 
-## v0.2 Upgrade-Hinweise
+## Was wall-vault tut
 
-- `Service` hat jetzt `default_model` und `allowed_models` gewonnen. Das dienstspezifische Standardmodell wird jetzt direkt auf der Service-Karte festgelegt.
-- `Client.default_service` / `default_model` wurden in `preferred_service` / `model_override` umbenannt und neu interpretiert. Wenn die Überschreibung leer ist, wird das Standardmodell des Dienstes verwendet.
-- Beim ersten v0.2-Start wird die vorhandene `vault.json` automatisch migriert, und der Zustand vor der Migration wird als `vault.json.pre-v02.{timestamp}.bak` gespeichert.
-- Das Dashboard wurde in drei Zonen umstrukturiert: eine linke Seitenleiste, ein zentrales Kartengitter und ein rechtseitiger Edit-Slideover.
-- Admin-API-Pfade sind unverändert, aber die Request-/Response-Body-Schemas wurden aktualisiert – alte CLI-Skripte müssen entsprechend aktualisiert werden.
+wall-vault ist eine einzelne Go-Binärdatei, die zwei zusammenarbeitende Dienste bündelt:
 
----
+- **Der Tresor (vault)** speichert API-Schlüssel verschlüsselt im Ruhezustand (AES-GCM mit einem Master-Passwort), verfolgt Nutzung und Cooldowns pro Schlüssel, sendet Änderungen über Server-Sent Events (SSE) und stellt unter `:56243` ein Web-Dashboard für menschliche Operatoren bereit.
+- **Der Proxy** stellt unter `:56244` Endpunkte für Gemini, Anthropic, OpenAI-kompatibel und Ollama-nativ bereit. Jeder KI-Client, der auf den Proxy zeigt, verwendet die Schlüssel im Tresor — Clients sehen sie nie. Wenn ein Upstream fehlschlägt, fällt der Versand auf den nächsten Anbieter in der Reihenfolge zurück.
 
-## v0.2.1 Neue Funktionen
+Dies ist nützlich, wenn:
 
-- **Multimodaler Pass-Through (OpenAI → Gemini)**: `/v1/chat/completions` akzeptiert jetzt sechs Content-Part-Typen zusätzlich zu `text` — `input_audio`, `input_video`, `input_image`, `input_file` und `image_url` (Data-URIs sowie externe http(s)-URLs ≤ 5 MB). Der Proxy konvertiert jeden davon in Geminis `inlineData`. OpenAI-kompatible Clients wie EconoWorld können Audio-/Bild-/Video-Blobs direkt streamen.
-- **EconoWorld-Agententyp**: `POST /agent/apply` mit `agentType: "econoworld"` schreibt die wall-vault-Einstellungen in die `analyzer/ai_config.json` des Projekts. `workDir` akzeptiert eine kommagetrennte Liste von Kandidatenpfaden und konvertiert Windows-Laufwerkspfade in WSL-Mount-Pfade.
-- **Dashboard-Schlüsselraster + CRUD**: 11 Schlüssel werden als kompakte Karten mit + Hinzufügen / ✕ Löschen-Slideover dargestellt.
-- **Dienst-Hinzufügen + Drag-and-Drop-Sortierung**: Das Dienste-Raster erhält eine +-Schaltfläche zum Hinzufügen sowie einen Ziehgriff (`⋮⋮`).
-- **Kopfzeile / Fußzeile / Theme-Animationen / Sprachumschalter** wiederhergestellt. Die 7 Themes (cherry/dark/light/ocean/gold/autumn/winter) spielen ihren Partikeleffekt auf einer Ebene hinter den Karten, aber über dem Hintergrund ab.
-- **Slideover-Schließen-UX**: Ein Klick außerhalb oder Esc schließt den Slideover.
-- **SSE-Statusanzeige + Betriebszeit-Timer** in der oberen Leiste (topbar), neben der Sprach-/Theme-Auswahl. Der `⏱ Betriebszeit`-Zähler und die `● SSE`-Anzeige (grün = verbunden, orange = erneut verbindend, grau = getrennt) stehen nebeneinander (seit v0.2.18 von der Fußzeile in den Header verschoben — Status ohne Scrollen sichtbar).
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## Was ist wall-vault?
-
-**wall-vault = KI-Proxy + API-Schlüsseltresor für OpenClaw**
-
-Um KI-Dienste zu nutzen, benötigen Sie **API-Schlüssel**. Ein API-Schlüssel ist wie ein **digitaler Ausweis**, der beweist: "Diese Person ist berechtigt, diesen Dienst zu nutzen." Allerdings haben diese Ausweise tägliche Nutzungslimits, und bei unsachgemäßer Verwaltung besteht das Risiko einer Offenlegung.
-
-wall-vault bewahrt diese Ausweise in einem sicheren Tresor auf und fungiert als **Proxy (Stellvertreter)** zwischen OpenClaw und den KI-Diensten. Einfach gesagt: OpenClaw muss sich nur mit wall-vault verbinden, und wall-vault erledigt den Rest.
-
-Probleme, die wall-vault löst:
-
-- **Automatische API-Schlüssel-Rotation**: Wenn ein Schlüssel sein Nutzungslimit erreicht oder vorübergehend gesperrt wird (Cooldown), wechselt das System lautlos zum nächsten Schlüssel. OpenClaw arbeitet ohne Unterbrechung weiter.
-- **Automatischer Service-Fallback**: Wenn Google nicht antwortet, wird auf OpenRouter umgeschaltet. Wenn das auch nicht funktioniert, wird automatisch auf lokal installierte KI (Ollama, LM Studio, vLLM) gewechselt. Ihre Sitzung wird nicht unterbrochen. Wenn der ursprüngliche Dienst wiederhergestellt ist, wird bei der nächsten Anfrage automatisch zurückgewechselt (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Echtzeit-Synchronisation (SSE)**: Wenn Sie das Modell im Tresor-Dashboard ändern, wird es innerhalb von 1-3 Sekunden auf dem OpenClaw-Bildschirm übernommen. SSE (Server-Sent Events) ist eine Technologie, bei der der Server Änderungen in Echtzeit an Clients pusht.
-- **Echtzeit-Benachrichtigungen**: Ereignisse wie erschöpfte Schlüssel oder Dienstausfälle werden sofort am unteren Rand des OpenClaw-TUI (Terminal-Bildschirm) angezeigt.
-
-> :bulb: **Claude Code, Cursor und VS Code** können ebenfalls verbunden werden, aber der Hauptzweck von wall-vault ist die Verwendung mit OpenClaw.
+- Sie Schlüssel für mehrere Anbieter haben und eine einzige URL möchten, mit der der Agent kommuniziert.
+- Sie möchten, dass ein Free-Tier-Schlüssel im Cooldown beiseitetritt, ohne die Sitzung zu unterbrechen.
+- Sie möchten, dass dieselben Schlüssel mehrere Bots, IDEs oder Skripte im selben LAN antreiben, ohne Anmeldedaten zu kopieren.
+- Sie ein Dashboard anstelle von Umgebungsvariablen zum Bearbeiten von Schlüsseln und Wechseln von Modellen wünschen.
+- Sie einen lokalen Fallback (Ollama, LM Studio, vLLM) möchten, wenn die Cloud-Limits erschöpft sind.
 
 ```
-OpenClaw (TUI-Terminal-Bildschirm)
-        |
-        v
-  wall-vault Proxy (:56244)   <- Schlüsselverwaltung, Routing, Fallback, Events
-        |
-        +-- Google Gemini API
-        +-- OpenRouter API (340+ Modelle)
-        +-- Ollama / LM Studio / vLLM (lokaler Rechner, letzte Instanz)
-        +-- OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
 ## Installation
 
-### Linux / macOS
-
-Öffnen Sie ein Terminal und fügen Sie die folgenden Befehle ein:
+### Linux / macOS Einzeiler
 
 ```bash
-# Linux (Standard-PC, Server — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (M1/M2/M3 Mac)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — Lädt die Datei aus dem Internet herunter.
-- `chmod +x` — Macht die heruntergeladene Datei "ausführbar". Wenn Sie diesen Schritt auslassen, erhalten Sie einen "Zugriff verweigert"-Fehler.
+Das Skript erkennt Betriebssystem und Architektur automatisch, lädt die richtige Binärdatei nach `~/.local/bin/wall-vault` herunter und macht sie ausführbar. Falls `~/.local/bin` nicht in Ihrem `PATH` ist, fügen Sie es hinzu:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Manueller Download
+
+Vorgefertigte Binärdateien werden bei jedem Release auf `https://github.com/sookmook/wall-vault/releases` veröffentlicht.
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-Öffnen Sie PowerShell (als Administrator) und führen Sie folgende Befehle aus:
-
 ```powershell
-# Download
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# Zum PATH hinzufügen (wird nach Neustart von PowerShell wirksam)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> :bulb: **Was ist PATH?** Eine Liste von Ordnern, in denen Ihr Computer nach Befehlen sucht. Durch Hinzufügen zum PATH können Sie `wall-vault` von jedem Ordner aus ausführen.
+### Aus dem Quellcode bauen
 
-### Aus Quellcode kompilieren (für Entwickler)
-
-Nur relevant, wenn die Go-Entwicklungsumgebung installiert ist.
+Erfordert Go 1.25 oder neuer.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (Version: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> :bulb: **Build-Zeitstempel-Version**: Beim Kompilieren mit `make build` wird die Version automatisch in einem Format wie `v0.1.27.20260409` mit Datum und Uhrzeit generiert. Beim direkten Kompilieren mit `go build ./...` wird die Version nur als `"dev"` angezeigt.
+`make build-all` kompiliert für alle fünf unterstützten Plattformen quer. Die Binärdateien landen in `bin/`.
 
 ---
 
-## Erste Schritte
-
-### Setup-Assistent ausführen
-
-Führen Sie nach der Installation unbedingt den **Setup-Assistenten** mit folgendem Befehl aus. Der Assistent führt Sie Schritt für Schritt durch die notwendigen Einstellungen.
+## Erster Start mit dem Setup-Assistenten
 
 ```bash
 wall-vault setup
 ```
 
-Der Assistent durchläuft folgende Schritte:
+Der Assistent fragt Sie der Reihe nach:
 
-```
-1. Sprachauswahl (10 Sprachen inkl. Deutsch)
-2. Theme-Auswahl (light / dark / gold / cherry / ocean)
-3. Betriebsmodus — Standalone (Einzelrechner) oder Distributed (mehrere Rechner)
-4. Bot-Name — Der auf dem Dashboard angezeigte Name
-5. Port-Konfiguration — Standard: Proxy 56244, Tresor 56243 (Enter für Standardwerte)
-6. KI-Service-Auswahl — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Tool-Sicherheitsfilter-Einstellungen
-8. Admin-Token — Ein Passwort zum Sperren der Dashboard-Verwaltungsfunktionen. Automatische Generierung möglich
-9. API-Schlüssel-Verschlüsselungspasswort — Für sicherere Schlüsselspeicherung (optional)
-10. Speicherpfad der Konfigurationsdatei
-```
+1. **Sprache** — wählt eine von 17 UI-Sprachen. Wird automatisch aus `$LANG` erkannt; der Assistent bietet trotzdem eine Liste an.
+2. **Theme** — `light` (Standard), `dark`, `cherry`, `ocean`, `gold`, `autumn`, `winter`. Nur kosmetisch.
+3. **Modus** — `standalone` (Single-Host, Standard) oder `distributed` (Vault auf einem Host, Proxies auf anderen).
+4. **Bot-Name** — ein freier `client_id`-Slug. Der Tresor nutzt diesen, um die Konfiguration pro Client einzugrenzen (Modell-Overrides, Fallback-Ketten).
+5. **Proxy-Port** — Standard `56244`.
+6. **Vault-Port** — Standard `56243` (nur standalone).
+7. **Dienst-Auswahl** — ein y/N für jeden von: Google Gemini, OpenRouter, Anthropic, OpenAI, Ollama, LM Studio, vLLM. Mehrere Auswahlen sind in Ordnung; jede schreibt am Ende ihren Umgebungsvariablen-Hinweis.
+8. **Tool-Filter** — `strip_all` (Standard; blockiert aus Sicherheitsgründen alle eingehenden Tool-Definitionen) oder `passthrough` (lässt alle Tools durch).
+9. **Admin-Token** — leer lassen für automatische Generierung. Das Dashboard erfordert dieses Token zum Anmelden.
+10. **Master-Passwort** — leer lassen für keine Verschlüsselung (NICHT empfohlen); Wert setzen, um den Schlüsselspeicher mit AES-GCM im Ruhezustand zu verschlüsseln.
+11. **Speicherpfad** — Standard ist `wall-vault.yaml` im aktuellen Verzeichnis. Der Loader sucht auch in `~/.wall-vault/config.yaml`.
 
-> :warning: **Merken Sie sich Ihr Admin-Token.** Sie benötigen es später, um Schlüssel hinzuzufügen oder Einstellungen im Dashboard zu ändern. Wenn Sie es verlieren, müssen Sie die Konfigurationsdatei manuell bearbeiten.
+Nach dem Speichern führt der Assistent `doctor.FixTrust` aus, sodass jeder lokal installierte Agent (OpenClaw, Claude Code, Cline) die wall-vault interne CA automatisch in seinen Trust-Store erhält. Wenn kein solcher Agent installiert ist, gibt der Schritt `SKIP` aus und schreibt nichts.
 
-Nach Abschluss des Assistenten wird automatisch eine `wall-vault.yaml`-Konfigurationsdatei erstellt.
-
-### Starten
+Dann starten Sie die Binärdatei:
 
 ```bash
 wall-vault start
 ```
 
-Die folgenden zwei Server starten gleichzeitig:
+`start` führt sowohl den Tresor als auch den Proxy in einem Prozess aus (Standalone-Modus). Für den verteilten Modus verwenden Sie `wall-vault vault` auf dem Tresor-Host und `wall-vault proxy` auf jedem Proxy-Host.
 
-- **Proxy** (`https://localhost:56244`) — Der Vermittler zwischen OpenClaw und KI-Diensten
-- **Schlüsseltresor** (`https://localhost:56243`) — API-Schlüsselverwaltung und Web-Dashboard
+Öffnen Sie `http://localhost:56243` in einem Browser. Melden Sie sich mit dem Admin-Token an, das der Assistent ausgegeben hat.
 
-Öffnen Sie `https://localhost:56243` in Ihrem Browser, um auf das Dashboard zuzugreifen.
+---
+
+## TLS aktivieren
+
+Die Standardeinstellungen des Assistenten lassen beide Listener auf reinem HTTP. Die meisten Agenten (OpenClaw, Claude Code, Cursor) funktionieren besser gegen einen einzigen HTTPS-Endpunkt, daher wird TLS in jeder Bereitstellung empfohlen, die über die lokale Maschine hinausgeht.
+
+wall-vault bringt seine eigene interne CA mit, sodass Sie keinen öffentlichen DNS-Namen oder Let's Encrypt benötigen.
+
+```bash
+# 1. Create the internal CA — written to ~/.wall-vault/ca.{crt,key}.
+#    The CA is good for 10 years by default; override with --ca-years.
+wall-vault cert init
+
+# 2. Issue a host certificate. Subject Alternative Names automatically include:
+#       hostname, "localhost", "127.0.0.1", and any non-loopback LAN IP detected.
+#    Override the issuer dir with --dir, validity with --host-years.
+wall-vault cert issue $(hostname)
+
+# 3. Trust the CA in this machine's OS keychain.
+#    Linux: writes to /etc/ssl/certs/ via update-ca-certificates (needs sudo).
+#    macOS: adds to the System keychain via security add-trusted-cert (needs sudo).
+#    Windows: imports into CurrentUser\Root via certutil (no admin needed).
+wall-vault cert install-trust
+
+# 4. Enable TLS on both listeners.
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
+wall-vault start
+```
+
+Um das Vertrauen auf andere LAN-Maschinen auszudehnen, kopieren Sie `~/.wall-vault/ca.crt` und führen Sie auf jeder `wall-vault cert install-trust --ca <path>` aus. Der Tresor stellt `ca.crt` außerdem über einen winzigen reinen HTTP-Listener auf `:56247` (dem **Bootstrap-Port**) bereit, für den Catch-22-Fall, in dem ein neuer Client die CA benötigt, um HTTPS zu sprechen.
+
+### HTTP-Begleiter im Loopback
+
+Einige Agenten — insbesondere die mitgelieferte Node-Laufzeit von OpenClaw — überschreiben `NODE_EXTRA_CA_CERTS` beim Prozess-Spawn und verwerfen jeden vom Operator bereitgestellten CA-Hinweis. Sie können die wall-vault CA aus dem Daemon heraus nicht ehren, auch nach `cert install-trust` nicht. wall-vault umgeht dies, indem es bei aktiviertem TLS einen zusätzlichen **nur-Loopback reinen HTTP-Listener** auf `127.0.0.1:56245` bindet. Same-Host-Clients erreichen den Proxy über diesen Port ganz ohne TLS; LAN-Clients verwenden weiterhin den TLS-Listener.
+
+Mit `WV_PROXY_PLAIN_PORT=0` deaktivieren, falls nicht benötigt.
+
+### `wall-vault cert list`
+
+Zeigt jedes Zertifikat unter `~/.wall-vault/` mit Subject, Gültigkeitsfenster und SANs.
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
+```
 
 ---
 
 ## API-Schlüssel registrieren
 
-Es gibt vier Methoden zur Registrierung von API-Schlüsseln. **Für Anfänger wird Methode 1 (Umgebungsvariablen) empfohlen.**
+Zwei Wege: das Dashboard oder Umgebungsvariablen.
 
-### Methode 1: Umgebungsvariablen (empfohlen — am einfachsten)
+### Dashboard (empfohlen)
 
-Umgebungsvariablen sind **voreingestellte Werte**, die Programme beim Start einlesen. Geben Sie einfach folgendes im Terminal ein:
+1. Melden Sie sich auf `https://localhost:56243` mit dem Admin-Token an.
+2. Klicken Sie auf **+ API key** in der Schlüsselkarte.
+3. Wählen Sie einen Dienst (Google, OpenRouter, Anthropic, OpenAI, …).
+4. Fügen Sie den Schlüssel ein. Speichern.
+
+Mehrere Schlüssel pro Dienst sind in Ordnung; der Proxy macht Round-Robin zwischen ihnen und überspringt jene, die einen Cooldown pro Schlüssel erreicht haben.
+
+### Umgebungsvariablen (einmaliger Bootstrap)
 
 ```bash
-# Google Gemini-Schlüssel registrieren
-export WV_KEY_GOOGLE=AIzaSy...
-
-# OpenRouter-Schlüssel registrieren
-export WV_KEY_OPENROUTER=sk-or-v1-...
-
-# Nach der Registrierung starten
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
 wall-vault start
 ```
 
-Wenn Sie mehrere Schlüssel haben, trennen Sie diese mit Kommas. wall-vault verwendet sie automatisch im Wechsel (Round Robin):
+Auf diese Weise bereitgestellte Schlüssel werden beim ersten Start in den verschlüsselten Speicher geschrieben. Nachfolgende Starts lesen sie von der Festplatte; Sie können die Umgebungsvariablen nach dem ersten Lauf entsetzen.
+
+### Cooldowns und Rotation
+
+Jeder erfolgreiche Aufruf erhöht die `usage_count` des Schlüssels und aktualisiert `last_used`. Bei HTTP 429 / 402 / 403 setzt der Proxy den Schlüssel in einen **Cooldown** (Standard: 60 Minuten für 429, 24 Stunden für 402, 12 Stunden für 403). Der nächste Versand wählt einen anderen Schlüssel für diesen Dienst. Wenn alle Schlüssel für einen Dienst im Cooldown sind, überspringt der Proxy diesen Dienst schnell vollständig und versucht den nächsten Anbieter in der Fallback-Kette.
+
+Cooldowns sind pro Schlüssel im Dashboard mit einem Countdown sichtbar.
+
+---
+
+## Agenten verbinden
+
+### OpenClaw
+
+OpenClaw ist der ursprüngliche Zielclient. Verwenden Sie das **+ Add agent** Modal des Dashboards:
+
+- Setzen Sie **Agent type** auf `openclaw` oder `nanoclaw`.
+- Setzen Sie **Work directory** — bei OpenClaw wird dies automatisch mit `~/.openclaw` gefüllt.
+- Wählen Sie einen **preferred service** und optional einen **model override**.
+- Klicken Sie auf **Apply**. wall-vault schreibt direkt `~/.openclaw/openclaw.json` (Anbieter-URLs, Vault-Token, Modelleinträge).
+
+Wenn Sie das Modell aus dem Dashboard ändern, übernimmt OpenClaw die Änderung über SSE innerhalb von 1–3 Sekunden — kein Neustart.
+
+### Claude Code
 
 ```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
 ```
 
-> :bulb: **Tipp**: Der `export`-Befehl gilt nur für die aktuelle Terminal-Sitzung. Damit es auch nach einem Neustart bestehen bleibt, fügen Sie die Zeilen zu Ihrer `~/.bashrc`- oder `~/.zshrc`-Datei hinzu.
+Wenn die Upstream-Anthropic-Credits aufgebraucht sind, fällt der Versand auf jene Dienste zurück, die in `fallback_services` dieses Clients aufgeführt sind. Standardmäßig gibt eine an den anthropic-Dispatch gesendete Nicht-Claude-Modell-ID einen Fehler zurück, sodass Fehlroutings sofort erkennbar sind. Aktivieren Sie das automatische Umschreiben:
 
-### Methode 2: Dashboard-UI (Mausklick)
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
 
-1. Öffnen Sie `https://localhost:56243` im Browser
-2. Klicken Sie im oberen **:key: API-Schlüssel**-Bereich auf `[+ Hinzufügen]`
-3. Geben Sie Servicetyp, Schlüsselwert, Bezeichnung (Memo-Name) und Tageslimit ein und speichern Sie
+### Cursor
 
-### Methode 3: REST-API (für Automatisierung/Skripte)
+In Cursor **Settings → AI → OpenAI API**:
 
-REST-API ist eine Methode, mit der Programme Daten über HTTP austauschen. Nützlich für automatisierte Registrierung per Skript.
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### Eigenes HTTP
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer admin-token" \
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "Hauptschlüssel",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### Methode 4: Proxy-Flags (für schnelle Tests)
+Derselbe Endpunkt akzeptiert Streaming (`"stream": true`), wenn `proxy.oai_stream_forward: true` gesetzt ist.
 
-Verwenden Sie dies für temporäre Tests ohne formale Registrierung. Die Schlüssel verschwinden beim Beenden des Programms.
+---
+
+## Das Dashboard
+
+`https://localhost:56243`. Fünf Karten im Home-Grid:
+
+- **Keys** — jeder API-Schlüssel, gruppiert nach Dienst. Hinzufügen, bearbeiten, löschen; Nutzung und Cooldown sehen.
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp, plus jedes Plugin-yaml in `~/.wall-vault/services/`. Pro Dienst `default_model`, `allowed_models`, Basis-URL, Reasoning-Toggle setzen.
+- **Clients (agents)** — jeder registrierte Client (OpenClaw-Bot, Claude Code-Sitzung, Cursor-Instanz, …). Bevorzugten Dienst, Modell-Override, Fallback-Kette zuweisen.
+- **Proxies** — jeder Proxy, der sich gegen diesen Tresor authentifiziert hat. Live-Status (online/offline), zuletzt gesehen, aktuelles Modell.
+- **Settings** — Admin-Token, Master-Passwort-Rotation, Theme, Sprache.
+
+Jede Karte hat einen Edit-Slideover (rechte Seite). Klick außerhalb oder `Esc` schließt ihn. Änderungen werden innerhalb von Sekunden über SSE an alle verbundenen Proxies übertragen.
+
+Der **Footer** trägt einen SSE-Indikator (grün = verbunden, orange = wieder verbinden, grau = getrennt) und die Live-Build-Version.
+
+---
+
+## Verteilter Modus
+
+Wenn Sie mehrere Maschinen haben, die alle dieselben Schlüssel benötigen, lassen Sie den Tresor auf einem Host und Proxies auf jedem der anderen laufen.
+
+### Tresor-Host
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## Proxy-Nutzung
-
-### Verwendung mit OpenClaw (Hauptzweck)
-
-So konfigurieren Sie OpenClaw, um KI-Dienste über wall-vault zu nutzen.
-
-Öffnen Sie `~/.openclaw/openclaw.json` und fügen Sie folgendes hinzu:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // Vault-Agent-Token
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // kostenloser 1M-Kontext
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> :bulb: **Einfacherer Weg**: Klicken Sie auf die **:lobster: OpenClaw-Konfiguration kopieren**-Schaltfläche auf der Dashboard-Agentenkarte. Ein Snippet mit vorausgefülltem Token und Adresse wird in die Zwischenablage kopiert. Einfach einfügen.
-
-**Wohin leitet das `wall-vault/`-Präfix im Modellnamen weiter?**
-
-wall-vault bestimmt automatisch anhand des Modellnamens, an welchen KI-Dienst die Anfrage gesendet wird:
-
-| Modellformat | Angesteuerter Dienst |
-|-------------|---------------------|
-| `wall-vault/gemini-*` | Direkt zu Google Gemini |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | Direkt zu OpenAI |
-| `wall-vault/claude-*` | Anthropic über OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (kostenloser 1M-Token-Kontext) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
-| `google/modellname`, `openai/modellname`, `anthropic/modellname` usw. | Direkt zum jeweiligen Dienst |
-| `custom/google/modellname`, `custom/openai/modellname` usw. | Entfernt `custom/`-Präfix und leitet um |
-| `modellname:cloud` | Entfernt `:cloud`-Suffix und leitet zu OpenRouter |
-
-> :bulb: **Was ist Kontext?** Die Menge an Konversation, die eine KI auf einmal behalten kann. 1M (eine Million Token) bedeutet, dass auch sehr lange Gespräche oder Dokumente in einem Durchgang verarbeitet werden können.
-
-### Direktverbindung über Gemini-API-Format (Kompatibilität mit bestehenden Tools)
-
-Wenn Sie Tools haben, die die Google Gemini API direkt verwenden, ändern Sie einfach die URL auf wall-vault:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-Oder wenn das Tool URLs direkt angibt:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### Verwendung mit dem OpenAI SDK (Python)
-
-Sie können wall-vault auch mit Python-Code verbinden, der KI nutzt. Ändern Sie einfach die `base_url`:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # API-Schlüssel werden von wall-vault verwaltet
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # Verwenden Sie das Provider/Modell-Format
-    messages=[{"role": "user", "content": "Hallo"}]
-)
-```
-
-### Modell zur Laufzeit ändern
-
-Um das KI-Modell zu ändern, während wall-vault bereits läuft:
-
-```bash
-# Modell direkt über Proxy-Anfrage ändern
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# Im verteilten Modus (Multi-Bot): Änderung am Tresor-Server -> sofortige Synchronisation via SSE
-curl -X PUT https://localhost:56243/admin/clients/mein-bot-id \
-  -H "Authorization: Bearer admin-token" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### Verfügbare Modelle auflisten
-
-```bash
-# Vollständige Liste anzeigen
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# Nur Google-Modelle anzeigen
-curl "https://localhost:56244/api/models?service=google"
-
-# Nach Name suchen (z.B. Modelle mit "claude")
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**Wichtige Modelle nach Service:**
-
-| Dienst | Wichtige Modelle |
-|--------|-----------------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M-Kontext kostenlos, DeepSeek R1/V3, Qwen 2.5 usw.) |
-| Ollama | Automatisch erkannt vom lokal installierten Server |
-| LM Studio | Lokaler Server (Port 1234) |
-| vLLM | Lokaler Server (Port 8000) |
-| llama.cpp | Lokaler Server (Port 8080) |
-
----
-
-## Schlüsseltresor-Dashboard
-
-Öffnen Sie `https://localhost:56243` in Ihrem Browser, um das Dashboard anzuzeigen.
-
-**Bildschirmaufbau:**
-- **Obere Leiste (fixiert)**: Logo, Sprach-/Theme-Auswahl, SSE-Verbindungsstatus
-- **Karten-Raster**: Agenten-, Service- und API-Schlüsselkarten in Kachelform
-
-### API-Schlüsselkarte
-
-Eine Karte zur übersichtlichen Verwaltung aller registrierten API-Schlüssel.
-
-- Zeigt die Schlüsselliste nach Service gruppiert an.
-- `today_usage`: Heute erfolgreich verarbeitete Token (von der KI gelesene und geschriebene Zeichen)
-- `today_attempts`: Gesamtanzahl der heutigen Aufrufe (Erfolge + Fehlschläge)
-- Verwenden Sie `[+ Hinzufügen]` zum Registrieren neuer Schlüssel und `x` zum Löschen.
-
-> :bulb: **Was sind Token?** Token sind die Einheiten, die KI zur Textverarbeitung verwendet. Ungefähr ein englisches Wort oder 1-2 deutsche Zeichen. API-Preise werden in der Regel nach Token-Anzahl berechnet.
-
-### Agentenkarte
-
-Eine Karte, die den Status der mit dem wall-vault-Proxy verbundenen Bots (Agenten) anzeigt.
-
-**Der Verbindungsstatus wird in 4 Stufen angezeigt:**
-
-| Anzeige | Status | Bedeutung |
-|---------|--------|-----------|
-| :green_circle: | Aktiv | Proxy arbeitet normal |
-| :yellow_circle: | Verzögert | Antwortet, aber langsam |
-| :red_circle: | Offline | Proxy antwortet nicht |
-| :black_circle: | Nicht verbunden / Deaktiviert | Proxy war nie mit dem Tresor verbunden oder ist deaktiviert |
-
-**Agentenkarten-Schaltflächen:**
-
-Wenn Sie beim Registrieren eines Agenten den **Agententyp** angeben, erscheinen automatisch passende Komfort-Schaltflächen.
-
----
-
-#### :radio_button: Konfiguration-kopieren-Schaltfläche — Erstellt automatisch Verbindungseinstellungen
-
-Durch Klicken wird ein Konfigurations-Snippet mit vorausgefülltem Token, Proxy-Adresse und Modellinformationen in die Zwischenablage kopiert. Fügen Sie den kopierten Inhalt einfach an der in der Tabelle angegebenen Stelle ein.
-
-| Schaltfläche | Agententyp | Einfügeort |
-|-------------|-----------|------------|
-| :lobster: OpenClaw-Konfiguration kopieren | `openclaw` | `~/.openclaw/openclaw.json` |
-| :crab: NanoClaw-Konfiguration kopieren | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| :orange_circle: Claude Code-Konfiguration kopieren | `claude-code` | `~/.claude/settings.json` |
-| :keyboard: Cursor-Konfiguration kopieren | `cursor` | Cursor -> Settings -> AI |
-| :computer: VSCode-Konfiguration kopieren | `vscode` | `~/.continue/config.json` |
-
-**Beispiel — Für Claude Code-Typ wird folgendes kopiert:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "token-dieses-agenten"
-}
-```
-
-**Beispiel — Für VSCode (Continue)-Typ:**
-
-```yaml
-# ~/.continue/config.yaml  <- In config.yaml einfügen, NICHT config.json
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: token-dieses-agenten
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> :warning: **Aktuelle Continue-Versionen verwenden `config.yaml`.** Wenn `config.yaml` existiert, wird `config.json` komplett ignoriert. Fügen Sie unbedingt in `config.yaml` ein.
-
-**Beispiel — Für Cursor-Typ:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : token-dieses-agenten
-
-// Oder Umgebungsvariablen:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=token-dieses-agenten
-```
-
-> :warning: **Wenn das Kopieren in die Zwischenablage nicht funktioniert**: Browser-Sicherheitsrichtlinien können das Kopieren blockieren. Wenn ein Popup-Textfeld erscheint, wählen Sie alles mit Ctrl+A aus und kopieren Sie mit Ctrl+C.
-
----
-
-#### :zap: Automatische-Anwendung-Schaltfläche — Ein Klick und die Konfiguration steht
-
-Bei Agenten vom Typ `cline`, `claude-code`, `openclaw` oder `nanoclaw` erscheint eine **:zap: Konfiguration anwenden**-Schaltfläche auf der Agentenkarte. Ein Klick aktualisiert automatisch die lokale Konfigurationsdatei des Agenten.
-
-| Schaltfläche | Agententyp | Zieldatei |
-|-------------|-----------|-----------|
-| :zap: Cline-Konfiguration anwenden | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| :zap: Claude Code-Konfiguration anwenden | `claude-code` | `~/.claude/settings.json` |
-| :zap: OpenClaw-Konfiguration anwenden | `openclaw` | `~/.openclaw/openclaw.json` |
-| :zap: NanoClaw-Konfiguration anwenden | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> :warning: Diese Schaltfläche sendet eine Anfrage an **localhost:56244** (lokaler Proxy). Der Proxy muss auf diesem Rechner laufen.
-
----
-
-#### :twisted_rightwards_arrows: Drag-and-Drop Kartensortierung (v0.1.17, verbessert v0.1.25)
-
-Sie können Agentenkarten im Dashboard per **Drag-and-Drop** in beliebiger Reihenfolge anordnen.
-
-1. Greifen Sie den **Ampel-Bereich (●)** oben links auf der Karte mit der Maus und ziehen Sie
-2. Lassen Sie auf der Karte an der gewünschten Position los, um die Reihenfolge zu tauschen
-
-> :bulb: Der Karteninhalt (Eingabefelder, Schaltflächen usw.) kann nicht gezogen werden. Nur im Ampelbereich greifen.
-
-#### :orange_circle: Agentenprozess-Erkennung (v0.1.25)
-
-Wenn der Proxy normal funktioniert, aber ein lokaler Agentenprozess (NanoClaw, OpenClaw) gestorben ist, wechselt die Kartenampel auf **orange (blinkend)** und zeigt eine "Agentenprozess gestoppt"-Meldung an.
-
-- :green_circle: Grün: Proxy + Agent normal
-- :orange_circle: Orange (blinkend): Proxy normal, Agent gestoppt
-- :red_circle: Rot: Proxy offline
-3. Die geänderte Reihenfolge wird **sofort auf dem Server gespeichert** und bleibt nach Seitenaktualisierung bestehen
-
-> :bulb: Touch-Geräte (Mobiltelefone/Tablets) werden noch nicht unterstützt. Verwenden Sie einen Desktop-Browser.
-
----
-
-#### :arrows_counterclockwise: Bidirektionale Modell-Synchronisation (v0.1.16)
-
-Wenn Sie das Modell eines Agenten im Tresor-Dashboard ändern, wird die lokale Konfiguration des Agenten automatisch aktualisiert.
-
-**Für Cline:**
-- Modelländerung im Tresor -> SSE-Event -> Proxy aktualisiert Modellfelder in `globalState.json`
-- Aktualisierte Felder: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` und API-Schlüssel werden nicht verändert
-- **VS Code-Neustart erforderlich (`Ctrl+Alt+R` oder `Ctrl+Shift+P` -> `Developer: Reload Window`)**
-  - Weil Cline Konfigurationsdateien zur Laufzeit nicht neu einliest
-
-**Für Claude Code:**
-- Modelländerung im Tresor -> SSE-Event -> Proxy aktualisiert `model`-Feld in `settings.json`
-- Durchsucht automatisch sowohl WSL- als auch Windows-Pfade (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
-
-**Umgekehrte Richtung (Agent -> Tresor):**
-- Wenn Agenten (Cline, Claude Code usw.) Anfragen an den Proxy senden, enthält der Proxy im Heartbeat die Service/Modell-Informationen des Clients
-- Die Agentenkarte im Tresor-Dashboard zeigt den aktuell verwendeten Service/Modell in Echtzeit an
-
-> :bulb: **Kernpunkt**: Der Proxy identifiziert Agenten anhand des Authorization-Tokens in Anfragen und routet automatisch zum im Tresor konfigurierten Service/Modell. Selbst wenn Cline oder Claude Code einen anderen Modellnamen senden, überschreibt der Proxy ihn mit der Tresor-Einstellung.
-
----
-
-### Cline in VS Code verwenden — Detaillierter Leitfaden
-
-#### Schritt 1: Cline installieren
-
-Installieren Sie **Cline** (ID: `saoudrizwan.claude-dev`) aus dem VS Code Extension Marketplace.
-
-#### Schritt 2: Agent im Tresor registrieren
-
-1. Öffnen Sie das Tresor-Dashboard (`http://tresor-IP:56243`)
-2. Klicken Sie im **Agenten**-Bereich auf **+ Hinzufügen**
-3. Füllen Sie folgendes aus:
-
-| Feld | Wert | Beschreibung |
-|------|------|-------------|
-| ID | `mein_cline` | Eindeutige Kennung (alphanumerisch, keine Leerzeichen) |
-| Name | `Mein Cline` | Auf dem Dashboard angezeigter Name |
-| Agententyp | `cline` | <- Muss `cline` ausgewählt werden |
-| Service | Gewünschten Service auswählen (z.B. `google`) | |
-| Modell | Gewünschtes Modell eingeben (z.B. `gemini-2.5-flash`) | |
-
-4. Klicken Sie auf **Speichern**, um ein Token automatisch zu generieren
-
-#### Schritt 3: Cline verbinden
-
-**Methode A — Automatische Anwendung (empfohlen)**
-
-1. Stellen Sie sicher, dass der wall-vault-**Proxy** auf diesem Rechner läuft (`localhost:56244`)
-2. Klicken Sie auf die **:zap: Cline-Konfiguration anwenden**-Schaltfläche auf der Dashboard-Agentenkarte
-3. Erfolg bei der Meldung "Konfiguration angewendet!"
-4. Laden Sie VS Code neu (`Ctrl+Alt+R`)
-
-**Methode B — Manuelle Einrichtung**
-
-Öffnen Sie die Einstellungen (:gear:) in der Cline-Seitenleiste:
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://proxy-adresse:56244/v1`
-  - Gleicher Rechner: `https://localhost:56244/v1`
-  - Anderer Rechner (z.B. Mac Mini): `http://192.168.1.20:56244/v1`
-- **API Key**: Vom Tresor ausgegebenes Token (von der Agentenkarte kopieren)
-- **Model ID**: Im Tresor konfiguriertes Modell (z.B. `gemini-2.5-flash`)
-
-#### Schritt 4: Überprüfung
-
-Senden Sie eine beliebige Nachricht im Cline-Chat-Fenster. Bei korrekter Funktion:
-- Die entsprechende Agentenkarte im Tresor-Dashboard zeigt einen **grünen Punkt (● Aktiv)**
-- Die Karte zeigt den aktuellen Service/Modell (z.B. `google / gemini-2.5-flash`)
-
-#### Modell ändern
-
-Wenn Sie das Cline-Modell ändern möchten, tun Sie dies über das **Tresor-Dashboard**:
-
-1. Ändern Sie das Service/Modell-Dropdown auf der Agentenkarte
-2. Klicken Sie auf **Anwenden**
-3. Laden Sie VS Code neu (`Ctrl+Alt+R`) — Der Modellname in der Cline-Fußzeile wird aktualisiert
-4. Das neue Modell wird ab der nächsten Anfrage verwendet
-
-> :bulb: Tatsächlich identifiziert der Proxy Clines Anfragen anhand des Tokens und routet sie zum im Tresor konfigurierten Modell. Auch ohne VS Code-Neustart **ändert sich das tatsächlich verwendete Modell sofort** — der Neustart dient nur dazu, die Modellanzeige in der Cline-UI zu aktualisieren.
-
-#### Trennungserkennung
-
-Wenn Sie VS Code schließen, wird die Agentenkarte im Tresor-Dashboard nach etwa **90 Sekunden** gelb (verzögert) und nach **3 Minuten** rot (offline). (Seit v0.1.18 ermöglichen 15-Sekunden-Statusprüfungen eine schnellere Offline-Erkennung.)
-
-#### Fehlerbehebung
-
-| Symptom | Ursache | Lösung |
-|---------|--------|--------|
-| "Verbindung fehlgeschlagen"-Fehler in Cline | Proxy nicht gestartet oder falsche Adresse | Proxy mit `curl https://localhost:56244/health` prüfen |
-| Grüner Punkt erscheint nicht im Tresor | API-Schlüssel (Token) nicht konfiguriert | **:zap: Cline-Konfiguration anwenden**-Schaltfläche erneut klicken |
-| Modell in der Cline-Fußzeile ändert sich nicht | Cline speichert Einstellungen im Cache | VS Code neu laden (`Ctrl+Alt+R`) |
-| Falscher Modellname wird angezeigt | Alter Bug (behoben in v0.1.16) | Proxy auf v0.1.16 oder höher aktualisieren |
-
----
-
-#### :purple_circle: Deploy-Befehl-kopieren-Schaltfläche — Zur Installation auf neuen Rechnern
-
-Verwenden Sie dies bei der Erstinstallation des wall-vault-Proxy auf einem neuen Computer und der Verbindung zum Tresor. Durch Klicken wird das gesamte Installationsskript kopiert. Fügen Sie es im Terminal des neuen Computers ein und führen Sie es aus — folgendes wird auf einmal erledigt:
-
-1. wall-vault-Binary-Installation (wird übersprungen, wenn bereits installiert)
-2. Automatische systemd-Benutzer-Service-Registrierung
-3. Service-Start und automatische Tresor-Verbindung
-
-> :bulb: Das Skript enthält bereits das Token dieses Agenten und die Tresor-Server-Adresse, sodass Sie es nach dem Einfügen ohne weitere Änderungen sofort ausführen können.
-
----
-
-### Servicekarte
-
-Eine Karte zum Ein-/Ausschalten und Konfigurieren von KI-Diensten.
-
-- Ein/Aus-Schalter pro Service
-- Geben Sie die Adresse lokaler KI-Server ein (Ollama, LM Studio, vLLM, llama.cpp usw. auf Ihrem Rechner), und verfügbare Modelle werden automatisch erkannt.
-- **Lokaler Service-Verbindungsstatus**: Der Punkt neben dem Servicenamen ist **grün** bei Verbindung, **grau** wenn nicht verbunden
-- **Lokale Service-Automatik** (v0.1.23+): Lokale Dienste (Ollama, LM Studio, vLLM, llama.cpp) werden basierend auf der Erreichbarkeit automatisch aktiviert/deaktiviert. Wenn ein Dienst erreichbar wird, wechselt er innerhalb von 15 Sekunden auf grün und das Kontrollkästchen wird aktiviert; bei Verbindungsabbruch wird automatisch deaktiviert. Funktioniert wie die schlüsselbasierte Automatik bei Cloud-Diensten (Google, OpenRouter usw.).
-- **Reasoning-Modus-Schalter** (v0.2.17+): Am unteren Rand des Bearbeitungsdialogs für lokale Dienste erscheint ein **Reasoning-Modus**-Kontrollkästchen. Wenn aktiviert, fügt der Proxy dem an den Upstream gesendeten chat-completions-Body `"reasoning": true` hinzu, sodass Modelle, die Gedankenprozess-Ausgaben unterstützen — etwa DeepSeek R1 oder Qwen QwQ — zusätzlich `<think>…</think>`-Blöcke zurückgeben. Server, die dieses Feld nicht kennen, ignorieren es, daher kann die Option auch bei gemischten Workloads bedenkenlos aktiviert bleiben.
-
-> :bulb: **Wenn ein lokaler Dienst auf einem anderen Computer läuft**: Geben Sie die IP dieses Computers in das Service-URL-Feld ein. Beispiel: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Wenn der Dienst nur an `127.0.0.1` statt `0.0.0.0` gebunden ist, funktioniert der Zugriff über externe IP nicht — prüfen Sie die Bindungsadresse in den Diensteinstellungen.
-
-### Admin-Token-Eingabe
-
-Wenn Sie im Dashboard wichtige Funktionen wie das Hinzufügen oder Löschen von Schlüsseln verwenden möchten, erscheint ein Admin-Token-Eingabe-Popup. Geben Sie das im Setup-Assistenten gesetzte Token ein. Nach einmaliger Eingabe bleibt es gültig, bis Sie den Browser schließen.
-
-> :warning: **Wenn Authentifizierungsfehler innerhalb von 15 Minuten 10 Mal überschritten werden, wird diese IP vorübergehend gesperrt.** Wenn Sie Ihr Token vergessen haben, prüfen Sie den `admin_token`-Eintrag in Ihrer `wall-vault.yaml`-Datei.
-
----
-
-## Verteilter Modus (Multi-Bot)
-
-Wenn OpenClaw gleichzeitig auf mehreren Computern betrieben wird, **teilen sich alle einen einzigen Schlüsseltresor**. Da die Schlüsselverwaltung nur an einer Stelle erfolgt, ist dies sehr praktisch.
-
-### Beispielkonfiguration
-
-```
-[Schlüsseltresor-Server]
-  wall-vault vault    (Schlüsseltresor :56243, Dashboard)
-
-[WSL Alpha]           [Raspberry Pi Gamma]   [Mac Mini Lokal]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  <-> SSE-Sync          <-> SSE-Sync            <-> SSE-Sync
-```
-
-Alle Bots zeigen auf den zentralen Tresor-Server, sodass Modelländerungen oder Schlüsselhinzufügungen im Tresor sofort bei allen Bots übernommen werden.
-
-### Schritt 1: Schlüsseltresor-Server starten
-
-Führen Sie auf dem Computer, der als Tresor-Server dient, folgenden Befehl aus:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### Schritt 2: Jeden Bot (Client) registrieren
+Das Dashboard ist nun unter `https://<vault-host>:56243` erreichbar. Fügen Sie für jeden entfernten Proxy einen Agenten in der **Clients**-Karte hinzu; jeder erzeugt ein eindeutiges `vault_token`.
 
-Registrieren Sie die Informationen jedes Bots, der sich mit dem Tresor-Server verbinden wird:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer admin-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "Bot A",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### Schritt 3: Proxy auf jedem Bot-Rechner starten
-
-Starten Sie auf jedem Bot-Rechner den Proxy mit der Tresor-Server-Adresse und dem Token:
+### Proxy-Hosts
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> :bulb: Ersetzen Sie **`192.168.x.x`** durch die tatsächliche interne IP-Adresse des Tresor-Server-Rechners. Sie finden sie in den Router-Einstellungen oder über den Befehl `ip addr`.
+Der Proxy authentifiziert sich gegen den Tresor, öffnet einen SSE-Stream und wendet jede Konfiguration an, die er erhält (bevorzugter Dienst, Modell-Override, Fallback-Kette). Nachfolgende Tresor-Änderungen kommen in Sekunden ohne Neustart an.
+
+Für LAN-übergreifende Installationen aktivieren Sie TLS auf dem Tresor-Host (`WV_VAULT_TLS_ENABLED=1` + die cert/key-Umgebungsvariablen) und führen Sie jeden Proxy-Host durch denselben `wall-vault cert install-trust`-Schritt, sodass die HTTPS-Aufrufe des Proxy in den Tresor vertraut werden.
 
 ---
 
-## Autostart-Konfiguration
+## Auto-Start
 
-Wenn es umständlich ist, wall-vault bei jedem Neustart manuell zu starten, registrieren Sie es als Systemdienst. Nach einmaliger Registrierung startet es automatisch beim Booten.
+### systemd (Linux)
 
-### Linux — systemd (die meisten Linux-Distributionen)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd ist das System, das Programme unter Linux automatisch startet und verwaltet:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-Protokolle anzeigen:
+Für den Tresor auf demselben Host schreiben Sie eine parallele `wall-vault-vault.service`. Für den Standalone-Modus genügt eine Unit, die `wall-vault start` aufruft.
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-Das System für automatisches Starten von Programmen unter macOS:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. Laden Sie NSSM von [nssm.cc](https://nssm.cc/download) herunter und fügen Sie es zum PATH hinzu.
-2. In einer Administrator-PowerShell:
-
-```powershell
-wall-vault doctor deploy windows
-```
+Verwenden Sie `nssm`, um `wall-vault.exe start` als Windows-Dienst zu umhüllen, oder einen `schtasks`-Eintrag, der bei der Benutzeranmeldung läuft.
 
 ---
 
-## Doctor (Diagnose)
+## Plugin-yamls
 
-Der `doctor`-Befehl ist ein Tool, das wall-vault-Konfigurationsprobleme **selbst diagnostiziert und repariert**.
+Jedes OpenAI-kompatible Backend kann ohne Codeänderungen hinzugefügt werden, indem ein yaml unter `~/.wall-vault/services/` abgelegt wird. wall-vault lädt es beim Start und registriert den Dienst für den Versand, das OAI-Compat-Erkennungsset und die Gemini-Stream-Bridge.
 
-```bash
-wall-vault doctor check   # Aktuellen Zustand diagnostizieren (nur lesen, nichts ändern)
-wall-vault doctor fix     # Probleme automatisch reparieren
-wall-vault doctor all     # Diagnose + automatische Reparatur in einem Schritt
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
 ```
 
-> :bulb: Wenn etwas nicht zu stimmen scheint, führen Sie zuerst `wall-vault doctor all` aus. Es erkennt und behebt viele Probleme automatisch.
+Das mitgelieferte Set in `configs/services/` (lmstudio, vllm, llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server, litellm-proxy, ollama, google, openrouter) wird standardmäßig deaktiviert ausgeliefert. Kopieren Sie das gewünschte nach `~/.wall-vault/services/`, setzen Sie `enabled: true`, starten Sie neu.
 
 ---
 
-## RTK Token-Einsparung
+## Doctor
 
-*(v0.1.24+)*
+`wall-vault doctor` führt eine einmalige Health-Probe über die gesamte Installation aus:
 
-**RTK (Token Reduction Kit)** komprimiert automatisch die Ausgabe von Shell-Befehlen, die KI-Coding-Agenten (wie Claude Code) ausführen, und reduziert so den Token-Verbrauch. Beispielsweise werden 15 Zeilen `git status`-Ausgabe auf eine 2-Zeilen-Zusammenfassung reduziert.
-
-### Grundlegende Verwendung
-
-```bash
-# Befehle mit wall-vault rtk umhüllen, um die Ausgabe automatisch zu filtern
-wall-vault rtk git status          # Zeigt nur die Liste geänderter Dateien
-wall-vault rtk git diff HEAD~1     # Nur geänderte Zeilen + minimaler Kontext
-wall-vault rtk git log -10         # Hash + einzeilige Nachricht je Commit
-wall-vault rtk go test ./...       # Zeigt nur fehlgeschlagene Tests
-wall-vault rtk ls -la              # Nicht unterstützte Befehle werden automatisch gekürzt
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
 ```
 
-### Unterstützte Befehle und Einsparungen
+Jede Zeile ist eine von:
 
-| Befehl | Filtermethode | Einsparung |
-|--------|-------------|------------|
-| `git status` | Nur Zusammenfassung geänderter Dateien | ~87% |
-| `git diff` | Geänderte Zeilen + 3 Zeilen Kontext | ~60-94% |
-| `git log` | Hash + erste Zeile Nachricht | ~90% |
-| `git push/pull/fetch` | Fortschritt entfernt, nur Zusammenfassung | ~80% |
-| `go test` | Nur Fehler, Erfolge werden gezählt | ~88-99% |
-| `go build/vet` | Nur Fehler | ~90% |
-| Alle anderen Befehle | Erste 50 + letzte 50 Zeilen, max. 32 KB | Variabel |
+- `✓` — gesund
+- `⚠` — beeinträchtigt, aber funktionsfähig (ein Schlüssel im Cooldown, niedrige Quote, etc.)
+- `✗` — kaputt
+- `SKIP` — nicht konfiguriert / auf diesem Host nicht zutreffend
 
-### 3-Stufen-Filter-Pipeline
+Ein zweiter Daemon-Modus führt dieselbe Probe alle `doctor.interval` (Standard 5 Minuten) aus und schreibt die Ergebnisse in `doctor.log_file` (Standard `/tmp/wall-vault-doctor.log`). Wenn `doctor.auto_fix` true ist, versucht er auch, gängige Drift zu reparieren (veraltete OpenClaw-Konfiguration, fehlendes TLS-Trust, neustartbare Dienste).
 
-1. **Befehlsspezifischer Strukturfilter** — Versteht das Ausgabeformat von git, go usw. und extrahiert nur bedeutungsvolle Teile
-2. **Regex-Nachbearbeitung** — Entfernt ANSI-Farbcodes, komprimiert Leerzeilen, fasst doppelte Zeilen zusammen
-3. **Durchleitung + Kürzung** — Nicht unterstützte Befehle behalten nur die ersten/letzten 50 Zeilen
-
-### Claude Code-Integration
-
-Sie können den `PreToolUse`-Hook von Claude Code konfigurieren, um alle Shell-Befehle automatisch durch RTK zu leiten.
-
-```bash
-# Hook installieren (wird automatisch zu Claude Code settings.json hinzugefügt)
-wall-vault rtk hook install
-```
-
-Oder manuell zu `~/.claude/settings.json` hinzufügen:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
-
-> :bulb: **Exit-Code-Erhaltung**: RTK gibt den Exit-Code des ursprünglichen Befehls unverändert zurück. Wenn ein Befehl fehlschlägt (Exit-Code != 0), erkennt die KI den Fehler korrekt.
-
-> :bulb: **Englisch erzwungen**: RTK führt Befehle mit `LC_ALL=C` aus und erzeugt unabhängig von den Systemspracheinstellungen immer englische Ausgabe. Dies ist notwendig, damit die Filter korrekt funktionieren.
+Lösen Sie eine einmalige Ausführung über die **Doctor**-Karte des Dashboards oder `wall-vault doctor` aus.
 
 ---
 
-## Umgebungsvariablen-Referenz
+## Hooks
 
-Umgebungsvariablen sind eine Möglichkeit, Konfigurationswerte an Programme zu übergeben. Geben Sie `export VARIABLE=wert` im Terminal ein oder tragen Sie sie in Autostart-Service-Dateien ein.
+Führen Sie einen Shell-Befehl bei Schlüsselereignissen aus:
 
-| Variable | Beschreibung | Beispielwert |
-|----------|-------------|-------------|
-| `WV_LANG` | Dashboard-Sprache | `ko`, `en`, `ja` |
-| `WV_THEME` | Dashboard-Theme | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Google-API-Schlüssel (kommagetrennt für mehrere) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | OpenRouter-API-Schlüssel | `sk-or-v1-...` |
-| `WV_VAULT_URL` | Tresor-Server-Adresse im verteilten Modus | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Client-(Bot-)Authentifizierungstoken | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | Admin-Token | `admin-token-here` |
-| `WV_MASTER_PASS` | API-Schlüssel-Verschlüsselungspasswort | `my-password` |
-| `WV_AVATAR` | Avatar-Bilddateipfad (relativ zu `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Ollama lokale Serveradresse | `http://192.168.x.x:11434` |
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+Jeder Hook erhält ereignisspezifische Umgebungsvariablen (`SERVICE`, `MODEL`, `ERROR`, `AGENT`, `LEVEL`, `MSG`). Hooks laufen asynchron mit einem 5-Sekunden-Timeout — der Proxy blockiert nie auf einem langsamen Hook.
+
+---
+
+## Umgebungsvariablen
+
+| Variable | YAML-Feld |
+|----------|-----------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | Einmaliger Import: kommagetrennte Google-Schlüssel |
+| `WV_KEY_OPENROUTER` | Einmaliger Import: OpenRouter-Schlüssel |
+| `WV_KEY_ANTHROPIC` | Einmaliger Import: Anthropic-Schlüssel |
+| `WV_KEY_OPENAI` | Einmaliger Import: OpenAI-Schlüssel |
+| `WV_OLLAMA_URL` | Pro-Host Ollama-URL-Override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Pro-Backend URL-Override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
+
+Jede Umgebungsvariable, wenn gesetzt, gewinnt gegen die YAML-Datei.
 
 ---
 
 ## Fehlerbehebung
 
-### Proxy startet nicht
+### `connection refused` auf `:56244`
 
-Der Port wird wahrscheinlich bereits von einem anderen Programm verwendet.
-
-```bash
-ss -tlnp | grep 56244   # Prüfen, wer Port 56244 verwendet
-wall-vault proxy --port 8080   # Mit einem anderen Port starten
-```
-
-### API-Schlüsselfehler (429, 402, 401, 403, 582)
-
-| Fehlercode | Bedeutung | Lösung |
-|------------|----------|--------|
-| **429** | Zu viele Anfragen (Kontingent überschritten) | Warten oder weitere Schlüssel hinzufügen |
-| **402** | Zahlung erforderlich oder Guthaben aufgebraucht | Guthaben beim entsprechenden Dienst aufladen |
-| **401 / 403** | Schlüssel falsch oder keine Berechtigung | Schlüsselwert überprüfen und neu registrieren |
-| **582** | Gateway-Überlastung (5 Minuten Cooldown) | Wird nach 5 Minuten automatisch aufgehoben |
+Entweder läuft der Proxy nicht oder er ist an einen anderen Host gebunden. Prüfen:
 
 ```bash
-# Registrierte Schlüsselliste und Status prüfen
-curl -H "Authorization: Bearer admin-token" https://localhost:56243/admin/keys
-
-# Schlüsselverbrauchszähler zurücksetzen
-curl -X POST -H "Authorization: Bearer admin-token" https://localhost:56243/admin/keys/reset
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
 ```
 
-### Agent zeigt "Nicht verbunden" an
+Wenn er auf einem anderen Port läuft, hat Ihre Konfiguration `proxy.port` überschrieben — prüfen Sie `~/.wall-vault/config.yaml`.
 
-"Nicht verbunden" bedeutet, dass der Proxy-Prozess keine Heartbeats an den Tresor sendet. **Das bedeutet nicht, dass Einstellungen nicht gespeichert wurden.** Der Proxy muss mit der Tresor-Server-Adresse und dem Token laufen.
+### `x509: certificate signed by unknown authority`
+
+Der Client vertraut der wall-vault internen CA nicht. Führen Sie `wall-vault cert install-trust` auf der Client-Maschine aus. Für Agenten, deren Laufzeit den OS-Trust-Store ignoriert (z. B. Node mit hartcodiertem `NODE_EXTRA_CA_CERTS`), verwenden Sie den Loopback-HTTP-Begleiter auf `127.0.0.1:56245` (nur Same-Host) oder setzen Sie `WV_PROXY_TLS_ENABLED=0`, um auf reines HTTP zurückzufallen.
+
+### `token not registered with vault`
+
+Das `Authorization: Bearer <token>` des Clients passt zu keinem registrierten Client. Überprüfen Sie das Token unter **Clients** im Dashboard. Wenn Sie ein Token-Literal wie `proxy-managed`, `dummy` oder `""` aus einer veralteten Konfiguration kopiert haben, ersetzen Sie es durch das echte Client-Token.
+
+### `Anthropic dispatch needs a Claude model id`
+
+Standardverhalten ab v0.2.63: eine an den anthropic-Dispatch gesendete Nicht-Claude-Modell-ID gibt einen Fehler zurück. Entweder das Routing korrigieren (senden Sie nicht `gemini-2.5-flash` an anthropic) oder das automatische Umschreiben über `proxy.anthropic_fallback_model` aktivieren.
+
+### `unknown service: <id>`
+
+Der Versand sah eine Service-ID, die kein Plugin-yaml beanspruchte. Prüfen:
 
 ```bash
-# Proxy mit Tresor-Server-Adresse, Token und Client-ID starten
-WV_VAULT_URL=http://tresor-server:56243 \
-WV_VAULT_TOKEN=client-token \
-WV_VAULT_CLIENT_ID=client-id \
-wall-vault proxy
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
 ```
 
-Nach erfolgreicher Verbindung zeigt das Dashboard innerhalb von etwa 20 Sekunden :green_circle: Aktiv an.
+Wenn das yaml existiert, aber `enabled: false` ist, kippen Sie es. Wenn es ganz fehlt, kopieren Sie aus `configs/services/` im Quellbaum.
 
-### Ollama verbindet sich nicht
+### Leere Antwort bei einem Reasoning-Modell
 
-Ollama ist ein Programm, das KI direkt auf Ihrem Computer ausführt. Prüfen Sie zuerst, ob Ollama läuft.
+`qwen3.6`, `deepseek-r1` und die GPT-`o1`-Familie geben manchmal nur `reasoning_content` aus und lassen `content` leer. Ab v0.2.63 fällt wall-vault automatisch auf den Reasoning-Text zurück — wenn Sie immer noch leere Antworten sehen, gibt das Backend keines der beiden Felder zurück. Prüfen Sie die Upstream-Logs.
 
-```bash
-curl http://localhost:11434/api/tags   # Wenn eine Modellliste erscheint, funktioniert es
-export OLLAMA_URL=http://192.168.x.x:11434   # Wenn auf einem anderen Computer
-```
+Speziell für LM Studio mit qwen3 setzen Sie `inline_no_think_for_qwen3: true` im Plugin-yaml, damit Reasoning inline deaktiviert wird. Die mitgelieferten lmstudio.yaml und ollama.yaml tun dies bereits.
 
-> :warning: Wenn Ollama nicht antwortet, starten Sie es zuerst mit dem Befehl `ollama serve`.
+### Dashboard zeigt „alle Schlüssel im Cooldown", aber ich habe gerade einen hinzugefügt
 
-> :warning: **Große Modelle sind langsam**: Große Modelle wie `qwen3.5:35b` oder `deepseek-r1` können mehrere Minuten für eine Antwort benötigen. Auch wenn es so aussieht, als würde nichts passieren, wird möglicherweise noch verarbeitet — bitte haben Sie Geduld.
+Der neue Schlüssel ist gesund, aber der Versandpfad kann sich noch im Cooldown für einen älteren Schlüssel befinden. Versuchen Sie eine neue Anfrage — der Proxy macht Round-Robin pro Aufruf, und ein gesunder Schlüssel wird als nächster gewählt.
+
+### Tresor öffnet nicht mit dem Master-Passwort
+
+Falsches Passwort. Es gibt keine Wiederherstellung — wall-vault liefert absichtlich keine Hintertür. Wenn Sie das Master-Passwort wirklich verloren haben, ist der einzige Weg, `~/.wall-vault/data/vault.json` zu löschen, mit einem neuen Passwort neu zu starten und die Schlüssel wieder hinzuzufügen.
+
+### Free-Tier OpenRouter-Limits erreicht
+
+Setzen Sie `proxy.services` so, dass es `openrouter` einschließt, und fügen Sie mindestens einen OpenRouter-Schlüssel hinzu. Der Proxy fällt automatisch von einem bezahlten Modell auf seine `:free`-Variante zurück, wenn der bezahlte Pfad 402 / 429 zurückgibt.
+
+### `journalctl --user -u wall-vault-proxy` ist leer
+
+systemd `--user`-Logs gehen in das Journal des Benutzers, der es ausführt. Wenn Sie die Unit als `root` oder über `sudo` gestartet haben, ist das Journal stattdessen in der System-Instanz — versuchen Sie `journalctl -u wall-vault-proxy` ohne `--user`.
 
 ---
 
-## Letzte Änderungen (v0.1.16 ~ v0.1.27)
+## Mehr
 
-### v0.1.27 (2026-04-09)
-- **Ollama-Fallback-Modellname behoben**: Bei Fallback von anderen Diensten zu Ollama wurden Provider-präfixierte Modellnamen (z.B. `google/gemini-3.1-pro-preview`) direkt an Ollama weitergegeben. Wird jetzt automatisch durch Umgebungsvariable/Standardmodell ersetzt.
-- **Cooldown-Dauer drastisch reduziert**: 429 Rate-Limit 30Min->5Min, 402 Zahlung 1Std->30Min, 401/403 24Std->6Std. Verhindert vollständige Proxy-Lähmung, wenn alle Schlüssel gleichzeitig in Cooldown gehen.
-- **Erzwungener Retry bei vollständigem Cooldown**: Wenn alle Schlüssel im Cooldown sind, wird der Schlüssel mit dem frühesten Ablauf erzwungen erneut versucht, um Anfrageverweigerungen zu verhindern.
-- **Service-Liste-Anzeige behoben**: Die `/status`-Antwort zeigt jetzt die tatsächlich vom Vault synchronisierte Service-Liste (verhindert Auslassung von anthropic usw.).
-
-### v0.1.25 (2026-04-08)
-- **Agentenprozess-Erkennung**: Der Proxy erkennt, ob lokale Agenten (NanoClaw/OpenClaw) noch laufen, und zeigt eine orangefarbene Ampel im Dashboard.
-- **Drag-Handle-Verbesserung**: Kartensortierung nur noch über den Ampelbereich (●) möglich. Verhindert versehentliches Ziehen von Eingabefeldern oder Schaltflächen.
-
-### v0.1.24 (2026-04-06)
-- **RTK Token-Einsparung-Unterbefehl**: `wall-vault rtk <command>` filtert Shell-Befehlsausgaben automatisch und reduziert den Token-Verbrauch von KI-Agenten um 60-90%. Enthält eingebaute Filter für Hauptbefehle wie git und go und kürzt nicht unterstützte Befehle automatisch. Transparente Integration mit Claude Code über `PreToolUse`-Hook.
-
-### v0.1.23 (2026-04-06)
-- **Ollama-Modellwechsel behoben**: Die Änderung des Ollama-Modells im Tresor-Dashboard wurde nicht auf den tatsächlichen Proxy übertragen. Zuvor wurde nur die Umgebungsvariable (`OLLAMA_MODEL`) verwendet; jetzt haben Tresor-Einstellungen Vorrang.
-- **Lokale Service-Automatik**: Ollama, LM Studio und vLLM werden bei Erreichbarkeit automatisch aktiviert und bei Verbindungsabbruch deaktiviert. Funktioniert wie die schlüsselbasierte Automatik bei Cloud-Diensten.
-
-### v0.1.22 (2026-04-05)
-- **Leeres content-Feld behoben**: Wenn Thinking-Modelle (gemini-3.1-pro, o1, claude thinking usw.) alle max_tokens für Reasoning verbraucht und keine tatsächliche Antwort erzeugt haben, hat der Proxy `content`/`text`-Felder in der Antwort-JSON über `omitempty` ausgelassen, was OpenAI/Anthropic SDK-Clients mit `Cannot read properties of undefined (reading 'trim')` zum Absturz brachte. Behoben: Felder werden jetzt gemäß offizieller API-Spezifikation immer einbezogen.
-
-### v0.1.21 (2026-04-05)
-- **Gemma 4 Modell-Support**: Gemma-Serienmodelle wie `gemma-4-31b-it` und `gemma-4-26b-a4b-it` können jetzt über die Google Gemini API verwendet werden.
-- **LM Studio / vLLM vollständiger Service-Support**: Zuvor fehlten diese Dienste im Proxy-Routing und fielen immer auf Ollama zurück. Jetzt korrekt über OpenAI-kompatible API geroutet.
-- **Dashboard-Service-Anzeige behoben**: Auch bei Fallback zeigt das Dashboard immer den vom Benutzer konfigurierten Service an.
-- **Lokaler Service-Status**: Beim Laden des Dashboards wird der Verbindungsstatus lokaler Dienste (Ollama, LM Studio, vLLM usw.) über die Punktfarbe angezeigt.
-- **Tool-Filter-Umgebungsvariable**: Tool-Durchleitungsmodus mit `WV_TOOL_FILTER=passthrough`-Umgebungsvariable einstellbar.
-
-### v0.1.20 (2026-03-28)
-- **Umfassende Sicherheitshärtung**: XSS-Prävention (41 Stellen), Konstantzeit-Token-Vergleich, CORS-Einschränkungen, Anfragegrößen-Limits, Pfadtraversal-Prävention, SSE-Authentifizierung, Rate-Limiter-Härtung und 12 weitere Sicherheitsverbesserungen.
-
-### v0.1.19 (2026-03-27)
-- **Claude Code Online-Erkennung**: Claude Code-Instanzen, die nicht über den Proxy laufen, werden ebenfalls als online im Dashboard angezeigt.
-
-### v0.1.18 (2026-03-26)
-- **Fallback-Service-Festsetzung behoben**: Nach vorübergehenden Fehlern mit Ollama-Fallback erfolgt automatische Rückkehr zum ursprünglichen Dienst nach dessen Wiederherstellung.
-- **Offline-Erkennung verbessert**: 15-Sekunden-Statusprüfungen ermöglichen schnellere Proxy-Ausfallerkennung.
-
-### v0.1.17 (2026-03-25)
-- **Drag-and-Drop-Kartensortierung**: Agentenkarten können per Drag-and-Drop umsortiert werden.
-- **Inline-Konfigurationsanwendung**: Offline-Agenten zeigen eine [:zap: Konfiguration anwenden]-Schaltfläche.
-- **cokacdir-Agententyp hinzugefügt**.
-
-### v0.1.16 (2026-03-25)
-- **Bidirektionale Modell-Synchronisation**: Modellwechsel für Cline oder Claude Code im Tresor-Dashboard werden automatisch übernommen.
-
----
-
-*Für detailliertere API-Informationen siehe [API.md](API.md).*
+- HTTP-API-Referenz — siehe [API.md](API.md)
+- Quellcode — `https://github.com/sookmook/wall-vault`
+- Bug-Reports / Feature-Wünsche — GitHub Issues
+- Release-Historie — [CHANGELOG.md](../CHANGELOG.md)

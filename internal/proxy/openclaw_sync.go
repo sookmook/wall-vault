@@ -357,7 +357,7 @@ func updateOpenClawJSON(service, model, defaultOrigin string) {
 	}
 
 	// Prune stale models[] entries (duplicate ids, half-written names) from
-	// every provider, not just the one we just touched. A historic raspi
+	// every provider, not just the one we just touched. A historic host-A
 	// config carried 11 entries with identical id but different name, which
 	// effectively broke OpenClaw model selection.
 	if pruneStaleModelsAcross(providers) {

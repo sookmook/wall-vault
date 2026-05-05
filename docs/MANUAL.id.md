@@ -1,931 +1,621 @@
 # Panduan Pengguna wall-vault
-*(Last updated: 2026-04-16 — v0.2.2)*
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · [中文](MANUAL.zh.md) · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · [हिन्दी](MANUAL.hi.md) · **Bahasa Indonesia** · [ภาษาไทย](MANUAL.th.md) · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
+
+Panduan ini mencakup pemasangan, konfigurasi, dan pengoperasian wall-vault. Untuk gambaran sekilas, lihat [README](../README.md). Untuk detail HTTP API, lihat [API reference](API.md).
 
 ## Daftar Isi
 
-1. [Apa itu wall-vault?](#apa-itu-wall-vault)
-2. [Instalasi](#instalasi)
-3. [Memulai (wizard setup)](#memulai)
-4. [Pendaftaran API Key](#pendaftaran-api-key)
-5. [Penggunaan Proxy](#penggunaan-proxy)
-6. [Dashboard Brankas Kunci](#dashboard-brankas-kunci)
-7. [Mode Terdistribusi (Multi Bot)](#mode-terdistribusi-multi-bot)
-8. [Pengaturan Auto-Start](#pengaturan-auto-start)
-9. [Doctor (Dokter)](#doctor-dokter)
-10. [Penghematan Token RTK](#penghematan-token-rtk)
-11. [Referensi Variabel Lingkungan](#referensi-variabel-lingkungan)
-12. [Pemecahan Masalah](#pemecahan-masalah)
+1. [Apa yang dilakukan wall-vault](#apa-yang-dilakukan-wall-vault)
+2. [Pemasangan](#pemasangan)
+3. [Menjalankan pertama kali dengan setup wizard](#menjalankan-pertama-kali-dengan-setup-wizard)
+4. [Mengaktifkan TLS](#mengaktifkan-tls)
+5. [Mendaftarkan API key](#mendaftarkan-api-key)
+6. [Menghubungkan agen](#menghubungkan-agen)
+7. [Dashboard](#dashboard)
+8. [Mode terdistribusi](#mode-terdistribusi)
+9. [Auto-start](#auto-start)
+10. [Plugin yamls](#plugin-yamls)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [Variabel lingkungan](#variabel-lingkungan)
+14. [Pemecahan masalah](#pemecahan-masalah)
 
 ---
 
-## Catatan Peningkatan v0.2
+## Apa yang dilakukan wall-vault
 
-- `Service` mendapatkan `default_model` dan `allowed_models`. Model default per-layanan kini diatur langsung pada kartu layanan.
-- `Client.default_service` / `default_model` telah diubah nama dan diinterpretasi ulang menjadi `preferred_service` / `model_override`. Jika override kosong, model default dari layanan digunakan.
-- Saat startup v0.2 pertama kali, `vault.json` yang ada secara otomatis dimigrasikan, dan keadaan pre-migrasi disimpan sebagai `vault.json.pre-v02.{timestamp}.bak`.
-- Dashboard telah distruktur ulang menjadi tiga zona: bilah samping kiri, grid kartu pusat, dan panel edit geser di sisi kanan.
-- Jalur Admin API tidak berubah, tetapi skema badan permintaan/respons telah diperbarui — skrip CLI lama akan perlu diperbarui sesuai kebutuhan.
+wall-vault adalah binary Go tunggal yang menggabungkan dua layanan yang saling bekerja sama:
 
----
+- **vault** menyimpan API key terenkripsi saat istirahat (AES-GCM dengan kata sandi master), melacak penggunaan dan cooldown per key, menyiarkan perubahan melalui Server-Sent Events (SSE), dan menyajikan dashboard web di `:56243` untuk operator manusia.
+- **proxy** mengekspos endpoint Gemini, Anthropic, OpenAI-compatible, dan Ollama-native di `:56244`. Klien AI mana pun yang menunjuk ke proxy akan menggunakan key di vault — klien tidak pernah melihatnya. Ketika satu upstream gagal, dispatch akan beralih ke provider berikutnya secara berurutan.
 
-## Fitur Baru v0.2.1
+Ini berguna ketika:
 
-- **Pass-through multimoda (OpenAI → Gemini)**: `/v1/chat/completions` kini menerima enam jenis bagian konten selain `text` — `input_audio`, `input_video`, `input_image`, `input_file`, dan `image_url` (data URI dan URL http(s) eksternal ≤ 5 MB). Proxy mengonversi masing-masing menjadi `inlineData` Gemini. Klien yang kompatibel dengan OpenAI seperti EconoWorld dapat melakukan streaming blob audio / gambar / video secara langsung.
-- **Jenis agen EconoWorld**: `POST /agent/apply` dengan `agentType: "econoworld"` menulis pengaturan wall-vault ke dalam `analyzer/ai_config.json` proyek. `workDir` menerima daftar jalur kandidat yang dipisahkan koma dan mengonversi jalur drive Windows menjadi jalur mount WSL.
-- **Grid kunci dashboard + CRUD**: 11 kunci dirender sebagai kartu ringkas dengan slideover + tambah / ✕ hapus.
-- **Penambahan layanan + penyusunan ulang seret-dan-lepas**: grid layanan mendapatkan tombol + tambah dan pegangan seret (`⋮⋮`).
-- **Header / footer / animasi tema / pengalih bahasa** dipulihkan. Ketujuh tema (cherry/dark/light/ocean/gold/autumn/winter) memainkan efek partikelnya pada lapisan di belakang kartu namun di atas latar belakang.
-- **UX penutupan slideover**: klik di luar atau Esc menutup slideover.
-- **Indikator status SSE + pengatur waktu aktif**: di bar atas (topbar), di samping pemilih bahasa/tema, terdapat penghitung `⏱ uptime` dan indikator `● SSE` (hijau = terhubung, oranye = menyambung ulang, abu-abu = terputus) yang diletakkan berdampingan (dipindahkan dari footer ke header sejak v0.2.18 — status bisa dilihat tanpa menggulir).
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## Apa itu wall-vault?
-
-**wall-vault = Proxy AI + Brankas API Key untuk OpenClaw**
-
-Untuk menggunakan layanan AI, Anda memerlukan **API key**. API key ibarat **kartu akses digital** yang membuktikan bahwa "orang ini berhak menggunakan layanan ini." Namun, kartu akses ini memiliki batas penggunaan harian, dan jika tidak dikelola dengan baik, ada risiko bocor.
-
-wall-vault menyimpan kartu-kartu akses ini dalam brankas yang aman dan berperan sebagai **proxy (perantara)** antara OpenClaw dan layanan AI. Singkatnya, OpenClaw cukup terhubung ke wall-vault, dan sisanya wall-vault yang mengurus semuanya.
-
-Masalah yang diselesaikan wall-vault:
-
-- **Rotasi API key otomatis**: Ketika penggunaan suatu key mencapai batas atau diblokir sementara (cooldown), secara diam-diam beralih ke key berikutnya. OpenClaw terus berjalan tanpa gangguan.
-- **Fallback layanan otomatis**: Jika Google tidak merespons, otomatis beralih ke OpenRouter, jika itu juga tidak bisa maka ke Ollama/LM Studio/vLLM (AI lokal) yang terinstal di komputer Anda. Sesi tidak terputus. Saat layanan asli pulih, otomatis kembali mulai dari permintaan berikutnya (v0.1.18+, LM Studio/vLLM: v0.1.21+).
-- **Sinkronisasi real-time (SSE)**: Saat mengganti model di dashboard brankas, dalam 1-3 detik langsung tercermin di layar OpenClaw. SSE (Server-Sent Events) adalah teknologi di mana server mendorong pembaruan secara real-time ke klien.
-- **Notifikasi real-time**: Event seperti kehabisan key atau gangguan layanan langsung ditampilkan di bagian bawah OpenClaw TUI (layar terminal).
-
-> 💡 **Claude Code, Cursor, VS Code** juga bisa dihubungkan, tapi tujuan utama wall-vault adalah digunakan bersama OpenClaw.
+- Anda memiliki key untuk beberapa provider dan menginginkan satu URL yang dihubungi agen.
+- Anda ingin key tier-gratis yang sedang cooldown menyingkir tanpa merusak sesi.
+- Anda ingin key yang sama menggerakkan beberapa bot, IDE, atau skrip pada LAN yang sama tanpa menyalin kredensial.
+- Anda menginginkan dashboard, bukan variabel lingkungan, untuk mengedit key dan mengganti model.
+- Anda menginginkan fallback lokal (Ollama, LM Studio, vLLM) saat batas cloud habis.
 
 ```
-OpenClaw (layar terminal TUI)
-        │
-        ▼
-  wall-vault proxy (:56244)   ← manajemen key, routing, fallback, event
-        │
-        ├─ Google Gemini API
-        ├─ OpenRouter API (340+ model)
-        ├─ Ollama / LM Studio / vLLM (komputer Anda, pilihan terakhir)
-        └─ OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
-## Instalasi
+## Pemasangan
 
-### Linux / macOS
-
-Buka terminal dan tempel perintah di bawah ini.
+### One-liner Linux / macOS
 
 ```bash
-# Linux (PC biasa, server — amd64)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon (Mac M1/M2/M3)
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — Mengunduh file dari internet.
-- `chmod +x` — Membuat file yang diunduh "dapat dieksekusi". Jika langkah ini dilewati, akan muncul error "izin ditolak".
+Skrip secara otomatis mendeteksi OS dan arsitektur, mengunduh binary yang tepat ke `~/.local/bin/wall-vault`, dan menjadikannya dapat dieksekusi. Jika `~/.local/bin` tidak ada di `PATH` Anda, tambahkan:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Unduhan manual
+
+Binary pre-built dipublikasikan pada setiap rilis di `https://github.com/sookmook/wall-vault/releases`.
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi, ARM servers)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-Buka PowerShell (Administrator) dan jalankan perintah berikut.
-
 ```powershell
-# Unduh
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# Tambahkan ke PATH (berlaku setelah PowerShell di-restart)
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> 💡 **Apa itu PATH?** Daftar folder tempat komputer mencari perintah. Dengan menambahkan ke PATH, Anda bisa menjalankan `wall-vault` dari folder mana saja.
+### Build dari source
 
-### Build dari Sumber (untuk developer)
-
-Hanya berlaku jika environment pengembangan bahasa Go sudah terinstal.
+Membutuhkan Go 1.25 atau lebih baru.
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault (versi: v0.1.25.YYYYMMDD.HHmmss)
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> 💡 **Versi timestamp build**: Saat build dengan `make build`, versi otomatis dihasilkan dalam format yang menyertakan tanggal dan waktu seperti `v0.1.27.20260409`. Jika build langsung dengan `go build ./...`, versi hanya menampilkan `"dev"`.
+`make build-all` melakukan cross-compile ke kelima platform yang didukung. Binary akan masuk ke `bin/`.
 
 ---
 
-## Memulai
-
-### Menjalankan wizard setup
-
-Setelah instalasi, pertama kali Anda **wajib** menjalankan **wizard setup** dengan perintah berikut. Wizard akan menanyakan item yang diperlukan satu per satu dan memandu Anda.
+## Menjalankan pertama kali dengan setup wizard
 
 ```bash
 wall-vault setup
 ```
 
-Langkah-langkah yang dilakukan wizard:
+Wizard meminta Anda, secara berurutan:
 
-```
-1. Pilih bahasa (10 bahasa termasuk bahasa Indonesia)
-2. Pilih tema (light / dark / gold / cherry / ocean)
-3. Mode operasi — penggunaan sendiri (standalone) atau beberapa mesin bersama (distributed)
-4. Nama bot — nama yang ditampilkan di dashboard
-5. Pengaturan port — default: proxy 56244, brankas 56243 (tekan enter jika tidak perlu diubah)
-6. Pilih layanan AI — Google / OpenRouter / Ollama / LM Studio / vLLM
-7. Pengaturan filter keamanan tool
-8. Pengaturan token admin — kata sandi untuk mengunci fitur manajemen dashboard. Bisa di-auto-generate
-9. Kata sandi enkripsi API key — untuk menyimpan key lebih aman (opsional)
-10. Path file konfigurasi
-```
+1. **Bahasa** — memilih salah satu dari 17 lokal UI. Dideteksi otomatis dari `$LANG`; wizard tetap menawarkan daftar.
+2. **Tema** — `light` (default), `dark`, `cherry`, `ocean`, `gold`, `autumn`, `winter`. Hanya kosmetik.
+3. **Mode** — `standalone` (host tunggal, default) atau `distributed` (vault di satu host, proxy di yang lain).
+4. **Nama bot** — slug `client_id` bebas. Vault menggunakannya untuk membatasi konfigurasi per-klien (override model, fallback chain).
+5. **Port proxy** — default `56244`.
+6. **Port vault** — default `56243` (hanya standalone).
+7. **Pemilihan layanan** — y/N untuk masing-masing: Google Gemini, OpenRouter, Anthropic, OpenAI, Ollama, LM Studio, vLLM. Banyak pilihan diperbolehkan; masing-masing menulis petunjuk env-var-nya di akhir.
+8. **Tool filter** — `strip_all` (default; memblokir semua definisi tool yang masuk untuk keamanan) atau `passthrough` (biarkan tool apa pun lewat).
+9. **Token admin** — biarkan kosong untuk dibuat otomatis. Dashboard memerlukan token ini untuk login.
+10. **Kata sandi master** — biarkan kosong untuk tanpa enkripsi (TIDAK direkomendasikan); atur nilai untuk mengenkripsi penyimpanan key dengan AES-GCM saat istirahat.
+11. **Path penyimpanan** — default `wall-vault.yaml` di direktori saat ini. Loader juga melihat `~/.wall-vault/config.yaml`.
 
-> ⚠️ **Pastikan Anda mengingat token admin.** Diperlukan nanti saat menambahkan key atau mengubah pengaturan di dashboard. Jika lupa, Anda harus mengedit file konfigurasi secara manual.
+Setelah menyimpan, wizard menjalankan `doctor.FixTrust` sehingga setiap agen yang terpasang secara lokal (OpenClaw, Claude Code, Cline) secara otomatis mendapat CA internal wall-vault yang ditambahkan ke trust store-nya. Jika tidak ada agen seperti itu yang terpasang, langkah ini mencetak `SKIP` dan tidak menulis apa pun.
 
-Setelah wizard selesai, file konfigurasi `wall-vault.yaml` akan dibuat secara otomatis.
-
-### Menjalankan
+Kemudian jalankan binary:
 
 ```bash
 wall-vault start
 ```
 
-Dua server berikut akan dimulai bersamaan:
+`start` menjalankan vault dan proxy dalam satu proses (mode standalone). Untuk mode terdistribusi gunakan `wall-vault vault` di host vault dan `wall-vault proxy` di setiap host proxy.
 
-- **Proxy** (`https://localhost:56244`) — Perantara yang menghubungkan OpenClaw dan layanan AI
-- **Brankas Kunci** (`https://localhost:56243`) — Manajemen API key dan dashboard web
-
-Buka `https://localhost:56243` di browser untuk langsung melihat dashboard.
+Buka `http://localhost:56243` di browser. Login dengan token admin yang dicetak oleh wizard.
 
 ---
 
-## Pendaftaran API Key
+## Mengaktifkan TLS
 
-Ada empat cara mendaftarkan API key. **Untuk pemula, disarankan Metode 1 (variabel lingkungan).**
+Default wizard meninggalkan kedua listener pada HTTP biasa. Sebagian besar agen (OpenClaw, Claude Code, Cursor) bekerja lebih baik dengan satu endpoint HTTPS, jadi TLS direkomendasikan dalam deployment apa pun yang melampaui mesin lokal.
 
-### Metode 1: Variabel Lingkungan (Disarankan — Paling Sederhana)
-
-Variabel lingkungan adalah **nilai yang telah ditetapkan sebelumnya** yang dibaca program saat dimulai. Ketik di terminal seperti berikut.
+wall-vault dilengkapi dengan CA internalnya sendiri sehingga Anda tidak memerlukan nama DNS publik atau Let's Encrypt.
 
 ```bash
-# Daftarkan Google Gemini key
-export WV_KEY_GOOGLE=AIzaSy...
+# 1. Create the internal CA — written to ~/.wall-vault/ca.{crt,key}.
+#    The CA is good for 10 years by default; override with --ca-years.
+wall-vault cert init
 
-# Daftarkan OpenRouter key
-export WV_KEY_OPENROUTER=sk-or-v1-...
+# 2. Issue a host certificate. Subject Alternative Names automatically include:
+#       hostname, "localhost", "127.0.0.1", and any non-loopback LAN IP detected.
+#    Override the issuer dir with --dir, validity with --host-years.
+wall-vault cert issue $(hostname)
 
-# Jalankan setelah pendaftaran
+# 3. Trust the CA in this machine's OS keychain.
+#    Linux: writes to /etc/ssl/certs/ via update-ca-certificates (needs sudo).
+#    macOS: adds to the System keychain via security add-trusted-cert (needs sudo).
+#    Windows: imports into CurrentUser\Root via certutil (no admin needed).
+wall-vault cert install-trust
+
+# 4. Enable TLS on both listeners.
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
 wall-vault start
 ```
 
-Jika Anda memiliki beberapa key, hubungkan dengan koma (,). wall-vault akan menggunakan key secara bergantian otomatis (round robin):
+Untuk memperluas trust ke mesin LAN lain, salin `~/.wall-vault/ca.crt` dan jalankan `wall-vault cert install-trust --ca <path>` di masing-masing mesin. Vault juga mengekspos `ca.crt` melalui listener plain-HTTP kecil di `:56247` (**bootstrap port**) untuk kasus catch-22 di mana klien baru memerlukan CA untuk berbicara HTTPS.
 
-```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+### Pendamping HTTP loopback
+
+Beberapa agen — terutama runtime Node yang dibundel OpenClaw — menulis ulang `NODE_EXTRA_CA_CERTS` saat proses spawn, menjatuhkan petunjuk CA apa pun yang disediakan operator. Mereka tidak dapat menghormati CA wall-vault dari dalam daemon, bahkan setelah `cert install-trust`. wall-vault mengatasi ini dengan mengikat **listener plain-HTTP khusus loopback** tambahan di `127.0.0.1:56245` setiap kali TLS diaktifkan. Klien same-host mencapai proxy melalui port itu tanpa TLS sama sekali; klien LAN tetap menggunakan listener TLS.
+
+Nonaktifkan dengan `WV_PROXY_PLAIN_PORT=0` jika Anda tidak membutuhkannya.
+
+### `wall-vault cert list`
+
+Menampilkan setiap sertifikat di bawah `~/.wall-vault/` dengan subject, jendela validitas, dan SAN.
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
 ```
 
-> 💡 **Tips**: Perintah `export` hanya berlaku untuk sesi terminal saat ini. Agar tetap berlaku setelah komputer di-restart, tambahkan baris di atas ke file `~/.bashrc` atau `~/.zshrc`.
+---
 
-### Metode 2: Dashboard UI (Klik dengan Mouse)
+## Mendaftarkan API key
 
-1. Buka `https://localhost:56243` di browser
-2. Klik tombol `[+ Tambah]` di kartu **🔑 API Key** di bagian atas
-3. Masukkan jenis layanan, nilai key, label (nama memo), batas harian, lalu simpan
+Dua cara: dashboard, atau variabel lingkungan.
 
-### Metode 3: REST API (untuk Otomasi/Skrip)
+### Dashboard (direkomendasikan)
 
-REST API adalah cara program bertukar data melalui HTTP. Berguna untuk pendaftaran otomatis via skrip.
+1. Login di `https://localhost:56243` dengan token admin.
+2. Klik **+ API key** di kartu keys.
+3. Pilih layanan (Google, OpenRouter, Anthropic, OpenAI, …).
+4. Tempel key. Simpan.
+
+Beberapa key per layanan diperbolehkan; proxy melakukan round-robin di antara mereka dan melewati yang terkena cooldown per-key.
+
+### Variabel lingkungan (bootstrap satu kali)
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer token-admin" \
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # comma-separated
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
+wall-vault start
+```
+
+Key yang disediakan dengan cara ini ditulis ke penyimpanan terenkripsi pada peluncuran pertama. Start berikutnya membacanya dari disk; Anda dapat unset variabel lingkungan setelah run pertama.
+
+### Cooldown dan rotasi
+
+Setiap panggilan yang berhasil meningkatkan `usage_count` key dan memperbarui `last_used`. Pada HTTP 429 / 402 / 403, proxy menempatkan key pada **cooldown** (default: 60 menit untuk 429, 24 jam untuk 402, 12 jam untuk 403). Dispatch berikutnya memilih key yang berbeda untuk layanan tersebut. Ketika semua key untuk layanan dalam cooldown, proxy melewati layanan tersebut sepenuhnya dengan cepat dan mencoba provider berikutnya dalam fallback chain.
+
+Cooldown terlihat per-key di dashboard dengan hitungan mundur.
+
+---
+
+## Menghubungkan agen
+
+### OpenClaw
+
+OpenClaw adalah klien target asli. Gunakan modal **+ Add agent** dashboard:
+
+- Atur **Agent type** ke `openclaw` atau `nanoclaw`.
+- Atur **Work directory** — untuk OpenClaw ini terisi otomatis sebagai `~/.openclaw`.
+- Pilih **preferred service** dan opsional **model override**.
+- Klik **Apply**. wall-vault menulis `~/.openclaw/openclaw.json` secara langsung (URL provider, vault token, entri model).
+
+Ketika Anda mengubah model dari dashboard, OpenClaw mengambil perubahan melalui SSE dalam 1-3 detik — tanpa restart.
+
+### Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
+```
+
+Ketika kredit upstream Anthropic habis, dispatch fallback ke layanan apa pun yang terdaftar di `fallback_services` klien ini. Secara default, ID model non-Claude yang dikirim ke dispatch anthropic mengembalikan error sehingga misrouting muncul segera. Opt in ke rewrite otomatis:
+
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
+
+### Cursor
+
+Di Cursor **Settings → AI → OpenAI API**:
+
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # or any model wall-vault knows
+```
+
+### Continue (VS Code, JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### HTTP kustom
+
+```bash
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "Key utama",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### Metode 4: Flag proxy (untuk Tes Singkat)
+Endpoint yang sama menerima streaming (`"stream": true`) ketika `proxy.oai_stream_forward: true` diatur.
 
-Untuk memasukkan key sementara dan menguji tanpa pendaftaran resmi. Hilang saat program ditutup.
+---
+
+## Dashboard
+
+`https://localhost:56243`. Lima kartu di grid utama:
+
+- **Keys** — setiap API key, dikelompokkan berdasarkan layanan. Tambah, edit, hapus; lihat penggunaan dan cooldown.
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp, ditambah plugin yaml apa pun di `~/.wall-vault/services/`. Atur per-layanan `default_model`, `allowed_models`, base URL, toggle reasoning.
+- **Clients (agents)** — setiap klien terdaftar (bot OpenClaw, sesi Claude Code, instance Cursor, …). Tetapkan layanan pilihan, override model, fallback chain.
+- **Proxies** — setiap proxy yang telah diautentikasi terhadap vault ini. Status langsung (online/offline), terakhir dilihat, model saat ini.
+- **Settings** — token admin, rotasi kata sandi master, tema, bahasa.
+
+Setiap kartu memiliki edit slideover (sisi kanan). Klik di luar atau `Esc` menutupnya. Perubahan didorong ke semua proxy yang terhubung melalui SSE dalam hitungan detik.
+
+**Footer** membawa indikator SSE (hijau = terhubung, oranye = menghubungkan kembali, abu-abu = terputus) dan versi build langsung.
+
+---
+
+## Mode terdistribusi
+
+Ketika Anda memiliki beberapa mesin yang semuanya membutuhkan key yang sama, jalankan vault di satu host dan proxy di masing-masing yang lain.
+
+### Host vault
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## Penggunaan Proxy
-
-### Penggunaan di OpenClaw (Tujuan Utama)
-
-Cara mengatur agar OpenClaw terhubung ke layanan AI melalui wall-vault:
-
-Buka file `~/.openclaw/openclaw.json` dan tambahkan konten berikut:
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // token agen vault
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // gratis 1M context
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> 💡 **Cara lebih mudah**: Tekan tombol **🦞 Salin Pengaturan OpenClaw** di kartu agen dashboard, snippet dengan token dan alamat yang sudah terisi akan disalin ke clipboard. Tinggal tempel saja.
-
-**`wall-vault/` di depan nama model akan terhubung ke mana?**
-
-Dengan melihat nama model, wall-vault secara otomatis menentukan ke layanan AI mana permintaan dikirim:
-
-| Format Model | Layanan Terhubung |
-|----------|--------------|
-| `wall-vault/gemini-*` | Google Gemini langsung |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | OpenAI langsung |
-| `wall-vault/claude-*` | Anthropic melalui OpenRouter |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter (gratis 1 juta token context) |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | Koneksi OpenRouter |
-| `google/nama-model`, `openai/nama-model`, `anthropic/nama-model` dll | Koneksi langsung ke layanan terkait |
-| `custom/google/nama-model`, `custom/openai/nama-model` dll | Hapus bagian `custom/` dan re-routing |
-| `nama-model:cloud` | Hapus bagian `:cloud` dan koneksi OpenRouter |
-
-> 💡 **Apa itu context?** Jumlah percakapan yang bisa diingat AI sekaligus. Dengan 1M (satu juta token), percakapan sangat panjang atau dokumen panjang pun bisa diproses sekaligus.
-
-### Koneksi Langsung Format Gemini API (Kompatibilitas Tool yang Ada)
-
-Jika Anda memiliki tool yang langsung menggunakan Google Gemini API, cukup ubah alamatnya ke wall-vault:
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-Atau untuk tool yang menentukan URL secara langsung:
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### Penggunaan di OpenAI SDK (Python)
-
-wall-vault juga bisa dihubungkan dalam kode Python yang menggunakan AI. Cukup ubah `base_url`:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # API key dikelola wall-vault secara otomatis
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # masukkan dalam format provider/model
-    messages=[{"role": "user", "content": "Halo"}]
-)
-```
-
-### Mengganti Model Saat Berjalan
-
-Untuk mengganti model AI yang digunakan saat wall-vault sudah berjalan:
-
-```bash
-# Minta langsung ke proxy untuk mengganti model
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# Dalam mode terdistribusi (multi bot), ubah dari server brankas → langsung diterapkan via SSE
-curl -X PUT https://localhost:56243/admin/clients/id-bot-saya \
-  -H "Authorization: Bearer token-admin" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### Melihat Daftar Model yang Tersedia
-
-```bash
-# Lihat daftar lengkap
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# Hanya model Google
-curl "https://localhost:56244/api/models?service=google"
-
-# Cari berdasarkan nama (contoh: model yang mengandung "claude")
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**Ringkasan Model Utama per Layanan:**
-
-| Layanan | Model Utama |
-|--------|----------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+ (Hunter Alpha 1M context gratis, DeepSeek R1/V3, Qwen 2.5 dll) |
-| Ollama | Auto-deteksi server lokal yang terinstal di komputer Anda |
-| LM Studio | Server lokal komputer Anda (port 1234) |
-| vLLM | Server lokal komputer Anda (port 8000) |
-| llama.cpp | Server lokal komputer Anda (port 8080) |
-
----
-
-## Dashboard Brankas Kunci
-
-Buka `https://localhost:56243` di browser untuk melihat dashboard.
-
-**Tata Letak Layar:**
-- **Bar atas tetap (topbar)**: Logo, pemilih bahasa/tema, status koneksi SSE
-- **Grid Kartu**: Kartu agen, layanan, API key tersusun dalam bentuk tile
-
-### Kartu API Key
-
-Kartu untuk mengelola API key yang terdaftar dalam satu pandangan.
-
-- Menampilkan daftar key berdasarkan layanan.
-- `today_usage`: Jumlah token (karakter yang dibaca dan ditulis AI) yang berhasil diproses hari ini
-- `today_attempts`: Total jumlah panggilan hari ini (termasuk sukses + gagal)
-- Daftarkan key baru dengan tombol `[+ Tambah]`, hapus key dengan `✕`.
-
-> 💡 **Apa itu token?** Unit yang digunakan AI untuk memproses teks. Kira-kira setara dengan satu kata bahasa Inggris, atau 1-2 karakter bahasa Indonesia. Biaya API biasanya dihitung berdasarkan jumlah token ini.
-
-### Kartu Agen
-
-Kartu yang menampilkan status bot (agen) yang terhubung ke proxy wall-vault.
-
-**Status koneksi ditampilkan dalam 4 tingkat:**
-
-| Simbol | Status | Arti |
-|------|------|------|
-| 🟢 | Berjalan | Proxy beroperasi normal |
-| 🟡 | Lambat | Respons datang tapi lambat |
-| 🔴 | Offline | Proxy tidak merespons |
-| ⚫ | Belum terhubung/Nonaktif | Proxy belum pernah terhubung ke brankas atau dinonaktifkan |
-
-**Panduan Tombol Bawah Kartu Agen:**
-
-Saat mendaftarkan agen, jika **jenis agen** ditentukan, tombol praktis yang sesuai dengan jenis tersebut otomatis muncul.
-
----
-
-#### 🔘 Tombol Salin Pengaturan — Membuat pengaturan koneksi secara otomatis
-
-Saat tombol diklik, snippet pengaturan dengan token agen, alamat proxy, informasi model yang sudah terisi disalin ke clipboard. Tempel konten yang disalin ke lokasi dalam tabel di bawah untuk menyelesaikan pengaturan koneksi.
-
-| Tombol | Jenis Agen | Lokasi Tempel |
-|------|-------------|-------------|
-| 🦞 Salin Pengaturan OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| 🦀 Salin Pengaturan NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| 🟠 Salin Pengaturan Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⌨ Salin Pengaturan Cursor | `cursor` | Cursor → Settings → AI |
-| 💻 Salin Pengaturan VSCode | `vscode` | `~/.continue/config.json` |
-
-**Contoh — Jika tipe Claude Code, konten seperti ini yang disalin:**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "token-agen-ini"
-}
-```
-
-**Contoh — Jika tipe VSCode (Continue):**
-
-```yaml
-# ~/.continue/config.yaml  ← tempel di config.yaml, bukan config.json
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: token-agen-ini
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> ⚠️ **Versi terbaru Continue menggunakan `config.yaml`.** Jika `config.yaml` ada, `config.json` sepenuhnya diabaikan. Pastikan tempel di `config.yaml`.
-
-**Contoh — Jika tipe Cursor:**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : token-agen-ini
-
-// atau variabel lingkungan:
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=token-agen-ini
-```
-
-> ⚠️ **Jika salin clipboard tidak berfungsi**: Kebijakan keamanan browser mungkin memblokir penyalinan. Jika popup textbox muncul, pilih semua dengan Ctrl+A lalu salin dengan Ctrl+C.
-
----
-
-#### ⚡ Tombol Auto-Apply — Satu klik, pengaturan selesai
-
-Jika jenis agen adalah `cline`, `claude-code`, `openclaw`, `nanoclaw`, tombol **⚡ Terapkan Pengaturan** ditampilkan di kartu agen. Menekan tombol ini secara otomatis memperbarui file pengaturan lokal agen tersebut.
-
-| Tombol | Jenis Agen | File yang Diterapkan |
-|------|-------------|-------------|
-| ⚡ Terapkan Pengaturan Cline | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| ⚡ Terapkan Pengaturan Claude Code | `claude-code` | `~/.claude/settings.json` |
-| ⚡ Terapkan Pengaturan OpenClaw | `openclaw` | `~/.openclaw/openclaw.json` |
-| ⚡ Terapkan Pengaturan NanoClaw | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> ⚠️ Tombol ini mengirim permintaan ke **localhost:56244** (proxy lokal). Proxy harus berjalan di mesin tersebut agar berfungsi.
-
----
-
-#### 🔀 Pengurutan Kartu Drag and Drop (v0.1.17, ditingkatkan v0.1.25)
-
-Kartu agen di dashboard dapat **di-drag** untuk diatur ulang sesuai urutan yang diinginkan.
-
-1. Pegang area **lampu lalu lintas (●)** di kiri atas kartu dengan mouse dan drag
-2. Lepaskan di atas kartu posisi yang diinginkan, urutan akan berubah
-
-> 💡 Body kartu (field input, tombol dll) tidak bisa di-drag. Hanya bisa dipegang dari area lampu lalu lintas.
-
-#### 🟠 Deteksi Proses Agen (v0.1.25)
-
-Saat proxy beroperasi normal tapi proses agen lokal (NanoClaw, OpenClaw) mati, lampu lalu lintas kartu berubah **oranye (berkedip)** dan pesan "Proses agen berhenti" ditampilkan.
-
-- 🟢 Hijau: Proxy + agen normal
-- 🟠 Oranye (berkedip): Proxy normal, agen mati
-- 🔴 Merah: Proxy offline
-3. Urutan yang diubah **langsung disimpan di server** dan tetap ada setelah refresh
-
-> 💡 Belum didukung di perangkat sentuh (mobile/tablet). Gunakan browser desktop.
-
----
-
-#### 🔄 Sinkronisasi Model Dua Arah (v0.1.16)
-
-Saat mengganti model agen di dashboard brankas, pengaturan lokal agen tersebut otomatis diperbarui.
-
-**Untuk Cline:**
-- Ubah model di brankas → event SSE → proxy memperbarui field model di `globalState.json`
-- Target pembaruan: `actModeOpenAiModelId`, `planModeOpenAiModelId`, `openAiModelId`
-- `openAiBaseUrl` dan API key tidak disentuh
-- **Diperlukan reload VS Code (`Ctrl+Alt+R` atau `Ctrl+Shift+P` → `Developer: Reload Window`)**
-  - Karena Cline tidak membaca ulang file pengaturan saat berjalan
-
-**Untuk Claude Code:**
-- Ubah model di brankas → event SSE → proxy memperbarui field `model` di `settings.json`
-- Otomatis mencari path WSL dan Windows (`~/.claude/`, `/mnt/c/Users/*/.claude/`)
-
-**Arah sebaliknya (agen → brankas):**
-- Agen (Cline, Claude Code dll) mengirim permintaan ke proxy, proxy menyertakan informasi layanan/model klien dalam heartbeat
-- Layanan/model yang sedang digunakan ditampilkan secara real-time di kartu agen dashboard brankas
-
-> 💡 **Poin penting**: Proxy mengidentifikasi agen dari token Authorization permintaan dan otomatis me-routing ke layanan/model yang diatur di brankas. Meskipun Cline atau Claude Code mengirim nama model yang berbeda, proxy meng-override dengan pengaturan brankas.
-
----
-
-### Menggunakan Cline di VS Code — Panduan Detail
-
-#### Langkah 1: Instal Cline
-
-Instal **Cline** (ID: `saoudrizwan.claude-dev`) dari VS Code Extension Marketplace.
-
-#### Langkah 2: Daftarkan Agen di Brankas
-
-1. Buka dashboard brankas (`http://IP-brankas:56243`)
-2. Klik **+ Tambah** di bagian **Agen**
-3. Masukkan sebagai berikut:
-
-| Field | Nilai | Keterangan |
-|------|----|------|
-| ID | `cline_saya` | Identifier unik (huruf Inggris, tanpa spasi) |
-| Nama | `Cline Saya` | Nama yang ditampilkan di dashboard |
-| Jenis Agen | `cline` | ← wajib pilih `cline` |
-| Layanan | Pilih layanan yang akan digunakan (contoh: `google`) | |
-| Model | Masukkan model yang akan digunakan (contoh: `gemini-2.5-flash`) | |
-
-4. Tekan **Simpan**, token otomatis dihasilkan
-
-#### Langkah 3: Hubungkan ke Cline
-
-**Metode A — Auto-apply (Disarankan)**
-
-1. Pastikan **proxy** wall-vault berjalan di mesin tersebut (`localhost:56244`)
-2. Klik tombol **⚡ Terapkan Pengaturan Cline** di kartu agen dashboard
-3. Jika muncul notifikasi "Pengaturan berhasil diterapkan!", berarti sukses
-4. Reload VS Code (`Ctrl+Alt+R`)
-
-**Metode B — Pengaturan Manual**
-
-Buka pengaturan (⚙️) di sidebar Cline:
-- **API Provider**: `OpenAI Compatible`
-- **Base URL**: `http://alamat-proxy:56244/v1`
-  - Jika di mesin yang sama: `https://localhost:56244/v1`
-  - Jika di mesin lain seperti server mini: `http://192.168.1.20:56244/v1`
-- **API Key**: Token yang diterbitkan dari brankas (salin dari kartu agen)
-- **Model ID**: Model yang diatur di brankas (contoh: `gemini-2.5-flash`)
-
-#### Langkah 4: Verifikasi
-
-Kirim pesan apa saja di jendela chat Cline. Jika normal:
-- Kartu agen tersebut di dashboard brankas akan menampilkan **titik hijau (● Berjalan)**
-- Layanan/model saat ini ditampilkan di kartu (contoh: `google / gemini-2.5-flash`)
-
-#### Mengganti Model
-
-Saat ingin mengganti model Cline, ubah dari **dashboard brankas**:
-
-1. Ubah dropdown layanan/model di kartu agen
-2. Klik **Terapkan**
-3. Reload VS Code (`Ctrl+Alt+R`) — nama model di footer Cline akan diperbarui
-4. Permintaan berikutnya akan menggunakan model baru
-
-> 💡 Sebenarnya proxy mengidentifikasi permintaan Cline berdasarkan token dan me-routing ke model pengaturan brankas. Meskipun tidak reload VS Code, **model yang benar-benar digunakan langsung berubah** — reload hanya untuk memperbarui tampilan model di UI Cline.
-
-#### Deteksi Pemutusan Koneksi
-
-Saat VS Code ditutup, di dashboard brankas sekitar **90 detik** kemudian kartu agen menjadi kuning (lambat), **3 menit** kemudian merah (offline). (Sejak v0.1.18, pengecekan status interval 15 detik membuat deteksi offline lebih cepat.)
-
-#### Pemecahan Masalah
-
-| Gejala | Penyebab | Solusi |
-|------|------|------|
-| Error "koneksi gagal" di Cline | Proxy tidak berjalan atau alamat salah | Periksa proxy dengan `curl https://localhost:56244/health` |
-| Titik hijau tidak muncul di brankas | API key (token) belum diatur | Klik tombol **⚡ Terapkan Pengaturan Cline** lagi |
-| Model footer Cline tidak berubah | Cline meng-cache pengaturan | Reload VS Code (`Ctrl+Alt+R`) |
-| Nama model yang salah ditampilkan | Bug lama (diperbaiki di v0.1.16) | Perbarui proxy ke v0.1.16+ |
-
----
-
-#### 🟣 Tombol Salin Perintah Deploy — Untuk menginstal di mesin baru
-
-Digunakan saat pertama kali menginstal proxy wall-vault di komputer baru dan menghubungkan ke brankas. Saat tombol diklik, seluruh skrip instalasi disalin. Tempel di terminal komputer baru dan jalankan, yang berikut ini diproses sekaligus:
-
-1. Instal binary wall-vault (dilewati jika sudah terinstal)
-2. Pendaftaran otomatis layanan user systemd
-3. Mulai layanan dan koneksi otomatis ke brankas
-
-> 💡 Token agen dan alamat server brankas sudah terisi dalam skrip, jadi setelah ditempel bisa langsung dijalankan tanpa modifikasi.
-
----
-
-### Kartu Layanan
-
-Kartu untuk mengaktifkan/menonaktifkan atau mengatur layanan AI yang digunakan.
-
-- Toggle switch aktif/nonaktif per layanan
-- Jika alamat server AI lokal (Ollama, LM Studio, vLLM, llama.cpp dll yang berjalan di komputer Anda) dimasukkan, model yang tersedia ditemukan secara otomatis.
-- **Tampilan status koneksi layanan lokal**: Titik ● di samping nama layanan berwarna **hijau** jika terhubung, **abu-abu** jika tidak terhubung
-- **Lampu lalu lintas otomatis layanan lokal** (v0.1.23+): Layanan lokal (Ollama, LM Studio, vLLM, llama.cpp) otomatis aktif saat bisa terhubung, otomatis nonaktif saat terputus. Cara yang sama seperti auto-toggle berbasis API key pada layanan cloud (Google, OpenRouter dll).
-- **Toggle mode reasoning** (v0.2.17+): Checkbox **mode reasoning** muncul di bagian bawah jendela edit layanan lokal. Jika diaktifkan, proxy menambahkan `"reasoning": true` ke body chat-completions yang dikirim ke upstream, sehingga model yang mendukung output proses berpikir seperti DeepSeek R1, Qwen QwQ mengembalikan blok `<think>…</think>` bersama respons. Server yang tidak mengenali field ini akan mengabaikannya, jadi aman untuk tetap diaktifkan bahkan pada workload campuran.
-
-> 💡 **Jika layanan lokal berjalan di komputer lain**: Masukkan IP komputer tersebut di kolom URL layanan. Contoh: `http://192.168.1.20:11434` (Ollama), `http://192.168.1.20:1234` (LM Studio), `http://192.168.1.20:8080` (llama.cpp). Jika layanan hanya bind ke `127.0.0.1` bukan `0.0.0.0`, koneksi via IP eksternal tidak akan berfungsi, periksa alamat bind di pengaturan layanan.
-
-### Input Token Admin
-
-Saat mencoba menggunakan fitur penting seperti menambah/menghapus key di dashboard, popup input token admin muncul. Masukkan token yang diatur di wizard setup. Setelah dimasukkan sekali, tetap berlaku sampai browser ditutup.
-
-> ⚠️ **Jika kegagalan autentikasi melebihi 10 kali dalam 15 menit, IP tersebut akan diblokir sementara.** Jika lupa token, periksa item `admin_token` di file `wall-vault.yaml`.
-
----
-
-## Mode Terdistribusi (Multi Bot)
-
-Konfigurasi untuk **berbagi satu brankas kunci** saat menjalankan OpenClaw di beberapa komputer secara bersamaan. Nyaman karena manajemen kunci cukup dari satu tempat.
-
-### Contoh Konfigurasi
-
-```
-[Server Brankas Kunci]
-  wall-vault vault    (brankas kunci :56243, dashboard)
-
-[WSL Alpha]            [Raspberry Pi Gamma]    [Mac Mini Lokal]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  ↕ sinkronisasi SSE    ↕ sinkronisasi SSE      ↕ sinkronisasi SSE
-```
-
-Semua bot melihat server brankas di tengah, jadi saat mengganti model atau menambah key di brankas, langsung diterapkan ke semua bot.
-
-### Langkah 1: Mulai Server Brankas Kunci
-
-Jalankan di komputer yang akan digunakan sebagai server brankas:
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### Langkah 2: Daftarkan Setiap Bot (Klien)
+Dashboard sekarang dapat dijangkau di `https://<vault-host>:56243`. Tambahkan agen untuk setiap proxy jarak jauh di kartu **Clients**; masing-masing menghasilkan `vault_token` unik.
 
-Daftarkan informasi setiap bot yang terhubung ke server brankas terlebih dahulu:
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer token-admin" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "Bot A",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### Langkah 3: Mulai Proxy di Setiap Komputer Bot
-
-Jalankan proxy dengan menentukan alamat server brankas dan token di setiap komputer tempat bot terinstal:
+### Host proxy
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> 💡 Ganti bagian **`192.168.x.x`** dengan alamat IP internal aktual komputer server brankas. Bisa diperiksa dari pengaturan router atau perintah `ip addr`.
+Proxy mengautentikasi terhadap vault, membuka stream SSE, dan menerapkan konfigurasi apa pun yang diterimanya (layanan pilihan, override model, fallback chain). Edit vault berikutnya mendarat dalam hitungan detik tanpa restart.
+
+Untuk instalasi yang melintasi LAN, aktifkan TLS pada host vault (`WV_VAULT_TLS_ENABLED=1` + variabel lingkungan cert/key) dan jalankan setiap host proxy melalui langkah `wall-vault cert install-trust` yang sama sehingga panggilan HTTPS proxy ke vault dipercaya.
 
 ---
 
-## Pengaturan Auto-Start
+## Auto-start
 
-Jika merepotkan harus menjalankan wall-vault secara manual setiap kali komputer di-restart, daftarkan sebagai system service. Setelah didaftarkan sekali, otomatis dimulai saat boot.
+### systemd (Linux)
 
-### Linux — systemd (Kebanyakan Linux)
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd adalah sistem yang mengelola dan memulai program secara otomatis di Linux:
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # so the unit keeps running after logout
 ```
 
-Lihat log:
+Untuk vault di host yang sama, tulis `wall-vault-vault.service` paralel. Untuk mode standalone, satu unit yang memanggil `wall-vault start` sudah cukup.
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-Sistem yang bertanggung jawab atas eksekusi otomatis program di macOS:
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. Unduh NSSM dari [nssm.cc](https://nssm.cc/download) dan tambahkan ke PATH.
-2. Di PowerShell Administrator:
-
-```powershell
-wall-vault doctor deploy windows
-```
+Gunakan `nssm` untuk membungkus `wall-vault.exe start` sebagai layanan Windows, atau entri `schtasks` yang berjalan saat user logon.
 
 ---
 
-## Doctor (Dokter)
+## Plugin yamls
 
-Perintah `doctor` adalah alat untuk **mendiagnosis dan memperbaiki sendiri** apakah wall-vault dikonfigurasi dengan benar.
+Backend OpenAI-compatible apa pun dapat ditambahkan tanpa perubahan kode dengan menjatuhkan yaml di bawah `~/.wall-vault/services/`. wall-vault memuatnya pada startup dan mendaftarkan layanan untuk dispatch, set deteksi OAI-compat, dan jembatan Gemini-stream.
 
-```bash
-wall-vault doctor check   # Diagnosis status saat ini (hanya baca, tidak mengubah apa pun)
-wall-vault doctor fix     # Perbaiki masalah secara otomatis
-wall-vault doctor all     # Diagnosis + perbaikan otomatis sekaligus
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # unique service id
+name: llama.cpp              # human label
+enabled: true                # disabled plugins are skipped at load
+
+default_url: http://localhost:8080   # operator override; env wins (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # for query_param: the param name (e.g. "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # let the dashboard auto-detect models
+  dynamic: true              # re-fetch on every dashboard open
+  auto_detect_url: true      # try /v1/models even when not declared
+
+concurrency:
+  max: 1                     # max concurrent requests to this backend
+  queue_size: 10
+  wait_notify: true          # show "queued" hint to TUI agents
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# Opt in to qwen3-family inline /no_think directive when reasoning is off.
+# Set true if your backend's chat template strips the marker (LM Studio's
+# jinja, Ollama's /v1 layer). Other backends typically echo the literal
+# text back, so this stays opt-in per yaml.
+inline_no_think_for_qwen3: false
+
+# Hub topology — point at another wall-vault. Required when this plugin
+# fronts a remote wall-vault (so the receiving wall-vault sees the
+# publisher prefix and routes correctly) and so the bearer token in
+# proxy.vault_token is sent as Authorization.
+preserve_model_id: false
+tls_internal_ca: false       # add ~/.wall-vault/ca.crt to client trust pool
 ```
 
-> 💡 Jika ada yang terasa aneh, jalankan `wall-vault doctor all` terlebih dahulu. Banyak masalah terdeteksi secara otomatis.
+Set yang dibundel di `configs/services/` (lmstudio, vllm, llamacpp, tgwui, localai, jan, koboldcpp, tabbyapi, mlx-server, litellm-proxy, ollama, google, openrouter) dikirim dinonaktifkan secara default. Salin yang Anda inginkan ke `~/.wall-vault/services/`, atur `enabled: true`, restart.
 
 ---
 
-## Penghematan Token RTK
+## Doctor
 
-*(v0.1.24+)*
+`wall-vault doctor` menjalankan probe kesehatan sekali jalan di seluruh instalasi:
 
-**RTK (Alat Penghematan Token)** secara otomatis mengompresi output perintah shell yang dijalankan oleh agen coding AI (Claude Code dll) untuk mengurangi penggunaan token. Misalnya, output 15 baris dari `git status` diringkas menjadi 2 baris.
-
-### Penggunaan Dasar
-
-```bash
-# Bungkus perintah dengan wall-vault rtk, output otomatis difilter
-wall-vault rtk git status          # Hanya daftar file yang berubah
-wall-vault rtk git diff HEAD~1     # Baris yang berubah + context minimal
-wall-vault rtk git log -10         # Hash + pesan satu baris
-wall-vault rtk go test ./...       # Hanya tampilkan test yang gagal
-wall-vault rtk ls -la              # Perintah yang tidak didukung otomatis dipotong
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
 ```
 
-### Perintah yang Didukung dan Efek Penghematan
+Setiap baris adalah salah satu dari:
 
-| Perintah | Metode Filter | Tingkat Penghematan |
-|------|----------|--------|
-| `git status` | Hanya ringkasan file yang berubah | ~87% |
-| `git diff` | Baris yang berubah + 3 baris context | ~60-94% |
-| `git log` | Hash + pesan baris pertama | ~90% |
-| `git push/pull/fetch` | Hapus progress, hanya ringkasan | ~80% |
-| `go test` | Hanya tampilkan gagal, hitung yang lulus | ~88-99% |
-| `go build/vet` | Hanya error | ~90% |
-| Semua perintah lainnya | 50 baris pertama + 50 baris terakhir, maks 32KB | Bervariasi |
+- `✓` — sehat
+- `⚠` — terdegradasi tetapi berfungsi (satu key cooldown, kuota rendah, dll.)
+- `✗` — rusak
+- `SKIP` — tidak dikonfigurasi / tidak berlaku pada host ini
 
-### Pipeline Filter 3 Tahap
+Mode daemon kedua menjalankan probe yang sama setiap `doctor.interval` (default 5 menit) dan menulis hasil ke `doctor.log_file` (default `/tmp/wall-vault-doctor.log`). Ketika `doctor.auto_fix` true, ia juga mencoba memperbaiki drift umum (konfigurasi OpenClaw basi, trust TLS hilang, layanan yang dapat di-restart).
 
-1. **Filter struktur per perintah** — Memahami format output git, go dll dan mengekstrak bagian yang bermakna
-2. **Post-processing regex** — Hapus kode warna ANSI, kurangi baris kosong, kumpulkan baris duplikat
-3. **Passthrough + Pemotongan** — Untuk perintah yang tidak didukung, simpan 50 baris pertama/terakhir
-
-### Integrasi Claude Code
-
-Semua perintah shell bisa diatur untuk otomatis melewati RTK menggunakan hook `PreToolUse` Claude Code.
-
-```bash
-# Instal hook (otomatis ditambahkan ke settings.json Claude Code)
-wall-vault rtk hook install
-```
-
-Atau tambahkan secara manual ke `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
-
-> 💡 **Preservasi exit code**: RTK mengembalikan exit code perintah asli apa adanya. Jika perintah gagal (exit code ≠ 0), AI juga mendeteksi kegagalan dengan akurat.
-
-> 💡 **Paksa bahasa Inggris**: RTK menjalankan perintah dengan `LC_ALL=C` agar selalu menghasilkan output bahasa Inggris terlepas dari pengaturan bahasa sistem. Ini agar filter bekerja dengan akurat.
+Trigger sekali jalan dari dashboard melalui kartu **Doctor** atau `wall-vault doctor`.
 
 ---
 
-## Referensi Variabel Lingkungan
+## Hooks
 
-Variabel lingkungan adalah cara meneruskan nilai pengaturan ke program. Ketik di terminal dalam format `export nama-variabel=nilai`, atau letakkan di file layanan auto-start agar selalu diterapkan.
+Jalankan perintah shell pada event utama:
 
-| Variabel | Keterangan | Contoh Nilai |
-|------|------|---------|
-| `WV_LANG` | Bahasa dashboard | `ko`, `en`, `ja` |
-| `WV_THEME` | Tema dashboard | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | API key Google (beberapa dengan koma) | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | API key OpenRouter | `sk-or-v1-...` |
-| `WV_VAULT_URL` | Alamat server brankas dalam mode terdistribusi | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | Token autentikasi klien (bot) | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | Token admin | `admin-token-here` |
-| `WV_MASTER_PASS` | Kata sandi enkripsi API key | `my-password` |
-| `WV_AVATAR` | Path file gambar avatar (path relatif dari `~/.openclaw/`) | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Alamat server lokal Ollama | `http://192.168.x.x:11434` |
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # if set, OpenClaw TUI receives events over this Unix socket
+```
+
+Setiap hook mendapat variabel lingkungan spesifik-event (`SERVICE`, `MODEL`, `ERROR`, `AGENT`, `LEVEL`, `MSG`). Hook berjalan async dengan timeout 5 detik — proxy tidak pernah blok pada hook yang lambat.
 
 ---
 
-## Pemecahan Masalah
+## Variabel lingkungan
 
-### Proxy Tidak Bisa Dimulai
+| Variabel | Field YAML |
+|----------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | One-shot import: comma-separated Google keys |
+| `WV_KEY_OPENROUTER` | One-shot import: OpenRouter keys |
+| `WV_KEY_ANTHROPIC` | One-shot import: Anthropic keys |
+| `WV_KEY_OPENAI` | One-shot import: OpenAI keys |
+| `WV_OLLAMA_URL` | Per-host Ollama URL override |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Per-backend URL override |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
 
-Penyebab umum adalah port sudah digunakan oleh program lain.
-
-```bash
-ss -tlnp | grep 56244   # Periksa siapa yang menggunakan port 56244
-wall-vault proxy --port 8080   # Mulai dengan nomor port lain
-```
-
-### Error API Key (429, 402, 401, 403, 582)
-
-| Kode Error | Arti | Penanganan |
-|----------|------|----------|
-| **429** | Terlalu banyak permintaan (batas penggunaan terlampaui) | Tunggu sebentar atau tambah key lain |
-| **402** | Pembayaran diperlukan atau kredit habis | Isi ulang kredit di layanan terkait |
-| **401 / 403** | Key salah atau tidak ada izin | Periksa ulang nilai key dan daftarkan kembali |
-| **582** | Gateway overload (cooldown 5 menit) | Otomatis dilepas setelah 5 menit |
-
-```bash
-# Periksa daftar dan status key terdaftar
-curl -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys
-
-# Reset counter penggunaan key
-curl -X POST -H "Authorization: Bearer token-admin" https://localhost:56243/admin/keys/reset
-```
-
-### Agen Menampilkan "Belum Terhubung"
-
-"Belum terhubung" berarti proses proxy tidak mengirim sinyal (heartbeat) ke brankas. **Ini bukan berarti pengaturan tidak tersimpan.** Proxy harus berjalan dengan mengetahui alamat server brankas dan token agar menjadi status terhubung.
-
-```bash
-# Mulai proxy dengan menentukan alamat server brankas, token, ID klien
-WV_VAULT_URL=http://alamat-server-brankas:56243 \
-WV_VAULT_TOKEN=token-klien \
-WV_VAULT_CLIENT_ID=ID-klien \
-wall-vault proxy
-```
-
-Jika koneksi berhasil, dalam sekitar 20 detik akan muncul 🟢 Berjalan di dashboard.
-
-### Ollama Tidak Bisa Terhubung
-
-Ollama adalah program yang menjalankan AI langsung di komputer Anda. Pertama periksa apakah Ollama menyala.
-
-```bash
-curl http://localhost:11434/api/tags   # Jika daftar model muncul, normal
-export OLLAMA_URL=http://192.168.x.x:11434   # Jika berjalan di komputer lain
-```
-
-> ⚠️ Jika Ollama tidak merespons, mulai Ollama terlebih dahulu dengan perintah `ollama serve`.
-
-> ⚠️ **Model besar lambat**: Model besar seperti `qwen3.5:35b`, `deepseek-r1` bisa memakan waktu beberapa menit untuk menghasilkan respons. Meskipun terlihat tidak ada respons, proses mungkin masih berjalan normal, harap tunggu.
+Setiap variabel env, ketika diatur, mengalahkan file YAML.
 
 ---
 
-## Perubahan Terbaru (v0.1.16 ~ v0.1.27)
+## Pemecahan masalah
 
-### v0.1.27 (2026-04-09)
-- **Perbaikan nama model fallback Ollama**: Saat fallback dari layanan lain ke Ollama, nama model dengan prefix provider (contoh: `google/gemini-3.1-pro-preview`) dikirim apa adanya ke Ollama. Sekarang otomatis diganti dengan variabel lingkungan/model default.
-- **Pengurangan drastis waktu cooldown**: 429 rate limit 30 menit→5 menit, 402 pembayaran 1 jam→30 menit, 401/403 24 jam→6 jam. Mencegah situasi di mana semua key cooldown bersamaan dan proxy lumpuh total.
-- **Coba paksa saat semua cooldown**: Saat semua key dalam status cooldown, coba paksa dengan key yang paling cepat selesai cooldown untuk mencegah penolakan permintaan.
-- **Perbaikan tampilan daftar layanan**: Respons `/status` menampilkan daftar layanan aktual yang disinkronisasi dari vault (mencegah absennya anthropic dll).
+### `connection refused` di `:56244`
 
-### v0.1.25 (2026-04-08)
-- **Deteksi proses agen**: Proxy mendeteksi apakah agen lokal (NanoClaw/OpenClaw) masih hidup dan menampilkan lampu lalu lintas oranye di dashboard.
-- **Perbaikan drag handle**: Saat mengurutkan kartu, hanya bisa dipegang dari area lampu lalu lintas (●). Tidak ada drag tidak sengaja dari field input atau tombol.
+Entah proxy tidak berjalan atau terikat ke host yang berbeda. Periksa:
 
-### v0.1.24 (2026-04-06)
-- **Subperintah penghematan token RTK**: `wall-vault rtk <command>` otomatis memfilter output perintah shell, mengurangi penggunaan token agen AI sebesar 60-90%. Filter bawaan untuk perintah utama seperti git, go, perintah yang tidak didukung juga otomatis dipotong. Integrasi transparan melalui hook `PreToolUse` Claude Code.
+```bash
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
+```
 
-### v0.1.23 (2026-04-06)
-- **Perbaikan perubahan model Ollama**: Model Ollama yang diubah dari dashboard brankas tidak benar-benar diterapkan ke proxy. Sebelumnya hanya menggunakan variabel lingkungan (`OLLAMA_MODEL`), sekarang pengaturan brankas yang diprioritaskan.
-- **Lampu lalu lintas otomatis layanan lokal**: Ollama/LM Studio/vLLM otomatis aktif saat bisa terhubung, otomatis nonaktif saat terputus. Sama seperti auto-toggle berbasis key layanan cloud.
+Jika berjalan di port yang berbeda, konfigurasi Anda memiliki `proxy.port` yang dioverride — periksa `~/.wall-vault/config.yaml`.
 
-### v0.1.22 (2026-04-05)
-- **Perbaikan field content kosong yang hilang**: Saat model thinking (gemini-3.1-pro, o1, claude thinking dll) menghabiskan batas max_tokens pada reasoning dan tidak bisa membuat respons aktual, proxy menghilangkan field `content`/`text` di JSON respons dengan `omitempty` menyebabkan klien SDK OpenAI/Anthropic crash dengan error `Cannot read properties of undefined (reading 'trim')`. Diubah agar selalu menyertakan field sesuai spesifikasi API resmi.
+### `x509: certificate signed by unknown authority`
 
-### v0.1.21 (2026-04-05)
-- **Dukungan model Gemma 4**: Model seri Gemma seperti `gemma-4-31b-it`, `gemma-4-26b-a4b-it` dll bisa digunakan melalui Google Gemini API.
-- **Dukungan resmi layanan LM Studio / vLLM**: Sebelumnya layanan ini terlewat di routing proxy dan selalu digantikan Ollama. Sekarang routing normal via API kompatibel OpenAI.
-- **Perbaikan tampilan layanan dashboard**: Meskipun terjadi fallback, dashboard selalu menampilkan layanan yang diatur pengguna.
-- **Tampilan status layanan lokal**: Saat dashboard dimuat, status koneksi layanan lokal (Ollama, LM Studio, vLLM dll) ditampilkan dengan warna titik ●.
-- **Variabel lingkungan filter tool**: Mode penerusan tool bisa diatur dengan variabel lingkungan `WV_TOOL_FILTER=passthrough`.
+Klien tidak mempercayai CA internal wall-vault. Jalankan `wall-vault cert install-trust` di mesin klien. Untuk agen yang runtime-nya mengabaikan trust store OS (mis. Node dengan `NODE_EXTRA_CA_CERTS` hardcoded), gunakan pendamping HTTP loopback di `127.0.0.1:56245` (hanya same-host) atau atur `WV_PROXY_TLS_ENABLED=0` untuk fallback ke HTTP biasa.
 
-### v0.1.20 (2026-03-28)
-- **Penguatan keamanan komprehensif**: Pencegahan XSS (41 lokasi), perbandingan token waktu konstan, pembatasan CORS, batas ukuran permintaan, pencegahan traversal path, autentikasi SSE, penguatan rate limiter dll 12 item keamanan ditingkatkan.
+### `token not registered with vault`
 
-### v0.1.19 (2026-03-27)
-- **Deteksi Claude Code online**: Claude Code yang tidak melalui proxy juga ditampilkan online di dashboard.
+`Authorization: Bearer <token>` klien tidak cocok dengan klien terdaftar mana pun. Verifikasi token di bawah **Clients** di dashboard. Jika Anda menyalin literal token seperti `proxy-managed`, `dummy`, atau `""` dari konfigurasi basi, ganti dengan token klien yang sebenarnya.
 
-### v0.1.18 (2026-03-26)
-- **Perbaikan layanan fallback macet**: Setelah fallback ke Ollama karena error sementara, otomatis kembali saat layanan asli pulih.
-- **Peningkatan deteksi offline**: Pengecekan status interval 15 detik membuat deteksi penghentian proxy lebih cepat.
+### `Anthropic dispatch needs a Claude model id`
 
-### v0.1.17 (2026-03-25)
-- **Pengurutan kartu drag and drop**: Kartu agen bisa diseret untuk mengubah urutan.
-- **Tombol apply pengaturan inline**: Tombol [⚡ Terapkan Pengaturan] ditampilkan di agen offline.
-- **Jenis agen cokacdir ditambahkan.**
+Perilaku default per v0.2.63: ID model non-Claude yang dikirim ke dispatch anthropic mengembalikan error. Entah perbaiki routing (jangan kirim `gemini-2.5-flash` ke anthropic) atau opt in ke rewrite otomatis melalui `proxy.anthropic_fallback_model`.
 
-### v0.1.16 (2026-03-25)
-- **Sinkronisasi model dua arah**: Mengubah model Cline/Claude Code dari dashboard brankas otomatis diterapkan.
+### `unknown service: <id>`
+
+Dispatch melihat ID layanan yang tidak diklaim oleh plugin yaml mana pun. Periksa:
+
+```bash
+ls ~/.wall-vault/services/        # any plugin yaml present?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
+```
+
+Jika yaml ada tetapi `enabled: false`, balik. Jika hilang sepenuhnya, salin dari `configs/services/` di source tree.
+
+### Respons kosong pada model reasoning
+
+`qwen3.6`, `deepseek-r1`, dan keluarga GPT-`o1` kadang-kadang hanya memancarkan `reasoning_content` dan meninggalkan `content` kosong. Per v0.2.63 wall-vault fallback ke teks reasoning secara otomatis — jika Anda masih melihat respons kosong, backend tidak mengembalikan field manapun. Periksa log upstream.
+
+Untuk LM Studio dengan qwen3 secara khusus, atur `inline_no_think_for_qwen3: true` di plugin yaml sehingga reasoning dinonaktifkan secara inline. lmstudio.yaml dan ollama.yaml bawaan sudah melakukan ini.
+
+### Dashboard menampilkan "all keys on cooldown" tetapi saya baru saja menambahkan satu
+
+Key baru sehat tetapi jalur dispatch mungkin masih dalam cooldown untuk key yang lebih lama. Coba permintaan baru — proxy round-robin per panggilan, dan key yang sehat akan dipilih berikutnya.
+
+### Vault tidak akan unlock dengan kata sandi master
+
+Kata sandi salah. Tidak ada pemulihan — wall-vault sengaja tidak mengirim backdoor. Jika Anda benar-benar kehilangan kata sandi master, satu-satunya jalan adalah menghapus `~/.wall-vault/data/vault.json`, restart dengan kata sandi baru, dan menambahkan ulang key.
+
+### Batas tier-gratis OpenRouter terkena
+
+Atur `proxy.services` untuk menyertakan `openrouter` dan tambahkan setidaknya satu key OpenRouter. Proxy auto-fallback dari model berbayar ke varian `:free`-nya ketika jalur berbayar mengembalikan 402 / 429.
+
+### `journalctl --user -u wall-vault-proxy` kosong
+
+Log systemd `--user` masuk ke journal user yang menjalankannya. Jika Anda memulai unit sebagai `root` atau via `sudo`, journal ada di instance sistem sebagai gantinya — coba `journalctl -u wall-vault-proxy` tanpa `--user`.
 
 ---
 
-*Untuk informasi API lebih detail, lihat [API.md](API.md).*
+## Lainnya
+
+- Referensi HTTP API — lihat [API.md](API.md)
+- Source — `https://github.com/sookmook/wall-vault`
+- Laporan bug / permintaan fitur — GitHub Issues
+- Riwayat rilis — [CHANGELOG.md](../CHANGELOG.md)

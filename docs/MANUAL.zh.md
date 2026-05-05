@@ -1,931 +1,620 @@
 # wall-vault 用户手册
-*(Last updated: 2026-04-16 — v0.2.2)*
 
----
+[English](MANUAL.md) · [한국어](MANUAL.ko.md) · **中文** · [日本語](MANUAL.ja.md) · [Español](MANUAL.es.md) · [Français](MANUAL.fr.md) · [Deutsch](MANUAL.de.md) · [Português](MANUAL.pt.md) · [العربية](MANUAL.ar.md) · [हिन्दी](MANUAL.hi.md) · [Bahasa Indonesia](MANUAL.id.md) · [ภาษาไทย](MANUAL.th.md) · [Kiswahili](MANUAL.sw.md) · [Hausa](MANUAL.ha.md) · [नेपाली](MANUAL.ne.md) · [Монгол](MANUAL.mn.md) · [isiZulu](MANUAL.zu.md)
+
+本手册涵盖 wall-vault 的安装、配置和操作。如需概览,请参阅 [README](../README.md)。如需 HTTP API 详细信息,请参阅 [API 参考](API.md)。
 
 ## 目录
 
-1. [什么是 wall-vault？](#什么是-wall-vault)
+1. [wall-vault 的功能](#wall-vault-的功能)
 2. [安装](#安装)
-3. [初次启动（setup 向导）](#初次启动)
-4. [注册 API 密钥](#注册-api-密钥)
-5. [代理使用方法](#代理使用方法)
-6. [密钥金库仪表盘](#密钥金库仪表盘)
-7. [分布式模式（多机器人）](#分布式模式多机器人)
-8. [自动启动设置](#自动启动设置)
-9. [Doctor 诊断工具](#doctor-诊断工具)
-10. [RTK 令牌节省](#rtk-令牌节省)
-11. [环境变量参考](#环境变量参考)
-12. [故障排除](#故障排除)
+3. [使用安装向导首次运行](#使用安装向导首次运行)
+4. [启用 TLS](#启用-tls)
+5. [注册 API 密钥](#注册-api-密钥)
+6. [连接代理](#连接代理)
+7. [仪表板](#仪表板)
+8. [分布式模式](#分布式模式)
+9. [自启动](#自启动)
+10. [插件 yaml](#插件-yaml)
+11. [Doctor](#doctor)
+12. [Hooks](#hooks)
+13. [环境变量](#环境变量)
+14. [故障排查](#故障排查)
 
 ---
 
-## v0.2 升级说明
+## wall-vault 的功能
 
-- `Service` 新增了 `default_model` 和 `allowed_models` 字段。服务级别的默认模型现在直接在服务卡片上设置。
-- `Client.default_service` / `default_model` 已重命名并重新解释为 `preferred_service` / `model_override`。如果 override 为空，则使用服务的默认模型。
-- 首次启动 v0.2 时，现有的 `vault.json` 会自动迁移，迁移前的状态保存为 `vault.json.pre-v02.{时间戳}.bak`。
-- 仪表盘已重构为三个区域：左侧边栏、中央卡片网格和右侧编辑滑动面板。
-- Admin API 路径保持不变，但请求/响应正文架构已更新——旧版 CLI 脚本需要相应更新。
+wall-vault 是一个单一 Go 二进制文件,捆绑了两个协同运行的服务:
 
----
+- **vault** 在静态状态下加密存储 API 密钥(使用主密码进行 AES-GCM 加密),按密钥跟踪使用情况和冷却时间,通过 Server-Sent Events(SSE)广播变更,并在 `:56243` 上为操作员提供 Web 仪表板。
+- **proxy** 在 `:56244` 上公开 Gemini、Anthropic、OpenAI 兼容和 Ollama 原生端点。任何指向 proxy 的 AI 客户端都使用 vault 中的密钥——客户端永远看不到这些密钥。当一个上游失败时,调度会按顺序回退到下一个提供商。
 
-## v0.2.1 新功能
+这在以下情况下非常有用:
 
-- **多模态透传（OpenAI → Gemini）**：`/v1/chat/completions` 除了 `text` 之外，现在还支持六种内容片段类型——`input_audio`、`input_video`、`input_image`、`input_file` 以及 `image_url`（支持 data URI 以及 ≤ 5 MB 的外部 http(s) URL）。代理会将每一种类型转换为 Gemini 的 `inlineData`。像 EconoWorld 这样的 OpenAI 兼容客户端可以直接流式传输音频 / 图像 / 视频二进制数据。
-- **EconoWorld 代理类型**：使用 `agentType: "econoworld"` 调用 `POST /agent/apply` 会将 wall-vault 设置写入项目的 `analyzer/ai_config.json`。`workDir` 接受以逗号分隔的候选路径列表，并会把 Windows 盘符路径转换为 WSL 挂载路径。
-- **仪表盘密钥网格 + CRUD**：11 把密钥以紧凑卡片形式呈现，配有 + 添加 / ✕ 删除滑动面板。
-- **服务添加 + 拖拽重新排序**：服务网格新增了 + 添加按钮以及拖拽手柄（`⋮⋮`）。
-- **页眉 / 页脚 / 主题动画 / 语言切换器**全部恢复。7 种主题（cherry/dark/light/ocean/gold/autumn/winter）的粒子特效在卡片下方、背景上方的图层播放。
-- **滑动面板关闭体验**：点击外部区域或按 `Esc` 即可关闭滑动面板。
-- **`SSE` 状态指示灯 + 正常运行时间计时器**：位于顶栏（topbar）的语言 / 主题选择器旁,`⏱ 运行时间` 计数器与 `● SSE` 指示灯（绿色 = 已连接，橙色 = 重连中，灰色 = 已断开）并排显示（自 v0.2.18 起从页脚移至头部 — 无需滚动即可查看状态）。
-
----
-
-## v0.2.2 Stability & UX Improvements
-
-- **Dispatch fast-skip**: cloud services whose keys are all on cooldown or exhausted are no longer force-retried. Dispatch moves to the next fallback immediately. Per-request tail latency dropped from ~15 s to ~1.5 s.
-- **Fallback model swap**: each fallback step now applies the target service's own `default_model`. Previously a `gemini-2.5-flash` request would be handed to Anthropic/Ollama verbatim and rejected (400/404).
-- **Anthropic credit-balance handling**: when Anthropic returns HTTP 400 with a "credit balance" body, the proxy promotes it to 402-equivalent and sets a 30 min cooldown so subsequent dispatches skip Anthropic automatically.
-- **Service edit default_model dropdown polish**:
-  - The server now renders the complete model list (Google 15, OpenRouter 345, etc.) into the `<select>` from the first open — no second round-trip required.
-  - `↓ Move to Allowed` button demotes the current default into the allowed_models textarea and clears the default.
-  - `✕ Clear` empties the default in place.
-  - Collapsible `Custom input` details block lets you type a model ID directly when the dropdown is unreachable.
-- **Agent edit/create model_override dropdown**: free text replaced by a `<select>` populated from the preferred service's `default_model` + `allowed_models`. Changing the preferred service auto-repopulates the override options.
-- **ClientInput v0.2 fields**: POST `/admin/clients` now accepts v0.2 canonical `preferred_service` / `model_override` alongside legacy `default_service` / `default_model` (legacy is a fallback).
-
----
-
-## 什么是 wall-vault？
-
-**wall-vault = OpenClaw 专用的 AI 代理（proxy） + API 密钥金库**
-
-使用 AI 服务需要 **API 密钥**。API 密钥就像一张**数字通行证**，用来证明"此人有资格使用该服务"。但是，这种通行证每天的使用次数有限，管理不当还有泄露的风险。
-
-wall-vault 将这些通行证保存在安全的金库中，并在 OpenClaw 和 AI 服务之间充当**代理（proxy）**角色。简单来说，OpenClaw 只需连接 wall-vault，其余复杂的事情由 wall-vault 自动处理。
-
-wall-vault 解决的问题：
-
-- **API 密钥自动轮换**：当某个密钥的使用量达到上限或被临时封锁（冷却）时，会静默切换到下一个密钥。OpenClaw 不会中断，继续正常工作。
-- **服务自动回退（fallback）**：如果 Google 没有响应，就切换到 OpenRouter；如果还不行，就自动切换到本地安装的 AI（Ollama、LM Studio、vLLM）。会话不会中断。当原始服务恢复后，下一个请求会自动切回（v0.1.18+，LM Studio/vLLM: v0.1.21+）。
-- **实时同步（SSE）**：在金库仪表盘中更改模型后，1-3 秒内即可在 OpenClaw 界面上反映。SSE（Server-Sent Events）是服务器向客户端实时推送变化的技术。
-- **实时通知**：密钥耗尽或服务故障等事件会立即显示在 OpenClaw TUI（终端界面）底部。
-
-> :bulb: **Claude Code、Cursor、VS Code** 也可以连接使用，但 wall-vault 的本来目的是配合 OpenClaw 使用。
+- 你拥有多个提供商的密钥,并希望代理只与一个 URL 通信。
+- 你希望免费层级密钥在冷却期间退场,而不打断会话。
+- 你希望在同一 LAN 上的多个机器人、IDE 或脚本使用相同的密钥,而无需复制凭证。
+- 你希望使用仪表板而非环境变量来编辑密钥和切换模型。
+- 你希望在云端额度用尽时使用本地回退(Ollama、LM Studio、vLLM)。
 
 ```
-OpenClaw（TUI 终端界面）
-        |
-        v
-  wall-vault 代理 (:56244)   <- 密钥管理、路由、回退、事件
-        |
-        +-- Google Gemini API
-        +-- OpenRouter API（340+ 个模型）
-        +-- Ollama / LM Studio / vLLM（本地机器，最后防线）
-        +-- OpenAI / Anthropic API
+   AI client (OpenClaw, Claude Code, Cursor, …)
+            │
+            ▼
+   wall-vault proxy  :56244
+            │  (selects key, dispatches, falls back on failure)
+            ├──► Google Gemini
+            ├──► Anthropic
+            ├──► OpenAI
+            ├──► OpenRouter (340+ models, auto :free fallback)
+            └──► Local OAI-compat backends (Ollama / LM Studio / vLLM / …)
+
+   vault (AES-GCM key store + dashboard)  :56243
+            ▲
+            │  SSE broadcast on change
+   Multiple proxies on different hosts can share one vault.
 ```
 
 ---
 
 ## 安装
 
-### Linux / macOS
-
-打开终端，直接粘贴以下命令：
+### Linux / macOS 一行命令
 
 ```bash
-# Linux（普通 PC、服务器 — amd64）
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
-  -o ~/.local/bin/wall-vault && chmod +x ~/.local/bin/wall-vault
-
-# macOS Apple Silicon（M1/M2/M3 Mac）
-curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
-  -o /usr/local/bin/wall-vault && chmod +x /usr/local/bin/wall-vault
+curl -fsSL https://raw.githubusercontent.com/sookmook/wall-vault/main/install.sh | sh
 ```
 
-- `curl -L ...` — 从网络下载文件。
-- `chmod +x` — 将下载的文件设为"可执行"。跳过此步骤会出现"权限不足"错误。
+该脚本自动检测 OS 和架构,将正确的二进制文件下载到 `~/.local/bin/wall-vault`,并使其可执行。如果 `~/.local/bin` 不在你的 `PATH` 中,请添加:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### 手动下载
+
+每次发布都会在 `https://github.com/sookmook/wall-vault/releases` 上发布预构建的二进制文件。
+
+```bash
+# Linux amd64
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-amd64 \
+  -o wall-vault && chmod +x wall-vault
+
+# Linux arm64 (Raspberry Pi、ARM 服务器)
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-linux-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Apple Silicon
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-arm64 \
+  -o wall-vault && chmod +x wall-vault
+
+# macOS Intel
+curl -L https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-darwin-amd64 \
+  -o wall-vault && chmod +x wall-vault
+```
 
 ### Windows
 
-打开 PowerShell（管理员权限）并执行以下命令：
-
 ```powershell
-# 下载
 Invoke-WebRequest -Uri `
   "https://github.com/sookmook/wall-vault/releases/latest/download/wall-vault-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\Programs\wall-vault\wall-vault.exe"
-
-# 添加到 PATH（重启 PowerShell 后生效）
-$env:PATH += ";$env:LOCALAPPDATA\Programs\wall-vault"
+  -OutFile wall-vault.exe
 ```
 
-> :bulb: **什么是 PATH？** 计算机查找命令的文件夹列表。添加到 PATH 后，可以从任何文件夹输入 `wall-vault` 来运行。
+### 从源码构建
 
-### 从源码构建（开发者用）
-
-仅适用于已安装 Go 语言开发环境的情况。
+需要 Go 1.25 或更新版本。
 
 ```bash
 git clone https://github.com/sookmook/wall-vault
 cd wall-vault
-make build       # bin/wall-vault（版本: v0.1.25.YYYYMMDD.HHmmss）
-make install     # ~/.local/bin/wall-vault
+go build -o wall-vault .
 ```
 
-> :bulb: **构建时间戳版本**：使用 `make build` 构建时，版本号会自动生成为 `v0.1.27.20260409` 这样包含日期和时间的格式。使用 `go build ./...` 直接构建时，版本号只会显示 `"dev"`。
+`make build-all` 会交叉编译到所有五个支持的平台。二进制文件会生成在 `bin/` 中。
 
 ---
 
-## 初次启动
-
-### 运行 setup 向导
-
-安装完成后，请务必使用以下命令运行**设置向导**。向导会逐一询问并引导你完成必要的配置项。
+## 使用安装向导首次运行
 
 ```bash
 wall-vault setup
 ```
 
-向导的步骤如下：
+向导会按顺序提示你以下内容:
 
-```
-1. 语言选择（含中文在内的 10 种语言）
-2. 主题选择（light / dark / gold / cherry / ocean）
-3. 运行模式 — 单机使用（standalone）还是多机共享（distributed）
-4. 机器人名称 — 在仪表盘上显示的名称
-5. 端口设置 — 默认值：代理 56244，金库 56243（无需更改直接回车）
-6. AI 服务选择 — 从 Google / OpenRouter / Ollama / LM Studio / vLLM 中选择
-7. 工具安全过滤器设置
-8. 管理员令牌 — 用于锁定仪表盘管理功能的密码。支持自动生成
-9. API 密钥加密密码 — 用于更安全地存储密钥（可选）
-10. 配置文件保存路径
-```
+1. **语言** — 从 17 个 UI 语言中选择一个。会自动从 `$LANG` 检测;但向导依然提供列表。
+2. **主题** — `light`(默认)、`dark`、`cherry`、`ocean`、`gold`、`autumn`、`winter`。仅外观影响。
+3. **模式** — `standalone`(单主机,默认)或 `distributed`(vault 在一个主机,proxy 在其他主机)。
+4. **机器人名称** — 自由形式的 `client_id` 标识。vault 用其来限定每个客户端的配置(模型覆盖、回退链)。
+5. **proxy 端口** — 默认 `56244`。
+6. **vault 端口** — 默认 `56243`(仅 standalone)。
+7. **服务选择** — 对以下每项给出 y/N:Google Gemini、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio、vLLM。可多选;每一项都会在末尾写入其环境变量提示。
+8. **工具过滤器** — `strip_all`(默认;出于安全考虑屏蔽所有传入工具定义)或 `passthrough`(允许任何工具通过)。
+9. **管理令牌** — 留空以自动生成。仪表板需要此令牌登录。
+10. **主密码** — 留空表示不加密(不推荐);设置一个值则会用 AES-GCM 在静态状态下加密密钥存储。
+11. **保存路径** — 默认是当前目录中的 `wall-vault.yaml`。加载器也会检查 `~/.wall-vault/config.yaml`。
 
-> :warning: **请务必记住管理员令牌。** 以后在仪表盘中添加密钥或更改设置时需要用到。如果忘记了，需要直接编辑配置文件。
+保存后,向导会运行 `doctor.FixTrust`,以便任何本地安装的代理(OpenClaw、Claude Code、Cline)将 wall-vault 内部 CA 自动添加到其信任存储。如果未安装此类代理,该步骤会显示 `SKIP`,不写入任何内容。
 
-向导完成后，会自动生成 `wall-vault.yaml` 配置文件。
-
-### 启动
+然后启动二进制文件:
 
 ```bash
 wall-vault start
 ```
 
-以下两个服务器同时启动：
+`start` 在一个进程中同时运行 vault 和 proxy(standalone 模式)。对于 distributed 模式,在 vault 主机上使用 `wall-vault vault`,在每个 proxy 主机上使用 `wall-vault proxy`。
 
-- **代理**（`https://localhost:56244`）— 连接 OpenClaw 和 AI 服务的中间人
-- **密钥金库**（`https://localhost:56243`）— API 密钥管理及 Web 仪表盘
+在浏览器中打开 `http://localhost:56243`。使用向导打印的管理令牌登录。
 
-在浏览器中打开 `https://localhost:56243` 即可访问仪表盘。
+---
+
+## 启用 TLS
+
+向导的默认设置将两个监听器都保留为纯 HTTP。大多数代理(OpenClaw、Claude Code、Cursor)在使用单一 HTTPS 端点时表现更好,因此在跨越本地机器以外的任何部署中都建议使用 TLS。
+
+wall-vault 自带内部 CA,因此你不需要公共 DNS 名称或 Let's Encrypt。
+
+```bash
+# 1. 创建内部 CA — 写入 ~/.wall-vault/ca.{crt,key}。
+#    CA 默认 10 年有效;使用 --ca-years 覆盖。
+wall-vault cert init
+
+# 2. 颁发主机证书。Subject Alternative Names 自动包含:
+#       hostname、"localhost"、"127.0.0.1" 以及检测到的任何非环回 LAN IP。
+#    使用 --dir 覆盖颁发目录,使用 --host-years 覆盖有效期。
+wall-vault cert issue $(hostname)
+
+# 3. 在本机的 OS 密钥环中信任 CA。
+#    Linux:通过 update-ca-certificates 写入 /etc/ssl/certs/(需要 sudo)。
+#    macOS:通过 security add-trusted-cert 添加到 System 密钥环(需要 sudo)。
+#    Windows:通过 certutil 导入到 CurrentUser\Root(无需管理员权限)。
+wall-vault cert install-trust
+
+# 4. 在两个监听器上启用 TLS。
+export WV_PROXY_TLS_ENABLED=1
+export WV_PROXY_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_PROXY_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+export WV_VAULT_TLS_ENABLED=1
+export WV_VAULT_TLS_CERT="$HOME/.wall-vault/$(hostname).crt"
+export WV_VAULT_TLS_KEY="$HOME/.wall-vault/$(hostname).key"
+
+wall-vault start
+```
+
+要将信任扩展到其他 LAN 机器,复制 `~/.wall-vault/ca.crt`,在每台机器上运行 `wall-vault cert install-trust --ca <path>`。vault 还会通过 `:56247`(**bootstrap 端口**)上的小型纯 HTTP 监听器公开 `ca.crt`,以应对全新客户端需要 CA 才能进行 HTTPS 通信的死锁情况。
+
+### 环回 HTTP 伴侣
+
+某些代理——特别是 OpenClaw 自带的 Node 运行时——会在进程启动时重写 `NODE_EXTRA_CA_CERTS`,丢弃任何由操作员提供的 CA 提示。即使在 `cert install-trust` 之后,它们也无法在守护进程内部识别 wall-vault CA。wall-vault 通过在启用 TLS 时绑定一个额外的 **仅环回纯 HTTP 监听器** `127.0.0.1:56245` 来解决此问题。同主机的客户端通过该端口完全不使用 TLS 即可连接 proxy;LAN 客户端继续使用 TLS 监听器。
+
+如果不需要,使用 `WV_PROXY_PLAIN_PORT=0` 禁用。
+
+### `wall-vault cert list`
+
+显示 `~/.wall-vault/` 下所有证书的 subject、有效期窗口和 SAN。
+
+```
+$ wall-vault cert list
+ca.crt          subject=wall-vault internal CA   not-after=2036-05-05
+hostname.crt    subject=hostname                 not-after=2031-05-05   SAN=hostname,localhost,127.0.0.1,192.168.…
+```
 
 ---
 
 ## 注册 API 密钥
 
-注册 API 密钥有四种方法。**推荐初次使用的用户使用方法 1（环境变量）。**
+有两种方式:仪表板,或环境变量。
 
-### 方法 1：环境变量（推荐 — 最简单）
+### 仪表板(推荐)
 
-环境变量是程序启动时读取的**预设值**。在终端中输入以下内容：
+1. 使用管理令牌登录到 `https://localhost:56243`。
+2. 在密钥卡中点击 **+ API key**。
+3. 选择服务(Google、OpenRouter、Anthropic、OpenAI 等)。
+4. 粘贴密钥。保存。
+
+每个服务允许多个密钥;proxy 会在它们之间轮询,并跳过命中按密钥冷却的密钥。
+
+### 环境变量(一次性 bootstrap)
 
 ```bash
-# 注册 Google Gemini 密钥
-export WV_KEY_GOOGLE=AIzaSy...
-
-# 注册 OpenRouter 密钥
-export WV_KEY_OPENROUTER=sk-or-v1-...
-
-# 注册后启动
+export WV_KEY_GOOGLE="AIzaSyA1...,AIzaSyB2...,AIzaSyC3..."   # 逗号分隔
+export WV_KEY_OPENROUTER="sk-or-v1-…"
+export WV_KEY_ANTHROPIC="sk-ant-…"
+export WV_KEY_OPENAI="sk-…"
 wall-vault start
 ```
 
-如果有多个密钥，用逗号（,）分隔。wall-vault 会自动轮流使用（轮询）：
+通过这种方式提供的密钥会在首次启动时写入加密存储。后续启动会从磁盘读取它们;首次运行后可以取消设置环境变量。
+
+### 冷却和轮换
+
+每次成功调用都会增加该密钥的 `usage_count` 并刷新 `last_used`。在 HTTP 429 / 402 / 403 时,proxy 将该密钥置于 **冷却** 状态(默认值:429 为 60 分钟,402 为 24 小时,403 为 12 小时)。下一次调度会为该服务选择不同的密钥。当某个服务的所有密钥都处于冷却状态时,proxy 会快速跳过该服务,并尝试回退链中的下一个提供商。
+
+冷却时间会在仪表板中按密钥显示,带倒计时。
+
+---
+
+## 连接代理
+
+### OpenClaw
+
+OpenClaw 是最初的目标客户端。使用仪表板的 **+ Add agent** 模态框:
+
+- 将 **Agent type** 设置为 `openclaw` 或 `nanoclaw`。
+- 设置 **Work directory** — 对于 OpenClaw 会自动填充为 `~/.openclaw`。
+- 选择一个 **preferred service**,可选地选择 **model override**。
+- 点击 **Apply**。wall-vault 会直接写入 `~/.openclaw/openclaw.json`(提供商 URL、vault 令牌、模型条目)。
+
+当你从仪表板更改模型时,OpenClaw 会通过 SSE 在 1-3 秒内接收变更——无需重启。
+
+### Claude Code
 
 ```bash
-export WV_KEY_GOOGLE=AIzaSy...,AIzaSy...,AIzaSy...
+export ANTHROPIC_BASE_URL=https://localhost:56244
+export ANTHROPIC_API_KEY=<your-vault-client-token>
+claude
 ```
 
-> :bulb: **提示**：`export` 命令仅适用于当前终端会话。要在重启后保持，请将上述行添加到 `~/.bashrc` 或 `~/.zshrc` 文件中。
+当上游 Anthropic 信用额度用尽时,调度会回退到该客户端的 `fallback_services` 中列出的服务。默认情况下,发送到 anthropic 调度的非 Claude 模型 ID 会返回错误,使错误路由立即显现。要选择启用自动重写:
 
-### 方法 2：仪表盘 UI（鼠标点击）
+```yaml
+proxy:
+  anthropic_fallback_model: "claude-haiku-4-5-20251001"
+```
 
-1. 在浏览器中打开 `https://localhost:56243`
-2. 在顶部 **:key: API 密钥** 卡片中点击 `[+ 添加]` 按钮
-3. 输入服务类型、密钥值、标签（备注名称）和每日限额后保存
+### Cursor
 
-### 方法 3：REST API（自动化/脚本用）
+在 Cursor 的 **Settings → AI → OpenAI API** 中:
 
-REST API 是程序之间通过 HTTP 交换数据的方式。适用于通过脚本自动注册。
+```
+Base URL:  https://localhost:56244
+API Key:   <your-vault-client-token>
+Model:     gemini-2.5-flash    # 或 wall-vault 已知的任何模型
+```
+
+### Continue (VS Code、JetBrains)
+
+`config.json`:
+
+```json
+{
+  "models": [
+    {
+      "title": "wall-vault",
+      "provider": "openai",
+      "model": "gemini-2.5-flash",
+      "apiBase": "https://localhost:56244/v1",
+      "apiKey": "<your-vault-client-token>"
+    }
+  ]
+}
+```
+
+### 自定义 HTTP
 
 ```bash
-curl -X POST https://localhost:56243/admin/keys \
-  -H "Authorization: Bearer 管理员令牌" \
+curl -X POST https://localhost:56244/v1/chat/completions \
+  -H "Authorization: Bearer <your-vault-client-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "service": "google",
-    "key": "AIzaSy...",
-    "label": "主密钥",
-    "daily_limit": 1000
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "hello"}]
   }'
 ```
 
-### 方法 4：proxy 标志（临时测试用）
+当设置了 `proxy.oai_stream_forward: true` 时,同一端点也接受流式传输(`"stream": true`)。
 
-无需正式注册，临时插入密钥进行测试。程序退出后密钥消失。
+---
+
+## 仪表板
+
+`https://localhost:56243`。主页网格上有五张卡片:
+
+- **Keys** — 按服务分组的所有 API 密钥。添加、编辑、删除;查看用量和冷却。
+- **Services** — Google / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio / vLLM / llama.cpp,加上 `~/.wall-vault/services/` 中的任何插件 yaml。设置每个服务的 `default_model`、`allowed_models`、基础 URL 和 reasoning 开关。
+- **Clients (agents)** — 每个已注册的客户端(OpenClaw 机器人、Claude Code 会话、Cursor 实例等)。分配首选服务、模型覆盖和回退链。
+- **Proxies** — 每个对该 vault 进行了认证的 proxy。实时状态(在线/离线)、最后可见时间、当前模型。
+- **Settings** — 管理令牌、主密码轮换、主题、语言。
+
+每张卡片都有一个编辑滑出框(右侧)。点击外部或按 `Esc` 关闭。变更通过 SSE 在数秒内推送到所有已连接的 proxy。
+
+**页脚** 包含一个 SSE 指示器(绿色 = 已连接、橙色 = 重连中、灰色 = 已断开)和实时构建版本。
+
+---
+
+## 分布式模式
+
+当你有多台机器都需要相同的密钥时,在一台主机上运行 vault,在其余每台主机上运行 proxy。
+
+### vault 主机
 
 ```bash
-wall-vault proxy --key-google=AIzaSy... --key-openrouter=sk-or-...
-```
-
----
-
-## 代理使用方法
-
-### 在 OpenClaw 中使用（主要用途）
-
-以下是将 OpenClaw 配置为通过 wall-vault 连接 AI 服务的方法。
-
-打开 `~/.openclaw/openclaw.json` 文件，添加以下内容：
-
-```json5
-// ~/.openclaw/openclaw.json
-{
-  models: {
-    providers: {
-      "wall-vault": {
-        baseUrl: "https://localhost:56244/v1",
-        apiKey: "your-agent-token",   // vault 代理令牌
-        api: "openai-completions",
-        models: [
-          { id: "wall-vault/gemini-2.5-flash" },
-          { id: "wall-vault/gemini-2.5-pro" },
-          { id: "wall-vault/hunter-alpha" },    // 免费 1M 上下文
-          { id: "wall-vault/claude-opus-4-6" }
-        ]
-      }
-    }
-  }
-}
-```
-
-> :bulb: **更简单的方法**：点击仪表盘代理卡片上的 **:lobster: 复制 OpenClaw 配置** 按钮，已填好令牌和地址的配置片段会被复制到剪贴板。只需粘贴即可。
-
-**模型名前的 `wall-vault/` 会连接到哪里？**
-
-wall-vault 根据模型名自动判断将请求发送到哪个 AI 服务：
-
-| 模型格式 | 连接的服务 |
-|---------|----------|
-| `wall-vault/gemini-*` | 直连 Google Gemini |
-| `wall-vault/gpt-*`, `wall-vault/o3`, `wall-vault/o4*` | 直连 OpenAI |
-| `wall-vault/claude-*` | 通过 OpenRouter 连接 Anthropic |
-| `wall-vault/hunter-alpha`, `wall-vault/healer-alpha` | OpenRouter（免费百万令牌上下文） |
-| `wall-vault/kimi-*`, `wall-vault/glm-*`, `wall-vault/deepseek-*` | OpenRouter |
-| `google/模型名`, `openai/模型名`, `anthropic/模型名` 等 | 直连对应服务 |
-| `custom/google/模型名`, `custom/openai/模型名` 等 | 去掉 `custom/` 部分后重新路由 |
-| `模型名:cloud` | 去掉 `:cloud` 部分后连接 OpenRouter |
-
-> :bulb: **什么是上下文（context）？** AI 一次能记住的对话量。1M（一百万令牌）意味着可以一次处理非常长的对话或文档。
-
-### 通过 Gemini API 格式直接连接（兼容现有工具）
-
-如果已有直接使用 Google Gemini API 的工具，只需将地址改为 wall-vault：
-
-```bash
-export ANTHROPIC_BASE_URL=https://localhost:56244/google
-```
-
-或者对于直接指定 URL 的工具：
-
-```
-https://localhost:56244/google/v1beta/models/gemini-2.5-flash:generateContent
-```
-
-### 在 OpenAI SDK（Python）中使用
-
-在使用 AI 的 Python 代码中也可以连接 wall-vault。只需更改 `base_url`：
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://localhost:56244/v1",
-    api_key="not-needed"  # API 密钥由 wall-vault 自动管理
-)
-
-response = client.chat.completions.create(
-    model="google/gemini-2.5-flash",   # 使用 provider/model 格式
-    messages=[{"role": "user", "content": "你好"}]
-)
-```
-
-### 运行中更改模型
-
-在 wall-vault 已运行的状态下更改 AI 模型：
-
-```bash
-# 直接向代理请求更改模型
-curl -X PUT https://localhost:56244/api/config/model \
-  -H "Content-Type: application/json" \
-  -d '{"service": "openrouter", "model": "anthropic/claude-3.5-sonnet"}'
-
-# 分布式模式（多机器人）中在金库服务器更改 -> 通过 SSE 即时同步
-curl -X PUT https://localhost:56243/admin/clients/my-bot-id \
-  -H "Authorization: Bearer 管理员令牌" \
-  -H "Content-Type: application/json" \
-  -d '{"default_service": "google", "default_model": "gemini-2.5-pro"}'
-```
-
-### 查看可用模型列表
-
-```bash
-# 查看完整列表
-curl https://localhost:56244/api/models | python3 -m json.tool
-
-# 仅查看 Google 模型
-curl "https://localhost:56244/api/models?service=google"
-
-# 按名称搜索（例如：包含"claude"的模型）
-curl "https://localhost:56244/api/models?q=claude"
-```
-
-**各服务主要模型：**
-
-| 服务 | 主要模型 |
-|------|---------|
-| Google | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-8b, gemini-2.0-flash |
-| OpenAI | gpt-4o, gpt-4o-mini, o3, o1, o1-mini |
-| OpenRouter | 346+（Hunter Alpha 1M 上下文免费、DeepSeek R1/V3、Qwen 2.5 等） |
-| Ollama | 从本地安装的服务器自动检测 |
-| LM Studio | 本地服务器（端口 1234） |
-| vLLM | 本地服务器（端口 8000） |
-| llama.cpp | 本地服务器（端口 8080） |
-
----
-
-## 密钥金库仪表盘
-
-在浏览器中打开 `https://localhost:56243` 即可查看仪表盘。
-
-**界面布局：**
-- **顶部固定栏（topbar）**：Logo、语言/主题选择器、SSE 连接状态
-- **卡片网格**：代理、服务、API 密钥卡片以磁贴形式排列
-
-### API 密钥卡片
-
-用于一览管理所有已注册 API 密钥的卡片。
-
-- 按服务分类显示密钥列表。
-- `today_usage`：今日成功处理的令牌数（AI 读写的字符数）
-- `today_attempts`：今日总调用次数（成功 + 失败）
-- 用 `[+ 添加]` 按钮注册新密钥，用 `x` 删除密钥。
-
-> :bulb: **什么是令牌（token）？** AI 处理文本时使用的单位。大约相当于一个英文单词，或 1-2 个中文字符。API 费用通常按令牌数计算。
-
-### 代理卡片
-
-显示连接到 wall-vault 代理的机器人（代理）状态的卡片。
-
-**连接状态分为 4 个级别：**
-
-| 指示灯 | 状态 | 含义 |
-|--------|------|------|
-| :green_circle: | 运行中 | 代理正常工作 |
-| :yellow_circle: | 延迟 | 有响应但较慢 |
-| :red_circle: | 离线 | 代理无响应 |
-| :black_circle: | 未连接/已禁用 | 代理从未连接过金库或已被禁用 |
-
-**代理卡片底部按钮说明：**
-
-注册代理时指定**代理类型**后，对应类型的便捷按钮会自动出现。
-
----
-
-#### :radio_button: 复制配置按钮 — 自动生成连接设置
-
-点击按钮后，包含该代理的令牌、代理地址、模型信息的配置片段会被复制到剪贴板。只需将复制的内容粘贴到下表所示位置，即可完成连接设置。
-
-| 按钮 | 代理类型 | 粘贴位置 |
-|------|---------|---------|
-| :lobster: 复制 OpenClaw 配置 | `openclaw` | `~/.openclaw/openclaw.json` |
-| :crab: 复制 NanoClaw 配置 | `nanoclaw` | `~/.openclaw/openclaw.json` |
-| :orange_circle: 复制 Claude Code 配置 | `claude-code` | `~/.claude/settings.json` |
-| :keyboard: 复制 Cursor 配置 | `cursor` | Cursor -> Settings -> AI |
-| :computer: 复制 VSCode 配置 | `vscode` | `~/.continue/config.json` |
-
-**示例 — Claude Code 类型时，复制的内容如下：**
-
-```json
-// ~/.claude/settings.json
-{
-  "apiProvider": "openai",
-  "baseUrl": "http://192.168.1.20:56244/v1",
-  "apiKey": "此代理的令牌"
-}
-```
-
-**示例 — VSCode（Continue）类型时：**
-
-```yaml
-# ~/.continue/config.yaml  <- 粘贴到 config.yaml，而非 config.json
-name: My Config
-version: 0.0.1
-schema: v1
-
-models:
-  - name: wall-vault proxy
-    provider: openai
-    model: gemini-2.5-flash
-    apiBase: http://192.168.1.20:56244/v1
-    apiKey: 此代理的令牌
-    roles:
-      - chat
-      - edit
-      - apply
-```
-
-> :warning: **Continue 最新版使用 `config.yaml`。** 如果 `config.yaml` 存在，`config.json` 会被完全忽略。请务必粘贴到 `config.yaml`。
-
-**示例 — Cursor 类型时：**
-
-```
-Base URL : http://192.168.1.20:56244/v1
-API Key  : 此代理的令牌
-
-// 或使用环境变量：
-OPENAI_BASE_URL=http://192.168.1.20:56244/v1
-OPENAI_API_KEY=此代理的令牌
-```
-
-> :warning: **剪贴板复制不可用时**：浏览器安全策略可能阻止复制。如果弹出文本框，请使用 Ctrl+A 全选后 Ctrl+C 复制。
-
----
-
-#### :zap: 自动应用按钮 — 一键完成配置
-
-代理类型为 `cline`、`claude-code`、`openclaw` 或 `nanoclaw` 时，代理卡片上会显示 **:zap: 应用配置** 按钮。点击此按钮会自动更新该代理的本地配置文件。
-
-| 按钮 | 代理类型 | 目标文件 |
-|------|---------|---------|
-| :zap: 应用 Cline 配置 | `cline` | `~/.cline/data/globalState.json` + `secrets.json` |
-| :zap: 应用 Claude Code 配置 | `claude-code` | `~/.claude/settings.json` |
-| :zap: 应用 OpenClaw 配置 | `openclaw` | `~/.openclaw/openclaw.json` |
-| :zap: 应用 NanoClaw 配置 | `nanoclaw` | `~/.openclaw/openclaw.json` |
-
-> :warning: 此按钮向 **localhost:56244**（本地代理）发送请求。该机器上必须有代理在运行。
-
----
-
-#### :twisted_rightwards_arrows: 拖拽排序卡片（v0.1.17，改进 v0.1.25）
-
-可以**拖拽**仪表盘上的代理卡片来重新排列顺序。
-
-1. 用鼠标抓住卡片左上角的**信号灯（●）**区域进行拖拽
-2. 放到目标位置的卡片上即可交换顺序
-
-> :bulb: 卡片主体（输入框、按钮等）不可拖拽。只能从信号灯区域抓取。
-
-#### :orange_circle: 代理进程检测（v0.1.25）
-
-当代理正常工作但本地代理进程（NanoClaw、OpenClaw）已停止时，卡片的信号灯变为**橙色（闪烁）**，并显示"代理进程已停止"消息。
-
-- :green_circle: 绿色：代理 + 进程正常
-- :orange_circle: 橙色（闪烁）：代理正常，进程已停止
-- :red_circle: 红色：代理离线
-3. 更改的顺序会**立即保存到服务器**，刷新页面后仍然保持
-
-> :bulb: 触屏设备（手机/平板）暂不支持。请使用桌面浏览器。
-
----
-
-#### :arrows_counterclockwise: 双向模型同步（v0.1.16）
-
-在金库仪表盘中更改代理的模型后，该代理的本地配置会自动更新。
-
-**Cline 的情况：**
-- 在金库中更改模型 -> SSE 事件 -> 代理更新 `globalState.json` 的模型字段
-- 更新对象：`actModeOpenAiModelId`、`planModeOpenAiModelId`、`openAiModelId`
-- 不修改 `openAiBaseUrl` 和 API 密钥
-- **需要重新加载 VS Code（`Ctrl+Alt+R` 或 `Ctrl+Shift+P` -> `Developer: Reload Window`）**
-  - 因为 Cline 在运行中不会重新读取配置文件
-
-**Claude Code 的情况：**
-- 在金库中更改模型 -> SSE 事件 -> 代理更新 `settings.json` 的 `model` 字段
-- 自动搜索 WSL 和 Windows 两侧路径（`~/.claude/`、`/mnt/c/Users/*/.claude/`）
-
-**反向同步（代理 -> 金库）：**
-- 代理（Cline、Claude Code 等）向 proxy 发送请求时，proxy 会在心跳中包含该客户端的服务/模型信息
-- 金库仪表盘的代理卡片实时显示当前使用的服务/模型
-
-> :bulb: **关键点**：proxy 通过请求的 Authorization 令牌识别代理，并自动路由到金库中配置的服务/模型。即使 Cline 或 Claude Code 发送了不同的模型名，proxy 也会用金库设置覆盖。
-
----
-
-### 在 VS Code 中使用 Cline — 详细指南
-
-#### 第 1 步：安装 Cline
-
-从 VS Code 扩展市场安装 **Cline**（ID: `saoudrizwan.claude-dev`）。
-
-#### 第 2 步：在金库中注册代理
-
-1. 打开金库仪表盘（`http://金库IP:56243`）
-2. 在**代理**部分点击 **+ 添加**
-3. 按以下内容填写：
-
-| 字段 | 值 | 说明 |
-|------|---|------|
-| ID | `my_cline` | 唯一标识符（英文数字，无空格） |
-| 名称 | `My Cline` | 仪表盘上显示的名称 |
-| 代理类型 | `cline` | <- 必须选择 `cline` |
-| 服务 | 选择要使用的服务（如：`google`） | |
-| 模型 | 输入要使用的模型（如：`gemini-2.5-flash`） | |
-
-4. 点击**保存**后令牌会自动生成
-
-#### 第 3 步：连接 Cline
-
-**方法 A — 自动应用（推荐）**
-
-1. 确认该机器上 wall-vault **proxy** 正在运行（`localhost:56244`）
-2. 点击仪表盘代理卡片上的 **:zap: 应用 Cline 配置** 按钮
-3. 出现"配置应用成功！"通知即表示成功
-4. 重新加载 VS Code（`Ctrl+Alt+R`）
-
-**方法 B — 手动设置**
-
-在 Cline 侧边栏打开设置（:gear:）：
-- **API Provider**：`OpenAI Compatible`
-- **Base URL**：`http://代理地址:56244/v1`
-  - 同一台机器：`https://localhost:56244/v1`
-  - Mac Mini 等其他机器：`http://192.168.1.20:56244/v1`
-- **API Key**：从金库获取的令牌（从代理卡片复制）
-- **Model ID**：在金库中设置的模型（如：`gemini-2.5-flash`）
-
-#### 第 4 步：验证
-
-在 Cline 聊天窗口发送任意消息。如果正常：
-- 金库仪表盘对应的代理卡片显示**绿色点（● 运行中）**
-- 卡片显示当前服务/模型（如：`google / gemini-2.5-flash`）
-
-#### 更改模型
-
-想要更改 Cline 的模型时，请在**金库仪表盘**中操作：
-
-1. 更改代理卡片的服务/模型下拉菜单
-2. 点击**应用**
-3. 重新加载 VS Code（`Ctrl+Alt+R`）— Cline 页脚的模型名会更新
-4. 下一个请求开始使用新模型
-
-> :bulb: 实际上 proxy 通过令牌识别 Cline 的请求，并路由到金库配置的模型。即使不重新加载 VS Code，**实际使用的模型也会立即切换** — 重新加载只是为了更新 Cline UI 的模型显示。
-
-#### 断连检测
-
-关闭 VS Code 后，金库仪表盘的代理卡片约 **90 秒**后变为黄色（延迟），**3 分钟**后变为红色（离线）。（v0.1.18 起，15 秒间隔的状态检查使离线检测更快。）
-
-#### 故障排除
-
-| 症状 | 原因 | 解决 |
-|------|------|------|
-| Cline 中出现"连接失败"错误 | proxy 未运行或地址错误 | 用 `curl https://localhost:56244/health` 检查 proxy |
-| 金库中绿色点不显示 | API 密钥（令牌）未设置 | 再次点击 **:zap: 应用 Cline 配置** 按钮 |
-| Cline 页脚模型不更新 | Cline 缓存了设置 | 重新加载 VS Code（`Ctrl+Alt+R`） |
-| 显示错误的模型名 | 旧版 bug（v0.1.16 已修复） | 将 proxy 更新到 v0.1.16 以上 |
-
----
-
-#### :purple_circle: 复制部署命令按钮 — 在新机器上安装时使用
-
-在新电脑上首次安装 wall-vault proxy 并连接金库时使用。点击按钮会复制完整的安装脚本。粘贴到新电脑的终端并执行，以下操作一次完成：
-
-1. wall-vault 二进制文件安装（已安装则跳过）
-2. systemd 用户服务自动注册
-3. 服务启动和金库自动连接
-
-> :bulb: 脚本中已预填该代理的令牌和金库服务器地址，粘贴后无需任何修改即可直接运行。
-
----
-
-### 服务卡片
-
-用于启用/禁用和配置 AI 服务的卡片。
-
-- 每个服务的启用/禁用切换开关
-- 输入本地 AI 服务器（本机运行的 Ollama、LM Studio、vLLM、llama.cpp 等）的地址后，会自动发现可用模型。
-- **本地服务连接状态显示**：服务名旁的 ● 为**绿色**表示已连接，**灰色**表示未连接
-- **本地服务自动信号灯**（v0.1.23+）：本地服务（Ollama、LM Studio、vLLM、llama.cpp）根据连接状态自动启用/禁用。服务可达时 15 秒内 ● 变绿并自动勾选；断连时自动取消。与云服务（Google、OpenRouter 等）根据 API 密钥自动切换的方式相同。
-- **推理模式开关**（v0.2.17+）：本地服务编辑面板底部会出现**推理模式**复选框。勾选后，代理在发往上游的 chat-completions 请求体中添加 `"reasoning": true`，使得 DeepSeek R1、Qwen QwQ 等支持思维过程输出的模型会额外返回 `<think>…</think>` 块。不认识该字段的服务器会直接忽略，因此即使在混合工作负载中也可以放心保持开启。
-
-> :bulb: **如果本地服务在另一台电脑上运行**：在服务 URL 输入框中输入该电脑的 IP。例如：`http://192.168.1.20:11434`（Ollama）、`http://192.168.1.20:1234`（LM Studio）、`http://192.168.1.20:8080`（llama.cpp）。如果服务绑定在 `127.0.0.1` 而非 `0.0.0.0`，则无法通过外部 IP 访问——请在服务设置中检查绑定地址。
-
-### 管理员令牌输入
-
-在仪表盘中使用添加/删除密钥等重要功能时，会弹出管理员令牌输入框。输入 setup 向导中设置的令牌即可。输入一次后，在关闭浏览器之前一直有效。
-
-> :warning: **如果 15 分钟内认证失败超过 10 次，该 IP 将被临时封锁。** 如果忘记令牌，请查看 `wall-vault.yaml` 文件中的 `admin_token` 字段。
-
----
-
-## 分布式模式（多机器人）
-
-在多台电脑上同时运行 OpenClaw 时，**共享一个密钥金库**的配置方式。只需在一处管理密钥，非常方便。
-
-### 配置示例
-
-```
-[密钥金库服务器]
-  wall-vault vault    （密钥金库 :56243，仪表盘）
-
-[WSL Alpha]           [树莓派 Gamma]         [Mac Mini 本地]
-  wall-vault proxy      wall-vault proxy        wall-vault proxy
-  openclaw TUI          openclaw TUI            openclaw TUI
-  <-> SSE 同步          <-> SSE 同步            <-> SSE 同步
-```
-
-所有机器人都指向中央金库服务器，因此在金库中更改模型或添加密钥会立即同步到所有机器人。
-
-### 第 1 步：启动密钥金库服务器
-
-在作为金库服务器的电脑上运行：
-
-```bash
+WV_VAULT_HOST=0.0.0.0 \
+WV_ADMIN_TOKEN=<admin> \
+WV_MASTER_PASS=<master> \
 wall-vault vault
 ```
 
-### 第 2 步：注册各机器人（客户端）
+仪表板现在可以从 `https://<vault-host>:56243` 访问。在 **Clients** 卡中为每个远程 proxy 添加一个代理;每个代理都会铸造一个唯一的 `vault_token`。
 
-预先在金库服务器上注册各机器人的信息：
-
-```bash
-curl -X POST https://localhost:56243/admin/clients \
-  -H "Authorization: Bearer 管理员令牌" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "botA",
-    "name": "机器人A",
-    "token": "bota-secret",
-    "default_service": "google",
-    "default_model": "gemini-2.5-flash"
-  }'
-```
-
-### 第 3 步：在各机器人机器上启动代理
-
-在安装了机器人的各电脑上，指定金库服务器地址和令牌来运行代理：
+### proxy 主机
 
 ```bash
-WV_VAULT_URL=http://192.168.x.x:56243 \
-WV_VAULT_TOKEN=bota-secret \
-WV_VAULT_CLIENT_ID=botA \
+WV_VAULT_URL=http://<vault-host>:56243 \
+WV_VAULT_TOKEN=<that-client-token> \
+WV_PROXY_HOST=0.0.0.0 \
 wall-vault proxy
 ```
 
-> :bulb: 请将 **`192.168.x.x`** 替换为金库服务器的实际内网 IP 地址。可通过路由器设置或 `ip addr` 命令查看。
+proxy 会对 vault 进行认证、打开 SSE 流,并应用接收到的任何配置(首选服务、模型覆盖、回退链)。后续的 vault 编辑会在数秒内生效,无需重启。
+
+对于跨 LAN 的安装,在 vault 主机上启用 TLS(`WV_VAULT_TLS_ENABLED=1` + cert/key 环境变量),并通过相同的 `wall-vault cert install-trust` 步骤运行每个 proxy 主机,以便 proxy 对 vault 的 HTTPS 调用受到信任。
 
 ---
 
-## 自动启动设置
+## 自启动
 
-如果每次重启电脑都手动启动 wall-vault 太麻烦，可以注册为系统服务。注册一次后，开机时会自动启动。
+### systemd (Linux)
 
-### Linux — systemd（大多数 Linux 发行版）
+```ini
+# ~/.config/systemd/user/wall-vault-proxy.service
+[Unit]
+Description=wall-vault proxy
+After=network-online.target
 
-systemd 是 Linux 中自动启动和管理程序的系统：
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wall-vault proxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
 
 ```bash
-wall-vault doctor deploy
-systemctl --user daemon-reload
-systemctl --user enable --now wall-vault
+systemctl --user enable --now wall-vault-proxy
+loginctl enable-linger $USER       # 注销后单元继续运行
 ```
 
-查看日志：
+对于同一主机上的 vault,编写一个并行的 `wall-vault-vault.service`。对于 standalone 模式,一个调用 `wall-vault start` 的单元就足够了。
+
+### launchd (macOS)
+
+```xml
+<!-- ~/Library/LaunchAgents/com.wall-vault.proxy.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wall-vault.proxy</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/wall-vault</string><string>proxy</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/wall-vault.proxy.log</string>
+  <key>StandardErrorPath</key><string>/tmp/wall-vault.proxy.err</string>
+</dict>
+</plist>
+```
 
 ```bash
-journalctl --user -u wall-vault -f
+launchctl load ~/Library/LaunchAgents/com.wall-vault.proxy.plist
 ```
 
-### macOS — launchd
+### Windows
 
-macOS 中负责程序自动启动的系统：
-
-```bash
-wall-vault doctor deploy launchd
-launchctl load ~/Library/LaunchAgents/com.wall-vault.plist
-```
-
-### Windows — NSSM
-
-1. 从 [nssm.cc](https://nssm.cc/download) 下载 NSSM 并添加到 PATH。
-2. 在管理员 PowerShell 中：
-
-```powershell
-wall-vault doctor deploy windows
-```
+使用 `nssm` 将 `wall-vault.exe start` 包装为 Windows 服务,或使用一个在用户登录时运行的 `schtasks` 条目。
 
 ---
 
-## Doctor 诊断工具
+## 插件 yaml
 
-`doctor` 命令是一个能够**自我诊断并修复** wall-vault 配置问题的工具。
+任何 OpenAI 兼容的后端都可以通过将 yaml 放入 `~/.wall-vault/services/` 来添加,无需更改代码。wall-vault 在启动时加载它,并将该服务注册到调度、OAI 兼容检测集和 Gemini 流桥接。
 
-```bash
-wall-vault doctor check   # 诊断当前状态（只读，不做任何更改）
-wall-vault doctor fix     # 自动修复问题
-wall-vault doctor all     # 诊断 + 自动修复一步完成
+```yaml
+# ~/.wall-vault/services/llamacpp.yaml
+id: llamacpp                 # 唯一服务 ID
+name: llama.cpp              # 人类可读标签
+enabled: true                # 已禁用的插件在加载时被跳过
+
+default_url: http://localhost:8080   # 操作员覆盖;env 优先 (WV_LLAMACPP_URL)
+endpoints:
+  generate: /v1/chat/completions
+  list_models: /v1/models
+
+auth:
+  type: none                 # none | bearer | query_param | header
+  param: ""                  # 对于 query_param:参数名 (例如 "key")
+
+request_format: openai       # openai | gemini | ollama | raw
+
+model_fetch:
+  enabled: true              # 让仪表板自动检测模型
+  dynamic: true              # 仪表板每次打开时重新获取
+  auto_detect_url: true      # 即使未声明也尝试 /v1/models
+
+concurrency:
+  max: 1                     # 此后端的最大并发请求数
+  queue_size: 10
+  wait_notify: true          # 向 TUI 代理显示 "queued" 提示
+
+error_codes:
+  503:
+    cooldown: 5m
+    message: "llama.cpp not responding"
+
+# 在 reasoning 关闭时为 qwen3 系列启用内联 /no_think 指令。
+# 如果你的后端的聊天模板会去除该标记 (LM Studio 的 jinja、Ollama 的 /v1
+# 层),则设置为 true。其他后端通常会原样回显字面文本,因此每个 yaml 默认
+# 保持 opt-in。
+inline_no_think_for_qwen3: false
+
+# Hub 拓扑 — 指向另一个 wall-vault。当此插件作为远程 wall-vault 的前端时
+# 必需 (这样接收方 wall-vault 可以看到 publisher 前缀并正确路由),并且使
+# proxy.vault_token 中的 bearer token 作为 Authorization 发送。
+preserve_model_id: false
+tls_internal_ca: false       # 将 ~/.wall-vault/ca.crt 添加到客户端信任池
 ```
 
-> :bulb: 如果觉得有什么不对，先运行 `wall-vault doctor all`。它能自动检测和修复许多问题。
+`configs/services/` 中捆绑的集合(lmstudio、vllm、llamacpp、tgwui、localai、jan、koboldcpp、tabbyapi、mlx-server、litellm-proxy、ollama、google、openrouter)默认禁用。将你想要的复制到 `~/.wall-vault/services/`,设置 `enabled: true`,然后重启。
 
 ---
 
-## RTK 令牌节省
+## Doctor
 
-*(v0.1.24+)*
+`wall-vault doctor` 对整个安装运行一次性健康探测:
 
-**RTK（令牌节省工具）** 自动压缩 AI 编程代理（如 Claude Code）执行的 shell 命令输出，减少令牌使用量。例如，`git status` 的 15 行输出可以缩减为 2 行摘要。
-
-### 基本用法
-
-```bash
-# 用 wall-vault rtk 包裹命令即可自动过滤输出
-wall-vault rtk git status          # 仅显示变更文件列表
-wall-vault rtk git diff HEAD~1     # 仅变更行 + 最少上下文
-wall-vault rtk git log -10         # 每行仅哈希 + 消息
-wall-vault rtk go test ./...       # 仅显示失败的测试
-wall-vault rtk ls -la              # 不支持的命令自动截断
+```
+✓ vault listener  (https://localhost:56243)
+✓ proxy listener  (https://localhost:56244)
+✓ master password set
+⚠ Google: 2 keys, all on cooldown
+✓ Anthropic: 1 key healthy
+✗ Ollama: not reachable at http://localhost:11434
 ```
 
-### 支持的命令和节省效果
+每行是以下之一:
 
-| 命令 | 过滤方式 | 节省率 |
-|------|---------|--------|
-| `git status` | 仅变更文件摘要 | ~87% |
-| `git diff` | 变更行 + 3 行上下文 | ~60-94% |
-| `git log` | 哈希 + 首行消息 | ~90% |
-| `git push/pull/fetch` | 去除进度，仅保留摘要 | ~80% |
-| `go test` | 仅显示失败，通过的计数 | ~88-99% |
-| `go build/vet` | 仅显示错误 | ~90% |
-| 其他所有命令 | 前 50 行 + 后 50 行，最大 32KB | 可变 |
+- `✓` — 健康
+- `⚠` — 性能下降但功能正常(一个密钥处于冷却、配额低等)
+- `✗` — 已损坏
+- `SKIP` — 未配置 / 在此主机上不适用
 
-### 三阶段过滤管道
+第二种守护进程模式每隔 `doctor.interval`(默认 5 分钟)运行相同的探测,并将结果写入 `doctor.log_file`(默认 `/tmp/wall-vault-doctor.log`)。当 `doctor.auto_fix` 为 true 时,它还会尝试修复常见的偏差(过时的 OpenClaw 配置、缺失的 TLS 信任、可重启的服务)。
 
-1. **命令级结构过滤器** — 理解 git、go 等的输出格式，只提取有意义的部分
-2. **正则表达式后处理** — 去除 ANSI 颜色代码、压缩空行、聚合重复行
-3. **直通 + 截断** — 不支持的命令仅保留前/后 50 行
-
-### Claude Code 集成
-
-可以通过 Claude Code 的 `PreToolUse` 钩子，让所有 shell 命令自动经过 RTK。
-
-```bash
-# 安装钩子（自动添加到 Claude Code settings.json）
-wall-vault rtk hook install
-```
-
-或手动添加到 `~/.claude/settings.json`：
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "command": "wall-vault rtk rewrite"
-    }]
-  }
-}
-```
-
-> :bulb: **退出码保留**：RTK 原样返回原始命令的退出码。命令失败时（exit code != 0），AI 也能准确检测到失败。
-
-> :bulb: **强制英文**：RTK 使用 `LC_ALL=C` 运行命令，无论系统语言设置如何，始终生成英文输出。这是过滤器正确工作的必要条件。
+通过仪表板的 **Doctor** 卡片或 `wall-vault doctor` 触发一次性运行。
 
 ---
 
-## 环境变量参考
+## Hooks
 
-环境变量是向程序传递配置值的方式。在终端输入 `export 变量名=值`，或写入自动启动服务文件中即可永久生效。
+在关键事件上运行 shell 命令:
 
-| 变量 | 说明 | 示例值 |
-|------|------|--------|
-| `WV_LANG` | 仪表盘语言 | `ko`, `en`, `ja` |
-| `WV_THEME` | 仪表盘主题 | `light`, `dark`, `gold` |
-| `WV_KEY_GOOGLE` | Google API 密钥（逗号分隔多个） | `AIza...,AIza...` |
-| `WV_KEY_OPENROUTER` | OpenRouter API 密钥 | `sk-or-v1-...` |
-| `WV_VAULT_URL` | 分布式模式中金库服务器地址 | `http://192.168.x.x:56243` |
-| `WV_VAULT_TOKEN` | 客户端（机器人）认证令牌 | `my-secret-token` |
-| `WV_ADMIN_TOKEN` | 管理员令牌 | `admin-token-here` |
-| `WV_MASTER_PASS` | API 密钥加密密码 | `my-password` |
-| `WV_AVATAR` | 头像图片路径（相对于 `~/.openclaw/`） | `workspace/avatars/avatar.png` |
-| `OLLAMA_URL` | Ollama 本地服务器地址 | `http://192.168.x.x:11434` |
+```yaml
+hooks:
+  on_model_change:   "logger 'wall-vault: $SERVICE/$MODEL'"
+  on_key_exhausted:  "notify-send 'wall-vault' '$SERVICE keys all on cooldown'"
+  on_service_down:   "/usr/local/bin/page-oncall.sh $SERVICE '$ERROR'"
+  on_doctor_fix:     "echo \"$AGENT: $LEVEL $MSG\" >> ~/wall-vault.audit.log"
+  openclaw_socket:   ""    # 如果设置,OpenClaw TUI 通过此 Unix 套接字接收事件
+```
+
+每个 hook 都会获得事件特定的环境变量(`SERVICE`、`MODEL`、`ERROR`、`AGENT`、`LEVEL`、`MSG`)。Hook 以 5 秒超时异步运行——proxy 永远不会因慢速 hook 而阻塞。
 
 ---
 
-## 故障排除
+## 环境变量
 
-### 代理无法启动
+| 变量 | YAML 字段 |
+|------|------------|
+| `WV_LANG` | `lang` |
+| `WV_THEME` | `theme` |
+| `WV_PROXY_PORT` | `proxy.port` |
+| `WV_PROXY_HOST` | `proxy.host` |
+| `WV_VAULT_PORT` | `vault.port` |
+| `WV_VAULT_HOST` | `vault.host` |
+| `WV_VAULT_URL` | `proxy.vault_url` (distributed) |
+| `WV_VAULT_TOKEN` | `proxy.vault_token` |
+| `WV_ADMIN_TOKEN` | `vault.admin_token` |
+| `WV_MASTER_PASS` | `vault.master_password` |
+| `WV_AVATAR` | `proxy.avatar` |
+| `WV_TOOL_FILTER` | `proxy.tool_filter` |
+| `WV_CC_CLIENT_ID` | `proxy.claude_code_client_id` |
+| `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
+| `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
+| `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
+| `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
+| `WV_VAULT_BOOTSTRAP_PORT` | `vault.bootstrap_port` |
+| `WV_PROXY_PLAIN_PORT` | `proxy.plain_port` |
+| `WV_KEY_GOOGLE` | 一次性导入:逗号分隔的 Google 密钥 |
+| `WV_KEY_OPENROUTER` | 一次性导入:OpenRouter 密钥 |
+| `WV_KEY_ANTHROPIC` | 一次性导入:Anthropic 密钥 |
+| `WV_KEY_OPENAI` | 一次性导入:OpenAI 密钥 |
+| `WV_OLLAMA_URL` | 每主机 Ollama URL 覆盖 |
+| `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
+| `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | 每后端 URL 覆盖 |
+| `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
+| `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
+| `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
+| `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
+| `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |
 
-端口可能已被其他程序占用。
-
-```bash
-ss -tlnp | grep 56244   # 查看 56244 端口被谁占用
-wall-vault proxy --port 8080   # 使用其他端口启动
-```
-
-### API 密钥错误（429, 402, 401, 403, 582）
-
-| 错误码 | 含义 | 处理方法 |
-|--------|------|---------|
-| **429** | 请求过多（配额超限） | 稍等或添加更多密钥 |
-| **402** | 需要付费或额度不足 | 在相应服务中充值 |
-| **401 / 403** | 密钥错误或无权限 | 重新确认密钥并重新注册 |
-| **582** | 网关过载（5 分钟冷却） | 5 分钟后自动解除 |
-
-```bash
-# 查看已注册的密钥列表和状态
-curl -H "Authorization: Bearer 管理员令牌" https://localhost:56243/admin/keys
-
-# 重置密钥使用计数器
-curl -X POST -H "Authorization: Bearer 管理员令牌" https://localhost:56243/admin/keys/reset
-```
-
-### 代理显示"未连接"
-
-"未连接"表示 proxy 进程没有向金库发送心跳信号。**这并不意味着设置没有保存。** proxy 需要在知道金库服务器地址和令牌的状态下运行。
-
-```bash
-# 指定金库服务器地址、令牌、客户端 ID 启动 proxy
-WV_VAULT_URL=http://金库服务器:56243 \
-WV_VAULT_TOKEN=客户端令牌 \
-WV_VAULT_CLIENT_ID=客户端ID \
-wall-vault proxy
-```
-
-连接成功后，约 20 秒内仪表盘会显示 :green_circle: 运行中。
-
-### Ollama 无法连接
-
-Ollama 是在本地电脑上直接运行 AI 的程序。首先检查 Ollama 是否在运行。
-
-```bash
-curl http://localhost:11434/api/tags   # 如果出现模型列表则正常
-export OLLAMA_URL=http://192.168.x.x:11434   # 如果在其他电脑上运行
-```
-
-> :warning: 如果 Ollama 无响应，请先用 `ollama serve` 命令启动 Ollama。
-
-> :warning: **大型模型响应很慢**：像 `qwen3.5:35b`、`deepseek-r1` 这样的大型模型，生成响应可能需要几分钟。即使看起来没有反应，也可能正在处理中——请耐心等待。
+设置的每个环境变量都会胜过 YAML 文件。
 
 ---
 
-## 近期变更（v0.1.16 ~ v0.1.27）
+## 故障排查
 
-### v0.1.27 (2026-04-09)
-- **Ollama 回退模型名修复**：从其他服务回退到 Ollama 时，带提供商前缀的模型名（如 `google/gemini-3.1-pro-preview`）会直接传递给 Ollama 的问题已修复。现在自动替换为环境变量/默认模型。
-- **冷却时间大幅缩短**：429 限速 30分钟->5分钟，402 付费 1小时->30分钟，401/403 24小时->6小时。防止所有密钥同时进入冷却导致代理完全瘫痪。
-- **全部冷却时强制重试**：当所有密钥都在冷却状态时，强制重试最快解除冷却的密钥，防止请求被拒。
-- **服务列表显示修复**：`/status` 响应现在显示从 vault 同步的实际服务列表（防止 anthropic 等被遗漏）。
+### `:56244` 上的 `connection refused`
 
-### v0.1.25 (2026-04-08)
-- **代理进程检测**：proxy 检测本地代理（NanoClaw/OpenClaw）是否存活，在仪表盘上以橙色信号灯显示。
-- **拖拽手柄改进**：卡片排序时只能从信号灯（●）区域抓取。防止从输入框或按钮误触拖拽。
+要么 proxy 未运行,要么它绑定到了不同的主机。请检查:
 
-### v0.1.24 (2026-04-06)
-- **RTK 令牌节省子命令**：`wall-vault rtk <command>` 自动过滤 shell 命令输出，将 AI 代理的令牌使用量减少 60-90%。内置 git、go 等主要命令的专用过滤器，不支持的命令也会自动截断。通过 Claude Code 的 `PreToolUse` 钩子透明集成。
+```bash
+ss -lnp | grep 56244
+systemctl --user status wall-vault-proxy   # Linux
+launchctl list | grep wall-vault           # macOS
+```
 
-### v0.1.23 (2026-04-06)
-- **Ollama 模型更改修复**：在金库仪表盘中更改 Ollama 模型后不反映到实际 proxy 的问题已修复。之前仅使用环境变量（`OLLAMA_MODEL`），现在优先使用金库设置。
-- **本地服务自动信号灯**：Ollama、LM Studio、vLLM 可达时自动启用，断连时自动禁用。与云服务基于密钥的自动切换方式相同。
+如果它在不同的端口上运行,你的配置中 `proxy.port` 被覆盖了——请检查 `~/.wall-vault/config.yaml`。
 
-### v0.1.22 (2026-04-05)
-- **空 content 字段遗漏修复**：thinking 模型（gemini-3.1-pro、o1、claude thinking 等）将 max_tokens 配额全部用于 reasoning 而无法生成实际响应时，proxy 通过 `omitempty` 遗漏响应 JSON 的 `content`/`text` 字段，导致 OpenAI/Anthropic SDK 客户端出现 `Cannot read properties of undefined (reading 'trim')` 崩溃的问题已修复。已按官方 API 规范改为始终包含字段。
+### `x509: certificate signed by unknown authority`
 
-### v0.1.21 (2026-04-05)
-- **Gemma 4 模型支持**：可通过 Google Gemini API 使用 `gemma-4-31b-it`、`gemma-4-26b-a4b-it` 等 Gemma 系列模型。
-- **LM Studio / vLLM 正式支持**：之前这些服务在 proxy 路由中缺失，总是回退到 Ollama。现在通过 OpenAI 兼容 API 正常路由。
-- **仪表盘服务显示修复**：即使发生回退，仪表盘也始终显示用户配置的服务。
-- **本地服务状态显示**：仪表盘加载时，以 ● 点颜色显示本地服务（Ollama、LM Studio、vLLM 等）的连接状态。
-- **工具过滤器环境变量**：可通过 `WV_TOOL_FILTER=passthrough` 环境变量设置工具传递模式。
+客户端不信任 wall-vault 内部 CA。在客户端机器上运行 `wall-vault cert install-trust`。对于运行时忽略 OS 信任存储的代理(例如带有硬编码 `NODE_EXTRA_CA_CERTS` 的 Node),请使用 `127.0.0.1:56245` 上的环回 HTTP 伴侣(仅同主机),或设置 `WV_PROXY_TLS_ENABLED=0` 以回退到纯 HTTP。
 
-### v0.1.20 (2026-03-28)
-- **全面安全加固**：XSS 防护（41 处）、常量时间令牌比较、CORS 限制、请求大小限制、路径穿越防护、SSE 认证、速率限制器加固等 12 项安全改进。
+### `token not registered with vault`
 
-### v0.1.19 (2026-03-27)
-- **Claude Code 在线检测**：不经过 proxy 的 Claude Code 也能在仪表盘上显示为在线。
+客户端的 `Authorization: Bearer <token>` 与任何已注册的客户端都不匹配。请在仪表板的 **Clients** 下验证令牌。如果你从过时的配置中复制了像 `proxy-managed`、`dummy` 或 `""` 这样的字面令牌,请用真正的客户端令牌替换它。
 
-### v0.1.18 (2026-03-26)
-- **回退服务粘连修复**：临时错误导致回退到 Ollama 后，原始服务恢复时自动切回。
-- **离线检测改进**：15 秒间隔的状态检查使 proxy 停止检测更快。
+### `Anthropic dispatch needs a Claude model id`
 
-### v0.1.17 (2026-03-25)
-- **拖拽排序卡片**：代理卡片可拖拽重新排序。
-- **内联配置应用按钮**：离线代理显示 [:zap: 应用配置] 按钮。
-- **新增 cokacdir 代理类型**。
+v0.2.63 起的默认行为:发送到 anthropic 调度的非 Claude 模型 ID 会返回错误。要么修复路由(不要将 `gemini-2.5-flash` 发送到 anthropic),要么通过 `proxy.anthropic_fallback_model` 选择启用自动重写。
 
-### v0.1.16 (2026-03-25)
-- **双向模型同步**：在金库仪表盘中更改 Cline 或 Claude Code 的模型后自动反映。
+### `unknown service: <id>`
+
+调度看到了一个没有插件 yaml 声明的服务 ID。请检查:
+
+```bash
+ls ~/.wall-vault/services/        # 是否存在任何插件 yaml?
+cat ~/.wall-vault/services/<id>.yaml | grep enabled
+```
+
+如果 yaml 存在但 `enabled: false`,请翻转它。如果完全缺失,请从源码树中的 `configs/services/` 复制。
+
+### reasoning 模型上响应为空
+
+`qwen3.6`、`deepseek-r1` 和 GPT-`o1` 系列有时只发出 `reasoning_content` 而留空 `content`。从 v0.2.63 起,wall-vault 会自动回退到 reasoning 文本——如果你仍然看到空响应,则后端两个字段都没有返回。检查上游的日志。
+
+特别是对于使用 qwen3 的 LM Studio,请在插件 yaml 中设置 `inline_no_think_for_qwen3: true`,以便内联禁用 reasoning。内置的 lmstudio.yaml 和 ollama.yaml 已经这样做了。
+
+### 仪表板显示"所有密钥都在冷却",但我刚刚添加了一个
+
+新密钥是健康的,但调度路径可能仍处于较旧密钥的冷却中。请尝试一个新请求——proxy 按调用轮询,接下来会选择一个健康的密钥。
+
+### vault 无法用主密码解锁
+
+密码错误。没有恢复方法——wall-vault 故意不附带后门。如果你确实丢失了主密码,唯一的方法是删除 `~/.wall-vault/data/vault.json`,使用新密码重新启动,然后重新添加密钥。
+
+### 达到了免费层级 OpenRouter 限额
+
+将 `proxy.services` 设置为包含 `openrouter`,并至少添加一个 OpenRouter 密钥。当付费路径返回 402 / 429 时,proxy 会自动从付费模型回退到其 `:free` 变体。
+
+### `journalctl --user -u wall-vault-proxy` 为空
+
+systemd 的 `--user` 日志会发送到运行它的用户的日志中。如果你以 `root` 或通过 `sudo` 启动该单元,日志会在系统实例中——请尝试不带 `--user` 的 `journalctl -u wall-vault-proxy`。
 
 ---
 
-*更详细的 API 信息请参阅 [API.md](API.md)。*
+## 更多
+
+- HTTP API 参考 — 请参阅 [API.md](API.md)
+- 源码 — `https://github.com/sookmook/wall-vault`
+- Bug 报告 / 功能请求 — GitHub Issues
+- 发布历史 — [CHANGELOG.md](../CHANGELOG.md)

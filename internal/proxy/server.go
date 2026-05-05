@@ -82,7 +82,7 @@ type Server struct {
 	// ownModelOverride mirrors the proxy's own client_id's model_override and
 	// is applied to token-less calls so the operator's vault-configured model
 	// wins over whatever the local OpenClaw / Claude Code happens to put in
-	// the request body. Without this, an operator who switches motoko to
+	// the request body. Without this, an operator who switches host-B to
 	// OpenRouter via vault still has to chase down OpenClaw's primary model
 	// in openclaw.json. With it, vault is the single source of truth.
 	ownModelOverride   string
@@ -400,14 +400,14 @@ func NewServer(cfg *config.Config) *Server {
 	// Sanitize ~/.openclaw/openclaw.json once at boot. OpenClaw 2026.4.29
 	// rejects model entries with empty `id`, which historically slipped
 	// past pre-guard versions of applyOpenClawConfig — we observed the
-	// raspi gateway crash-loop on 2026-05-01 from a single such entry.
+	// host-A gateway crash-loop on 2026-05-01 from a single such entry.
 	// No-op for hosts that don't run OpenClaw (most of the fleet).
 	runStartupSanitize()
 
 	// Heal stale provider settings once at boot. The sanitize pass above
 	// only removes empty-id entries; the heal pass forces baseUrls back
 	// to localhost and prunes duplicate / dangling-name entries. Same
-	// raspi root cause: an external host got written into providers.custom
+	// host-A root cause: an external host got written into providers.custom
 	// and providers.anthropic.baseUrl, bypassing the proxy entirely.
 	// CA bundle location: alongside the proxy TLS cert as `ca.crt`. The
 	// heal pass writes it into models.providers.<id>.request.tls.ca for
@@ -1456,7 +1456,7 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request) {
 	// a token-auth'd client whose model_override is empty would get the
 	// proxy's own model regardless of what they typed in the request — the
 	// pattern that hit earlier reviewer feedback, where an econoworld token route
-	// to mini9's proxy (s.model="anthropic/claude-opus-4-7") swallowed the
+	// to host-D's proxy (s.model="anthropic/claude-opus-4-7") swallowed the
 	// requested "qwen3.6:27b".
 	mdl := oaiReq.Model
 	s.mu.RLock()

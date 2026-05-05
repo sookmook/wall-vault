@@ -8,6 +8,53 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.64] — 2026-05-05
+
+Documentation rewrite + repository sanitisation pass. No proxy or vault
+behaviour changes; the binary built from this tag is functionally
+equivalent to v0.2.63.
+
+### Changed
+
+- **README rewritten as English master** (`README.md`, ~390 lines), focused
+  on what wall-vault does for an external operator: install, TLS setup,
+  client connections, configuration, modes, plugin yamls, and build from
+  source. The previous monolith mixed origin-story prose, fleet
+  narrative, and seven languages in a single 1370-line file.
+- **MANUAL rewritten as English master** (`docs/MANUAL.md`, 621 lines)
+  covering install, setup wizard, TLS, key registration, agent
+  connections, dashboard, distributed mode, auto-start, plugin yamls,
+  doctor, hooks, environment variables, and troubleshooting. Removed
+  outdated v0.2.x upgrade notes that CHANGELOG already covers.
+- **Per-language files** for both README and MANUAL: `*.ko.md` Korean,
+  `*.zh.md` Simplified Chinese, `*.ja.md` Japanese, `*.es.md` Spanish,
+  `*.fr.md` French, `*.de.md` German, `*.pt.md` Portuguese, `*.ar.md`
+  Arabic, `*.hi.md` Hindi, `*.id.md` Indonesian, `*.th.md` Thai, `*.sw.md`
+  Swahili, `*.ha.md` Hausa, `*.ne.md` Nepali, `*.mn.md` Mongolian (modern
+  Cyrillic), `*.zu.md` isiZulu. 17 locales total per document. The English
+  master moves to `README.md` / `docs/MANUAL.md`; previous Korean masters
+  become `README.ko.md` / `docs/MANUAL.ko.md` to mirror the README/MANUAL
+  pattern. Old `docs/MANUAL.en.md` removed.
+- **Source comments and test files anonymised.** Per-host references in
+  `internal/proxy/{server,openclaw_sync,openclaw_sanitize,local_dispatch_test,openclaw_heal_test,token_sentinel_test}.go`
+  were rewritten from concrete hostnames (`raspi`, `motoko`, `jaksooni`,
+  `mini9`) to generic placeholders (`host-A`/`host-B`/`host-C`/`host-D`).
+  Test fixture IPs that pinned a specific LAN address moved to neutral
+  placeholders inside the RFC1918 range. CHANGELOG entries that
+  described per-host incidents were rewritten the same way. The author's
+  personal site/email links were already removed from the dashboard
+  footer in v0.2.63; the corresponding CHANGELOG narrative was sanitised
+  here to match.
+
+### Notes
+
+- A fresh `git clone` shows 17-locale READMEs and manuals; existing
+  installs get the same when they pull this tag.
+- No code-path change. `make build` produces a binary stamped
+  `v0.2.64.…` but the proxy + vault dispatch is identical to v0.2.63.
+
+---
+
 ## [0.2.63] — 2026-05-05
 
 External-user usability hardening pass. Three diagnostic agents flagged
@@ -87,10 +134,10 @@ this release fixes the ones that block a fresh non-default install.
 
 ### Removed
 
-- **Footer link to `sookmook.org` and `sookmook@gmail.com`.** The
-  vault dashboard footer now shows only the wall-vault GitHub link.
-  The author's personal contact details no longer appear on every
-  external operator's install.
+- **Author's personal site/email links from the vault dashboard
+  footer.** The footer now shows only the wall-vault GitHub link, so
+  external operators no longer see the author's personal contact
+  details on every install.
 
 ### Notes
 
@@ -134,10 +181,10 @@ this release fixes the ones that block a fresh non-default install.
   inferServiceFromBareModel on it, recognised the gemma- prefix as
   Google's family, and dispatched to the native Google handler,
   which 502'd with "Google: 모델 없음 (gemma-4-26b-a4b)". Symptom on
-  raspi: telegram replies stopped landing because OpenClaw → raspi
+  host-A: telegram replies stopped landing because OpenClaw → host-A
   wall-vault → mini wall-vault hub all 502'd before reaching mini's
   LM Studio. New plugin field `preserve_model_id: true` opts out of
-  the strip; raspi's lmstudio.yaml now sets it.
+  the strip; host-A's lmstudio.yaml now sets it.
 
 ---
 
@@ -528,7 +575,7 @@ this release fixes the ones that block a fresh non-default install.
   vault token into `models.providers.{custom,anthropic,google}.apiKey`
   and forces `authHeader: true` whenever the existing values look
   pre-v0.2.37 (literal `"dummy"` / `"proxy-managed"` / empty + the
-  default `authHeader: false`). Triggered by raspi + motoko
+  default `authHeader: false`). Triggered by host-A + host-B
   2026-05-02: both still carried `apiKey: "dummy"` from a year-old
   install, so every OpenClaw → wall-vault call after the v0.2.39
   token-auth gate landed surfaced as `401 token not registered with
@@ -552,7 +599,7 @@ this release fixes the ones that block a fresh non-default install.
 - **Heal pass also normalizes the `google` provider.**
   `normalizeOpenClawProviders` now runs the same upstream-host →
   localhost rewrite on `models.providers.google.baseUrl` that v0.2.43
-  introduced for `custom` and `anthropic`. Triggered by motoko
+  introduced for `custom` and `anthropic`. Triggered by host-B
   2026-05-02: the google provider had `http://<internal-host>:11434/v1`
   written into its baseUrl slot — an ollama URL accidentally landed in
   the google provider — so every OpenClaw call addressed
@@ -671,7 +718,7 @@ this release fixes the ones that block a fresh non-default install.
   because the vault-distributed service URL `http://<internal-host>:1234`
   pointed at LM Studio's localhost-only listener on a different
   machine, with no path through the mini's wall-vault hub. The fix
-  could not be a hardcoded raspi/mini IP edit; it had to be a generic
+  could not be a hardcoded host-A/mini IP edit; it had to be a generic
   "client wall-vault forwards to hub wall-vault" pattern that any
   third-party deployment (cloud GPU box + laptop, office LM Studio +
   N seats, etc.) could reuse without code changes. v0.2.44 makes that
@@ -696,7 +743,7 @@ this release fixes the ones that block a fresh non-default install.
      non-ollama service).
   2. `models[]` entries with empty `id`, dangling-name (e.g.
      `"openrouter / "`), or duplicate `id` within the same provider are
-     pruned. The raspi snapshot carried 11 entries with identical
+     pruned. The host-A snapshot carried 11 entries with identical
      `id="qwen3.6:27b"` and differing names, which collapsed OpenClaw's
      model selector into a single resolvable model and surfaced as the
      `Model "custom/" could not be resolved` log spam.
@@ -733,7 +780,7 @@ this release fixes the ones that block a fresh non-default install.
   boot (no-op for hosts without OpenClaw) and is also exposed as
   `wall-vault doctor sanitize-openclaw`. Backs up the original to
   `*.bak.sanitize` before rewriting; only writes when something actually
-  changes so clean configs see no churn. Triggered by raspi observation
+  changes so clean configs see no churn. Triggered by host-A observation
   on 2026-05-01: a single empty-id entry left over from a pre-v0.2.32
   applyOpenClawConfig caller crash-looped the gateway after restart.
 - **17-language i18n on auth + bootstrap pages.** `/setup`, `/login`,
@@ -826,11 +873,11 @@ pulled. The actual bottleneck was the missing keep_alive hint.
   is in place for the day OpenClaw breaks the providers layout.
 - Tests for parser + gte() + schemaTag() invariant.
 
-Note: the gateway-restart failures users reported on motoko/mini after
+Note: the gateway-restart failures users reported on host-B/mini after
 `openclaw update` to 2026.4.29 are unrelated to wall-vault — research
 confirmed the providers schema is unchanged; the failures are
 OpenClaw's own lifecycle bugs (stale PID holding port 56242 on mini,
-health-probe race on motoko). Recovery is operator-side: stop the
+health-probe race on host-B). Recovery is operator-side: stop the
 stale gateway, retry update.
 
 ### Added — Click-to-claim onboarding
@@ -1102,9 +1149,9 @@ stale gateway, retry update.
 - **Token-less callers now inherit the proxy's own `model_override`.**
   v0.2.29 made token-less calls pick up the proxy's own `fallback_services`
   but the model itself still came from the request body — so an operator
-  who switched motoko to OpenRouter via `vault.model_override` was still
+  who switched host-B to OpenRouter via `vault.model_override` was still
   served whatever local OpenClaw / Claude Code's primary model said.
-  Surfaced when motoko's OpenClaw kept emitting `custom/gemma4:26b`,
+  Surfaced when host-B's OpenClaw kept emitting `custom/gemma4:26b`,
   driving every chat to the (chronically stuck) mini Ollama instead of
   the freshly-funded OpenRouter. v0.2.30 mirrors `client.ModelOverride`
   into a new `s.ownModelOverride` field on every `syncFromVault` and
@@ -1184,7 +1231,7 @@ stale gateway, retry update.
   a token-auth'd client whose `model_override` was empty had its
   request-body model silently replaced by the proxy's own default
   (e.g. an econoworld request for `qwen3.6:27b` routed through
-  jaksooni's `mini9` proxy was rewritten to `anthropic/claude-opus-4-7`).
+  host-C's `host-D` proxy was rewritten to `anthropic/claude-opus-4-7`).
   New priority: `vault token override > request body > proxy default`.
   Vault override is still final — operators can still pin a model on a
   client by setting its `model_override`. Affects both `/v1/chat/completions`
@@ -1258,10 +1305,10 @@ stale gateway, retry update.
   still used the vault-provided `127.0.0.1`, producing `connection
   refused` and a silent fallback to the cloud chain. New order:
   `WV_OLLAMA_URL` env > `OLLAMA_URL` env > vault `serviceURLs` >
-  `http://localhost:11434`. Surfaced by <separate incident> ("earlier reviewer →
-  야마이 클로드 라우팅 문의"): an econoworld-token call to
-  `qwen3.6:27b` was returning `google/gemini-3.1-flash-lite-preview`
-  because jaksooni's proxy could not reach its env-pinned Ollama.
+  `http://localhost:11434`. Surfaced by <separate incident>: an
+  econoworld-token call to `qwen3.6:27b` was returning
+  `google/gemini-3.1-flash-lite-preview` because host-C's proxy
+  could not reach its env-pinned Ollama.
 
 ---
 
@@ -2354,7 +2401,7 @@ without the proxy stripping them.
 
 - **Header bar**: logo image, Korean title, version stamp, theme switcher
   (7 themes), language switcher (17 locales auto-discovered).
-- **Footer**: GitHub / sookmook.org / email links + live uptime ticker
+- **Footer**: GitHub / author site / email links + live uptime ticker
   reading `data-wv-started` and refreshing every second.
 - **Service / agent / key cards** redesigned: chips, status dots
   (active / cooldown / off / online / ready), avatar previews, key usage

@@ -17,8 +17,8 @@ func TestIsLocalProxyBaseURL(t *testing.T) {
 		{"http://localhost:56244/v1", true},
 		{"https://127.0.0.1:56244/v1", true},
 		{"http://127.0.0.1:9999", true},
-		{"http://192.168.0.6:11434", false},
-		{"http://192.168.0.6:11434/v1", false},
+		{"http://192.168.0.10:11434", false},
+		{"http://192.168.0.10:11434/v1", false},
 		{"https://api.anthropic.com", false},
 		{"https://localhost", false}, // no port — bareword host, treat as not-local-proxy
 	}
@@ -32,7 +32,7 @@ func TestIsLocalProxyBaseURL(t *testing.T) {
 func TestForceLocalhostBaseURL_RewritesUpstream(t *testing.T) {
 	providers := map[string]interface{}{
 		"custom": map[string]interface{}{
-			"baseUrl": "http://192.168.0.6:11434/v1",
+			"baseUrl": "http://192.168.0.10:11434/v1",
 		},
 	}
 	if !forceLocalhostBaseURL(providers, "custom", "https://localhost:56244/v1") {
@@ -206,7 +206,7 @@ func TestRepairDanglingPrimary_NoChangeWhenValid(t *testing.T) {
 }
 
 func TestUpdateOpenClawJSON_EmptyModelIsNoop(t *testing.T) {
-	// Regression for raspi 2026-05-01: SSE config_change fired before a
+	// Regression for host-A 2026-05-01: SSE config_change fired before a
 	// real model had been resolved, and updateOpenClawJSON wrote
 	// primary="custom/" which OpenClaw rejected on every gateway restart.
 	// We can't easily exercise the full function (it touches $HOME), but
@@ -221,7 +221,7 @@ func TestUpdateOpenClawJSON_EmptyModelIsNoop(t *testing.T) {
 }
 
 func TestNormalizeProviderAuth_RewritesStaleApiKey(t *testing.T) {
-	// raspi/motoko 2026-05-02 — providers.{custom,anthropic,google}.apiKey
+	// host-A/host-B 2026-05-02 — providers.{custom,anthropic,google}.apiKey
 	// was "dummy"/"proxy-managed"/"" with authHeader=false, left over from
 	// pre-v0.2.37 installs. OpenClaw faithfully sent those literals and
 	// every call 401'd with `token not registered with vault`.
@@ -293,14 +293,14 @@ func TestNormalizeProviderAuth_NoTokenSkips(t *testing.T) {
 }
 
 func TestNormalizeOpenClawProviders_GoogleStaleUpstream(t *testing.T) {
-	// motoko 2026-05-02 — google provider baseUrl pointed at the mini's
-	// ollama (http://192.168.0.6:11434/v1), which made every OpenClaw
+	// host-B 2026-05-02 — google provider baseUrl pointed at the mini's
+	// ollama (http://192.168.0.10:11434/v1), which made every OpenClaw
 	// google call land on ollama and 404 with "model not found".
 	cfg := map[string]interface{}{
 		"models": map[string]interface{}{
 			"providers": map[string]interface{}{
 				"google": map[string]interface{}{
-					"baseUrl": "http://192.168.0.6:11434/v1",
+					"baseUrl": "http://192.168.0.10:11434/v1",
 				},
 			},
 		},
@@ -315,21 +315,21 @@ func TestNormalizeOpenClawProviders_GoogleStaleUpstream(t *testing.T) {
 }
 
 func TestNormalizeOpenClawProviders_RaspiSnapshot(t *testing.T) {
-	// Mirror of the raspi 2026-05-01 broken state: anthropic + custom
+	// Mirror of the host-A 2026-05-01 broken state: anthropic + custom
 	// pointing at the upstream ollama, custom.models with 11 dup-id entries
 	// plus one dangling-name entry.
 	cfg := map[string]interface{}{
 		"models": map[string]interface{}{
 			"providers": map[string]interface{}{
 				"anthropic": map[string]interface{}{
-					"baseUrl": "http://192.168.0.6:11434",
+					"baseUrl": "http://192.168.0.10:11434",
 					"apiKey":  "proxy-managed",
 					"models": []interface{}{
 						map[string]interface{}{"id": "qwen3.6:27b", "name": "proxy / x"},
 					},
 				},
 				"custom": map[string]interface{}{
-					"baseUrl": "http://192.168.0.6:11434/v1",
+					"baseUrl": "http://192.168.0.10:11434/v1",
 					"models": []interface{}{
 						map[string]interface{}{"id": "qwen3.6:27b", "name": "ollama / a"},
 						map[string]interface{}{"id": "qwen3.6:27b", "name": "ollama / b"},
@@ -340,7 +340,7 @@ func TestNormalizeOpenClawProviders_RaspiSnapshot(t *testing.T) {
 		},
 	}
 	if !normalizeOpenClawProviders(cfg, "", "", "", "") {
-		t.Fatal("expected change=true for broken raspi snapshot")
+		t.Fatal("expected change=true for broken host-A snapshot")
 	}
 	provs := cfg["models"].(map[string]interface{})["providers"].(map[string]interface{})
 	if got := provs["custom"].(map[string]interface{})["baseUrl"].(string); got != "https://localhost:56244/v1" {

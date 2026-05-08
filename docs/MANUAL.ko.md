@@ -528,6 +528,8 @@ hooks:
 | `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
 | `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
 | `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_PROXY_TLS_REQUIRED` | `proxy.tls.required` (TLS 꺼져 있으면 부팅 거부 — 평문 fallback 차단) |
+| `WV_PROXY_ALLOW_CIDRS` | `proxy.allow_cidrs` (CSV 형식, 예: `192.168.0.0/16,10.0.0.0/8`. 루프백은 항상 통과) |
 | `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
 | `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
 | `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
@@ -537,13 +539,17 @@ hooks:
 | `WV_KEY_OPENROUTER` | 일회성 임포트: OpenRouter 키 |
 | `WV_KEY_ANTHROPIC` | 일회성 임포트: Anthropic 키 |
 | `WV_KEY_OPENAI` | 일회성 임포트: OpenAI 키 |
-| `WV_OLLAMA_URL` | 호스트별 Ollama URL 오버라이드 |
+| `WV_OLLAMA_URL` | 호스트별 Ollama URL 오버라이드 (단일 인스턴스) |
+| `WV_OLLAMA_URLS` | 콤마 구분 Ollama URL 목록 (멀티 인스턴스 디스패치) |
 | `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
 | `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
-| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | 백엔드별 URL 오버라이드 |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | 백엔드별 URL 오버라이드 (단일 인스턴스) |
 | `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
 | `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
 | `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_INJECT_MODEL_IDENTITY` | `proxy.inject_model_identity` (시스템 메시지 모델 정체성 가드, 기본 off) |
+| `WV_PROMPT_TOKEN_CAP` | 호스트별 로컬 OAI 호환 프롬프트 자동 truncate 임계 (양의 정수 = 활성, 0 = off) |
+| `WV_DISPATCH_TRACE` | `1` 로 설정 시 dispatch 마다 결정된 service/model 과 사유 로그 (기본 off) |
 | `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
 | `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
 | `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |

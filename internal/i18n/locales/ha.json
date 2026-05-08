@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "URL na uwar garken AI na gida (Ollama / LM Studio / vLLM). Ka raba da waƙafi don abubuwa da yawa; ana hanya bisa sunan samfuri. Tsaida wani misali da \"<samfuri>@local<N>\" — local1 = URL na farko, local2 = na biyu.",
   "act_close": "Rufe (Esc)",
   "opt_service_default": "(yi amfani da tsohuwar aiki)",
   "warn_stale_override_short": "(⚠ darajar yanzu · za a sake saita idan aka ajiye)",

@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "ローカル AI サーバーの URL (Ollama / LM Studio / vLLM)。カンマ区切りで複数指定可能 (モデル名で自動振り分け)。明示指定は \"<モデル>@local<N>\" — local1 = 1番目の URL、local2 = 2番目。",
   "act_close": "閉じる (Esc)",
   "opt_service_default": "(サービス既定を使用)",
   "warn_stale_override_short": "(⚠ 現在値 · 保存時にリセット)",

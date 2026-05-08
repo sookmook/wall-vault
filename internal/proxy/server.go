@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -127,6 +128,17 @@ type Server struct {
 	// traffic). Built once in NewServer.
 	ollamaHTTP *http.Client
 
+	// servicePools routes each local-service dispatch to whichever instance
+	// hosts the requested model. Keyed by service id. The "ollama" pool uses
+	// /api/tags for discovery; every other local service (lmstudio, vllm,
+	// llamacpp, custom OpenAI-compat plugins) uses /v1/models. Single-URL
+	// deployments behave identically to the pre-pool path. URL list is
+	// rebuilt from env (WV_<ID>_URLS list + WV_<ID>_URL) ∪ plugin DefaultURL
+	// ∪ vault serviceURLs[id] every vault sync. Operators can also enter a
+	// comma-separated list directly into the dashboard URL field.
+	servicePools map[string]*servicePool
+	poolsMu      sync.RWMutex
+
 	// pluginByID indexes cfg.Plugins by service id so the dispatch path
 	// can look up auth / TLS / default_url settings in O(1). Empty map
 	// when no plugin yamls are present — every existing call site keeps
@@ -229,6 +241,34 @@ func NewServer(cfg *config.Config) *Server {
 		},
 	}
 
+	// Per-service dispatch pools. Built-in local services (ollama plus the
+	// three OpenAI-compatible defaults) always get a pool; plugin-defined
+	// services with an OAI-compatible request_format join the rotation too.
+	// Vault sync later re-merges in serviceURLs[id]. Started below so the
+	// first request post-NewServer already sees a populated model→URL map.
+	// Stop() tears the goroutines down at shutdown.
+	s.servicePools = map[string]*servicePool{}
+	s.servicePools["ollama"] = newServicePool("ollama", s.resolveOllamaURLs(), fetchOllamaTags, s.ollamaHTTP)
+	for _, id := range []string{"lmstudio", "vllm", "llamacpp"} {
+		s.servicePools[id] = newServicePool(id, s.resolveLocalServiceURLs(id), fetchOpenAICompatModels, s.ollamaHTTP)
+	}
+	for id, plugin := range s.pluginByID {
+		if _, exists := s.servicePools[id]; exists {
+			continue
+		}
+		// Only OpenAI-compatible plugins expose /v1/models reliably. The
+		// other RequestFormat values (gemini, ollama, raw) need a different
+		// discovery path or have no list endpoint at all — skip them so a
+		// dead /v1/models call doesn't spam the log.
+		if plugin.RequestFormat != "" && plugin.RequestFormat != "openai" {
+			continue
+		}
+		s.servicePools[id] = newServicePool(id, s.resolveLocalServiceURLs(id), fetchOpenAICompatModels, s.ollamaHTTP)
+	}
+	for _, p := range s.servicePools {
+		p.Start(context.Background())
+	}
+
 	// initialize hooks manager
 	shellCmds := map[hooks.EventType]string{
 		hooks.EventModelChanged: cfg.Hooks.OnModelChange,
@@ -294,6 +334,13 @@ func NewServer(cfg *config.Config) *Server {
 				if effective != "" {
 					go updateEconoWorldModel(effective)
 				}
+				// Mirror the live ollama reasoning toggle into
+				// EconoWorld's ai_config.json so _call_ollama_native
+				// picks up dashboard changes without a manual edit.
+				s.mu.RLock()
+				ollamaThink := s.serviceReasoning["ollama"]
+				s.mu.RUnlock()
+				go updateEconoWorldOllamaThink(ollamaThink)
 			}
 		}, func() {
 			// Flush token cache so vault model changes take effect immediately
@@ -332,17 +379,32 @@ func NewServer(cfg *config.Config) *Server {
 		})
 		s.sse.Start()
 
-		// initial load of client config and keys from vault (2s delay,
-		// cancellable via stopCh so Stop() during startup doesn't leak this
-		// goroutine).
-		go func() {
-			select {
-			case <-time.After(2 * time.Second):
-				s.syncFromVault()
-			case <-s.stopCh:
-				return
+		// Initial vault sync — synchronous so the first inbound request
+		// after Handler() goes live can find keys / services / cooldown
+		// state in place. Without this, dispatch raced the 2s-delayed
+		// goroutine and reported "전체 쿨다운 또는 등록된 키 없음" when
+		// the keyMgr was simply empty.
+		//
+		// Retried with backoff because vault + proxy frequently share a
+		// host (any local-vault deploy) and the proxy can lose the race
+		// for the listen socket — the first sync hits "connection refused"
+		// while vault is still binding, returns, and dispatch then sees
+		// the empty keyMgr for the full 5-minute periodic gap (observed
+		// on the v0.2.82 deploy). Loop until at least one key is loaded
+		// or the budget is exhausted; fall through either way so a
+		// permanently-down vault doesn't block startup forever — the
+		// periodic sync still retries.
+		for i := 0; i < 10; i++ {
+			s.syncFromVault()
+			if s.keyMgr.HasAnyKey() {
+				break
 			}
-		}()
+			select {
+			case <-time.After(1 * time.Second):
+			case <-s.stopCh:
+				return s
+			}
+		}
 
 		// periodic key sync (every 5 minutes)
 		go func() {
@@ -459,40 +521,101 @@ func (s *Server) defaultProxyOrigin() string {
 	return DefaultProxyOrigin(s.cfg.Proxy.Port, s.cfg.Proxy.TLS.Enabled)
 }
 
-// resolveLocalServiceURL returns the base URL the proxy should target for
-// an OpenAI-compatible local backend. Resolution order, highest first:
+// refreshAllServicePoolURLs re-resolves every service pool's URL list and
+// pushes it via SetURLs. Called from syncAllowedServices after vault sync
+// updates s.serviceURLs. SetURLs is a no-op when the list is unchanged, so
+// machines whose vault config doesn't move see no extra polling.
+func (s *Server) refreshAllServicePoolURLs() {
+	s.poolsMu.RLock()
+	pools := make(map[string]*servicePool, len(s.servicePools))
+	for id, p := range s.servicePools {
+		pools[id] = p
+	}
+	s.poolsMu.RUnlock()
+	for id, p := range pools {
+		if id == "ollama" {
+			p.SetURLs(s.resolveOllamaURLs())
+			continue
+		}
+		p.SetURLs(s.resolveLocalServiceURLs(id))
+	}
+}
+
+// resolveLocalServiceURLs builds the multi-instance URL list for a local
+// service's dispatch pool. Sources, in order, with the first occurrence
+// winning on duplicates:
 //
-//  1. `WV_<ID>_URL` env var (e.g. WV_LMSTUDIO_URL=http://workstation:1234)
-//     so an operator can hot-tune the URL without editing yaml.
-//  2. plugin.DefaultURL — explicit per-plugin override from yaml.
-//  3. s.serviceURLs[id] — vault-distributed SSE default.
-//  4. Built-in fallbacks for the historic three (lmstudio / vllm / llamacpp).
+//  1. WV_<ID>_URLS env (comma list)
+//  2. WV_<ID>_URL env (single — accepts comma list too)
+//  3. plugin.DefaultURL (single — accepts comma list)
+//  4. vault serviceURLs[id] (single from SSE — accepts comma list)
+//  5. Built-in fallbacks for the historic three (lmstudio / vllm / llamacpp)
 //
-// Returns the empty string when nothing produces a URL — callers must
-// detect that and surface a config error rather than dialling "".
+// Every textual source goes through splitOllamaURLs so an operator who types
+// "http://a:1234, http://b:1234" into the dashboard URL field gets the same
+// multi-instance behaviour as the dedicated env list.
+//
+// Returns nil when nothing produces a URL — callers must detect that and
+// surface a config error rather than dispatching to "".
+func (s *Server) resolveLocalServiceURLs(serviceID string) []string {
+	if serviceID == "" {
+		return nil
+	}
+	envBase := "WV_" + strings.ToUpper(strings.ReplaceAll(serviceID, "-", "_"))
+	out := make([]string, 0, 4)
+	out = append(out, splitOllamaURLs(os.Getenv(envBase+"_URLS"))...)
+	out = append(out, splitOllamaURLs(os.Getenv(envBase+"_URL"))...)
+	if plugin := s.pluginByID[serviceID]; plugin != nil && plugin.DefaultURL != "" {
+		out = append(out, splitOllamaURLs(plugin.DefaultURL)...)
+	}
+	s.mu.RLock()
+	u := s.serviceURLs[serviceID]
+	s.mu.RUnlock()
+	out = append(out, splitOllamaURLs(u)...)
+	if len(out) == 0 {
+		defaults := map[string]string{
+			"lmstudio": "http://localhost:1234",
+			"vllm":     "http://localhost:8000",
+			"llamacpp": "http://localhost:8080",
+		}
+		if d, ok := defaults[serviceID]; ok {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// resolveLocalServiceURL returns the first URL for the service. Kept as a
+// thin shim for callers that need a single representative URL. Multi-
+// instance dispatch goes through resolveLocalServiceURLForModel.
 func (s *Server) resolveLocalServiceURL(serviceID string) string {
 	if serviceID == "" {
 		return ""
 	}
-	envName := "WV_" + strings.ToUpper(strings.ReplaceAll(serviceID, "-", "_")) + "_URL"
-	if v := strings.TrimSpace(os.Getenv(envName)); v != "" {
-		return v
+	urls := s.resolveLocalServiceURLs(serviceID)
+	if len(urls) == 0 {
+		return ""
 	}
-	if plugin := s.pluginByID[serviceID]; plugin != nil && plugin.DefaultURL != "" {
-		return plugin.DefaultURL
+	return urls[0]
+}
+
+// resolveLocalServiceURLForModel returns the URL of the instance that hosts
+// the given model id, or the first configured URL on miss (so the upstream
+// returns a real 404). Single-URL setups resolve every model to that URL
+// — same as the pre-pool resolveLocalServiceURL.
+func (s *Server) resolveLocalServiceURLForModel(serviceID, model string) string {
+	if serviceID == "" {
+		return ""
 	}
-	s.mu.RLock()
-	url := s.serviceURLs[serviceID]
-	s.mu.RUnlock()
-	if url != "" {
-		return url
+	s.poolsMu.RLock()
+	pool := s.servicePools[serviceID]
+	s.poolsMu.RUnlock()
+	if pool != nil {
+		if u := pool.URLForModel(model); u != "" {
+			return u
+		}
 	}
-	defaults := map[string]string{
-		"lmstudio": "http://localhost:1234",
-		"vllm":     "http://localhost:8000",
-		"llamacpp": "http://localhost:8080",
-	}
-	return defaults[serviceID]
+	return s.resolveLocalServiceURL(serviceID)
 }
 
 // applyQwen3NoThinkSuffix appends the "/no_think" inline directive to the
@@ -573,6 +696,15 @@ func (s *Server) Stop() {
 		return // already closed
 	default:
 		close(s.stopCh)
+	}
+	s.poolsMu.RLock()
+	pools := make([]*servicePool, 0, len(s.servicePools))
+	for _, p := range s.servicePools {
+		pools = append(pools, p)
+	}
+	s.poolsMu.RUnlock()
+	for _, p := range pools {
+		p.Stop()
 	}
 }
 
@@ -751,11 +883,13 @@ func (s *Server) syncFromVault() {
 
 	var clients []struct {
 		ID               string   `json:"id"`
-		DefaultService   string   `json:"default_service"`
-		DefaultModel     string   `json:"default_model"`
-		ModelOverride    string   `json:"model_override,omitempty"`
+		PreferredService string   `json:"preferred_service"`         // v0.2 canonical
+		DefaultService   string   `json:"default_service"`           // v0.1 legacy
+		DefaultModel     string   `json:"default_model"`             // v0.1 legacy
+		ModelOverride    string   `json:"model_override,omitempty"`  // v0.2 canonical
 		AgentType        string   `json:"agent_type"`
 		Host             string   `json:"host"`
+		WorkDir          string   `json:"work_dir,omitempty"`
 		FallbackServices []string `json:"fallback_services,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
@@ -797,6 +931,15 @@ func (s *Server) syncFromVault() {
 			Service:   c.DefaultService,
 			Model:     c.DefaultModel,
 		})
+		// Seed agent-specific work_dir caches so SSE/sync-driven config
+		// writers (updateEconoWorldOllamaThink, etc.) resolve the right
+		// directory before the first /agent/apply call lands. Without this,
+		// a fresh proxy boot on a host where the agent never bootstrapped
+		// after restart silently no-ops on every config_change because
+		// resolveEconoWorldDir falls back to the hard-coded default.
+		if c.AgentType == "econoworld" && c.WorkDir != "" {
+			setCachedEconoWorldDir(resolveEconoWorldDir(c.WorkDir))
+		}
 	}
 	// ccID kept for any legacy reader that still references claudeCodeClientID.
 	// Prefer the first claude-code entry in the hosted set.
@@ -811,18 +954,33 @@ func (s *Server) syncFromVault() {
 		if c.ID == s.cfg.Proxy.ClientID {
 			s.mu.Lock()
 			oldSvc, oldMdl := s.service, s.model
-			if c.DefaultService != "" {
-				s.service = c.DefaultService
+			// v0.2 canonical (PreferredService / ModelOverride) wins; v0.1
+			// legacy (DefaultService / DefaultModel) is the fallback so
+			// pre-migration installs keep working. A v0.2-only client (which
+			// leaves the legacy fields empty) used to drop through silently
+			// and freeze s.service / s.model at whatever value was set last,
+			// causing dispatch to keep routing to the previous service even
+			// after the operator changed the dashboard.
+			effSvc := c.PreferredService
+			if effSvc == "" {
+				effSvc = c.DefaultService
 			}
-			if c.DefaultModel != "" {
-				s.model = c.DefaultModel
+			if effSvc != "" {
+				s.service = effSvc
+			}
+			effMdl := c.ModelOverride
+			if effMdl == "" {
+				effMdl = c.DefaultModel
+			}
+			if effMdl != "" {
+				s.model = effMdl
 			}
 			s.ownFallback = append(s.ownFallback[:0], c.FallbackServices...)
 			s.ownModelOverride = c.ModelOverride
 			newSvc, newMdl := s.service, s.model
 			s.mu.Unlock()
 			log.Printf("[sync] 설정 로드: %s/%s  override=%q  fallback=%v",
-				c.DefaultService, c.DefaultModel, c.ModelOverride, c.FallbackServices)
+				effSvc, effMdl, c.ModelOverride, c.FallbackServices)
 			if newSvc != oldSvc || newMdl != oldMdl {
 				go updateOpenClawJSON(newSvc, newMdl, s.defaultProxyOrigin())
 			}
@@ -906,34 +1064,89 @@ func (s *Server) syncAllowedServices() error {
 		}
 	}
 	s.mu.Lock()
+	oldOllamaThink := s.serviceReasoning["ollama"]
 	s.allowedServices = ids
 	s.serviceURLs = urls
 	s.serviceDefaults = defaults
 	s.serviceReasoning = reasoning
+	newOllamaThink := reasoning["ollama"]
 	s.mu.Unlock()
+	// Mirror an ollama reasoning_mode change into EconoWorld's ai_config.json.
+	// The SSE config_change handler only fires for client-targeted edits
+	// (model / preferred_service); a service-level reasoning toggle in the
+	// vault dashboard reaches us through this poll instead. Without the
+	// diff-and-call here, EconoWorld's ollama.think would only refresh on
+	// the next /agent/apply or model swap.
+	if oldOllamaThink != newOllamaThink {
+		go updateEconoWorldOllamaThink(newOllamaThink)
+	}
+	// Re-merge every local-service URL list so a vault-side change (operator
+	// added or removed an instance, edited a comma-separated list in the
+	// dashboard URL field) flows into the dispatch pools without restart.
+	s.refreshAllServicePoolURLs()
 	log.Printf("[sync] 프록시 서비스 목록: %v (urls: %v, defaults: %v, reasoning: %v)", ids, urls, defaults, reasoning)
 	return nil
 }
 
-// ollamaURL returns the Ollama base URL with the resolution order
-//   vault service config  >  WV_OLLAMA_URL / OLLAMA_URL env  >  localhost default
+// resolveOllamaURLs builds the multi-instance URL list for ollamaPool.
+// Sources, in order, with the first entry winning on duplicates:
 //
-// Before v0.2.19 env vars won out even when vault had a real fleet URL
-// (e.g. http://<internal-host>:11434), which meant any proxy that started before
-// its syncAllowedServices goroutine finished would fall straight through to
-// the localhost default — producing "connection refused" on hosts with no
-// local Ollama. vault-side config is now the primary source of truth; env
-// remains as a fallback override for environments that never register an
-// Ollama service entry.
+//  1. cfg.Proxy.OllamaURLs (yaml + WV_OLLAMA_URLS env list)
+//  2. WV_OLLAMA_URL env (legacy single — accepts comma list too)
+//  3. OLLAMA_URL env (legacy single — accepts comma list too)
+//  4. vault serviceURLs["ollama"] (single string from SSE — accepts comma list)
+//
+// Every textual source goes through splitOllamaURLs so an operator who types
+// "http://a:11434, http://b:11434" into the vault dashboard's URL field gets
+// the same multi-instance behaviour as the dedicated WV_OLLAMA_URLS env. The
+// vault schema still carries one string field; this is a UX-only relaxation.
+//
+// Empty result is acceptable — the pool falls back to localhost on dispatch.
+// Called at NewServer and again after every vault sync so a vault-side URL
+// change propagates without restart.
+func (s *Server) resolveOllamaURLs() []string {
+	out := make([]string, 0, len(s.cfg.Proxy.OllamaURLs)+3)
+	out = append(out, s.cfg.Proxy.OllamaURLs...)
+	out = append(out, splitOllamaURLs(os.Getenv("WV_OLLAMA_URL"))...)
+	out = append(out, splitOllamaURLs(os.Getenv("OLLAMA_URL"))...)
+	s.mu.RLock()
+	u := s.serviceURLs["ollama"]
+	s.mu.RUnlock()
+	out = append(out, splitOllamaURLs(u)...)
+	return out
+}
+
+// splitOllamaURLs accepts a string that may contain a single URL or a
+// comma-separated list. Empty / whitespace-only entries are dropped so a
+// trailing comma or stray space doesn't poison the resulting list.
+func splitOllamaURLs(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// ollamaURL returns the first URL in the ollama dispatch pool. Kept as a
+// thin shim for callers that need a single representative URL (e.g. log
+// lines), preserving the legacy resolution order for single-URL deployments.
+// Multi-instance dispatch goes through ollamaURLForModel.
 func (s *Server) ollamaURL() string {
-	// Per-machine env var wins over vault serviceURLs. Each fleet host knows
-	// its own topology (where the GPU/Ollama is reachable) better than a
-	// single global vault default — e.g. on a multi-machine fleet only one
-	// box runs Ollama and the other proxies need to reach it remotely. The
-	// previous priority (vault > env) ignored the systemd Environment=
-	// override, so even when the operator set WV_OLLAMA_URL correctly the
-	// proxy still used the vault-provided 127.0.0.1, causing connection-refused
-	// fallbacks. See CHANGELOG v0.2.26.
+	s.poolsMu.RLock()
+	pool := s.servicePools["ollama"]
+	s.poolsMu.RUnlock()
+	if pool != nil {
+		urls := pool.URLs()
+		if len(urls) > 0 {
+			return urls[0]
+		}
+	}
 	if v := os.Getenv("WV_OLLAMA_URL"); v != "" {
 		return v
 	}
@@ -947,6 +1160,21 @@ func (s *Server) ollamaURL() string {
 		return u
 	}
 	return "http://localhost:11434"
+}
+
+// ollamaURLForModel returns the Ollama URL hosting the given model id, or
+// the first configured URL on miss (so the upstream returns a real 404).
+// Single-URL deployments resolve every model to that one URL.
+func (s *Server) ollamaURLForModel(model string) string {
+	s.poolsMu.RLock()
+	pool := s.servicePools["ollama"]
+	s.poolsMu.RUnlock()
+	if pool != nil {
+		if u := pool.URLForModel(model); u != "" {
+			return u
+		}
+	}
+	return s.ollamaURL()
 }
 
 func (s *Server) Handler() http.Handler {
@@ -983,8 +1211,14 @@ func (s *Server) Handler() http.Handler {
 	// AI traffic for at most a handful of agents, so legitimate callers never
 	// approach this, while a misbehaving loop or scanner is bounded.
 	rl := middleware.NewRateLimiter(100, 20)
+	// IPAllowlist runs ahead of every other gate so an off-LAN scanner can't
+	// even touch the auth surface when the operator has scoped the proxy down
+	// to a specific CIDR set. Empty list (default) is a no-op and keeps the
+	// historic "trust the LAN" behaviour.
+	allow := middleware.IPAllowlist(s.cfg.Proxy.AllowCIDRs)
 	return middleware.Chain(mux,
 		middleware.Recovery,
+		allow,
 		middleware.SecurityHeaders,
 		rl.Middleware,
 		middleware.CORS,
@@ -1005,6 +1239,22 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		sseConnected = s.sse != nil && s.sse.IsConnected()
 	}
 	readiness := sseConnected
+	// Unauthenticated /health gets status + readiness + version. clientID and
+	// sse_connected used to be public, which let an off-LAN scanner finger-
+	// print the deploy topology (which client this proxy serves, whether
+	// vault SSE is up). Those are now hidden behind auth. Version stays
+	// public because deploy verification (Makefile post-deploy step) reads it
+	// without a token, and the version string is already published in
+	// GitHub releases — gating it would break ops without raising the bar
+	// for a real attacker.
+	if !s.callerHasValidToken(r) {
+		jsonOK(w, map[string]interface{}{
+			"status":    "ok",
+			"readiness": readiness,
+			"version":   Version,
+		})
+		return
+	}
 	jsonOK(w, map[string]interface{}{
 		"status":        "ok",
 		"readiness":     readiness,
@@ -1015,6 +1265,20 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	// Unauthenticated /status used to expose clientID + service + model +
+	// tool_filter + active services list to anyone who could reach the
+	// listener. Off-LAN that's a topology fingerprinting freebie. Now those
+	// fields require a token; unauthenticated callers get status + version
+	// only (version is already public via GitHub releases, and Makefile
+	// post-deploy verification reads it without auth).
+	if !s.callerHasValidToken(r) {
+		jsonOK(w, map[string]interface{}{
+			"status":  "ok",
+			"version": Version,
+		})
+		return
+	}
+
 	s.mu.RLock()
 	svc := s.service
 	mdl := s.model
@@ -1028,8 +1292,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// return THAT client's config instead of the proxy's own. This lets
 	// observability consumers (e.g. an analyzer whose token maps to a
 	// different client than the proxy itself) see the routing that will be
-	// applied to their own requests. Unauthenticated callers keep the
-	// previous behaviour — proxy's own client config.
+	// applied to their own requests.
 	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 		tok := strings.TrimPrefix(auth, "Bearer ")
 		if tok != "" && tok != s.cfg.Proxy.VaultToken {
@@ -1079,6 +1342,29 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		"models": all,
 		"count":  len(all),
 	})
+}
+
+// callerHasValidToken reports whether the request carries a Bearer token
+// that the proxy would accept for an authenticated route. Unlike
+// requireProxyToken it never writes a response — it's used by /health and
+// /status to decide whether to surface the rich payload (deploy fingerprint)
+// or the minimal liveness one. Cheap because lookupTokenConfig is cached.
+func (s *Server) callerHasValidToken(r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return false
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == "" {
+		return false
+	}
+	if s.cfg.Proxy.VaultToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.Proxy.VaultToken)) == 1 {
+		return true
+	}
+	if entry := s.lookupTokenConfig(token); entry != nil {
+		return true
+	}
+	return false
 }
 
 // requireProxyToken authenticates a request to /v1/chat/completions,
@@ -2156,6 +2442,110 @@ func (s *Server) dispatchWithChain(ctx context.Context, primary, model string, f
 	return nil, fmt.Errorf("모든 서비스 실패: %v", lastErr)
 }
 
+// promptTokenCapDefault is the dispatch-time auto-truncate threshold for
+// OAI-compat backend calls. Default is 0 (disabled): the operator made
+// the call (v0.2.81) that the agent runtime, not the proxy, owns
+// conversation pruning. Set WV_PROMPT_TOKEN_CAP=<positive int> to opt
+// back in per-host — useful as a temporary safety net while a
+// misbehaving agent gets a /compact patch.
+//
+// Why the default flipped: v0.2.80 trimmed by message granularity, which
+// can split assistant tool_call / tool result pairs and trigger a
+// different 400 from the backend ("orphaned tool message"). Until the
+// trimmer is taught to drop pair-by-pair, the safer default is "do not
+// touch the prompt and let the agent compact its own history".
+const promptTokenCapDefault = 0
+
+func promptTokenCap() int {
+	if v := os.Getenv("WV_PROMPT_TOKEN_CAP"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return promptTokenCapDefault
+}
+
+// estimateOAIRequestTokens approximates the prompt size an OAI-compat
+// backend will see. Counts message content chars plus the marshalled
+// tools schema (claude-code agents send 16+ tool defs that dominate
+// prompt size, so omitting them produces wildly low estimates). Divides
+// by 3 — empirical compromise between English (~4 chars/token) and
+// Korean (~2 chars/token) for the wall-vault fleet's mixed traffic.
+func estimateOAIRequestTokens(req *OpenAIRequest) int {
+	if req == nil {
+		return 0
+	}
+	chars := 0
+	for _, m := range req.Messages {
+		chars += len(m.Content)
+	}
+	if len(req.Tools) > 0 {
+		if data, err := json.Marshal(req.Tools); err == nil {
+			chars += len(data)
+		}
+	}
+	return chars / 3
+}
+
+// truncateOldestOAIMessages drops the oldest non-system, non-final
+// messages from req until the estimated token count fits under cap.
+// Preserves the system prompt at index 0 (when present) and the final
+// user message (current turn). Returns the number of messages dropped
+// so callers can log when truncation kicked in.
+//
+// cap ≤ 0 disables the truncation (returns 0).
+func truncateOldestOAIMessages(req *OpenAIRequest, cap int) int {
+	if req == nil || cap <= 0 || len(req.Messages) == 0 {
+		return 0
+	}
+	dropped := 0
+	for estimateOAIRequestTokens(req) > cap {
+		dropIdx := -1
+		for i, m := range req.Messages {
+			if i == len(req.Messages)-1 {
+				break // never drop the final (current) message
+			}
+			if m.Role == "system" {
+				continue
+			}
+			dropIdx = i
+			break
+		}
+		if dropIdx < 0 {
+			return dropped // nothing droppable left
+		}
+		req.Messages = append(req.Messages[:dropIdx], req.Messages[dropIdx+1:]...)
+		dropped++
+	}
+	return dropped
+}
+
+// translateBackendError converts a non-2xx response from a local OAI-compat
+// backend (llamacpp / ollama / lmstudio / vLLM) into an error whose message
+// is meaningful to the end-user agent. Today we only special-case
+// llama.cpp's `exceed_context_size_error` because that's the failure mode
+// the fleet hits in practice — agents accumulate conversation history and
+// blow past the per-server `-c` budget, the raw HTTP 400 surfaces as an
+// opaque blob in the bot's UI, and the operator has no clue why their
+// chat went silent. For other 4xx / 5xx the original HTTP status + body
+// is preserved so debugging info isn't lost.
+//
+// statusCode is the HTTP status from the upstream backend. body is the
+// raw response body (already read by the caller — the dispatch loop and
+// streamLocalService use a small LimitReader so this is bounded).
+func translateBackendError(serviceID string, statusCode int, body []byte) error {
+	bodyStr := string(body)
+	if statusCode == http.StatusBadRequest && strings.Contains(bodyStr, "exceed_context_size_error") {
+		return fmt.Errorf(
+			"%s: 대화 컨텍스트가 너무 깁니다 — 백엔드의 처리 한계를 초과했습니다. "+
+				"대화를 압축하거나(/compact) 새 conversation 으로 시작하세요. "+
+				"백엔드 원본: %s",
+			serviceID, bodyStr,
+		)
+	}
+	return fmt.Errorf("%s 오류: HTTP %d: %s", serviceID, statusCode, bodyStr)
+}
+
 // ─── Google Gemini ────────────────────────────────────────────────────────────
 
 func (s *Server) callGoogle(ctx context.Context, model string, req *GeminiRequest) (*GeminiResponse, error) {
@@ -2364,7 +2754,11 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// dispatch_v2.go's dispatchWith() now uses each service's default_model,
 	// so a Gemini/Claude model id can never reach the Ollama endpoint
 	// structurally. See ResolveModel + dispatchWith.
-	ollamaURL := s.ollamaURL()
+	ollamaURL := s.ollamaURLForModel(model)
+	// "<model>@local<N>" pins the request to a specific instance; the alias
+	// is consumed by URLForModel above. Strip it before forwarding so the
+	// upstream Ollama receives a plain model id.
+	model = stripInstanceAlias(model)
 
 	// Distribute fleet arrival times: each proxy delays entry by a
 	// deterministic phase offset (sha256(client_id) → [0, 500ms)) plus a
@@ -2397,6 +2791,7 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	// /v1/chat/completions accepts the standard OpenAI format including arguments-as-string.
 	oaiReq := GeminiToOpenAI(model, req)
 	oaiReq.Stream = false
+	oaiReq.Messages = s.maybeInjectModelIdentity(oaiReq.Messages, model)
 	s.mu.RLock()
 	reasoning := s.serviceReasoning["ollama"]
 	s.mu.RUnlock()
@@ -2426,6 +2821,9 @@ func (s *Server) callOllama(ctx context.Context, model string, req *GeminiReques
 	if n := s.cfg.Proxy.OllamaNumCtx; n > 0 {
 		nc := n
 		oaiReq.Options = &OllamaOptions{NumCtx: &nc}
+	}
+	if dropped := truncateOldestOAIMessages(oaiReq, promptTokenCap()); dropped > 0 {
+		log.Printf("[proxy] ollama prompt cap: dropped %d oldest messages (cap=%d tokens)", dropped, promptTokenCap())
 	}
 	data, _ := json.Marshal(oaiReq)
 
@@ -2468,11 +2866,15 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 	plugin := s.pluginByID[serviceID]
 
 	// URL resolution: env var > plugin.DefaultURL > vault SSE > built-in
-	// default. See resolveLocalServiceURL for rationale.
-	baseURL := s.resolveLocalServiceURL(serviceID)
+	// default. See resolveLocalServiceURLs for rationale; model-aware so a
+	// multi-instance pool routes per-request.
+	baseURL := s.resolveLocalServiceURLForModel(serviceID, model)
 	if baseURL == "" {
 		return nil, fmt.Errorf("%s: URL 미설정", serviceID)
 	}
+	// Drop the "@local<N>" instance pin before forwarding to the
+	// OpenAI-compatible backend.
+	model = stripInstanceAlias(model)
 
 	// Fleet time distribution — same AgentOffset + FallbackJitter as callOllama.
 	// Restored in v0.2.27. See timing.go.
@@ -2511,6 +2913,7 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 
 	oaiReq := GeminiToOpenAI(model, req)
 	oaiReq.Stream = false
+	oaiReq.Messages = s.maybeInjectModelIdentity(oaiReq.Messages, model)
 	s.mu.RLock()
 	reasoning := s.serviceReasoning[serviceID]
 	s.mu.RUnlock()
@@ -2522,6 +2925,9 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 	// can opt in via yaml without a Go-side switch edit, and backends whose
 	// templates don't strip the marker stay safe by default.
 	s.applyQwen3NoThinkSuffix(oaiReq, serviceID, model, reasoning)
+	if dropped := truncateOldestOAIMessages(oaiReq, promptTokenCap()); dropped > 0 {
+		log.Printf("[proxy] %s prompt cap: dropped %d oldest messages (cap=%d tokens)", serviceID, dropped, promptTokenCap())
+	}
 	data, _ := json.Marshal(oaiReq)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
@@ -2555,7 +2961,7 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("%s 오류: HTTP %d: %s", serviceID, resp.StatusCode, body)
+		return nil, translateBackendError(serviceID, resp.StatusCode, body)
 	}
 
 	body, _ := io.ReadAll(resp.Body)

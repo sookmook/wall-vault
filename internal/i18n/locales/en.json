@@ -191,7 +191,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM). Comma-separated for multiple instances; routed by model name. Pin a request with \"<model>@local<N>\" — local1 = first URL, local2 = second.",
   "act_close": "Close (Esc)",
   "opt_service_default": "(use service default)",
   "warn_stale_override_short": "(⚠ current value · will reset on save)",

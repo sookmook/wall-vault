@@ -528,6 +528,8 @@ Cada hook recebe variáveis de ambiente específicas do evento (`SERVICE`, `MODE
 | `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
 | `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
 | `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_PROXY_TLS_REQUIRED` | `proxy.tls.required` (recusa iniciar com TLS desativado — bloqueia o fallback em texto plano) |
+| `WV_PROXY_ALLOW_CIDRS` | `proxy.allow_cidrs` (lista separada por vírgulas, p. ex. `192.168.0.0/16,10.0.0.0/8`; loopback sempre passa) |
 | `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
 | `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
 | `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
@@ -537,13 +539,17 @@ Cada hook recebe variáveis de ambiente específicas do evento (`SERVICE`, `MODE
 | `WV_KEY_OPENROUTER` | Importação única: chaves OpenRouter |
 | `WV_KEY_ANTHROPIC` | Importação única: chaves Anthropic |
 | `WV_KEY_OPENAI` | Importação única: chaves OpenAI |
-| `WV_OLLAMA_URL` | Substituição de URL Ollama por host |
+| `WV_OLLAMA_URL` | Substituição de URL Ollama por host (instância única) |
+| `WV_OLLAMA_URLS` | URLs Ollama separadas por vírgula (dispatch multi-instância) |
 | `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
 | `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
-| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Substituição de URL por backend |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | Substituição de URL por backend (instância única) |
 | `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
 | `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
 | `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_INJECT_MODEL_IDENTITY` | `proxy.inject_model_identity` (guarda de identidade por mensagem de sistema, desligado por padrão) |
+| `WV_PROMPT_TOKEN_CAP` | Limite de auto-truncamento por host para prompts OAI-compat locais (inteiro positivo = ativar, 0 = off) |
+| `WV_DISPATCH_TRACE` | Definir `1` para registrar serviço/modelo resolvido e razão de cada dispatch (off por padrão) |
 | `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
 | `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
 | `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |

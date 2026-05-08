@@ -85,6 +85,61 @@ func TestUpdateEconoWorldModelAt_NoOpenAICompatSectionIsSilent(t *testing.T) {
 	}
 }
 
+func TestUpdateEconoWorldOllamaThinkAt_UpdatesThinkField(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"ollama":{"model":"qwen3.5:27b","think":false}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := updateEconoWorldOllamaThinkAt(path, true); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	var got map[string]interface{}
+	data, _ := os.ReadFile(path)
+	_ = json.Unmarshal(data, &got)
+	ollama, _ := got["ollama"].(map[string]interface{})
+	if ollama["think"] != true {
+		t.Fatalf("think = %v, want true", ollama["think"])
+	}
+	if ollama["model"] != "qwen3.5:27b" {
+		t.Fatalf("model clobbered: %v", ollama["model"])
+	}
+}
+
+func TestUpdateEconoWorldOllamaThinkAt_MissingFileIsSilent(t *testing.T) {
+	err := updateEconoWorldOllamaThinkAt(filepath.Join(t.TempDir(), "no.json"), true)
+	if err != nil {
+		t.Fatalf("missing file should be silent, got %v", err)
+	}
+}
+
+func TestUpdateEconoWorldOllamaThinkAt_CreatesOllamaSectionIfAbsent(t *testing.T) {
+	// First-time bootstrap when only the openai_compatible section exists:
+	// the function must add the ollama section rather than silently skipping,
+	// so EconoWorld picks up the toggle even before its operator switches
+	// provider to ollama.
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "ai_config.json")
+	pre := `{"provider":"openai_compatible","openai_compatible":{"base_url":"http://x"}}`
+	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := updateEconoWorldOllamaThinkAt(path, true); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	var got map[string]interface{}
+	data, _ := os.ReadFile(path)
+	_ = json.Unmarshal(data, &got)
+	ollama, ok := got["ollama"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("ollama section missing: %+v", got)
+	}
+	if ollama["think"] != true {
+		t.Fatalf("think = %v, want true", ollama["think"])
+	}
+}
+
 func TestApplyEconoWorldConfig_WritesNewRobustnessFields(t *testing.T) {
 	// Fresh bootstrap into an empty workdir must surface stream,
 	// request_timeout_seconds and the configured max_tokens floor.
@@ -92,7 +147,7 @@ func TestApplyEconoWorldConfig_WritesNewRobustnessFields(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(tmp, "analyzer"), 0755); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	path, err := applyEconoWorldConfig("http://127.0.0.1:56245/v1", "m1", "tok", tmp, 8192, true, 300)
+	path, err := applyEconoWorldConfig("http://127.0.0.1:56245/v1", "m1", "tok", tmp, 8192, true, 300, false)
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
@@ -131,7 +186,7 @@ func TestApplyEconoWorldConfig_PreservesOperatorTunedValues(t *testing.T) {
 	if err := os.WriteFile(path, []byte(pre), 0644); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if _, err := applyEconoWorldConfig("http://new/v1", "m2", "tok", tmp, 8192, true, 300); err != nil {
+	if _, err := applyEconoWorldConfig("http://new/v1", "m2", "tok", tmp, 8192, true, 300, false); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	var got map[string]interface{}
@@ -369,7 +424,7 @@ func TestApplyEconoWorldConfig_PopulatesDirCache(t *testing.T) {
 	}
 	if _, err := applyEconoWorldConfig(
 		"http://127.0.0.1:56244/v1", "google/gemma-4-26b-a4b", "tok",
-		tmp, 8192, true, 300,
+		tmp, 8192, true, 300, false,
 	); err != nil {
 		t.Fatalf("apply: %v", err)
 	}

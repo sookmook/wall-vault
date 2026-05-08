@@ -254,12 +254,43 @@ type ollamaTagsResp struct {
 	} `json:"models"`
 }
 
-// FetchOllama: auto-fetch model list from Ollama server
-// if ollamaURL is empty, tries common addresses in order
+// FetchOllama: auto-fetch model list from Ollama server.
+//
+// ollamaURL accepts either a single URL or a comma-separated list. When
+// multiple URLs are present, every responsive instance's model list is
+// merged (first occurrence wins on duplicates) so the dashboard surfaces
+// the union of every reachable Ollama. A single empty/dead URL list
+// falls back to the auto-detection candidates and ultimately to the
+// recommended-model placeholder so a fresh setup still shows something.
 func fetchOllama(ollamaURL string) []Model {
+	pieces := splitCSV(ollamaURL)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	if len(pieces) > 1 {
+		seen := map[string]bool{}
+		var merged []Model
+		for _, base := range pieces {
+			models, err := tryFetchOllama(client, strings.TrimRight(base, "/"))
+			if err != nil {
+				continue
+			}
+			for _, m := range models {
+				if seen[m.ID] {
+					continue
+				}
+				seen[m.ID] = true
+				merged = append(merged, m)
+			}
+		}
+		if len(merged) > 0 {
+			return merged
+		}
+		return OllamaRecommended()
+	}
+
 	candidates := []string{}
-	if ollamaURL != "" {
-		candidates = append(candidates, strings.TrimRight(ollamaURL, "/"))
+	if len(pieces) == 1 {
+		candidates = append(candidates, strings.TrimRight(pieces[0], "/"))
 	}
 	// auto-detection candidates
 	candidates = append(candidates,
@@ -267,7 +298,6 @@ func fetchOllama(ollamaURL string) []Model {
 		"http://127.0.0.1:11434",
 	)
 
-	client := &http.Client{Timeout: 5 * time.Second}
 	for _, base := range candidates {
 		models, err := tryFetchOllama(client, base)
 		if err == nil {
@@ -276,6 +306,22 @@ func fetchOllama(ollamaURL string) []Model {
 	}
 	// Ollama server not responding — fallback to recommended model list
 	return OllamaRecommended()
+}
+
+// splitCSV splits a comma-separated URL list, dropping empty / whitespace-
+// only entries. Returns nil for empty input.
+func splitCSV(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func tryFetchOllama(client *http.Client, base string) ([]Model, error) {
@@ -465,16 +511,45 @@ func fetchGitHubCopilot() []Model {
 // ─── OpenAI-compatible (LM Studio / vLLM / custom) ───────────────────────────
 
 // fetchOpenAICompat: fetch model list from OpenAI /v1/models compatible endpoint
+// fetchOpenAICompat fetches /v1/models from the given primary URL (which
+// may be a comma-separated list of URLs) and merges the results. Falls
+// back to fallbackURL on total failure, then to compatFallback. The
+// multi-URL path mirrors fetchOllama: every responsive instance
+// contributes its model list, first occurrence wins on duplicates.
 func fetchOpenAICompat(service, primaryURL, fallbackURL string) []Model {
+	pieces := splitCSV(primaryURL)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	if len(pieces) > 1 {
+		seen := map[string]bool{}
+		var merged []Model
+		for _, base := range pieces {
+			models, err := tryFetchOpenAICompat(client, service, strings.TrimRight(base, "/"))
+			if err != nil {
+				continue
+			}
+			for _, m := range models {
+				if seen[m.ID] {
+					continue
+				}
+				seen[m.ID] = true
+				merged = append(merged, m)
+			}
+		}
+		if len(merged) > 0 {
+			return merged
+		}
+		return compatFallback(service)
+	}
+
 	candidates := []string{}
-	if primaryURL != "" {
-		candidates = append(candidates, strings.TrimRight(primaryURL, "/"))
+	if len(pieces) == 1 {
+		candidates = append(candidates, strings.TrimRight(pieces[0], "/"))
 	}
 	if fallbackURL != "" {
 		candidates = append(candidates, strings.TrimRight(fallbackURL, "/"))
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
 	for _, base := range candidates {
 		models, err := tryFetchOpenAICompat(client, service, base)
 		if err == nil {

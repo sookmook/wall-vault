@@ -78,7 +78,10 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 	case "nanoclaw":
 		path, err = applyNanoclawConfig(body.BaseURL, body.Model, token)
 	case "econoworld":
-		path, err = applyEconoWorldConfig(body.BaseURL, body.Model, token, body.WorkDir, s.cfg.Proxy.EconoWorldMaxTokens, s.cfg.Proxy.EconoWorldStream, s.cfg.Proxy.EconoWorldRequestTimeout)
+		s.mu.RLock()
+		ollamaThink := s.serviceReasoning["ollama"]
+		s.mu.RUnlock()
+		path, err = applyEconoWorldConfig(body.BaseURL, body.Model, token, body.WorkDir, s.cfg.Proxy.EconoWorldMaxTokens, s.cfg.Proxy.EconoWorldStream, s.cfg.Proxy.EconoWorldRequestTimeout, ollamaThink)
 	default:
 		jsonError(w, "unsupported agentType: "+body.AgentType, http.StatusBadRequest)
 		return
@@ -539,7 +542,14 @@ func cachedEconoWorldDir() string {
 // drive paths are converted to their WSL mount equivalents. When none of the
 // candidates exist the first listed candidate (or the hard-coded default) is
 // used so the resulting error clearly points at the missing directory.
-func applyEconoWorldConfig(baseURL, model, token, workDir string, maxTokens int, stream bool, requestTimeout int) (string, error) {
+//
+// ollamaThink is the wall-vault ollama service's reasoning_mode toggle. It
+// only affects EconoWorld's _call_ollama_native path (analyzer/ai_client.py),
+// which is dormant under provider=openai_compatible. Writing it on every
+// /agent/apply keeps the field in sync with vault even when EconoWorld later
+// flips its provider to ollama, so dispatch and the agent agree on the
+// reasoning toggle without a manual ai_config.json edit.
+func applyEconoWorldConfig(baseURL, model, token, workDir string, maxTokens int, stream bool, requestTimeout int, ollamaThink bool) (string, error) {
 	dir := resolveEconoWorldDir(workDir)
 	setCachedEconoWorldDir(dir)
 	path := filepath.Join(dir, "analyzer", "ai_config.json")
@@ -577,6 +587,19 @@ func applyEconoWorldConfig(baseURL, model, token, workDir string, maxTokens int,
 	if _, ok := compat["request_timeout_seconds"]; !ok && requestTimeout > 0 {
 		compat["request_timeout_seconds"] = requestTimeout
 	}
+
+	// Mirror the vault ollama service's reasoning_mode into the ollama section
+	// of ai_config.json. EconoWorld's _call_ollama_native path reads this
+	// field as `cfg.get("think", False)`; without it the hard-coded
+	// `"think": False` (pre-v0.2.74) ignored vault and forced reasoning off
+	// even when the operator turned it on. Always overwrite — the vault
+	// dashboard is the single source of truth here.
+	ollama, _ := cfg["ollama"].(map[string]interface{})
+	if ollama == nil {
+		ollama = map[string]interface{}{}
+		cfg["ollama"] = ollama
+	}
+	ollama["think"] = ollamaThink
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return "", fmt.Errorf("failed to create analyzer directory: %w", err)
@@ -630,6 +653,50 @@ func updateEconoWorldModelAt(path, model string) error {
 		return nil
 	}
 	compat["model"] = model
+	return writeJSON(path, cfg)
+}
+
+// updateEconoWorldOllamaThink is the SSE/sync-driven counterpart for the
+// ollama reasoning_mode toggle. The proxy holds the live value in
+// s.serviceReasoning["ollama"]; whenever vault pushes a config_change the
+// proxy mirrors it into ai_config.json so EconoWorld's _call_ollama_native
+// picks it up on the next request without a manual edit. Hosts without
+// EconoWorld installed or whose ai_config.json hasn't been bootstrapped
+// yet silently skip — the next /agent/apply seeds the field.
+func updateEconoWorldOllamaThink(think bool) {
+	dir := cachedEconoWorldDir()
+	if dir == "" {
+		dir = resolveEconoWorldDir("")
+	}
+	path := filepath.Join(dir, "analyzer", "ai_config.json")
+	if err := updateEconoWorldOllamaThinkAt(path, think); err != nil {
+		log.Printf("[econoworld] updateOllamaThink failed: %v", err)
+	}
+}
+
+// updateEconoWorldOllamaThinkAt is the file-path-taking core of
+// updateEconoWorldOllamaThink, split out for unit testing.
+func updateEconoWorldOllamaThinkAt(path string, think bool) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil // host doesn't have EconoWorld — silent skip
+		}
+		return err
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	ollama, _ := cfg["ollama"].(map[string]interface{})
+	if ollama == nil {
+		ollama = map[string]interface{}{}
+		cfg["ollama"] = ollama
+	}
+	if cur, ok := ollama["think"].(bool); ok && cur == think {
+		return nil // no change — skip the rewrite
+	}
+	ollama["think"] = think
 	return writeJSON(path, cfg)
 }
 

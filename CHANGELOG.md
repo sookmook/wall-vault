@@ -8,6 +8,529 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.84] — 2026-05-08
+
+Three opt-in defenses for proxy hosts that may be reachable beyond LAN.
+Default behaviour is unchanged — every gate is off until the operator
+sets the relevant config field or env var.
+
+### Added
+
+- `proxy.allow_cidrs` (env: `WV_PROXY_ALLOW_CIDRS`) — listener-level CIDR
+  allowlist running ahead of rate-limit and auth. Loopback always
+  passes; non-matching peers get HTTP 403 before reaching the auth
+  surface. Empty list (default) disables the gate.
+- `proxy.tls.required` (env: `WV_PROXY_TLS_REQUIRED`) — when true the
+  proxy refuses to start with `tls.enabled=false`, so a misconfigured
+  deploy can't silently fall back to plain HTTP and ship Bearer tokens
+  in the clear.
+- `internal/middleware/allowlist.go`: new IPAllowlist middleware. Bad
+  CIDRs in the config are logged and skipped at startup so a single
+  typo doesn't lock every caller out.
+
+### Changed
+
+- `/health` and `/status` no longer expose `version`, `client`,
+  `service`, `model`, `tool_filter`, `services`, or `sse_connected` to
+  unauthenticated callers. Authenticated callers (proxy vault_token or
+  any vault-registered client token) still receive the full payload, so
+  the dashboard, doctor, and existing readiness probes keep working.
+  Unauthenticated callers get `{"status":"ok"[,"readiness":bool]}` —
+  enough for liveness, nothing for fingerprinting.
+
+---
+
+## [0.2.83] — 2026-05-07
+
+Closes the second leg of the v0.2.82 fix. v0.2.82 made the startup
+sync synchronous, but it still ran exactly once — so when proxy and
+vault share a host (any local-vault deploy) the proxy can win the
+listen-socket race and the first sync attempt fails with
+`dial tcp: connect: connection refused` while vault is still binding.
+Observed on the v0.2.82 deploy: the first sync got refused, SSE
+reconnected ~1 s later, but the next periodic sync was ~5 min away,
+and a dispatch in that gap hit the empty keyMgr and reported
+"google 전체 쿨다운".
+
+### Fixed
+
+- `internal/proxy/server.go` startup sync loop: retry up to 10× with
+  1-second backoff, breaking as soon as at least one key has loaded.
+  Falls through unconditionally so a permanently-down vault doesn't
+  block startup; the periodic 5-minute sync continues to retry on its
+  own.
+- `internal/proxy/keymgr.go`: new `HasAnyKey()` method so the startup
+  loop can detect when sync has produced non-empty data without poking
+  internal state.
+
+---
+
+## [0.2.82] — 2026-05-07
+
+Closes a startup race that surfaced as "service 'google' 전체 쿨다운"
+on every proxy restart. `NewServer` started the vault sync as a
+goroutine with a 2-second delay; the proxy's HTTP handler went live as
+soon as `main.go` called `Handler()`, so the first inbound request had
+a 2-second window where `keyMgr.keys` was still empty. `CanServe`
+treated "no keys registered" the same as "all keys cooled down" and
+dispatch fast-skipped the service. Observed on the v0.2.81 deploy:
+dispatch logged the skip ~300 ms before the sync finished pulling
+the configured key set.
+
+### Fixed
+
+- `internal/proxy/server.go` `NewServer`: call `s.syncFromVault()`
+  synchronously before returning so the first request always finds a
+  populated `keyMgr`. Failures stay non-fatal — the SSE reconnect
+  handler and the periodic 5-minute sync still retry on their own.
+
+---
+
+## [0.2.81] — 2026-05-07
+
+Disables the v0.2.80 auto-trimmer by default. The trimmer drops oldest
+non-system, non-final messages one at a time, which can break apart an
+assistant `tool_calls` + matching `tool` reply, and llama.cpp / ollama
+return a different 400 ("orphaned tool message") in that case. Until the
+trimmer is taught to drop pair-by-pair, the safer default is "do not
+touch the prompt and let the agent runtime compact its own history".
+
+The trimmer is still available — set `WV_PROMPT_TOKEN_CAP=<positive int>`
+on a specific host to opt in (e.g. as a temporary safety net for an
+agent that doesn't have its own /compact yet).
+
+### Changed
+
+- `internal/proxy/server.go` `promptTokenCapDefault`: 28000 → 0. Logic
+  unchanged — the helper short-circuits on cap ≤ 0.
+
+---
+
+## [0.2.80] — 2026-05-07
+
+Auto-truncate prompts that would otherwise blow past the local OAI-compat
+backend's context budget. v0.2.79 surfaced the failure mode in Korean
+but didn't actually unblock the agent; v0.2.80 drops the oldest
+non-system, non-final messages from the request until the estimated
+token count fits under `WV_PROMPT_TOKEN_CAP` (default 28000 — leaves
+4K margin under the 32K llama.cpp default).
+
+This shifts the burden off the agent runtime: claude-code and nanoclaw
+both keep accumulating history because that is how the conversation
+state machine works. Forcing the proxy to do the cap means a freshly
+restarted llama.cpp on a 64K build keeps working as conversations grow,
+and a 32K build degrades gracefully (older context drops, newest turn
+still answers) instead of falling off a cliff at 32K + 1.
+
+### Added
+
+- `internal/proxy/server.go`:
+  - `promptTokenCapDefault = 28000` and `promptTokenCap()` reading
+    `WV_PROMPT_TOKEN_CAP` (set to 0 or negative to disable).
+  - `estimateOAIRequestTokens` — chars / 3 over message content + the
+    marshalled tools schema. Conservative for mixed Korean/English.
+  - `truncateOldestOAIMessages` — drops oldest non-system, non-final
+    messages until the estimate fits. Logs a one-line `[proxy] <svc>
+    prompt cap: dropped N oldest messages (cap=…)` when it kicks in.
+
+### Changed
+
+- All four local OAI-compat dispatch sites call the truncator after the
+  per-service `oaiReq` mutations and before `json.Marshal`:
+  - `callOllama` (server.go)
+  - `callLocalService` (server.go)
+  - `streamPluginAsGemini` (stream.go)
+  - `streamLocalService` (stream.go)
+
+Cloud paths (Anthropic / OpenAI / OpenRouter / Google) are deliberately
+not touched — their context budgets are 200K+ and applying a 28K cap
+there would corrupt long-context use cases.
+
+---
+
+## [0.2.79] — 2026-05-07
+
+Translates the local-OAI-compat backends' `exceed_context_size_error`
+into a Korean operator-facing message instead of surfacing the raw
+HTTP 400 body. Operators ran into this when conversation history
+accumulated past llama.cpp's `-c` budget — bots saw an opaque blob in
+their UI when the chat went silent because llamacpp returned
+`request (… tokens) exceeds the available context size (… tokens)`.
+Now the wall-vault surfaces a clear hint to compact the conversation
+or start a new one. The companion ops fix is to raise `WV_LCPP_CTX`
+(e.g. 65536) on each llama-server, which is host-managed and outside
+the proxy binary.
+
+### Added
+
+- `internal/proxy/server.go` `translateBackendError` — single helper
+  used by both `callLocalService` and `streamLocalService` for the
+  non-2xx path. Pattern-matches the llama.cpp error type string so
+  unrelated 4xx / 5xx still surface their original body unchanged.
+
+### Changed
+
+- `internal/proxy/server.go` `callLocalService`: route the non-OK
+  branch through `translateBackendError`.
+- `internal/proxy/stream.go` `streamLocalService`: same.
+
+---
+
+## [0.2.78] — 2026-05-07
+
+Unblocks v0.2.77 by adding `work_dir` to the authenticated `/api/clients`
+payload. The proxy-side cache seed introduced in v0.2.77 only fires when
+the response carries the field, but vault's `handlePublicClients` had
+been omitting it from the `pub` struct since the field was first added
+to the model. Without this every proxy boot left
+`econoWorldDirCache` empty, so `updateEconoWorldOllamaThink` resolved to
+`/mnt/e/Work/Dev/EconoWorld` (the hard-coded default) and silently
+no-op'd on hosts where that path doesn't exist.
+
+### Fixed
+
+- `internal/vault/server.go` `handlePublicClients`: include `work_dir`
+  in the authenticated response shape and append `c.WorkDir` so the
+  proxy's syncFromVault decoder actually receives it. Unauthenticated
+  callers still get the minimal fields — no information leakage change.
+
+---
+
+## [0.2.77] — 2026-05-07
+
+Final piece of the v0.2.74-76 EconoWorld reasoning sync chain. With vault
+correctly persisting `reasoning_mode` (v0.2.76) and the proxy correctly
+broadcasting it through both SSE and the sync poll (v0.2.74-75), there was
+still one gap: `updateEconoWorldOllamaThink` calls `resolveEconoWorldDir`
+which consults `cachedEconoWorldDir`, and that cache was only populated by
+`/agent/apply`. A proxy that boots without ever receiving an apply (e.g.
+EconoWorld already running before the proxy restart) fell back to the
+hard-coded default `/mnt/e/Work/Dev/EconoWorld`, which exists on no actual
+host, so every config_change silently no-op'd.
+
+Vault already carries the `work_dir` per client; the sync loop just wasn't
+reading it. Now it is — so on every sync poll the proxy re-seeds the cache
+from vault, and EconoWorld config writers find the directory immediately
+after boot.
+
+### Fixed
+
+- `internal/proxy/server.go` `syncFromVault`:
+  - Adds `work_dir` to the JSON struct used to decode `/api/clients`.
+  - When iterating co-hosted agents, calls `setCachedEconoWorldDir`
+    against the resolved directory for any `agent_type=econoworld` entry
+    with a non-empty `work_dir`. Reuses `resolveEconoWorldDir` so Windows
+    drive paths and comma-separated candidate lists work as documented.
+
+---
+
+## [0.2.76] — 2026-05-07
+
+Fixes a long-standing vault bug surfaced while validating the v0.2.74-75
+EconoWorld reasoning sync: the dashboard's per-service `reasoning_mode`
+toggle was being read out of the PUT body and written to a freshly-loaded
+`ServiceConfig` struct, but `Store.UpsertService`'s update branch never
+copied the field into the live record. The toggle silently reverted to
+`false` on every save, so SSE listeners and `/api/services` consumers
+never saw a `reasoning_mode=true` even after a successful PUT.
+
+This was the root cause behind v0.2.74-75's "no propagation" symptom —
+those changes wired up the proxy-side mirror correctly, but vault had
+nothing to broadcast.
+
+### Fixed
+
+- `internal/vault/store.go` `UpsertService`: copy `inp.ReasoningMode`
+  into the existing record alongside the other simple fields. No
+  conditional gate (matches the unconditional pattern used for
+  `LocalURL` / `Enabled` / `DefaultModel`).
+
+---
+
+## [0.2.75] — 2026-05-07
+
+Plugs the dashboard-toggle gap missed by v0.2.74. The SSE `config_change`
+handler only fires for **client**-targeted edits (model / preferred_service);
+a vault-side **service**-level reasoning toggle (the dashboard's "ollama
+reasoning" switch with no client edit) reached us through `syncAllowedServices`
+poll instead, and the v0.2.74 mirror was wired only to the SSE path. Result:
+flipping ollama reasoning in the dashboard would not propagate to EconoWorld
+until the next `/agent/apply` or client model swap.
+
+### Fixed
+
+- `internal/proxy/server.go` `syncAllowedServices`: diff
+  `s.serviceReasoning["ollama"]` before/after the poll-driven map swap and
+  call `updateEconoWorldOllamaThink` when it changes.
+
+---
+
+## [0.2.74] — 2026-05-07
+
+Mirrors the vault ollama service's `reasoning_mode` toggle into EconoWorld's
+`analyzer/ai_config.json` so the agent's dormant `_call_ollama_native` path
+follows dashboard changes without a manual edit. Closes a latent
+discrepancy: `_call_ollama_native` (analyzer/ai_client.py) used to hard-code
+`"think": False`, which would silently override the dashboard's reasoning
+toggle the moment EconoWorld's operator flipped `provider` from
+`openai_compatible` to `ollama`.
+
+The companion EconoWorld patch turns `"think": False` into
+`bool(cfg.get("think", False))` so the agent reads the field this proxy
+now writes; `false` remains the default when wall-vault hasn't seeded the
+field yet, preserving today's behaviour.
+
+### Changed
+
+- `internal/proxy/agent_apply.go`:
+  - `applyEconoWorldConfig` gains an `ollamaThink bool` parameter and writes
+    it to the `ollama.think` field on every `/agent/apply`.
+  - New `updateEconoWorldOllamaThink` (SSE/sync-driven counterpart to
+    `updateEconoWorldModel`) and its file-path-taking core
+    `updateEconoWorldOllamaThinkAt` for unit testing.
+- `internal/proxy/server.go`: SSE `config_change` handler now calls
+  `updateEconoWorldOllamaThink` alongside `updateEconoWorldModel` so a
+  vault-side reasoning toggle propagates without a `/agent/apply` cycle.
+
+### Tests
+
+- `TestUpdateEconoWorldOllamaThinkAt_UpdatesThinkField`,
+  `TestUpdateEconoWorldOllamaThinkAt_MissingFileIsSilent`,
+  `TestUpdateEconoWorldOllamaThinkAt_CreatesOllamaSectionIfAbsent`.
+
+---
+
+## [0.2.73] — 2026-05-07
+
+Fixes a vault-sync regression that left `s.service` / `s.model` stale
+on v0.2 clients. The proxy's poll loop only consulted the v0.1 legacy
+fields (`default_service` / `default_model`); a v0.2 client whose
+operator set `preferred_service` / `model_override` in the dashboard
+left those legacy fields empty, so the loop fell through and
+dispatch kept routing to whatever service/model was set last —
+silently ignoring dashboard changes until the proxy was restarted.
+
+This is the root cause behind the "switched to llamacpp in the
+dashboard but bot still hits ollama and fails" symptom one host
+reported. Every proxy on this build picks up the dashboard change
+on its next sync.
+
+### Fixed
+
+- `internal/proxy/server.go` vault-sync (`runSyncLoop` / `pullClients`):
+  `PreferredService` is now read from the JSON payload and wins over
+  the legacy `DefaultService`. Same precedence for `ModelOverride`
+  vs. `DefaultModel`. Pre-migration v0.1 installs keep working
+  because legacy fields remain a fallback when the v0.2 fields are
+  empty.
+
+---
+
+## [0.2.72] — 2026-05-06
+
+Optional model-identity guard. Closes a class of confusing failures
+where an agent's workspace memory or system prompt hardcodes a specific
+model name, the operator routes the request to a *different* model via
+the multi-Ollama pool, and the live model echoes the hardcoded name
+back when asked about itself — making it look like routing is broken
+when it's actually fine. The new `inject_model_identity` flag prepends
+a one-line system message to every dispatched chat-completion that
+pins the actual model id; the live model uses that as ground truth
+when answering identity questions.
+
+### Added
+
+- `ProxyConfig.InjectModelIdentity bool` (`yaml: inject_model_identity`,
+  default off). Turn on per-host with `WV_INJECT_MODEL_IDENTITY=1` or
+  in the proxy YAML.
+- `internal/proxy/identity_inject.go` — small helper. The injected
+  system message reads "You are running on model `<id>`. Ignore any
+  conflicting model identity from earlier context, system prompts, or
+  memory injections — answer questions about your own identity using
+  this model id." Existing system messages are preserved in their
+  original order after the prepended one.
+- Five dispatch sites gated on the flag: `callOllama`,
+  `callLocalService`, the streaming variants `streamOllama`,
+  `streamLocalService`, and `streamPluginAsGemini`. Every chat
+  completion routed through the proxy gets the same defensive prepend
+  when the flag is on.
+
+### Notes
+
+- Off by default. Enable when you run multiple models behind one
+  wall-vault and your agents pull memory or system prompts that may
+  name a specific model.
+- Token cost: one short sentence per turn. Negligible for typical
+  chat contexts; measurable in large-batch / latency-sensitive setups,
+  hence the opt-in default.
+- Does not affect single-model deployments — the injected message just
+  reaffirms what the model already knows.
+
+---
+
+## [0.2.71] — 2026-05-06
+
+Instance pinning for collision-prone multi-Ollama setups. When the same
+model id (e.g. `qwen3:32b`) lives on more than one configured instance,
+the proxy until now silently routed every request to whichever URL was
+listed first. v0.2.71 lets a caller pick a specific instance with a
+positional alias suffix — `qwen3:32b@local1` always goes to the first
+URL, `qwen3:32b@local2` to the second, and so on. The aliases are
+auto-assigned in URL list order; no extra configuration needed.
+
+### Added
+
+- `servicePool.aliasToURL` — built automatically from the URL list, with
+  `local1` mapping to `urls[0]`, `local2` to `urls[1]`, … Reordering the
+  dashboard URL list rotates the aliases (intentional: positional, not
+  opaque).
+- `splitInstanceAlias(model)` and `stripInstanceAlias(model)` helpers
+  in `service_pool.go`. Conservative parser: only `@local<digits>` at
+  the end of the model id counts; an `@variant` suffix used by some
+  routers passes through untouched.
+- `URLForModel` now consumes the alias before falling back to the
+  model→URL cache. An unknown alias (`@local99`) falls through to the
+  first URL so dispatch still hits a real upstream.
+- 17 locale `hint_local_url` updated to document the alias scheme.
+
+### Changed
+
+- `callOllama`, `callLocalService`, `streamOllama`, `streamLocalService`,
+  and `streamPluginAsGemini` strip the alias suffix from the outbound
+  model id after the URL has been resolved. Upstream Ollama and
+  OpenAI-compatible servers see plain `qwen3:32b` again, so no upstream
+  compatibility surface changes.
+
+### Notes
+
+- Aliases are positional, not stable. Operators who reorder the
+  dashboard URL list should update any agent configs that pinned a
+  specific `local<N>`. A future stable-alias scheme (named per URL) can
+  layer on top of this without breaking the positional default.
+
+---
+
+## [0.2.70] — 2026-05-06
+
+Slideover swap race fix. Clicking a service card while another slideover
+(e.g. agent edit) was already open sometimes left the new card's frame
+invisible. Root cause: `slideover.Frame` carried `hx-swap-oob="true"`
+while every trigger also set `hx-target="#slideover" hx-swap="outerHTML"`.
+HTMX OOB-extracted the aside out of the response body, swapped it into
+the DOM, then ran the empty leftover body through the trigger's
+outerHTML swap — which removed the freshly-installed aside. The race
+showed up only on rapid consecutive card clicks because the first OOB
+swap landed before the second card's trigger started its swap.
+
+### Fixed
+
+- Removed `hx-swap-oob="true"` from `slideover.Frame`. The response now
+  flows through the trigger's `hx-target="#slideover" hx-swap="outerHTML"`
+  exclusively, producing one atomic swap. `slideover.Empty` keeps the
+  attribute because it only renders into the static initial page (where
+  the attribute is inert) and is never returned from an HTMX response.
+
+---
+
+## [0.2.69] — 2026-05-06
+
+Multi-instance dispatch generalised to every local service. v0.2.68 only
+covered `ollama`; v0.2.69 lets `lmstudio`, `vllm`, `llamacpp`, and any
+OpenAI-compatible plugin share the same model-aware routing. The vault
+dashboard URL field now accepts a comma-separated list for every local
+service — operators don't need a new yaml field or env var to point one
+proxy at multiple instances of the same backend.
+
+### Added
+
+- `internal/proxy/service_pool.go` — generalised dispatch pool. `ollamaPool`
+  type and file are renamed to `servicePool`; the new pool takes a
+  `modelFetcher` so it can drive `/api/tags` (Ollama) or `/v1/models`
+  (OpenAI-compat).
+- `Server.servicePools map[string]*servicePool` — one pool per built-in
+  local service plus every OpenAI-compatible plugin discovered at boot.
+- `Server.resolveLocalServiceURLs(serviceID) []string` — multi-source URL
+  resolver mirroring `resolveOllamaURLs`. Sources go through
+  `splitOllamaURLs`, so a comma list typed into the dashboard URL field
+  produces a multi-instance pool without yaml or env changes.
+- `Server.resolveLocalServiceURLForModel(serviceID, model) string` —
+  model-aware variant used by `callLocalService` and the streaming local
+  paths.
+- `Server.refreshAllServicePoolURLs` — vault sync now re-pushes every
+  pool's URL list so a dashboard edit propagates without restart.
+
+### Changed
+
+- `Server.callLocalService`, `streamPluginAsGemini`, and `streamLocalService`
+  switch from `resolveLocalServiceURL` to `resolveLocalServiceURLForModel`.
+  Single-URL setups behave identically; multi-instance setups route per
+  model id.
+- `internal/models/registry.go` — `fetchOllama` and `fetchOpenAICompat`
+  accept comma-separated URL strings and merge model lists across every
+  reachable instance. The dashboard model dropdown now surfaces the union
+  of every instance, not just the first listed (the v0.2.68 limitation
+  this release fixes).
+- 17 locale files: `hint_local_url` updated to mention multi-URL support
+  ("comma-separated for multiple instances; routed by model name") in the
+  native language. ar/de/en/es/fr/ha/hi/id/ja/ko/mn/ne/pt/sw/th/zh/zu.
+
+### Notes
+
+- Plugin services with a non-OpenAI `request_format` (gemini, ollama, raw)
+  are skipped at pool registration so a dead `/v1/models` poll doesn't
+  spam the log. They still work with single-URL dispatch via the legacy
+  resolver.
+
+---
+
+## [0.2.68] — 2026-05-06
+
+Multi-instance Ollama dispatch. The proxy can now reach more than one
+Ollama instance and route each call to whichever one hosts the requested
+model. Each URL is polled (`/api/tags`) every five minutes; the resulting
+model→URL map drives dispatch with first-listed wins on collisions and a
+first-URL fallback on miss (so the upstream still returns a real 404
+rather than a fabricated error from us). Single-URL deployments behave
+identically to the pre-pool path.
+
+### Added
+
+- `ProxyConfig.OllamaURLs []string` (`yaml: ollama_urls`) accepts a list
+  of base URLs.
+- `WV_OLLAMA_URLS=http://a:11434,http://b:11434` env var as comma-list
+  alternative to YAML. Trimmed/blank entries are dropped.
+- New `internal/proxy/ollama_pool.go` with the pool, refresh ticker, and
+  cache-miss-triggered reactive refresh. `Server.ollamaPool` lives the
+  whole proxy lifetime; `Stop()` tears the goroutine down.
+- `Server.ollamaURLForModel(model)` — every dispatch site now picks a
+  URL by model id (`callOllama`, streaming path).
+
+### Changed
+
+- `Server.ollamaURL()` now returns `ollamaPool.URLs()[0]` instead of
+  walking the env/vault chain directly. The chain is still consulted —
+  it now feeds `resolveOllamaURLs`, which builds the pool's URL list
+  from `cfg.Proxy.OllamaURLs ∪ WV_OLLAMA_URL ∪ OLLAMA_URL ∪ vault
+  serviceURLs[ollama]` (dedup, first-occurrence wins). Single-URL
+  setups keep working unchanged.
+- `syncAllowedServices` (vault sync) re-runs `resolveOllamaURLs` and
+  feeds the result into `ollamaPool.SetURLs`, so a vault-side URL
+  change propagates without a proxy restart.
+
+### Notes
+
+- Pool refresh interval is fixed at five minutes. Aggressive workloads
+  that add/remove models faster can rely on the cache-miss reactive
+  refresh — the first request for an unseen model triggers an out-of-
+  band refresh.
+- `models.Registry.Refresh` still calls `fetchOllama` with a single
+  URL (the pool's first). Dashboard model lists therefore reflect the
+  first-listed instance only; dispatch is still correct across all
+  instances. Registry-side multi-URL aggregation is a separate
+  follow-up.
+
+---
+
 ## [0.2.67] — 2026-05-05
 
 EconoWorld config heal now also normalizes a `provider` field that has
@@ -1184,9 +1707,10 @@ stale gateway, retry update.
   every chat completion silently entered reasoning mode: the model burned the
   full `num_predict` budget on hidden thought, returned `content=""` with
   `finish_reason="length"`, and held the model resident in wired memory.
-  Across four fleet machines hammering one mini Ollama daemon this accumulated
+  Across multiple fleet proxies hammering one Ollama host this accumulated
   to ~42 GB wired and a hung daemon within minutes — the symptom the operator
-  described as "프록시 안 쓰고 미니 자체에서 큰 모델도 잘만 된다", because
+  described as "the model runs fine when called directly on the host without
+  the proxy in front of it", because
   `ollama run --think=false` from the CLI bypassed the same setting.
   `OllamaRequest` and `OpenAIRequest` now expose a `Think *bool` field, and
   `callOllama` / `streamOllama` / `callLocalService` pin it to the same value

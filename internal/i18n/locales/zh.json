@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "本地 AI 服务器地址 (Ollama / LM Studio / vLLM)。逗号分隔可填多个 (按模型名自动路由)。指定实例使用 \"<模型>@local<N>\" — local1 = 第1个 URL, local2 = 第2个。",
   "act_close": "关闭 (Esc)",
   "opt_service_default": "（使用服务默认值）",
   "warn_stale_override_short": "(⚠ 当前值 · 保存时将重置)",

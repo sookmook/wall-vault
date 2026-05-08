@@ -527,6 +527,8 @@ hooks:
 | `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
 | `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
 | `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_PROXY_TLS_REQUIRED` | `proxy.tls.required` (TLS 关闭时拒绝启动 — 防止明文回退) |
+| `WV_PROXY_ALLOW_CIDRS` | `proxy.allow_cidrs` (逗号分隔列表, 例如 `192.168.0.0/16,10.0.0.0/8`; 回环地址始终通过) |
 | `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
 | `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
 | `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
@@ -536,13 +538,17 @@ hooks:
 | `WV_KEY_OPENROUTER` | 一次性导入:OpenRouter 密钥 |
 | `WV_KEY_ANTHROPIC` | 一次性导入:Anthropic 密钥 |
 | `WV_KEY_OPENAI` | 一次性导入:OpenAI 密钥 |
-| `WV_OLLAMA_URL` | 每主机 Ollama URL 覆盖 |
+| `WV_OLLAMA_URL` | 每主机 Ollama URL 覆盖（单实例） |
+| `WV_OLLAMA_URLS` | 逗号分隔的 Ollama URL 列表（多实例分发） |
 | `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
 | `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
-| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | 每后端 URL 覆盖 |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | 每后端 URL 覆盖（单实例） |
 | `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
 | `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
 | `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_INJECT_MODEL_IDENTITY` | `proxy.inject_model_identity`（系统消息身份守卫，默认关闭） |
+| `WV_PROMPT_TOKEN_CAP` | 每主机本地 OAI 兼容提示自动截断阈值（正整数 = 启用，0 = 关闭） |
+| `WV_DISPATCH_TRACE` | 设为 `1` 以记录每个 dispatch 的解析服务/模型和原因（默认关闭） |
 | `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
 | `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
 | `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |

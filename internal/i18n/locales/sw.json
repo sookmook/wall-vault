@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "URL ya seva ya AI ya ndani (Ollama / LM Studio / vLLM). Tenga kwa koma kwa instansi nyingi; huelekezwa kwa jina la modeli. Bandika instansi kwa \"<modeli>@local<N>\" — local1 = URL ya kwanza, local2 = ya pili.",
   "act_close": "Funga (Esc)",
   "opt_service_default": "(tumia chaguo-msingi la huduma)",
   "warn_stale_override_short": "(⚠ thamani ya sasa · itawekwa upya ukihifadhi)",

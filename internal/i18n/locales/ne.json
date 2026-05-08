@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "स्थानीय AI सर्भरको URL (Ollama / LM Studio / vLLM)। धेरै इन्स्टान्सका लागि अल्पविरामले छुट्याउनुहोस्; मोडेलको नामबाट रुट हुन्छ। इन्स्टान्स तोक्न \"<मोडेल>@local<N>\" — local1 = पहिलो URL, local2 = दोस्रो।",
   "act_close": "बन्द गर्नुहोस् (Esc)",
   "opt_service_default": "(सेवा पूर्वनिर्धारित प्रयोग)",
   "warn_stale_override_short": "(⚠ हालको मान · सेभ गर्दा रिसेट हुन्छ)",

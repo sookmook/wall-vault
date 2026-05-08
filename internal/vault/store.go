@@ -721,6 +721,7 @@ func (s *Store) UpsertService(inp *ServiceConfig) error {
 			sv.ProxyEnabled = inp.ProxyEnabled
 			sv.DefaultModel = inp.DefaultModel
 			sv.AllowedModels = inp.AllowedModels
+			sv.ReasoningMode = inp.ReasoningMode
 			if inp.SortOrder != 0 {
 				sv.SortOrder = inp.SortOrder
 			}

@@ -191,7 +191,7 @@
   "hint_allowed_models": "한 줄에 하나씩. 비우면 무제한.",
   "hint_sort_order": "작을수록 먼저 시도되는 우선순위.",
   "hint_avatar": "256px로 자동 리사이즈됩니다. 비우면 현재 아바타 유지.",
-  "hint_local_url": "Ollama·LM Studio·vLLM 같은 로컬 AI 서버 주소.",
+  "hint_local_url": "Ollama·LM Studio·vLLM 같은 로컬 AI 서버 주소. 콤마로 여러 개 입력 가능 (모델 이름으로 자동 라우팅). 명시 지정은 \"<모델>@local<N>\" — local1 = 첫 URL, local2 = 두 번째.",
   "act_close": "닫기 (Esc)",
   "opt_service_default": "(서비스 기본 사용)",
   "warn_stale_override_short": "(⚠ 현재 값 · 저장 시 초기화)",

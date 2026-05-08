@@ -3,7 +3,7 @@ package slideover
 import "github.com/sookmook/wall-vault/internal/i18n"
 
 templ Frame(title string, body templ.Component) {
-	<aside id="slideover" data-open="true" hx-swap-oob="true"
+	<aside id="slideover" data-open="true"
 		role="dialog" aria-modal="true" aria-labelledby="wv-slideover-title">
 		<div class="slideover-head">
 			<b id="wv-slideover-title">✏︎ { title }</b>

@@ -259,12 +259,15 @@ func (s *Server) streamPluginAsGemini(ctx context.Context, w http.ResponseWriter
 		return
 	}
 
-	// URL resolution shared with callLocalService.
-	baseURL := s.resolveLocalServiceURL(serviceID)
+	// URL resolution shared with callLocalService — model-aware so a
+	// multi-instance pool routes per-request.
+	baseURL := s.resolveLocalServiceURLForModel(serviceID, model)
 	if baseURL == "" {
 		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: URL 미설정", serviceID))
 		return
 	}
+	// Drop the "@local<N>" instance pin before forwarding to upstream.
+	model = stripInstanceAlias(model)
 
 	// Per-service semaphore — same shape as streamOllama / callLocalService.
 	if sem, ok := s.localSems[serviceID]; ok {
@@ -287,6 +290,7 @@ func (s *Server) streamPluginAsGemini(ctx context.Context, w http.ResponseWriter
 
 	oaiReq := GeminiToOpenAI(sentModel, req)
 	oaiReq.Stream = true
+	oaiReq.Messages = s.maybeInjectModelIdentity(oaiReq.Messages, sentModel)
 	s.mu.RLock()
 	reasoning := s.serviceReasoning[serviceID]
 	s.mu.RUnlock()
@@ -294,6 +298,9 @@ func (s *Server) streamPluginAsGemini(ctx context.Context, w http.ResponseWriter
 	oaiReq.Think = &reasoning
 	s.applyQwen3NoThinkSuffix(oaiReq, serviceID, sentModel, reasoning)
 
+	if dropped := truncateOldestOAIMessages(oaiReq, promptTokenCap()); dropped > 0 {
+		log.Printf("[proxy] %s prompt cap: dropped %d oldest messages (cap=%d tokens)", serviceID, dropped, promptTokenCap())
+	}
 	data, err := json.Marshal(oaiReq)
 	if err != nil {
 		writeGeminiErrorChunk(w, f, fmt.Errorf("%s: marshal: %w", serviceID, err))
@@ -392,7 +399,10 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 			return
 		}
 	}
-	ollamaURL := s.ollamaURL()
+	ollamaURL := s.ollamaURLForModel(model)
+	// "<model>@local<N>" pins to a specific instance; the alias is
+	// consumed above. Drop it before forwarding to upstream Ollama.
+	model = stripInstanceAlias(model)
 
 	// Fleet time distribution — same AgentOffset + FallbackJitter as the
 	// non-streaming path. Restored in v0.2.27. See timing.go.
@@ -421,6 +431,7 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 
 	ollamaReq := GeminiToOllama(model, req)
 	ollamaReq.Stream = true
+	ollamaReq.Messages = s.maybeInjectModelIdentity(ollamaReq.Messages, model)
 	// Pin per-request think to avoid silent reasoning blow-ups on
 	// thinking-capable models. See OpenAIRequest.Think rationale.
 	s.mu.RLock()
@@ -562,10 +573,18 @@ func (s *Server) streamLocalService(
 	oaiReq *OpenAIRequest,
 ) error {
 	plugin := s.pluginByID[serviceID]
-	// URL resolution shared with callLocalService.
-	baseURL := s.resolveLocalServiceURL(serviceID)
+	// URL resolution shared with callLocalService — model-aware so a
+	// multi-instance pool routes per-request.
+	baseURL := s.resolveLocalServiceURLForModel(serviceID, model)
 	if baseURL == "" {
 		return fmt.Errorf("%s: URL 미설정", serviceID)
+	}
+	// Drop the "@local<N>" instance pin before forwarding to the
+	// OpenAI-compatible backend. oaiReq.Model is rewritten by callers
+	// that follow this resolver, so cleaning the local variable suffices.
+	model = stripInstanceAlias(model)
+	if oaiReq != nil {
+		oaiReq.Model = stripInstanceAlias(oaiReq.Model)
 	}
 
 	// Fleet time distribution — same AgentOffset + FallbackJitter as
@@ -607,10 +626,14 @@ func (s *Server) streamLocalService(
 	s.mu.RUnlock()
 	oaiReq.Model = sentModel
 	oaiReq.Stream = true
+	oaiReq.Messages = s.maybeInjectModelIdentity(oaiReq.Messages, sentModel)
 	oaiReq.Reasoning = reasoning
 	oaiReq.Think = &reasoning
 	s.applyQwen3NoThinkSuffix(oaiReq, serviceID, sentModel, reasoning)
 
+	if dropped := truncateOldestOAIMessages(oaiReq, promptTokenCap()); dropped > 0 {
+		log.Printf("[proxy] %s prompt cap (stream): dropped %d oldest messages (cap=%d tokens)", serviceID, dropped, promptTokenCap())
+	}
 	data, _ := json.Marshal(oaiReq)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/v1/chat/completions", bytes.NewReader(data))
 	if err != nil {
@@ -637,7 +660,7 @@ func (s *Server) streamLocalService(
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("%s: stream status %d: %s", serviceID, resp.StatusCode, string(body))
+		return translateBackendError(serviceID, resp.StatusCode, body)
 	}
 
 	// Caller-side SSE headers (idempotent — handler may have set them).

@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "URL server AI lokal (Ollama / LM Studio / vLLM). Pisahkan dengan koma untuk banyak instance; dirutekan berdasarkan nama model. Pin instance dengan \"<model>@local<N>\" — local1 = URL pertama, local2 = kedua.",
   "act_close": "Tutup (Esc)",
   "opt_service_default": "(gunakan default layanan)",
   "warn_stale_override_short": "(⚠ nilai saat ini · akan direset saat disimpan)",

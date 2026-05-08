@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "URL du serveur IA local (Ollama / LM Studio / vLLM). Séparer par des virgules pour plusieurs instances ; routage par nom de modèle. Cibler une instance via \"<modèle>@local<N>\" — local1 = première URL, local2 = deuxième.",
   "act_close": "Fermer (Esc)",
   "opt_service_default": "(utiliser le défaut du service)",
   "warn_stale_override_short": "(⚠ valeur actuelle · sera réinitialisée à l'enregistrement)",

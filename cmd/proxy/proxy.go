@@ -88,6 +88,16 @@ func RunStandalone() {
 }
 
 func runProxy(cfg *config.Config) {
+	// TLS required: refuse to run with TLS off when the operator has flagged
+	// the host as needing transport encryption (e.g. proxy reachable beyond
+	// LAN). Without this check, a misconfigured deploy silently falls back to
+	// plain HTTP and ships Bearer tokens in the clear. Fail-closed at startup
+	// so the misconfiguration surfaces in the journal instead of in a
+	// post-incident review.
+	if cfg.Proxy.TLS.Required && !cfg.Proxy.TLS.Enabled {
+		log.Fatalf("[proxy] tls.required=true but tls.enabled=false — refusing to start in plain HTTP mode")
+	}
+
 	srv := iproxy.NewServer(cfg)
 	addr := fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port)
 

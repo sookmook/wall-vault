@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "URL เซิร์ฟเวอร์ AI ภายใน (Ollama / LM Studio / vLLM) ใส่หลายรายการคั่นด้วยจุลภาค จัดเส้นทางตามชื่อโมเดล ระบุอินสแตนซ์ด้วย \"<โมเดล>@local<N>\" — local1 = URL แรก, local2 = อันที่สอง",
   "act_close": "ปิด (Esc)",
   "opt_service_default": "(ใช้ค่าเริ่มต้นของบริการ)",
   "warn_stale_override_short": "(⚠ ค่าปัจจุบัน · จะถูกรีเซ็ตเมื่อบันทึก)",

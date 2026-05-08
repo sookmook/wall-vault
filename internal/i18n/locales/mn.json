@@ -187,7 +187,7 @@
   "hint_allowed_models": "One per line. Leave blank for no restriction.",
   "hint_sort_order": "Lower numbers are tried first.",
   "hint_avatar": "Auto-resized to 256px. Leave blank to keep current.",
-  "hint_local_url": "Local AI server URL (Ollama / LM Studio / vLLM).",
+  "hint_local_url": "Дотоод AI серверийн URL (Ollama / LM Studio / vLLM). Олон хаягийг таслалаар тусгаарлана; загварын нэрээр чиглүүлнэ. Тодорхой хувийг \"<загвар>@local<N>\" — local1 = эхний URL, local2 = хоёр дахь.",
   "act_close": "Хаах (Esc)",
   "opt_service_default": "(үйлчилгээний анхдагч ашиглах)",
   "warn_stale_override_short": "(⚠ одоогийн утга · хадгалах үед шинэчлэгдэнэ)",

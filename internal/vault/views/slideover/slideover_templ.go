@@ -28,7 +28,7 @@ func Frame(title string, body templ.Component) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<aside id=\"slideover\" data-open=\"true\" hx-swap-oob=\"true\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"wv-slideover-title\"><div class=\"slideover-head\"><b id=\"wv-slideover-title\">✏︎ ")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<aside id=\"slideover\" data-open=\"true\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"wv-slideover-title\"><div class=\"slideover-head\"><b id=\"wv-slideover-title\">✏︎ ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

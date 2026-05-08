@@ -528,6 +528,8 @@ hooks:
 | `WV_PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
 | `WV_PROXY_TLS_CERT` | `proxy.tls.cert_file` |
 | `WV_PROXY_TLS_KEY` | `proxy.tls.key_file` |
+| `WV_PROXY_TLS_REQUIRED` | `proxy.tls.required` (TLS 無効時に起動拒否 — 平文フォールバックを遮断) |
+| `WV_PROXY_ALLOW_CIDRS` | `proxy.allow_cidrs` (カンマ区切り、例: `192.168.0.0/16,10.0.0.0/8`。ループバックは常に通過) |
 | `WV_VAULT_TLS_ENABLED` | `vault.tls.enabled` |
 | `WV_VAULT_TLS_CERT` | `vault.tls.cert_file` |
 | `WV_VAULT_TLS_KEY` | `vault.tls.key_file` |
@@ -537,13 +539,17 @@ hooks:
 | `WV_KEY_OPENROUTER` | ワンショットインポート: OpenRouter キー |
 | `WV_KEY_ANTHROPIC` | ワンショットインポート: Anthropic キー |
 | `WV_KEY_OPENAI` | ワンショットインポート: OpenAI キー |
-| `WV_OLLAMA_URL` | ホストごとの Ollama URL オーバーライド |
+| `WV_OLLAMA_URL` | ホストごとの Ollama URL オーバーライド（単一インスタンス） |
+| `WV_OLLAMA_URLS` | カンマ区切りの Ollama URL リスト（マルチインスタンスディスパッチ） |
 | `WV_OLLAMA_KEEP_ALIVE` | `proxy.ollama_keep_alive` |
 | `WV_OLLAMA_NUM_CTX` | `proxy.ollama_num_ctx` |
-| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | バックエンドごとの URL オーバーライド |
+| `WV_LMSTUDIO_URL`, `WV_VLLM_URL`, `WV_LLAMACPP_URL` | バックエンドごとの URL オーバーライド（単一インスタンス） |
 | `WV_TOKEN_SENTINEL_FALLBACK` | `proxy.token_sentinel_fallback` |
 | `WV_OAI_STREAM_FORWARD` | `proxy.oai_stream_forward` |
 | `WV_ANTHROPIC_FALLBACK_MODEL` | `proxy.anthropic_fallback_model` |
+| `WV_INJECT_MODEL_IDENTITY` | `proxy.inject_model_identity`（システムメッセージのアイデンティティガード、デフォルトオフ） |
+| `WV_PROMPT_TOKEN_CAP` | ホストごとのローカル OAI 互換プロンプト自動トランケート上限（正整数 = 有効、0 = 無効） |
+| `WV_DISPATCH_TRACE` | `1` に設定するとディスパッチごとに解決されたサービス/モデルと理由をログ（デフォルトオフ） |
 | `WV_ECONOWORLD_MAX_TOKENS` | `proxy.econoworld_max_tokens` |
 | `WV_ECONOWORLD_STREAM` | `proxy.econoworld_stream` |
 | `WV_ECONOWORLD_REQUEST_TIMEOUT` | `proxy.econoworld_request_timeout` |

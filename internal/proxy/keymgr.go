@@ -148,6 +148,20 @@ func (km *KeyManager) Get(service string) (*localKey, error) {
 	return nil, fmt.Errorf("서비스 '%s' 사용 가능한 키 없음 (등록된 키 %d개)", service, n)
 }
 
+// HasAnyKey returns true when at least one key (any service) is loaded.
+// Used by NewServer's startup sync loop to know when the vault has
+// answered with non-empty data, so the loop can stop retrying.
+func (km *KeyManager) HasAnyKey() bool {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	for _, keys := range km.keys {
+		if len(keys) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // CanServe returns true when the service has at least one key that is not
 // on cooldown and not exhausted. Used by dispatch to fast-skip fully-cooled
 // cloud services instead of waiting for Get() to force-retry and collect a

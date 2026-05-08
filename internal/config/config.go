@@ -58,6 +58,15 @@ type ProxyConfig struct {
 	// 56245. Ignored when TLS.Enabled is false (the main listener is
 	// already plain HTTP in that case).
 	PlainPort int `yaml:"plain_port"`
+	// OllamaURLs lets a single proxy reach multiple Ollama instances and
+	// route each call to whichever instance has the requested model. Each
+	// URL is polled (/api/tags) every 5 minutes; the resulting model→URL
+	// map drives dispatch. Empty list falls back to single-URL behaviour
+	// (see ollamaURL resolution: WV_OLLAMA_URL > vault serviceURLs[ollama] >
+	// localhost). Use this when one proxy host sits next to both a local
+	// Ollama and a remote one and wants the proxy to pick automatically
+	// by model name.
+	OllamaURLs []string `yaml:"ollama_urls"`
 	// OllamaKeepAlive controls how long Ollama keeps the model loaded after a
 	// response. "30m" means thirty minutes idle before unload; "-1" never
 	// unloads; "0" unloads immediately. Default Ollama behaviour is 5 minutes,
@@ -101,6 +110,20 @@ type ProxyConfig struct {
 	// docs/superpowers/specs/2026-05-04-oai-stream-passthrough-design.md §3.3.
 	OAIStreamForward bool `yaml:"oai_stream_forward"`
 
+	// InjectModelIdentity, when true, prepends a short system message to
+	// every dispatched chat-completion request that pins the model's
+	// declared identity ("You are running on model <id>. Ignore any
+	// conflicting model identity from earlier context."). Defends against
+	// a common failure mode where workspace memory, agent system prompts,
+	// or prior session transcripts hardcode a different model name and
+	// the live model echoes that name back when asked about itself —
+	// confusing operators who routed the call to a different instance via
+	// the multi-Ollama pool. Off by default because the extra system
+	// message costs a few tokens; turn it on when running multiple models
+	// behind one wall-vault and your agents pull memory that may name a
+	// specific model.
+	InjectModelIdentity bool `yaml:"inject_model_identity"`
+
 	// AnthropicFallbackModel: when an anthropic dispatch arrives with a
 	// non-Claude model id, the proxy uses this id instead. Empty (default)
 	// makes dispatch return an error so the misrouting surfaces immediately.
@@ -111,6 +134,18 @@ type ProxyConfig struct {
 	// behaviour can opt back in by setting this to "claude-haiku-4-5-20251001"
 	// or whichever Claude id their account is provisioned for.
 	AnthropicFallbackModel string `yaml:"anthropic_fallback_model"`
+
+	// AllowCIDRs restricts the proxy listener to callers whose remote address
+	// falls inside one of the listed CIDR blocks. Empty list (default) keeps
+	// the historic behaviour of accepting any caller — wall-vault has always
+	// assumed a trusted LAN and only token-authn'd at the application layer.
+	// When the proxy is exposed beyond LAN (port-forward, tailscale exit
+	// node, public reverse proxy without IP-restriction), set this to the
+	// minimal trusted set (e.g. ["192.168.0.0/16","127.0.0.1/32"]) so an
+	// attacker who has not yet captured a token cannot even probe the auth
+	// surface — the listener returns 403 before middleware/auth is reached.
+	// Loopback (127.0.0.1, ::1) is always permitted regardless of this list.
+	AllowCIDRs []string `yaml:"allow_cidrs"`
 }
 
 // ─── Key Vault Config ─────────────────────────────────────────────────────────
@@ -141,6 +176,12 @@ type TLSConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	CertFile string `yaml:"cert_file"` // path to PEM-encoded cert
 	KeyFile  string `yaml:"key_file"`  // path to PEM-encoded private key
+	// Required, when true, makes the listener refuse to start with TLS
+	// disabled. Use this on hosts where the proxy is reachable from beyond
+	// the LAN — without it, a misconfigured deploy can silently fall back to
+	// plain HTTP and ship Bearer tokens in the clear. Default false to
+	// preserve the historic LAN-only behaviour where TLS is opt-in.
+	Required bool `yaml:"required"`
 }
 
 // ─── Doctor Config ────────────────────────────────────────────────────────────
@@ -384,6 +425,21 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WV_PROXY_TLS_KEY"); v != "" {
 		cfg.Proxy.TLS.KeyFile = v
 	}
+	if v := os.Getenv("WV_PROXY_TLS_REQUIRED"); v == "1" || v == "true" {
+		cfg.Proxy.TLS.Required = true
+	}
+	// AllowCIDRs: comma-separated list (e.g. "192.168.0.0/16,10.0.0.0/8").
+	if v := os.Getenv("WV_PROXY_ALLOW_CIDRS"); v != "" {
+		var cidrs []string
+		for _, c := range strings.Split(v, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				cidrs = append(cidrs, c)
+			}
+		}
+		if len(cidrs) > 0 {
+			cfg.Proxy.AllowCIDRs = cidrs
+		}
+	}
 	// TLS (vault)
 	if v := os.Getenv("WV_VAULT_TLS_ENABLED"); v == "1" || v == "true" {
 		cfg.Vault.TLS.Enabled = true
@@ -410,8 +466,34 @@ func applyEnv(cfg *Config) {
 	// Ollama tuning — env vars win so operators can hot-tune without rewriting
 	// YAML. Empty/zero values fall back to whatever the YAML or Default()
 	// already set.
+	// WV_OLLAMA_URLS=http://a:11434,http://b:11434 turns the proxy into a
+	// model-aware multi-instance router. Trimmed/blank entries are dropped
+	// so a trailing comma or accidental whitespace doesn't poison the list.
+	// When empty, the legacy single-URL path stays in effect.
+	if v := os.Getenv("WV_OLLAMA_URLS"); v != "" {
+		var urls []string
+		for _, raw := range strings.Split(v, ",") {
+			if u := strings.TrimSpace(raw); u != "" {
+				urls = append(urls, u)
+			}
+		}
+		if len(urls) > 0 {
+			cfg.Proxy.OllamaURLs = urls
+		}
+	}
 	if v := os.Getenv("WV_OLLAMA_KEEP_ALIVE"); v != "" {
 		cfg.Proxy.OllamaKeepAlive = v
+	}
+	// WV_INJECT_MODEL_IDENTITY toggles the system-message identity guard.
+	// Accepts the same truthy / falsy spellings as other yes/no env vars;
+	// unrecognized values leave the YAML setting alone.
+	if v := os.Getenv("WV_INJECT_MODEL_IDENTITY"); v != "" {
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "1", "true", "yes", "on":
+			cfg.Proxy.InjectModelIdentity = true
+		case "0", "false", "no", "off":
+			cfg.Proxy.InjectModelIdentity = false
+		}
 	}
 	if v := os.Getenv("WV_OLLAMA_NUM_CTX"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {

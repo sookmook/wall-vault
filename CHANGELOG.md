@@ -614,8 +614,8 @@ equivalent to v0.2.63.
   pattern. Old `docs/MANUAL.en.md` removed.
 - **Source comments and test files anonymised.** Per-host references in
   `internal/proxy/{server,openclaw_sync,openclaw_sanitize,local_dispatch_test,openclaw_heal_test,token_sentinel_test}.go`
-  were rewritten from concrete hostnames (`raspi`, `motoko`, `jaksooni`,
-  `mini9`) to generic placeholders (`host-A`/`host-B`/`host-C`/`host-D`).
+  were rewritten from machine-specific hostnames to generic placeholders
+  (`host-A`/`host-B`/`host-C`/`host-D`).
   Test fixture IPs that pinned a specific LAN address moved to neutral
   placeholders inside the RFC1918 range. CHANGELOG entries that
   described per-host incidents were rewritten the same way. The author's
@@ -759,7 +759,7 @@ this release fixes the ones that block a fresh non-default install.
   Google's family, and dispatched to the native Google handler,
   which 502'd with "Google: 모델 없음 (gemma-4-26b-a4b)". Symptom on
   host-A: telegram replies stopped landing because OpenClaw → host-A
-  wall-vault → mini wall-vault hub all 502'd before reaching mini's
+  wall-vault → host-B wall-vault hub all 502'd before reaching host-B's
   LM Studio. New plugin field `preserve_model_id: true` opts out of
   the strip; host-A's lmstudio.yaml now sets it.
 
@@ -922,7 +922,7 @@ this release fixes the ones that block a fresh non-default install.
 ### Fixed
 
 - **Heal pass relaxes the gateway's channel-stale threshold to 60
-  minutes.** Mini gateway 2026-05-03 spent the night in a 300-second
+  minutes.** A gateway on host-B spent the night in a 300-second
   SIGTERM-restart loop that survived even after v0.2.55 aligned
   active-memory's model: every five minutes the gateway logged
   `[gateway] signal SIGTERM received` and launchd brought it back up.
@@ -944,7 +944,7 @@ this release fixes the ones that block a fresh non-default install.
 ### Fixed
 
 - **Heal pass aligns active-memory plugin model with the agent's
-  primary.** Mini gateway 2026-05-02 was caught in a 300-second
+  primary.** A gateway on host-B was caught in a 300-second
   SIGTERM-restart loop: OpenClaw's `active-memory` plugin shipped
   with `model: custom/gemini-2.5-flash-lite`, but the host's vault
   has no google credentials in its services list, so every plugin
@@ -1006,8 +1006,8 @@ this release fixes the ones that block a fresh non-default install.
 
 ### Fixed
 
-- **Heal pass also writes provider-level `request.tls.ca`.** Mini
-  gateway 2026-05-02 surfaced the next layer of breakage after the
+- **Heal pass also writes provider-level `request.tls.ca`.** A host-B
+  gateway on 2026-05-02 surfaced the next layer of breakage after the
   v0.2.52 `data:` chunk fix: TUI and Telegram dispatches still failed
   with `Connection error`, and `wall-vault-proxy.err` revealed the real
   cause — `http: TLS handshake error from 127.0.0.1: EOF`. The
@@ -1153,7 +1153,7 @@ this release fixes the ones that block a fresh non-default install.
   and forces `authHeader: true` whenever the existing values look
   pre-v0.2.37 (literal `"dummy"` / `"proxy-managed"` / empty + the
   default `authHeader: false`). Triggered by host-A + host-B
-  2026-05-02: both still carried `apiKey: "dummy"` from a year-old
+  observations: both still carried `apiKey: "dummy"` from a year-old
   install, so every OpenClaw → wall-vault call after the v0.2.39
   token-auth gate landed surfaced as `401 token not registered with
   vault`. With this heal, a stale config self-corrects on next proxy
@@ -1177,7 +1177,7 @@ this release fixes the ones that block a fresh non-default install.
   `normalizeOpenClawProviders` now runs the same upstream-host →
   localhost rewrite on `models.providers.google.baseUrl` that v0.2.43
   introduced for `custom` and `anthropic`. Triggered by host-B
-  2026-05-02: the google provider had `http://<internal-host>:11434/v1`
+  observation: the google provider had `http://<internal-host>:11434/v1`
   written into its baseUrl slot — an ollama URL accidentally landed in
   the google provider — so every OpenClaw call addressed
   `custom/gemini-2.5-flash` (which `parseProviderModel` correctly
@@ -1294,8 +1294,8 @@ this release fixes the ones that block a fresh non-default install.
 - (operator host, earlier) incident: telegram bot couldn't reach LM Studio
   because the vault-distributed service URL `http://<internal-host>:1234`
   pointed at LM Studio's localhost-only listener on a different
-  machine, with no path through the mini's wall-vault hub. The fix
-  could not be a hardcoded host-A/mini IP edit; it had to be a generic
+  machine, with no path through the host-B wall-vault hub. The fix
+  could not be a hardcoded host-A/host-B IP edit; it had to be a generic
   "client wall-vault forwards to hub wall-vault" pattern that any
   third-party deployment (cloud GPU box + laptop, office LM Studio +
   N seats, etc.) could reuse without code changes. v0.2.44 makes that
@@ -1357,8 +1357,8 @@ this release fixes the ones that block a fresh non-default install.
   boot (no-op for hosts without OpenClaw) and is also exposed as
   `wall-vault doctor sanitize-openclaw`. Backs up the original to
   `*.bak.sanitize` before rewriting; only writes when something actually
-  changes so clean configs see no churn. Triggered by host-A observation
-  on 2026-05-01: a single empty-id entry left over from a pre-v0.2.32
+  changes so clean configs see no churn. Triggered by a host-A
+  observation: a single empty-id entry left over from a pre-v0.2.32
   applyOpenClawConfig caller crash-looped the gateway after restart.
 - **17-language i18n on auth + bootstrap pages.** `/setup`, `/login`,
   the bootstrap CA-distribution index page, and the dashboard header's
@@ -1394,7 +1394,7 @@ this release fixes the ones that block a fresh non-default install.
     didn't match (no vault fallback)
   - 503 `"no auth configured"` — neither proxy.vault_token nor
     proxy.vault_url set
-  Real ops cost prompted this — board #43 documented operators chasing
+  Real ops cost prompted this — an earlier review noted operators chasing
   IP whitelist for an hour when the cause was a stale token cache.
 - Tests: bootstrap handler routes (ca.crt + index + 404 hint), CA path
   resolution fallback chain, every tokenAuthFail branch's wire-format.
@@ -1406,8 +1406,8 @@ this release fixes the ones that block a fresh non-default install.
 ### Added — Ollama latency reduction
 
 - **`keep_alive` on every Ollama call (default 30m).** Ollama's own default
-  unloads the model after 5 minutes idle, which on the 27B fleet model on
-  mini meant every call separated by more than 5 minutes paid an 80-113s
+  unloads the model after 5 minutes idle, which on the 27B model on the
+  primary inference host meant every call separated by more than 5 minutes paid an 80-113s
   cold reload. The proxy now sends `keep_alive=30m` on every Ollama
   request so the model stays warm between sparse calls. Tunable via
   `WV_OLLAMA_KEEP_ALIVE` (e.g. `-1` for forever, `10m` for tighter RAM,
@@ -1450,10 +1450,10 @@ pulled. The actual bottleneck was the missing keep_alive hint.
   is in place for the day OpenClaw breaks the providers layout.
 - Tests for parser + gte() + schemaTag() invariant.
 
-Note: the gateway-restart failures users reported on host-B/mini after
+Note: the gateway-restart failures users reported on host-B after
 `openclaw update` to 2026.4.29 are unrelated to wall-vault — research
 confirmed the providers schema is unchanged; the failures are
-OpenClaw's own lifecycle bugs (stale PID holding port 56242 on mini,
+OpenClaw's own lifecycle bugs (stale PID holding port 56242 on host-B,
 health-probe race on host-B). Recovery is operator-side: stop the
 stale gateway, retry update.
 
@@ -1566,14 +1566,15 @@ stale gateway, retry update.
 ### Fixed
 
 - **Proxy upstream timeout raised from 60s → 5m to survive Ollama cold-starts.**
-  On the mini (Apple M4 Pro / 64 GB) loading qwen3.6:27b cold takes ≈ 80s and
+  On the macOS host loading qwen3.6:27b cold takes ≈ 80s and
   gemma4:26b ≈ 6m for the first request after the model unloads. Every
   minute-cron caller (machine-status push, voice_assistant's OpenClaw flow,
   etc.) was disconnecting after 60s, which canceled the in-flight ollama
   request server-side; ollama then dropped the half-loaded model, the next
   call started cold again, and the loop reproduced indefinitely — surfacing
-  on `:56240/machines` as `"LLM 프로바이더 다운: 모든 서비스 실패: Ollama 연결
-  실패…"` from speaker=mini. With 5m the cold-start completes, keep_alive=3m
+  on the operator dashboard as a "LLM provider down: all services failed:
+  Ollama connection failed" message from the host. With 5m the cold-start
+  completes, keep_alive=3m
   keeps the model resident, and subsequent calls return in 1-3s.
 
 ---
@@ -1730,7 +1731,7 @@ stale gateway, retry update.
   who switched host-B to OpenRouter via `vault.model_override` was still
   served whatever local OpenClaw / Claude Code's primary model said.
   Surfaced when host-B's OpenClaw kept emitting `custom/gemma4:26b`,
-  driving every chat to the (chronically stuck) mini Ollama instead of
+  driving every chat to the (chronically stuck) host-B Ollama instead of
   the freshly-funded OpenRouter. v0.2.30 mirrors `client.ModelOverride`
   into a new `s.ownModelOverride` field on every `syncFromVault` and
   applies it to token-less calls before request-body model is consulted.
@@ -1776,7 +1777,7 @@ stale gateway, retry update.
   `preferred_service` is `ollama` was therefore forwarded to ollama as-is,
   producing a 404 from ollama (it does not host google models) and a noisy
   cascade of downstream errors visible in voice_api logs as
-  `entity.parse.failed` (<separate incident>, "mini 카드 로그 진단 — LLM/TTS 흐름").
+  `entity.parse.failed` (separate incident).
 
   v0.2.28 adds `inferServiceFromBareModel` and consults it whenever the model
   name has no `/`. Mapping rules:
@@ -1853,7 +1854,7 @@ stale gateway, retry update.
   was an artifact of a separate `ollamaURL()` priority bug — the
   fleet's traffic was reaching `127.0.0.1:11434` and bouncing on
   connection-refused before ever queueing. With v0.2.26's URL fix,
-  four proxies actually fan in to mini's Ollama and the host hung in
+  four proxies actually fan in to the shared Ollama host and it hung in
   practice. v0.2.27 puts the deterministic `AgentOffset(client_id,
   500ms)` + uniform `FallbackJitter(0–200ms)` back at all three
   acquire sites (`callOllama`, `streamOllama`, `callLocalService`).
@@ -1898,7 +1899,7 @@ stale gateway, retry update.
   same pgrep gate on every agent type, which fixed cline's false-green
   but introduced a false-red for claude-code clients that simply hadn't
   been invoked in the last few minutes (operator complaint:
-  "babi2 잘 하고 있는데 왜 빨간불"). The two cases differ in nature —
+  "agent is fine but the dot is red"). The two cases differ in nature —
   Cline only runs while VSCode is open, while a claude-code client is
   a fleet member that gets typed into intermittently and uses
   Anthropic OAuth bypassing this proxy. Updated probe table:
@@ -1912,9 +1913,9 @@ stale gateway, retry update.
   | econoworld | always false (self-reports separately) |
   | other | false (don't fake green for unknown types) |
 
-  Net effect: `claude` / `babi` / `babi2` / `macclaude` / `saweol`
-  light up as long as their host is heartbeating; `motoko_vsc` stays
-  red while VSCode is closed; openclaw/nanoclaw signals are unchanged.
+  Net effect: claude-code clients light up as long as their host is
+  heartbeating; cline clients stay red while VSCode is closed;
+  openclaw/nanoclaw signals are unchanged.
 
 ---
 
@@ -2705,7 +2706,7 @@ proxy writes.
   trip OpenClaw's zod validator with
   `models.providers.custom.models.1.id: Too small: expected string to
   have >=1 characters` and push the gateway into a SIGTERM crash
-  loop. Observed on mini after the v0.2.7 deploy wave — `openclaw.json`
+  loop. Observed on a host after the v0.2.7 deploy wave — `openclaw.json`
   had a bare `{"id":""}` at index 1 that prevented the Telegram bot
   from ever starting.
 - No behavior change for a clean config; the only side effect is
@@ -3829,7 +3830,7 @@ key absorbs all traffic until it is exhausted before moving to the next.
 - Documentation reframed around OpenClaw as primary use case (README, MANUAL, API)
 
 ### Fixed
-- Binary on mini was v0.1.3; redeployed v0.1.4+ darwin/arm64 build
+- Binary on the macOS host was v0.1.3; redeployed v0.1.4+ darwin/arm64 build
 
 ---
 

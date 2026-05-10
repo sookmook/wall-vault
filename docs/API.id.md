@@ -466,7 +466,7 @@ Daftar semua kunci API yang terdaftar (tanpa kunci teks biasa).
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "Kunci utama",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ Mendaftarkan kunci API baru. Event SSE `key_added` langsung di-broadcast saat pe
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "Kunci utama",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Tambah kunci Google
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"Kunci utama","daily_limit":1000}'
 
 # Tambah kunci OpenAI
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # Tambah kunci OpenRouter
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"Kunci OR"}'
 
 # Hapus kunci (broadcast SSE key_deleted)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

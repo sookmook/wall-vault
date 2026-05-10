@@ -333,7 +333,7 @@ def s01_title(logo):
     draw.line([((W - 280) // 2, rule_y), ((W + 280) // 2, rule_y)], fill=PRIMARY, width=3)
 
     tag_font = font("medium", 26)
-    tag = "키 금고  ·  지능형 라우팅  ·  fleet observability  —  한 바이너리에"
+    tag = "키 금고  ·  지능형 라우팅  ·  에이전트들 가시성  —  한 바이너리에"
     tw, _ = measure(tag, tag_font, draw)
     text(draw, ((W - tw) // 2, rule_y + 26), tag, tag_font, MUTED)
 
@@ -400,7 +400,7 @@ def s03_problem(logo):
     card_h = 220
     gap = 24
     items = [
-        ("01", "키 만료 · 쿨다운", "단일 클라우드 키가 만료되면\nfleet 전체가 즉시 정지합니다."),
+        ("01", "키 만료 · 쿨다운", "단일 클라우드 키가 만료되면\n에이전트들 전체가 즉시 정지합니다."),
         ("02", "벤더별 모델 ID 차이", "Anthropic / OpenAI / Google /\nOpenRouter 모두 다른 네임스페이스."),
         ("03", "관측 가시성 0", "여러 머신·여러 에이전트가\n어디서 멈췄는지 안 보입니다."),
         ("04", "조용한 모델 치환", "Fallback 이 다른 모델로\n바꿔치기 — 응답 품질 붕괴."),
@@ -483,7 +483,7 @@ def s04_definition(logo):
         ("암호화 저장",  "AES-GCM",     "마스터 키로 키 자체를 암호화 저장.\n탈취돼도 평문 노출 0."),
         ("자동 로테이션","Round-Robin", "쿨다운 자동 감지 + 다음 키로\n무중단 전환."),
         ("정직한 라우팅","Strict default","모델 무단 치환 없음.\nfallback 헤더로 가시성 100%."),
-        ("실시간 신호등","SSE 동기화",  "fleet 전 에이전트 상태를\n한 화면에서 즉시 확인."),
+        ("실시간 신호등","SSE 동기화",  "에이전트들 전체 상태를\n한 화면에서 즉시 확인."),
     ]
     for i, (ttl, kicker, body) in enumerate(features):
         x = MARGIN_X + i * (feat_w + feat_gap)
@@ -600,7 +600,7 @@ def s05_architecture(logo):
     text(draw, (px + 24, vy + 80), "AES-GCM 키 금고", font("extrabold", 26), PAPER)
     text(draw, (px + 24, vy + 120), "SSE 실시간 브로드캐스트", font("semibold", 18), PRIMARY_LT)
     text(draw, (px + 24, vy + 150), "키 로테이션 · 자동 쿨다운", font("regular", 16), MUTED2)
-    text(draw, (px + 24, vy + 178), "fleet 신호등 통합", font("regular", 16), MUTED2)
+    text(draw, (px + 24, vy + 178), "에이전트들 신호등 통합", font("regular", 16), MUTED2)
 
     # SSE connector between proxy and vault
     sse_x1 = px + inner_w // 2
@@ -643,7 +643,7 @@ def s05_architecture(logo):
     strip_h = 80
     strip_box = [MARGIN_X, strip_y, W - MARGIN_X, strip_y + strip_h]
     draw.rounded_rectangle(strip_box, radius=20, fill=INK)
-    metrics = [("4", "API 포맷"), ("170+", "모델"), ("17", "로케일"), ("4 머신+", "fleet 운영"), ("AES-GCM", "키 금고")]
+    metrics = [("4", "API 포맷"), ("170+", "모델"), ("17", "로케일"), ("4 머신+", "에이전트들 운영"), ("AES-GCM", "키 금고")]
     seg_w = (W - MARGIN_X * 2) // len(metrics)
     for i, (n, l) in enumerate(metrics):
         seg_x = MARGIN_X + i * seg_w
@@ -914,7 +914,7 @@ def s10_proof(logo):
     draw = ImageDraw.Draw(canvas)
     watermark_logo(canvas, logo)
 
-    big_title(draw, "실측 운영 — 끊김 없는 fleet")
+    big_title(draw, "실측 운영 — 끊김 없는 에이전트들")
 
     # central vault on bottom-center, 4 host nodes on top forming a fan
     cy = 480
@@ -985,7 +985,7 @@ def s10_proof(logo):
     strip_h = 100
     strip_box = [MARGIN_X, strip_y, W - MARGIN_X, strip_y + strip_h]
     draw.rounded_rectangle(strip_box, radius=20, fill=INK)
-    metrics = [("4+", "fleet 머신"), ("12", "활성 에이전트"), ("100%", "신호등 정직성"),
+    metrics = [("4+", "에이전트들 머신"), ("12", "활성 에이전트"), ("100%", "신호등 정직성"),
                ("1-3s", "SSE 지연"), ("∞", "수평 확장")]
     seg_w = (W - MARGIN_X * 2) // len(metrics)
     for i, (n, l) in enumerate(metrics):
@@ -1102,7 +1102,7 @@ def s12_compare(logo):
         ("AES-GCM 암호화 키 금고",          "✓",           "✗",         "✗",               "✗"),
         ("4 API 포맷 동시 노출",             "✓",           "✓",         "✗",               "✗"),
         ("Strict-by-default + fallback 헤더","✓",           "✗",         "✗",               "✗"),
-        ("SSE 실시간 fleet 동기화",          "✓",           "✗",         "✗",               "✗"),
+        ("SSE 실시간 에이전트들 동기화",     "✓",           "✗",         "✗",               "✗"),
         ("에이전트 페르소나 · 음성 통합",   "✓",           "✗",         "✗",               "✗"),
         ("17 개국 다국어 UI",                "✓",           "✗",         "✗",               "✗"),
         ("한 바이너리 · 무의존",             "✓",           "Python",    "JS",              "언어별"),
@@ -1210,7 +1210,7 @@ def s13_roadmap(logo):
                 ("멀티벤더 라우팅 · 키 금고 핵심", "완료"),
                 ("호스트 기반 신호등",            "완료"),
                 ("Strict-by-default 라우팅",       "완료"),
-                ("4 머신 fleet 안정 가동",          "완료"),
+                ("4 머신 에이전트들 안정 가동",     "완료"),
             ],
             "color": SUCCESS,
         },

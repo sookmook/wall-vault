@@ -561,7 +561,7 @@ func normalizeOpenClawProviders(cfg map[string]interface{}, vaultToken, caBundle
 
 // relaxChannelStaleThreshold raises the gateway's channel-stale window
 // when the operator left it unset (or set it lower than 60 minutes).
-// Mini gateway 2026-05-02 was caught in a 300s SIGTERM-restart loop:
+// Observed: a gateway was caught in a 300s SIGTERM-restart loop:
 // OpenClaw's health monitor flagged the telegram socket as stale every
 // 5 minutes when idle, and the gateway terminated for restart while a
 // pending TUI/Telegram turn was mid-flight. Moving the threshold to
@@ -592,8 +592,8 @@ func relaxChannelStaleThreshold(cfg map[string]interface{}) bool {
 
 // alignActiveMemoryModelToAgentDefault rewrites
 // plugins.entries.active-memory.config.model to match
-// agents.defaults.model.primary when the two diverge. Triggered by mini
-// 2026-05-02: active-memory shipped with a hard-coded default of
+// agents.defaults.model.primary when the two diverge.
+// Triggered when active-memory shipped with a hard-coded default of
 // `custom/gemini-2.5-flash-lite`, but the host has no google credentials in
 // vault (services: [anthropic, ollama, lmstudio]), so every plugin tick
 // failed to dispatch. The plugin's failure is then misread by the

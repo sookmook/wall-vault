@@ -145,7 +145,7 @@ def main():
     title_font = load_font(48, bold=True)
     sub_font = load_font(24)
     draw.text((margin, 30), "벽금고 통합 대시보드", font=title_font, fill=PALETTE["ink"])
-    draw.text((margin, 86), "fleet 전 에이전트 신호등 — host 매칭 + agent_type 별 liveness", font=sub_font, fill=PALETTE["muted"])
+    draw.text((margin, 86), "에이전트들 신호등 — host 매칭 + agent_type 별 liveness", font=sub_font, fill=PALETTE["muted"])
 
     for i, (name, agent_type, status, model) in enumerate(CARDS):
         col = i % cols

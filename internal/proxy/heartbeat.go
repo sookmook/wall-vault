@@ -233,7 +233,7 @@ func (s *Server) sendHeartbeat() {
 //                   intermittently and talks to Anthropic via OAuth
 //                   bypassing this proxy, so a pgrep-based probe
 //                   produces false reds during normal idle periods —
-//                   exactly the "babi2 잘 하고 있는데 왜 빨간불"
+//                   exactly the "agent is healthy but shown red"
 //                   complaint v0.2.25 resolves. From the operator's
 //                   view a fleet member that hasn't been typed into
 //                   in an hour is still "the agent on that box".
@@ -241,7 +241,7 @@ func (s *Server) sendHeartbeat() {
 //   - cline         pgrep -x code (VSCode binary). Cline is a VSCode
 //                   extension; with VSCode closed the extension cannot
 //                   be running. Strict probe is the v0.2.24 fix for
-//                   "클라인은 작동도 안 했는데 초록불" and we keep it.
+//                   "cline never ran but is shown green" and we keep it.
 //
 //   - openclaw      pgrep -f openclaw-gateway (long-lived daemon).
 //   - nanoclaw      systemctl --user is-active nanoclaw (systemd unit).

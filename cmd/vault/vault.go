@@ -77,7 +77,7 @@ func runVault(cfg *config.Config, cfgPath string) {
 	}()
 
 	// Bootstrap (plain-HTTP CA distribution) — runs alongside the main
-	// vault listener so distributed-mode hosts (mini in our fleet) that
+	// vault listener so distributed-mode hosts (e.g. macOS hosts) that
 	// invoke `wall-vault vault` directly via launchd / systemd still get
 	// the listener. main.go's runAll() also handles this for `wall-vault
 	// start`; both call sites are mandatory because operators stick to

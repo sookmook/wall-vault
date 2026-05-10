@@ -18,7 +18,7 @@ footer: "wall-vault · 투자·제휴 피칭 · 2026"
 
 ## AI 가 절대 끊기지 않는 멀티벤더 게이트웨이
 
-<div class="tagline">키 금고 · 지능형 라우팅 · fleet observability — 한 바이너리에</div>
+<div class="tagline">키 금고 · 지능형 라우팅 · 에이전트들 가시성 — 한 바이너리에</div>
 
 ---
 
@@ -47,7 +47,7 @@ footer: "wall-vault · 투자·제휴 피칭 · 2026"
 
 <div>
 
-> "키 하나 죽으면 fleet 전체가 멈춥니다.<br/>그게 어디서 어떻게 멈췄는지조차 보이지 않습니다."
+> "키 하나 죽으면 에이전트들 전체가 멈춥니다.<br/>그게 어디서 어떻게 멈췄는지조차 보이지 않습니다."
 
 </div>
 
@@ -220,7 +220,7 @@ footer: "wall-vault · 투자·제휴 피칭 · 2026"
 <tr><td>AES-GCM 암호화 키 금고</td>          <td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
 <tr><td>4 API 포맷 동시 노출</td>            <td class="yes">✓</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
 <tr><td>Strict-by-default + fallback 헤더</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
-<tr><td>SSE 실시간 fleet 동기화</td>         <td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
+<tr><td>SSE 실시간 에이전트들 동기화</td>     <td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
 <tr><td>에이전트 페르소나 · 음성 통합</td>   <td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
 <tr><td>17 개국 다국어 UI</td>               <td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td></tr>
 <tr><td>한 바이너리·무의존</td>              <td class="yes">✓</td><td class="no">Python</td><td class="no">JS</td><td class="no">언어별</td></tr>

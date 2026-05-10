@@ -725,6 +725,15 @@ func (s *Server) handleAdminClientsID(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		// When ModelOverride is explicitly cleared (operator chose "use service
+		// default" in the dashboard), also clear the v0.1 legacy DefaultModel
+		// so the proxy fallback chain can reach the service-level default
+		// instead of stopping at a stale legacy value carried over from a
+		// pre-v0.2 install.
+		if inp.ModelOverride != nil && *inp.ModelOverride == "" {
+			empty := ""
+			inp.DefaultModel = &empty
+		}
 		if err := s.store.UpdateClient(id, inp); err != nil {
 			jsonError(w, err.Error(), http.StatusNotFound)
 			return

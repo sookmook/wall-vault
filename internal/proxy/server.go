@@ -461,8 +461,8 @@ func NewServer(cfg *config.Config) *Server {
 
 	// Sanitize ~/.openclaw/openclaw.json once at boot. OpenClaw 2026.4.29
 	// rejects model entries with empty `id`, which historically slipped
-	// past pre-guard versions of applyOpenClawConfig — we observed the
-	// host-A gateway crash-loop on 2026-05-01 from a single such entry.
+	// past pre-guard versions of applyOpenClawConfig — we observed a
+	// host-A gateway crash-loop from a single such entry.
 	// No-op for hosts that don't run OpenClaw (most of the fleet).
 	runStartupSanitize()
 
@@ -895,6 +895,16 @@ func (s *Server) syncFromVault() {
 	if err := json.NewDecoder(resp.Body).Decode(&clients); err != nil {
 		return
 	}
+	// Refresh the service-level defaults *before* walking clients so the
+	// per-client effMdl fallback (ModelOverride → DefaultModel →
+	// serviceDefaults[svc]) can resolve to the live service default in the
+	// same sync that just cleared a client's legacy default_model. Without
+	// this ordering, clearing a client's model in vault would leave s.model
+	// blank for one full sync cycle and OpenClaw would skip its config
+	// rewrite (newMdl == oldMdl when both are blank).
+	if err := s.syncAllowedServices(); err != nil {
+		log.Printf("[sync] 서비스 목록 동기화 실패: %v", err)
+	}
 	// Build the co-hosted agent set for this proxy. The operator-assigned
 	// Client.Host field drives inclusion — every client whose Host matches
 	// os.Hostname() is reported in every heartbeat's ActiveClients, so one
@@ -972,6 +982,9 @@ func (s *Server) syncFromVault() {
 			if effMdl == "" {
 				effMdl = c.DefaultModel
 			}
+			if effMdl == "" {
+				effMdl = s.serviceDefaults[effSvc]
+			}
 			if effMdl != "" {
 				s.model = effMdl
 			}
@@ -1011,11 +1024,6 @@ func (s *Server) syncFromVault() {
 	// sync keys
 	if err := s.keyMgr.SyncFromVault(); err != nil {
 		log.Printf("[sync] 키 동기화 실패: %v", err)
-	}
-
-	// sync proxy-enabled services
-	if err := s.syncAllowedServices(); err != nil {
-		log.Printf("[sync] 서비스 목록 동기화 실패: %v", err)
 	}
 }
 
@@ -1612,8 +1620,16 @@ func (s *Server) handleGemini(w http.ResponseWriter, r *http.Request) {
 
 	if urlModel := extractModelFromPath(r.URL.Path); urlModel != "" {
 		if strings.HasPrefix(urlModel, "gemini-") || strings.HasPrefix(urlModel, "gemma-") {
-			svc = "google"
-			mdl = urlModel
+			// Promote to google by default, but a local quantized variant
+			// (GGUF file, Unsloth Dynamic, q*/iq*/bf16/MXFP markers) belongs
+			// on llamacpp — Google's API rejects those names with HTTP 400
+			// "unexpected model name format".
+			if isLocalQuantizedModel(urlModel) {
+				mdl = urlModel
+			} else {
+				svc = "google"
+				mdl = urlModel
+			}
 		}
 	}
 
@@ -3230,6 +3246,13 @@ func inferServiceFromBareModel(mdl string) string {
 	if strings.Contains(mdl, ":") {
 		return "ollama"
 	}
+	// Local quantized variants of any cloud model (e.g. unsloth GGUF Gemma,
+	// Llama, Qwen) live on llamacpp — checked before the cloud-prefix table
+	// so a name like "gemma-4-26B-A4B-it-UD-Q4_K_M.gguf" doesn't get force
+	// routed to Google's API and 400 with "unexpected model name format".
+	if isLocalQuantizedModel(mdl) {
+		return "llamacpp"
+	}
 	switch {
 	case strings.HasPrefix(mdl, "claude-"):
 		return "anthropic"
@@ -3243,6 +3266,27 @@ func inferServiceFromBareModel(mdl string) string {
 		return "openai"
 	}
 	return ""
+}
+
+// isLocalQuantizedModel returns true when the model name carries markers
+// indicating a locally-served quantized weight file (GGUF, Unsloth Dynamic,
+// k-quant suffixes, IQ-quant suffixes, bf16, MXFP). Such names belong on
+// llamacpp / lmstudio / vllm, not on a cloud provider's API.
+func isLocalQuantizedModel(name string) bool {
+	n := strings.ToLower(name)
+	if strings.Contains(n, ".gguf") || strings.Contains(n, "-ud-") {
+		return true
+	}
+	for _, marker := range []string{
+		"-q2_", "-q3_", "-q4_", "-q5_", "-q6_", "-q8_",
+		"-iq1_", "-iq2_", "-iq3_", "-iq4_",
+		"-bf16", "-mxfp4", "-fp8",
+	} {
+		if strings.Contains(n, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // stripControlTokens removes model-internal delimiter tokens that should not

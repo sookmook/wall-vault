@@ -7,11 +7,11 @@ import (
 )
 
 // tokenAuthFail used to fall through to the same generic "invalid token" 401
-// regardless of why the lookup failed. Board #43 from 바비2호 documented
-// real ops cost from that — they spent time chasing IP whitelist when the
-// actual cause was vault-side. Each branch below pins the wire-format
-// message a caller sees so a future refactor that conflates them again
-// fails the test instead of silently regressing the diagnostics.
+// regardless of why the lookup failed. An earlier reviewer report documented
+// real ops cost — operators spent time chasing IP whitelist when the actual
+// cause was vault-side. Each branch below pins the wire-format message a
+// caller sees so a future refactor that conflates them again fails the
+// test instead of silently regressing the diagnostics.
 
 func TestTokenAuthFail_NotRegistered(t *testing.T) {
 	w := httptest.NewRecorder()

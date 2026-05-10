@@ -206,7 +206,7 @@ func TestRepairDanglingPrimary_NoChangeWhenValid(t *testing.T) {
 }
 
 func TestUpdateOpenClawJSON_EmptyModelIsNoop(t *testing.T) {
-	// Regression for host-A 2026-05-01: SSE config_change fired before a
+	// Regression for host-A: SSE config_change fired before a
 	// real model had been resolved, and updateOpenClawJSON wrote
 	// primary="custom/" which OpenClaw rejected on every gateway restart.
 	// We can't easily exercise the full function (it touches $HOME), but
@@ -221,7 +221,7 @@ func TestUpdateOpenClawJSON_EmptyModelIsNoop(t *testing.T) {
 }
 
 func TestNormalizeProviderAuth_RewritesStaleApiKey(t *testing.T) {
-	// host-A/host-B 2026-05-02 — providers.{custom,anthropic,google}.apiKey
+	// host-A/host-B — providers.{custom,anthropic,google}.apiKey
 	// was "dummy"/"proxy-managed"/"" with authHeader=false, left over from
 	// pre-v0.2.37 installs. OpenClaw faithfully sent those literals and
 	// every call 401'd with `token not registered with vault`.
@@ -293,7 +293,7 @@ func TestNormalizeProviderAuth_NoTokenSkips(t *testing.T) {
 }
 
 func TestNormalizeOpenClawProviders_GoogleStaleUpstream(t *testing.T) {
-	// host-B 2026-05-02 — google provider baseUrl pointed at the mini's
+	// host-B — google provider baseUrl pointed at the upstream
 	// ollama (http://192.168.0.10:11434/v1), which made every OpenClaw
 	// google call land on ollama and 404 with "model not found".
 	cfg := map[string]interface{}{
@@ -314,8 +314,8 @@ func TestNormalizeOpenClawProviders_GoogleStaleUpstream(t *testing.T) {
 	}
 }
 
-func TestNormalizeOpenClawProviders_RaspiSnapshot(t *testing.T) {
-	// Mirror of the host-A 2026-05-01 broken state: anthropic + custom
+func TestNormalizeOpenClawProviders_HostASnapshot(t *testing.T) {
+	// Mirror of host-A's broken state: anthropic + custom
 	// pointing at the upstream ollama, custom.models with 11 dup-id entries
 	// plus one dangling-name entry.
 	cfg := map[string]interface{}{
@@ -356,7 +356,7 @@ func TestNormalizeOpenClawProviders_RaspiSnapshot(t *testing.T) {
 }
 
 func TestHealAgentSpecificModels_RewritesStaleCache(t *testing.T) {
-	// Simulate the mini 2026-05-02 state: per-agent cache holds
+	// Simulate host-B's state: per-agent cache holds
 	// baseUrl=http://localhost:56244/v1 + apiKey=dummy + authHeader=false
 	// while the main openclaw.json was already healed to https + real token.
 	tmp := t.TempDir()

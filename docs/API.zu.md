@@ -466,7 +466,7 @@ Uhlu lwawo wonke okhiye be-API ababhaliswe (ngaphandle kokhiye bombhalo ovulekil
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "Ukhiye omkhulu",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ Ukubhalisa ukhiye omusha we-API. Masinyane ngemva kokubhalisa isigameko se-SSE `
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "Ukhiye omkhulu",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Ukwengeza ukhiye we-Google
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"Ukhiye omkhulu","daily_limit":1000}'
 
 # Ukwengeza ukhiye we-OpenAI
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # Ukwengeza ukhiye we-OpenRouter
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"Ukhiye we-OR"}'
 
 # Ukususa ukhiye (SSE key_deleted iyasakazwa)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

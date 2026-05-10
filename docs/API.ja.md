@@ -466,7 +466,7 @@ data: {"type":"usage_reset","data":{"time":"2026-03-13T00:00:30Z"}}
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "メインキー",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ data: {"type":"usage_reset","data":{"time":"2026-03-13T00:00:30Z"}}
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "メインキー",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Google キー追加
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"メインキー","daily_limit":1000}'
 
 # OpenAI キー追加
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # OpenRouter キー追加
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"ORキー"}'
 
 # キー削除（SSE key_deleted ブロードキャスト）
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

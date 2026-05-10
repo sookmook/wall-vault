@@ -49,7 +49,13 @@ Impress 어디든 올려서 확인. PDF 가 필요하면 PowerPoint 의 "다른 
 않도록 설계돼 있습니다. 외부 공개 직전 검증:
 
 ```bash
-grep -rE "192\\.168\\.|SMPC|dhvmszmffh|c34cec|모토코|작순이|미니|라즈" docs/promo/ \
+# Deny-list patterns (LAN ranges, hostname prefixes, internal hashes,
+# persona/role tokens) are kept in a local-only file outside the repo.
+# The repo only ships the public-safe baseline (RFC1918 ranges).
+TOKENS_FILE="${PROMO_DENY_TOKENS:-$HOME/.wall-vault/promo-deny-tokens}"
+EXTRA=""
+[ -f "$TOKENS_FILE" ] && EXTRA="|$(tr '\\n' '|' < "$TOKENS_FILE" | sed 's/|$//')"
+grep -rE "192\\.168\\.${EXTRA}" docs/promo/ \
   | grep -v "Binary file" | grep -v "\\.png" \
   && exit 1 || true
 ```

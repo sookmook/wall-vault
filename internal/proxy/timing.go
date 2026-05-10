@@ -13,8 +13,9 @@ import (
 // v0.2.23 removal turned out to be premature: the "0 queue overflow events
 // in 24h" data point that justified removal was an artifact of the
 // v0.2.26-fixed ollama URL bug — requests weren't reaching the queue at
-// all. Once routing was fixed the four-proxy fan-in actually hit mini's
-// Ollama and the host hung, exactly the pattern v0.2.21 was preventing.
+// all. Once routing was fixed the four-proxy fan-in actually hit the
+// shared Ollama backend and the host hung, exactly the pattern v0.2.21
+// was preventing.
 //
 // Four nodes with 500ms bucket spacing average ~125ms apart; 200ms of
 // additive jitter smooths residual hash collisions. Total worst case

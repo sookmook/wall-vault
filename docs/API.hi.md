@@ -466,7 +466,7 @@ data: {"type":"usage_reset","data":{"time":"2026-03-13T00:00:30Z"}}
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "मुख्य कुंजी",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ data: {"type":"usage_reset","data":{"time":"2026-03-13T00:00:30Z"}}
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "मुख्य कुंजी",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Google की जोड़ें
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"मुख्य कुंजी","daily_limit":1000}'
 
 # OpenAI की जोड़ें
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # OpenRouter की जोड़ें
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR कुंजी"}'
 
 # की हटाएँ (SSE key_deleted ब्रॉडकास्ट)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

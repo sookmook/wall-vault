@@ -466,7 +466,7 @@ Lista de todas as chaves API registradas (sem chaves em texto puro).
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "Chave principal",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ Registro de nova chave API. O evento SSE `key_added` é transmitido imediatament
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "Chave principal",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Adicionar chave Google
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"Chave principal","daily_limit":1000}'
 
 # Adicionar chave OpenAI
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # Adicionar chave OpenRouter
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"Chave OR"}'
 
 # Excluir chave (broadcast SSE key_deleted)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

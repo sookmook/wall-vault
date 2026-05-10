@@ -466,7 +466,7 @@ List all registered API keys (plaintext keys excluded).
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "Main Key",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ Register a new API key. An SSE `key_added` event is broadcast immediately upon r
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "Main Key",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Add Google key
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"Main Key","daily_limit":1000}'
 
 # Add OpenAI key
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # Add OpenRouter key
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR Key"}'
 
 # Delete key (SSE key_deleted broadcast)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

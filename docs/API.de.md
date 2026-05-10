@@ -466,7 +466,7 @@ Alle registrierten API-Schlüssel auflisten (Klartextschlüssel ausgeschlossen).
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "Hauptschlüssel",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ Neuen API-Schlüssel registrieren. Ein SSE-`key_added`-Ereignis wird sofort bei 
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "Hauptschlüssel",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Google-Schlüssel hinzufügen
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"Hauptschlüssel","daily_limit":1000}'
 
 # OpenAI-Schlüssel hinzufügen
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # OpenRouter-Schlüssel hinzufügen
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR-Schlüssel"}'
 
 # Schlüssel löschen (SSE key_deleted Broadcast)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

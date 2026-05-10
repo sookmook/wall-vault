@@ -466,7 +466,7 @@ Jerin dukkan makullan API da aka yi rajista (ban da makulli a fayyace).
   {
     "id": "key-abc123",
     "service": "google",
-    "label": "메인 키",
+    "label": "Babban Maɓalli",
     "today_usage": 42,
     "today_attempts": 45,
     "daily_limit": 1000,
@@ -499,7 +499,7 @@ Yin rajistar sabon makullin API. Nan take bayan rajista SSE `key_added` abin da 
 {
   "service": "google",
   "key": "AIzaSy...",
-  "label": "메인 키",
+  "label": "Babban Maɓalli",
   "daily_limit": 1000
 }
 ```
@@ -995,7 +995,7 @@ curl -H "$ADMIN" https://localhost:56243/admin/keys
 # Ƙara makullin Google
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"google","key":"AIzaSy...","label":"메인 키","daily_limit":1000}'
+  -d '{"service":"google","key":"AIzaSy...","label":"Babban Maɓalli","daily_limit":1000}'
 
 # Ƙara makullin OpenAI
 curl -X POST https://localhost:56243/admin/keys \
@@ -1005,7 +1005,7 @@ curl -X POST https://localhost:56243/admin/keys \
 # Ƙara makullin OpenRouter
 curl -X POST https://localhost:56243/admin/keys \
   -H "$ADMIN" -H "Content-Type: application/json" \
-  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"OR 키"}'
+  -d '{"service":"openrouter","key":"sk-or-v1-...","label":"Maɓallin OR"}'
 
 # Share makulli (SSE key_deleted watsa)
 curl -X DELETE https://localhost:56243/admin/keys/key-abc123 -H "$ADMIN"

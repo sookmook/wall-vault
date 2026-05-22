@@ -104,6 +104,8 @@
   "cfg_openclaw_title": "Copy config for ~/.openclaw/openclaw.json",
   "cfg_nanoclaw": "🦀 Copy NanoClaw Config",
   "cfg_nanoclaw_title": "Copy config for ~/.openclaw/openclaw.json",
+  "cfg_hermes": "⚡ Copy Hermes Config",
+  "cfg_hermes_title": "Copy config for ~/.hermes/.env",
   "cfg_claude": "🟠 Copy Claude Code Config",
   "cfg_claude_title": "Copy config for ~/.claude/settings.json",
   "cfg_cursor": "⌨ Copy Cursor Config",

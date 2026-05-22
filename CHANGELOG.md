@@ -8,6 +8,48 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.85] — 2026-05-22
+
+### Added
+
+- `hermes` agent type (NousResearch/hermes-agent v0.14+) selectable in
+  the client_create dropdown at index 1, immediately after `openclaw`.
+  `applyHermesConfig` writes credentials in two layers, both required
+  for the gateway's chat-completions client to authenticate against
+  the proxy:
+  - `~/.hermes/.env` — `HERMES_INFERENCE_PROVIDER=custom`,
+    `CUSTOM_API_KEY`, `CUSTOM_BASE_URL`, plus `OPENAI_*` aliases for
+    tools that read those names directly.
+  - `~/.hermes/config.yaml` — `model.{default,provider,base_url,
+    api_key}` patched line-by-line via `patchHermesConfigYAML`, which
+    preserves the heavily-commented upstream template (no YAML
+    unmarshal/marshal round-trip).
+
+  The YAML `api_key` is load-bearing. For `provider: custom` Hermes'
+  runtime_provider falls back to the literal string `"no-key-required"`
+  (15 chars, starts with `no-k`) when no key is found through its
+  preferred path, and the vault returns `401 token not registered with
+  vault` for that fallback. Writing only the dotenv reproduces the 401
+  every time — both layers are mandatory until upstream Hermes
+  consolidates credential lookup.
+
+- Hermes process liveness detection in `heartbeat.go`. Both
+  `detectClientAlive("hermes")` and `detectAgentProcess("hermes")` run
+  `pgrep -f "hermes_cli.main"` because the systemd unit invokes
+  `<venv>/bin/python -m hermes_cli.main gateway run --replace` — not
+  `<venv>/bin/hermes` (the latter is a one-shot CLI wrapper that
+  exits, while the gateway is the long-lived process).
+
+- i18n keys `cfg_hermes` / `cfg_hermes_title` (ko/en).
+
+### Notes
+
+- Hermes' Python OpenAI SDK rejects the proxy's self-signed cert, so
+  the operator-side base_url should point at the loopback HTTP
+  companion (`http://127.0.0.1:56245/v1`), not HTTPS `:56244`. The
+  loopback listener was constrained to `127.0.0.1`-only in v0.2.84,
+  which keeps this safe.
+
 ## [0.2.84] — 2026-05-08
 
 Three opt-in defenses for proxy hosts that may be reachable beyond LAN.

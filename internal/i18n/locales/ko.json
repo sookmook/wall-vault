@@ -104,6 +104,8 @@
   "cfg_openclaw_title": "~/.openclaw/openclaw.json 설정 복사",
   "cfg_nanoclaw": "🦀 NanoClaw 설정 복사",
   "cfg_nanoclaw_title": "~/.openclaw/openclaw.json 설정 복사",
+  "cfg_hermes": "⚡ Hermes 설정 복사",
+  "cfg_hermes_title": "~/.hermes/.env 설정 복사",
   "cfg_claude": "🟠 Claude Code 설정 복사",
   "cfg_claude_title": "~/.claude/settings.json 설정 복사",
   "cfg_cursor": "⌨ Cursor 설정 복사",

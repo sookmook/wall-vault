@@ -77,6 +77,8 @@ func (s *Server) handleAgentApply(w http.ResponseWriter, r *http.Request) {
 		path, err = applyOpenClawConfig(body.BaseURL, body.Model, token)
 	case "nanoclaw":
 		path, err = applyNanoclawConfig(body.BaseURL, body.Model, token)
+	case "hermes":
+		path, err = applyHermesConfig(body.BaseURL, body.Model, token)
 	case "econoworld":
 		s.mu.RLock()
 		ollamaThink := s.serviceReasoning["ollama"]
@@ -478,6 +480,125 @@ func applyNanoclawConfig(baseURL, _ /*model*/, token string) (string, error) {
 		return "", fmt.Errorf("write %s: %w", path, err)
 	}
 	return path, nil
+}
+
+// ── Hermes ────────────────────────────────────────────────────────────────────
+
+// applyHermesConfig writes wall-vault proxy settings into Hermes Agent
+// (NousResearch/hermes-agent v0.14+). Hermes loads ~/.hermes/.env via
+// hermes_cli.env_loader, then runtime_provider.py picks credentials in
+// this priority order for provider="custom":
+//
+//  1. ~/.hermes/config.yaml  → model.api_key  / model.base_url
+//  2. ~/.hermes/.env         → CUSTOM_API_KEY / CUSTOM_BASE_URL
+//  3. fallback string "no-key-required"  (← what wall-vault rejects with 401)
+//
+// Empirically OPENAI_API_KEY in .env did NOT override the fallback for the
+// gateway's chat-completions client, so we write both layers:
+//   - dotenv: HERMES_INFERENCE_PROVIDER, CUSTOM_API_KEY, CUSTOM_BASE_URL
+//     (and OPENAI_* aliases for tools that look those up directly)
+//   - YAML:  model.default / model.provider / model.base_url / model.api_key
+//
+// Other lines in .env (TELEGRAM_BOT_TOKEN etc.) and other YAML keys are
+// preserved untouched. .env is re-issued at 0600 since it holds the
+// bot token + wall-vault credential.
+func applyHermesConfig(baseURL, model, token string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	envPath := filepath.Join(home, ".hermes", ".env")
+
+	var lines []string
+	if data, err := os.ReadFile(envPath); err == nil {
+		lines = strings.Split(string(data), "\n")
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("read %s: %w", envPath, err)
+	}
+
+	setLine := func(in []string, key, value string) []string {
+		prefix := key + "="
+		for i, l := range in {
+			if strings.HasPrefix(l, prefix) {
+				in[i] = prefix + value
+				return in
+			}
+		}
+		return append(in, prefix+value)
+	}
+	lines = setLine(lines, "HERMES_INFERENCE_PROVIDER", "custom")
+	lines = setLine(lines, "CUSTOM_API_KEY", token)
+	lines = setLine(lines, "CUSTOM_BASE_URL", baseURL)
+	lines = setLine(lines, "OPENAI_API_KEY", token)
+	lines = setLine(lines, "OPENAI_BASE_URL", baseURL)
+
+	out := strings.Join(lines, "\n") + "\n"
+	if err := os.MkdirAll(filepath.Dir(envPath), 0o700); err != nil {
+		return "", fmt.Errorf("mkdir %s: %w", filepath.Dir(envPath), err)
+	}
+	if err := os.WriteFile(envPath, []byte(out), 0o600); err != nil {
+		return "", fmt.Errorf("write %s: %w", envPath, err)
+	}
+
+	// Best-effort config.yaml model section patch — required because the
+	// gateway's chat-completions client reads api_key from the YAML, not
+	// the dotenv. Skip silently if the file is missing (first-run Hermes
+	// will create it via `hermes setup`); never fail /agent/apply on YAML
+	// edit issues since the dotenv write above is the load-bearing piece.
+	yamlPath := filepath.Join(home, ".hermes", "config.yaml")
+	if data, err := os.ReadFile(yamlPath); err == nil {
+		_ = patchHermesConfigYAML(yamlPath, data, baseURL, model, token)
+	}
+
+	return envPath, nil
+}
+
+// patchHermesConfigYAML rewrites the top-level model.{default,provider,
+// base_url,api_key} keys in Hermes' config.yaml without disturbing
+// comments or other sections. Line-based edit instead of YAML
+// unmarshal/marshal so the heavily-commented template stays readable.
+func patchHermesConfigYAML(path string, data []byte, baseURL, model, token string) error {
+	lines := strings.Split(string(data), "\n")
+	inModel := false
+	hasAPIKey := false
+	var baseURLLine int = -1
+	for i, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if strings.HasPrefix(l, "model:") {
+			inModel = true
+			continue
+		}
+		if inModel {
+			// Top-level model section ends at the next column-0 key
+			if len(l) > 0 && l[0] != ' ' && l[0] != '\t' && trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				inModel = false
+				continue
+			}
+			if strings.HasPrefix(trimmed, "default:") && model != "" {
+				lines[i] = "  default: " + model
+			} else if strings.HasPrefix(trimmed, "provider:") {
+				lines[i] = "  provider: custom"
+			} else if strings.HasPrefix(trimmed, "base_url:") {
+				lines[i] = "  base_url: " + baseURL
+				baseURLLine = i
+			} else if strings.HasPrefix(trimmed, "api_key:") {
+				lines[i] = `  api_key: "` + token + `"`
+				hasAPIKey = true
+			}
+		}
+	}
+	if !hasAPIKey && baseURLLine >= 0 {
+		// Insert api_key line immediately after base_url
+		newLines := make([]string, 0, len(lines)+1)
+		newLines = append(newLines, lines[:baseURLLine+1]...)
+		newLines = append(newLines, `  api_key: "`+token+`"`)
+		newLines = append(newLines, lines[baseURLLine+1:]...)
+		lines = newLines
+	}
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o600)
 }
 
 // isValidAgentToken checks whether a Bearer token is authorized to call /agent/apply.

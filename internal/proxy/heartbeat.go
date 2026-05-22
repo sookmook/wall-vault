@@ -245,6 +245,7 @@ func (s *Server) sendHeartbeat() {
 //
 //   - openclaw      pgrep -f openclaw-gateway (long-lived daemon).
 //   - nanoclaw      systemctl --user is-active nanoclaw (systemd unit).
+//   - hermes        pgrep -f hermes_cli.main (gateway/chat process).
 //   - econoworld    false — self-reports through its own heartbeat,
 //                   must not be claimed via hostAgents.
 //   - other         false — don't fake green for an unknown type.
@@ -258,6 +259,8 @@ func detectClientAlive(agentType string) bool {
 		return exec.Command("pgrep", "-f", "openclaw-gateway").Run() == nil
 	case "nanoclaw":
 		return exec.Command("systemctl", "--user", "is-active", "--quiet", "nanoclaw").Run() == nil
+	case "hermes":
+		return exec.Command("pgrep", "-f", "hermes_cli.main").Run() == nil
 	}
 	return false
 }
@@ -277,6 +280,11 @@ func detectAgentProcess(agentType string) *bool {
 		return &alive
 	case "openclaw":
 		if err := exec.Command("pgrep", "-f", "openclaw-gateway").Run(); err != nil {
+			return &dead
+		}
+		return &alive
+	case "hermes":
+		if err := exec.Command("pgrep", "-f", "hermes_cli.main").Run(); err != nil {
 			return &dead
 		}
 		return &alive

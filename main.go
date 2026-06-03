@@ -139,7 +139,19 @@ func runAll() {
 	// start proxy
 	proxySrv := iproxy.NewServer(cfg)
 	proxyAddr := fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port)
-	proxyHTTP := &http.Server{Addr: proxyAddr, Handler: proxySrv.Handler()}
+	// ReadHeaderTimeout caps the header-read phase so a half-open client
+	// can't pin a goroutine forever. ReadTimeout / WriteTimeout stay 0 to
+	// keep long streaming responses (Ollama cold-start, llama.cpp slow
+	// generation) intact — the body phase is bounded by the per-request
+	// context deadline, not the server-wide timeout. IdleTimeout reclaims
+	// keep-alive conns whose client went away without FIN/RST (WSL2
+	// portproxy flap, Windows socket forced close, etc.).
+	proxyHTTP := &http.Server{
+		Addr:              proxyAddr,
+		Handler:           proxySrv.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	proxyScheme := "http"
 	if cfg.Proxy.TLS.Enabled {
 		proxyScheme = "https"
@@ -163,7 +175,12 @@ func runAll() {
 	var proxyPlainHTTP *http.Server
 	if cfg.Proxy.TLS.Enabled && cfg.Proxy.PlainPort > 0 {
 		plainAddr := fmt.Sprintf("127.0.0.1:%d", cfg.Proxy.PlainPort)
-		proxyPlainHTTP = &http.Server{Addr: plainAddr, Handler: proxySrv.Handler()}
+		proxyPlainHTTP = &http.Server{
+			Addr:              plainAddr,
+			Handler:           proxySrv.Handler(),
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       120 * time.Second,
+		}
 		go func() {
 			log.Printf("[proxy] plain-HTTP companion 시작 :%d (loopback only)", cfg.Proxy.PlainPort)
 			err := proxyPlainHTTP.ListenAndServe()

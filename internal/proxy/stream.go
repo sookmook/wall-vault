@@ -322,7 +322,7 @@ func (s *Server) streamPluginAsGemini(ctx context.Context, w http.ResponseWriter
 	if plugin.TLSInternalCA {
 		client = internalHTTPClient(10 * time.Minute)
 	} else {
-		client = &http.Client{Timeout: 10 * time.Minute}
+		client = s.dispatchSSEHTTP
 	}
 
 	resp, err := client.Do(httpReq)
@@ -447,11 +447,10 @@ func (s *Server) streamOllama(ctx context.Context, w http.ResponseWriter, f http
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	// Match callOllama's budget — local inference with cold model reload
-	// (OLLAMA_KEEP_ALIVE can unload large models between calls) easily
-	// exceeds cfg.Proxy.Timeout's default 60s.
-	client := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := client.Do(httpReq)
+	// Reuse the shared Ollama pool (same 10-minute budget as callOllama).
+	// Sharing keeps keep-alive idle conns hot across stream + non-stream
+	// callers, instead of each stream open paying a fresh handshake.
+	resp, err := s.ollamaHTTP.Do(httpReq)
 	if err != nil {
 		writeGeminiErrorChunk(w, f, fmt.Errorf("Ollama 연결 실패: %w", err))
 		return
@@ -645,11 +644,16 @@ func (s *Server) streamLocalService(
 		httpReq.Header.Set("Authorization", "Bearer "+s.cfg.Proxy.VaultToken)
 	}
 
+	// Internal-CA path keeps its own client (incompatible root CAs).
+	// Default path uses the shared dispatchSSEHTTP pool: Timeout: 0 so
+	// long-running streams aren't cut by a client-wide deadline (caller
+	// ctx already owns the deadline), and the shared Transport keeps
+	// keep-alive working under sustained fan-out to a single upstream.
 	var client *http.Client
 	if plugin != nil && plugin.TLSInternalCA {
 		client = internalHTTPClient(10 * time.Minute)
 	} else {
-		client = &http.Client{Timeout: 10 * time.Minute}
+		client = s.dispatchSSEHTTP
 	}
 
 	resp, err := client.Do(httpReq)

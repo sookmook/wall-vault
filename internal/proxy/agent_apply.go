@@ -873,8 +873,14 @@ func healEconoWorldConfigAt(path, localBaseOrigin string, maxTokens int, stream 
 	changed := false
 
 	// Leg 1 — same-host URL rewrite. Preserve the path suffix (typically
-	// /v1) so we don't drop client-required path components.
-	if localBaseOrigin != "" {
+	// /v1) so we don't drop client-required path components. Skipped when
+	// the config file lives on a Windows mount (/mnt/<letter>/...): the
+	// EconoWorld client is then a Windows-native process and can't reach
+	// wall-vault's plain-HTTP companion (127.0.0.1:<plain_port> binds
+	// inside WSL only — opaque to the Windows TCP stack). Heal leaves the
+	// operator-configured URL alone in that case; the field-fill legs
+	// still run.
+	if localBaseOrigin != "" && !isWindowsMountPath(path) {
 		if cur, _ := compat["base_url"].(string); cur != "" && isLocalProxyBaseURL(cur) {
 			suffix := pathSuffixAfterAuthority(cur)
 			want := strings.TrimRight(localBaseOrigin, "/") + suffix
@@ -1012,6 +1018,25 @@ func splitEconoWorldDirs(workDir string) []string {
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
+
+// isWindowsMountPath reports whether p sits on a WSL mount of a Windows
+// drive (`/mnt/<single-letter>/...`). Used by healEconoWorldConfigAt to
+// opt out of the loopback-companion URL rewrite when the config belongs
+// to a Windows-native client process: the plain-HTTP companion binds
+// 127.0.0.1 inside WSL only, so a Windows-side caller can't reach the
+// rewritten URL.
+func isWindowsMountPath(p string) bool {
+	const prefix = "/mnt/"
+	if !strings.HasPrefix(p, prefix) {
+		return false
+	}
+	rest := p[len(prefix):]
+	if len(rest) < 2 || rest[1] != '/' {
+		return false
+	}
+	c := rest[0]
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
 
 // wslHomeCandidates returns the list of plausible per-user roots for an
 // agent that may live in either the WSL native home or under a Windows user

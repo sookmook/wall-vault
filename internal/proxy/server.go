@@ -128,6 +128,22 @@ type Server struct {
 	// traffic). Built once in NewServer.
 	ollamaHTTP *http.Client
 
+	// dispatchHTTP / dispatchSSEHTTP are shared keep-alive pools for every
+	// non-Ollama upstream call. Before they existed, callLocalService,
+	// streamLocalService and doRequest each constructed a fresh
+	// &http.Client{} per request whose Transport defaulted to
+	// http.DefaultTransport — and DefaultTransport.MaxIdleConnsPerHost is
+	// 2. When a single client (e.g. EconoWorld's 5 s heartbeat) drives
+	// sustained dispatch to one upstream host (a llama.cpp / lmstudio /
+	// vllm / cloud endpoint), the 2-conn limit forces new TCP+TLS
+	// handshakes constantly, piles TIME_WAIT, and eventually starves
+	// ephemeral ports — visible as occasional dispatch stalls. Sharing a
+	// dedicated Transport with MaxIdleConnsPerHost: 20 lets keep-alive
+	// actually work. SSE variant keeps Timeout: 0 so streaming responses
+	// rely on the caller ctx deadline, never the client-wide timeout.
+	dispatchHTTP    *http.Client
+	dispatchSSEHTTP *http.Client
+
 	// servicePools routes each local-service dispatch to whichever instance
 	// hosts the requested model. Keyed by service id. The "ollama" pool uses
 	// /api/tags for discovery; every other local service (lmstudio, vllm,
@@ -237,6 +253,27 @@ func NewServer(cfg *config.Config) *Server {
 		Transport: &http.Transport{
 			MaxIdleConns:        10,
 			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     120 * time.Second,
+		},
+	}
+	// Dispatch pools for everything other than Ollama. Sized larger than
+	// ollamaHTTP because llamacpp / lmstudio / vllm / cloud upstreams can
+	// see more concurrent fan-out from a single bursty client. Separate
+	// Transport instances so SSE long-poll connections don't crowd the
+	// idle slot accounting for short-lived non-stream requests.
+	s.dispatchHTTP = &http.Client{
+		Timeout: cfg.Proxy.Timeout,
+		Transport: &http.Transport{
+			MaxIdleConns:        20,
+			MaxIdleConnsPerHost: 20,
+			IdleConnTimeout:     120 * time.Second,
+		},
+	}
+	s.dispatchSSEHTTP = &http.Client{
+		Timeout: 0, // ctx deadline owns the per-request bound
+		Transport: &http.Transport{
+			MaxIdleConns:        20,
+			MaxIdleConnsPerHost: 20,
 			IdleConnTimeout:     120 * time.Second,
 		},
 	}
@@ -738,6 +775,7 @@ const (
 	tokenLookupVaultUnreachable                         // network / dial / timeout
 	tokenLookupVaultError                               // vault 5xx or malformed response
 	tokenLookupSkipped                                  // empty config (vault_url unset) — caller should fall back
+	tokenLookupVaultStale                               // vault unreachable, returning an entry past expiry but still inside VaultStaleGrace
 )
 
 func (s *Server) lookupTokenConfig(token string) *tokenCacheEntry {
@@ -781,6 +819,24 @@ func (s *Server) lookupTokenConfigDetailed(token string) (*tokenCacheEntry, toke
 	client := internalHTTPClient(3 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
+		// Vault unreachable. If a previously validated entry is still inside
+		// the configured grace window, return it stale so a brief vault
+		// blip doesn't translate to a 503 storm for every token-bearing
+		// client. Default grace is 30s; operators can set it to 0 to
+		// restore strict immediate invalidation. A vault that actively
+		// revoked the token (key_deleted SSE) would have already flushed
+		// this entry, so the grace path only fires when vault simply
+		// isn't answering.
+		if grace := s.cfg.Proxy.VaultStaleGrace; grace > 0 {
+			s.tokenCacheMu.RLock()
+			stale, ok := s.tokenCache[token]
+			s.tokenCacheMu.RUnlock()
+			if ok && time.Now().Before(stale.expiresAt.Add(grace)) {
+				log.Printf("[token-auth] vault unreachable, serving stale token entry (client_id=%s, expired %v ago)",
+					stale.clientID, time.Since(stale.expiresAt).Round(time.Millisecond))
+				return stale, tokenLookupVaultStale
+			}
+		}
 		return nil, tokenLookupVaultUnreachable
 	}
 	defer resp.Body.Close()
@@ -851,12 +907,16 @@ const tokenCacheMaxSize = 200
 
 // evictExpiredTokens removes tokenCache entries whose TTL has passed.
 // Called both periodically (ticker) and opportunistically from lookupTokenConfig.
+// VaultStaleGrace extends the keep-around window so that an entry stays
+// available for emergency stale-fallback during vault unreachable spells.
+// Once now is past expiresAt + grace, the entry is unconditionally dropped.
 func (s *Server) evictExpiredTokens() {
 	s.tokenCacheMu.Lock()
 	defer s.tokenCacheMu.Unlock()
 	now := time.Now()
+	grace := s.cfg.Proxy.VaultStaleGrace
 	for k, v := range s.tokenCache {
-		if now.After(v.expiresAt) {
+		if now.After(v.expiresAt.Add(grace)) {
 			delete(s.tokenCache, k)
 		}
 	}
@@ -2962,12 +3022,16 @@ func (s *Server) callLocalService(ctx context.Context, serviceID, model string, 
 	// Plugin-driven TLS trust: a plugin yaml with tls_internal_ca=true
 	// uses internalHTTPClient so the wall-vault internal CA is trusted.
 	// This lets a hub backend present a self-signed cert without the
-	// caller having to install the CA into the OS trust store.
+	// caller having to install the CA into the OS trust store. The
+	// internal-CA path keeps its own short-lived client (different root
+	// CAs can't share a pool); the default path uses the shared
+	// dispatchHTTP pool so keep-alive actually works under sustained
+	// fan-out to a single upstream host.
 	var client *http.Client
 	if plugin != nil && plugin.TLSInternalCA {
 		client = internalHTTPClient(10 * time.Minute)
 	} else {
-		client = &http.Client{Timeout: 10 * time.Minute}
+		client = s.dispatchHTTP
 	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
@@ -3002,8 +3066,7 @@ func (s *Server) doRequest(ctx context.Context, method, url string, body []byte,
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	client := &http.Client{Timeout: s.cfg.Proxy.Timeout}
-	return client.Do(req)
+	return s.dispatchHTTP.Do(req)
 }
 
 func (s *Server) getKey(service string) (*localKey, string, error) {

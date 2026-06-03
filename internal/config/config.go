@@ -101,6 +101,20 @@ type ProxyConfig struct {
 	// vault-side authn for non-loopback callers. Default off — operators
 	// opt in per host with WV_TOKEN_SENTINEL_FALLBACK=1.
 	TokenSentinelFallback bool `yaml:"token_sentinel_fallback"`
+
+	// VaultStaleGrace extends an expired tokenCache entry's usable lifetime
+	// when the vault itself is unreachable. Without it a 1-2s vault blip
+	// (restart, network flap, SSE reconnect window) makes every
+	// token-authenticated request return 503 simultaneously, and a bursty
+	// client (e.g. EconoWorld's 5s heartbeat) can pile retries into a
+	// cascading failure. With it, an entry that has been validated against
+	// vault at least once stays usable for up to VaultStaleGrace past its
+	// normal expiry — but only while vault lookups are failing. As soon as
+	// vault is reachable again, the lookup goes through normally and a
+	// key_deleted SSE event still flushes the cache instantly. Default 30s;
+	// 0 disables the grace and restores the pre-feature behaviour for
+	// operators who want strict immediate invalidation.
+	VaultStaleGrace time.Duration `yaml:"vault_stale_grace"`
 	// OAIStreamForward toggles real backend stream passthrough for
 	// oaiCompatServices clients. When off (default) the OpenAI-compatible
 	// handler keeps its v0.2.61 fake-chunk replay behaviour. When on, a
@@ -247,6 +261,9 @@ func Default() *Config {
 			EconoWorldMaxTokens:      8192,
 			EconoWorldStream:         true,
 			EconoWorldRequestTimeout: 600,
+			// 30s graceful stale window for token cache when vault is
+			// unreachable. See ProxyConfig.VaultStaleGrace docs.
+			VaultStaleGrace: 30 * time.Second,
 			// Loopback-only plain HTTP companion. Disabled (0) when TLS is
 			// off; activated when TLS is on so same-host clients that
 			// cannot honour our CA still have a path in.

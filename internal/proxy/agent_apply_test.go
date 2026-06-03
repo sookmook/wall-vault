@@ -432,3 +432,59 @@ func TestApplyEconoWorldConfig_PopulatesDirCache(t *testing.T) {
 		t.Fatalf("apply did not seed cache: got %q, want %q", got, tmp)
 	}
 }
+
+func TestIsWindowsMountPath(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/mnt/c/Users/foo/ai_config.json", true},
+		{"/mnt/d/Apps/SomeAgent/ai_config.json", true},
+		{"/mnt/e/Work/SomeAgent/ai_config.json", true},
+		{"/mnt/C/UPPER/case.json", true},
+		{"/home/user/SomeAgent/ai_config.json", false},
+		{"/tmp/whatever/ai_config.json", false},
+		{"/mnt/wsl/somewhere", false},
+		{"/mnt/cdrom/ai_config.json", false},
+		{"/mnt/", false},
+		{"/mnt/c", false},
+		{"", false},
+	}
+	for _, tc := range cases {
+		if got := isWindowsMountPath(tc.path); got != tc.want {
+			t.Errorf("isWindowsMountPath(%q) = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestHealEconoWorldConfigAt_SkipsRewriteOnWindowsMount(t *testing.T) {
+	// On a /mnt/<letter>/... path the EconoWorld client is Windows-native;
+	// it can't reach the WSL-internal :56245 plain companion, so heal must
+	// leave the operator-configured base_url alone even when
+	// localBaseOrigin is set. The field-fill legs (stream / timeout) still
+	// run so this test asserts both behaviours at once. Skipped on hosts
+	// without a writable /mnt/c (non-WSL CI runners).
+	tmp := t.TempDir()
+	winPath := "/mnt/c/" + filepath.Base(tmp) + "-ai_config.json"
+	pre := `{"openai_compatible":{"base_url":"https://localhost:56244/v1"}}`
+	if err := os.WriteFile(winPath, []byte(pre), 0644); err != nil {
+		t.Skipf("no writable /mnt/c in this env: %v", err)
+	}
+	defer os.Remove(winPath)
+	if err := healEconoWorldConfigAt(winPath, "http://127.0.0.1:56245", 8192, true, 600); err != nil {
+		t.Fatalf("heal: %v", err)
+	}
+	raw, _ := os.ReadFile(winPath)
+	var got map[string]interface{}
+	_ = json.Unmarshal(raw, &got)
+	compat, _ := got["openai_compatible"].(map[string]interface{})
+	if compat["base_url"] != "https://localhost:56244/v1" {
+		t.Fatalf("base_url should be untouched on Windows mount path, got %v", compat["base_url"])
+	}
+	if compat["stream"] != true {
+		t.Fatalf("Leg 2 (stream fill) should still run, got %v", compat["stream"])
+	}
+	if compat["request_timeout_seconds"].(float64) != 600 {
+		t.Fatalf("Leg 2 (timeout fill) should still run, got %v", compat["request_timeout_seconds"])
+	}
+}

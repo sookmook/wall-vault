@@ -8,6 +8,62 @@ wall-vault의 모든 주요 변경 사항을 기록합니다.
 
 ---
 
+## [0.2.87] — 2026-06-04
+
+### Fixed
+
+- `healEconoWorldConfigAt` now skips Leg 1 (loopback-companion URL
+  rewrite) when the config lives on a Windows mount
+  (`/mnt/<letter>/...`). Windows-native EconoWorld processes cannot
+  reach the WSL-internal `127.0.0.1:<plain_port>` companion, so the
+  previous heal silently downgraded their `base_url` to an unreachable
+  address on every proxy restart. Leg 2
+  (`stream` / `request_timeout_seconds` fill) and Leg 3 (legacy
+  `max_tokens=4096` upgrade) still run.
+- New `isWindowsMountPath` helper. Covered by `TestIsWindowsMountPath`
+  (11 cases) and `TestHealEconoWorldConfigAt_SkipsRewriteOnWindowsMount`
+  (integration leg, auto-skipped on non-WSL hosts).
+
+## [0.2.86] — 2026-06-03
+
+### Added
+
+- `Proxy.VaultStaleGrace` config (`vault_stale_grace`, default `30s`).
+  When vault is unreachable, a token cache entry stays usable for up
+  to this grace past its normal expiry. Surfaces as a new
+  `tokenLookupVaultStale` reason with a log line per fall-through. A
+  vault `key_deleted` SSE event still flushes the entry instantly.
+  Set to `0` to restore strict immediate invalidation.
+
+### Changed
+
+- `http.Server` for both the TLS proxy listener (`main.go`) and the
+  loopback plain-HTTP companion now set `ReadHeaderTimeout: 10s` and
+  `IdleTimeout: 120s`. `ReadTimeout` / `WriteTimeout` stay `0` to
+  preserve long streaming responses (Ollama cold-start, llama.cpp
+  slow generation).
+- Two shared dispatch pools (`Server.dispatchHTTP`,
+  `Server.dispatchSSEHTTP`) replace the per-call `&http.Client{}`
+  constructions in `callLocalService`, `streamLocalService`, plugin
+  streaming, and `doRequest`. Each pool uses
+  `MaxIdleConnsPerHost: 20`, `IdleConnTimeout: 120s`. The plugin
+  `TLSInternalCA` path keeps its own client (a different root CA
+  can't share a pool).
+- Ollama streaming (`stream.go`) shares the existing
+  `Server.ollamaHTTP` pool instead of building a fresh client per
+  request.
+- `evictExpiredTokens` keeps entries until
+  `expiresAt + VaultStaleGrace` so the new grace window has something
+  to fall through to.
+
+### Notes
+
+- These changes target sustained single-host dispatch — e.g. an
+  EconoWorld 5s heartbeat into a single llama.cpp upstream — where
+  Go's `http.DefaultTransport.MaxIdleConnsPerHost=2` was forcing new
+  TCP+TLS handshakes per request, accumulating TIME_WAIT and
+  occasionally stalling.
+
 ## [0.2.85] — 2026-05-22
 
 ### Added
